@@ -380,16 +380,6 @@ VectorCanvas >> frameRectangle: aRectangle borderWidth: borderWidth color: borde
 ]
 
 { #category : #'drawing - FormCanvas protocol' }
-VectorCanvas >> image: aForm at: aPoint [
-
-	"NO quiero usar imagenes en M3... ver como hacer... quizas meter un servicio en el canvas que en m2 use imagenes y en m3 no..."
-
-	self flag: #jmvVer4
-	" 	self halt"
-	"super image: aForm at: aPoint"
-]
-
-{ #category : #'drawing - FormCanvas protocol' }
 VectorCanvas >> image: aForm multipliedBy: aColor at: aPoint [
 
 	"NO quiero usar imagenes en M3... ver como hacer... quizas meter un servicio en el canvas que en m2 use imagenes y en m3 no..."
@@ -762,7 +752,7 @@ VectorCanvas >> roundBottomRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax 
 VectorCanvas >> roundRect: aRectangle color: aColor radius: r [
 
 	"For BitBltCanvas protocol, aRectangle:
-	- uses Squeak / Smalltalk-80 convention: do include topLeft, but don't include bottomRight. (too pixel oriented for M3 taste)"
+		- uses Squeak / Smalltalk-80 convention: do include topLeft, but don't include bottomRight. (too pixel oriented for M3 taste)"
 
 	self fillColor: aColor do: [ 
 		self
