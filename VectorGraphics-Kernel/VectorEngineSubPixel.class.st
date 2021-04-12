@@ -1,24 +1,7 @@
 Class {
 	#name : #VectorEngineSubPixel,
-	#superclass : #VectorEngineAbstract,
+	#superclass : #VectorEnginePixel,
 	#instVars : [
-		'edgeCounts',
-		'alphaMask',
-		'blendLeft',
-		'blendTop',
-		'blendRight',
-		'blendBottom',
-		'strokeColor',
-		'fillColor',
-		'clipLeft',
-		'clipTop',
-		'clipRight',
-		'clipBottom',
-		'prevYTruncated',
-		'auxAntiAliasingWidthScaledInverse',
-		'auxStrokeWidthDilatedHalf',
-		'auxStrokeWidthDilatedHalfSquared',
-		'auxStrokeWidthErodedHalfSquared',
 		'subPixelDelta'
 	],
 	#category : #'VectorGraphics-Kernel'
@@ -28,13 +11,6 @@ Class {
 VectorEngineSubPixel class >> defaultAntiAliasingWidth [
 
 	^ 1.4
-]
-
-{ #category : #accessing }
-VectorEngineSubPixel >> antiAliasingWidth: aNumber [
-
-	super antiAliasingWidth: aNumber.
-	auxAntiAliasingWidthScaledInverse := 127.0 / antiAliasingWidth
 ]
 
 { #category : #'private - blend with mask' }
@@ -343,22 +319,6 @@ VectorEngineSubPixel >> blendStrokeOnlyAtX: x y: y pixelIndex: pixelIndex [
 		morphIds at: pixelIndex put: currentMorphId ]
 ]
 
-{ #category : #accessing }
-VectorEngineSubPixel >> clipRect: aRectangle [
-
-	"by convention, aRectangle includes left and top but does not include right and bottom.
-	We do draw clipRight and clipBottom but not beyond.
-	"
-
-	"In targetForm coordinates"
-
-	clipLeft := aRectangle left asInteger max: 0.
-	clipTop := aRectangle top asInteger max: 0.
-	clipRight := (aRectangle right asInteger min: targetWidth) - 1.
-	clipBottom := (aRectangle bottom asInteger min: targetForm height)
-	              - 1
-]
-
 { #category : #private }
 VectorEngineSubPixel >> finishPath: ensureClosePath [
 
@@ -368,8 +328,7 @@ VectorEngineSubPixel >> finishPath: ensureClosePath [
 
 	ensureClosePath ifTrue: [ 
 		(pathFirstX = pathCurrentX and: [ pathFirstY = pathCurrentY ]) 
-			ifFalse: [ "This is actually an error condition. If we are asked to fill, then the path should be closed.
-			This is a workaround. If width > 0.0, we'll be adding a visible edge to the path." 
+			ifFalse: [ "This is actually an error condition. If we are asked to fill, then the path should be closed. 	This is a workaround. If width > 0.0, we'll be adding a visible edge to the path." 
 				self basicClosePath ] ].
 
 	blendLeft := (blendLeft - auxStrokeWidthDilatedHalf - subPixelDelta)
@@ -385,10 +344,10 @@ VectorEngineSubPixel >> finishPath: ensureClosePath [
 	morphBoundsRight := morphBoundsRight max: blendRight.
 	morphBoundsBottom := morphBoundsBottom max: blendBottom.
 
-	blendLeft < clipLeft ifTrue: [ blendLeft := clipLeft ].
-	blendTop < clipTop ifTrue: [ blendTop := clipTop ].
-	blendRight > clipRight ifTrue: [ blendRight := clipRight ].
-	blendBottom > clipBottom ifTrue: [ blendBottom := clipBottom ].
+	blendLeft := blendLeft max: clipLeft.
+	blendTop := blendTop max: clipTop.
+	blendRight := blendRight min: clipRight.
+	blendBottom := blendBottom min: clipBottom.
 
 	(blendRight >= blendLeft and: [ blendBottom >= blendTop ]) ifTrue: [ 
 		fillColor notNil
@@ -409,101 +368,6 @@ VectorEngineSubPixel >> finishPath: ensureClosePath [
 ]
 
 { #category : #private }
-VectorEngineSubPixel >> initializePath [
-
-	super initializePath.
-
-	blendLeft := targetWidth. "drawable right. Will later be refined."
-	blendTop := targetForm height. "drawable bottom. Will later be refined."
-	blendRight := 0. "drawable left. Will later be refined."
-	blendBottom := 0 "drawable top. Will later be refined."
-]
-
-{ #category : #private }
-VectorEngineSubPixel >> newTrajectoryFragment [
-
-	prevYTruncated := nil
-]
-
-{ #category : #'primitive algorithms' }
-VectorEngineSubPixel >> primArcCenterX: cx centerY: cy radiusX: rx radiusY: ry start: startAngle rotationCos: thetaCos rotationSin: thetaSin hops: hops angleDelta: d [
-
-	| angle xp yp x y |
-	angle := startAngle.
-	hops + 1 timesRepeat: [ 
-		xp := angle cos * rx.
-		yp := angle sin * ry.
-		x := thetaCos * xp - (thetaSin * yp) + cx.
-		y := thetaSin * xp + (thetaCos * yp) + cy.
-		self updateAlphasForX: x y: y.
-		self updateEdgesAndBoundsForX: x y: y.
-		angle := angle + d ]
-]
-
-{ #category : #'primitive algorithms' }
-VectorEngineSubPixel >> primCubicBezierFromX: xFrom y: yFrom toX: xTo y: yTo control1X: xControl1 y: yControl1 control2X: xControl2 y: yControl2 hops: hops [
-
-	| t oneLessT increment f2 f3 f1 f23 f4 x y |
-	t := 0.0.
-	increment := 1.0 / hops.
-	hops timesRepeat: [ 
-		oneLessT := 1.0 - t.
-		f1 := oneLessT * oneLessT * oneLessT.
-		f23 := 3 * oneLessT * t.
-		f2 := f23 * oneLessT.
-		f3 := f23 * t.
-		f4 := t * t * t.
-		x := f1 * xFrom + (f2 * xControl1) + (f3 * xControl2) + (f4 * xTo).
-		y := f1 * yFrom + (f2 * yControl1) + (f3 * yControl2) + (f4 * yTo).
-		self updateAlphasForX: x y: y.
-		self updateEdgesAndBoundsForX: x y: y.
-		t := t + increment ].
-	self updateAlphasForX: xTo y: yTo.
-	self updateEdgesAndBoundsForX: xTo y: yTo
-]
-
-{ #category : #'primitive algorithms' }
-VectorEngineSubPixel >> primLineFromX: xFrom y: yFrom toX: xTo y: yTo hops: hops incrementX: incrementX incrementY: incrementY [
-
-	| x y |
-	x := xFrom.
-	y := yFrom.
-	hops timesRepeat: [ 
-		self updateAlphasForX: x y: y.
-		self updateEdgesAndBoundsForX: x y: y.
-		x := x + incrementX.
-		y := y + incrementY ].
-	self updateAlphasForX: xTo y: yTo.
-	self updateEdgesAndBoundsForX: xTo y: yTo
-]
-
-{ #category : #'primitive algorithms' }
-VectorEngineSubPixel >> primQuadraticBezierFromX: xFrom y: yFrom toX: xTo y: yTo controlX: xControl y: yControl hops: hops [
-
-	| t oneLessT increment f2 f3 f1 x y |
-	t := 0.0.
-	increment := 1.0 / hops.
-	hops timesRepeat: [ 
-		oneLessT := 1.0 - t.
-		f1 := oneLessT * oneLessT.
-		f2 := 2 * oneLessT * t.
-		f3 := t * t.
-		x := f1 * xFrom + (f2 * xControl) + (f3 * xTo).
-		y := f1 * yFrom + (f2 * yControl) + (f3 * yTo).
-		self updateAlphasForX: x y: y.
-		self updateEdgesAndBoundsForX: x y: y.
-		t := t + increment ].
-	self updateAlphasForX: xTo y: yTo.
-	self updateEdgesAndBoundsForX: xTo y: yTo
-]
-
-{ #category : #private }
-VectorEngineSubPixel >> pvtFillColor: aFillColorOrNil [
-
-	fillColor := aFillColorOrNil
-]
-
-{ #category : #private }
 VectorEngineSubPixel >> pvtSetForm: aForm [
 
 	| s |
@@ -512,25 +376,6 @@ VectorEngineSubPixel >> pvtSetForm: aForm [
 	alphaMask := WordArray new: s.
 	edgeCounts := WordArray new: s.
 	subPixelDelta := 0.25 "Values closer to 0.333 might produce a bit of coloring on some displays. Used to be 0.28"
-]
-
-{ #category : #private }
-VectorEngineSubPixel >> pvtStrokeColor: aStrokeColorOrNil [
-
-	strokeColor := aStrokeColorOrNil
-]
-
-{ #category : #private }
-VectorEngineSubPixel >> pvtStrokeWidth: aNumber [
-
-	| swErodedHalf |
-	super pvtStrokeWidth: aNumber.
-	auxStrokeWidthDilatedHalf := strokeWidth + antiAliasingWidth * 0.5.
-	auxStrokeWidthDilatedHalfSquared := auxStrokeWidthDilatedHalf
-	                                    * auxStrokeWidthDilatedHalf.
-	swErodedHalf := strokeWidth - antiAliasingWidth * 0.5.
-	auxStrokeWidthErodedHalfSquared := swErodedHalf * swErodedHalf
-	                                   * swErodedHalf sign
 ]
 
 { #category : #'primitive algorithms - aux' }
@@ -546,20 +391,20 @@ VectorEngineSubPixel >> updateAlphasForX: x y: y [
 	| distanceToAxisSquared alpha t b l r alphaWord doUpdate dySquared dx dxSquared dy pixelIndex dxp |
 	"Compute affected rect. Honor clipRect"
 	t := (y - auxStrokeWidthDilatedHalf) truncated + 1.
-	t < clipTop ifTrue: [ t := clipTop ].
+	t := t max: clipTop.
 	b := (y + auxStrokeWidthDilatedHalf) truncated.
-	b > clipBottom ifTrue: [ b := clipBottom ].
+	b := b min: clipBottom.
 	l := (x - auxStrokeWidthDilatedHalf - subPixelDelta) truncated + 1.
-	l < clipLeft ifTrue: [ l := clipLeft ].
+	l := l max: clipLeft.
 	r := (x + auxStrokeWidthDilatedHalf + subPixelDelta) truncated.
-	r > clipRight ifTrue: [ r := clipRight ].
+	r := r min: clipRight.
 
 	t to: b do: [ :displayY | 
 		pixelIndex := displayY * targetWidth + l.
 		l to: r do: [ :displayX | 
 			pixelIndex := pixelIndex + 1.
 			alphaWord := alphaMask bytesAt: pixelIndex.
-			alphaWord = #[ 16r7F 16r7F 16r7F 16r00 ] ifFalse: [ 
+			alphaWord = #[ 16r7F 16r7F 16r7F 16r00 ] ifFalse: [ "16r007F7F7F"
 				doUpdate := false.
 				dy := displayY - y.
 				dySquared := dy * dy.
@@ -605,7 +450,7 @@ VectorEngineSubPixel >> updateAlphasForX: x y: y [
 					alpha > (alphaWord at: 1) ifTrue: [ 
 						alphaWord at: 1 put: alpha.
 						doUpdate := true ] ].
-				doUpdate ifTrue: [ alphaMask bytesAt: pixelIndex put: alphaWord ] ] "16r007F7F7F" ] ]
+				doUpdate ifTrue: [ alphaMask bytesAt: pixelIndex put: alphaWord ] ] ] ]
 ]
 
 { #category : #'primitive algorithms - aux' }

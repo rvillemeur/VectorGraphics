@@ -1953,6 +1953,27 @@ VectorEngineAbstract >> newTrajectoryFragment [
 	
 ]
 
+{ #category : #'primitive algorithms' }
+VectorEngineAbstract >> primArcCenterX: cx centerY: cy radiusX: rx radiusY: ry start: startAngle rotationCos: thetaCos rotationSin: thetaSin hops: hops angleDelta: d [
+^self subclassResponsibility 
+]
+
+{ #category : #'primitive algorithms' }
+VectorEngineAbstract >> primCubicBezierFromX: xFrom y: yFrom toX: xTo y: yTo control1X: xControl1 y: yControl1 control2X: xControl2 y: yControl2 hops: hops [
+^self subclassResponsibility 
+]
+
+{ #category : #'primitive algorithms' }
+VectorEngineAbstract >> primLineFromX: xFrom y: yFrom toX: xTo y: yTo hops: hops incrementX: incrementX incrementY: incrementY [
+
+^self subclassResponsibility 
+]
+
+{ #category : #'primitive algorithms' }
+VectorEngineAbstract >> primQuadraticBezierFromX: xFrom y: yFrom toX: xTo y: yTo controlX: xControl y: yControl hops: hops [
+	^self subclassResponsibility 
+]
+
 { #category : #private }
 VectorEngineAbstract >> pvtSetForm: aForm [
 
