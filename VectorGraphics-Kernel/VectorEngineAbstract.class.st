@@ -1896,6 +1896,11 @@ VectorEngineAbstract >> fillColor: aFillColor do: pathCommandsBlock [
 	self finishPath: true
 ]
 
+{ #category : #abstract }
+VectorEngineAbstract >> finishPath: aPath [
+^ self subclassResponsibility 
+]
+
 { #category : #accessing }
 VectorEngineAbstract >> geometryTransformation: aGeometryTransformation [
 
@@ -1949,7 +1954,7 @@ VectorEngineAbstract >> morphBoundsAfterDraw [
 
 { #category : #private }
 VectorEngineAbstract >> newTrajectoryFragment [
-
+^self subclassResponsibility 
 	
 ]
 
@@ -1974,6 +1979,11 @@ VectorEngineAbstract >> primQuadraticBezierFromX: xFrom y: yFrom toX: xTo y: yTo
 	^self subclassResponsibility 
 ]
 
+{ #category : #abstract }
+VectorEngineAbstract >> pvtFillColor: aFillColor [
+^ self subclassResponsibility 
+]
+
 { #category : #private }
 VectorEngineAbstract >> pvtSetForm: aForm [
 
@@ -1983,6 +1993,11 @@ VectorEngineAbstract >> pvtSetForm: aForm [
 	self resetMorphBounds.
 	self clipRect: targetForm boundingBox.
 	self antiAliasingWidth: self class defaultAntiAliasingWidth
+]
+
+{ #category : #abstract }
+VectorEngineAbstract >> pvtStrokeColor: aColor [
+^self subclassResponsibility 
 ]
 
 { #category : #private }
