@@ -2352,10 +2352,9 @@ VectorEngineAbstract >> strokeWidth: clientStrokeWidth color: aStrokeColor fillC
 	self pvtStrokeWidth: aStrokeWidth.
 	self pvtStrokeColor: aStrokeColor.
 	self pvtFillColor: aFillColor.
-	aStrokeWidth < antiAliasingWidth
-		ifTrue: [ "Strokes are really thin, but strokeColor is same as fillColor, so there's no problem sampling them." "See #experimentHopsPerPixel1" 
-			hopsPerPixel := 8 ]
-		ifFalse: [ hopsPerPixel := 10.0 / strokeWidth + 1 max: 2 ]. "See #experimentHopsPerPixel2. Additionally, fills require at least 2."
+	hopsPerPixel := aStrokeWidth < antiAliasingWidth
+		                ifTrue: [ 8 ]
+		                ifFalse: [ 10.0 / strokeWidth + 1 max: 2 ].
 
 	self initializePath.
 	pathCommandsBlock valueWithPossibleArgument: self.

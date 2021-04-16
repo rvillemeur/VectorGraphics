@@ -319,7 +319,7 @@ VectorEngineSubPixel >> blendStrokeOnlyAtX: x y: y pixelIndex: pixelIndex [
 		morphIds at: pixelIndex put: currentMorphId ]
 ]
 
-{ #category : #private }
+{ #category : #abstract }
 VectorEngineSubPixel >> finishPath: ensureClosePath [
 
 	"Blend stroke and/or fill over background, according to the just computed pen alphas (distance from pixel to center of stroke)"
@@ -473,8 +473,8 @@ VectorEngineSubPixel >> updateEdgeCountAtX: x y: y [
 	prevYTruncated := thisYTruncated.
 
 	"All edge count at the left of the clipRect are added there (at the left of the clipRect).
-	The effect is the same, and we need to clean up less stuff afterwards.
-	More important, it avoids trying to acess pixels outside our form, i.e. invalid array acesses."
+		The effect is the same, and we need to clean up less stuff afterwards.
+			More important, it avoids trying to acess pixels outside our form, i.e. invalid array acesses."
 	pixelIndexBase := pixelY * targetWidth.
 	redOffset := (x + subPixelDelta) truncated + 1 max: clipLeft.
 	greenOffset := x truncated + 1 max: clipLeft.

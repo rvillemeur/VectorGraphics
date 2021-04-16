@@ -222,7 +222,7 @@ VectorEngineWholePixel >> blendStrokeOnlyAtX: x y: y pixelIndex: pixelIndex [
 		morphIds at: pixelIndex put: currentMorphId ]
 ]
 
-{ #category : #private }
+{ #category : #abstract }
 VectorEngineWholePixel >> finishPath: ensureClosePath [
 
 	"Blend stroke and/or fill over background, according to the just computed pen alphas (distance from pixel to center of stroke)"
@@ -232,7 +232,7 @@ VectorEngineWholePixel >> finishPath: ensureClosePath [
 	ensureClosePath ifTrue: [ 
 		(pathFirstX = pathCurrentX and: [ pathFirstY = pathCurrentY ]) 
 			ifFalse: [ "This is actually an error condition. If we are asked to fill, then the path should be closed.
-			This is a workaround. If width > 0.0, we'll be adding a visible edge to the path." 
+							This is a workaround. If width > 0.0, we'll be adding a visible edge to the path." 
 				self basicClosePath ] ].
 
 	blendLeft := (blendLeft - auxStrokeWidthDilatedHalf) truncated + 1.
@@ -246,10 +246,10 @@ VectorEngineWholePixel >> finishPath: ensureClosePath [
 	morphBoundsRight := morphBoundsRight max: blendRight.
 	morphBoundsBottom := morphBoundsBottom max: blendBottom.
 
-	blendLeft < clipLeft ifTrue: [ blendLeft := clipLeft ].
-	blendTop < clipTop ifTrue: [ blendTop := clipTop ].
-	blendRight > clipRight ifTrue: [ blendRight := clipRight ].
-	blendBottom > clipBottom ifTrue: [ blendBottom := clipBottom ].
+	blendLeft := blendLeft max: clipLeft.
+	blendTop := blendTop max: clipTop.
+	blendRight := blendRight min: clipRight.
+	blendBottom := blendBottom min: clipBottom.
 
 	(blendRight >= blendLeft and: [ blendBottom >= blendTop ]) ifTrue: [ 
 		fillColor notNil
@@ -291,13 +291,13 @@ VectorEngineWholePixel >> updateAlphasForX: x y: y [
 	| distanceToAxisSquared alpha t b l r prevAlpha dx dy pixelIndex |
 	"Compute affected rect. Honor clipRect"
 	t := (y - auxStrokeWidthDilatedHalf) truncated + 1.
-	t < clipTop ifTrue: [ t := clipTop ].
+	t := t max: clipTop.
 	b := (y + auxStrokeWidthDilatedHalf) truncated.
-	b > clipBottom ifTrue: [ b := clipBottom ].
+	b := b min: clipBottom.
 	l := (x - auxStrokeWidthDilatedHalf) truncated + 1.
-	l < clipLeft ifTrue: [ l := clipLeft ].
+	l := l max: clipLeft.
 	r := (x + auxStrokeWidthDilatedHalf) truncated.
-	r > clipRight ifTrue: [ r := clipRight ].
+	r := r min: clipRight.
 
 	t to: b do: [ :displayY | 
 		pixelIndex := displayY * targetWidth + l.
@@ -326,24 +326,22 @@ VectorEngineWholePixel >> updateEdgesAndBoundsForX: x y: y [
 	blendTop := blendTop min: y.
 	blendRight := blendRight max: x.
 	blendBottom := blendBottom max: y.
-
-	"Compute edges intersecting with this horizontal line, for fills."
-	fillColor notNil ifTrue: [ 
-		thisYTruncated := y truncated.
-		(thisYTruncated between: clipTop - 1 and: clipBottom) ifTrue: [ 
-			prevYTruncated isNil
-				ifTrue: [ prevYTruncated := thisYTruncated ]
-				ifFalse: [ 
-					thisYTruncated = prevYTruncated ifFalse: [ "All edge count at the left of the clipRect are added there (at the left of the clipRect).
-						The effect is the same, and we need to clean up less stuff afterwards.
-						More important, it avoids trying to acess pixels outside our form, i.e. invalid array acesses."
-						pixelX := x truncated + 1 max: clipLeft.
-						pixelX <= clipRight ifTrue: [ 
-							pixelY := thisYTruncated max: prevYTruncated.
-							increment := (thisYTruncated - prevYTruncated) sign.
-							pixelIndex := pixelY * targetWidth + pixelX + 1.
-							count := edgeCounts at: pixelIndex.
-							count := count + increment bitAnd: 16rFF.
-							edgeCounts at: pixelIndex put: count ].
-						prevYTruncated := thisYTruncated ] ] ] ]
+	fillColor notNil ifFalse: [ ^ self ].
+	thisYTruncated := y truncated.
+	(thisYTruncated between: clipTop - 1 and: clipBottom) ifTrue: [ 
+		prevYTruncated
+			ifNil: [ prevYTruncated := thisYTruncated ]
+			ifNotNil: [ 
+				thisYTruncated = prevYTruncated ifFalse: [ "All edge count at the left of the clipRect are added there (at the left of the clipRect).
+											The effect is the same, and we need to clean up less stuff afterwards.
+												More important, it avoids trying to acess pixels outside our form, i.e. invalid array acesses."
+					pixelX := x truncated + 1 max: clipLeft.
+					pixelX <= clipRight ifTrue: [ 
+						pixelY := thisYTruncated max: prevYTruncated.
+						increment := (thisYTruncated - prevYTruncated) sign.
+						pixelIndex := pixelY * targetWidth + pixelX + 1.
+						count := edgeCounts at: pixelIndex.
+						count := count + increment bitAnd: 16rFF.
+						edgeCounts at: pixelIndex put: count ].
+					prevYTruncated := thisYTruncated ] ] ]
 ]
