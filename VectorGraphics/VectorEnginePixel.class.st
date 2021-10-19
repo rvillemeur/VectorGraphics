@@ -20,7 +20,7 @@ Class {
 		'auxStrokeWidthDilatedHalfSquared',
 		'auxStrokeWidthErodedHalfSquared'
 	],
-	#category : #'VectorGraphics-Kernel'
+	#category : #'VectorGraphics-kernel'
 }
 
 { #category : #accessing }

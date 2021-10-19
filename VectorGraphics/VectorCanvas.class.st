@@ -22,7 +22,7 @@ Class {
 		'clippingMorphDisplayBounds',
 		'currentTransformation'
 	],
-	#category : #'VectorGraphics-Kernel'
+	#category : #'VectorGraphics-kernel'
 }
 
 { #category : #'class initialization' }

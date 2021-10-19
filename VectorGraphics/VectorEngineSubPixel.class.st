@@ -4,7 +4,7 @@ Class {
 	#instVars : [
 		'subPixelDelta'
 	],
-	#category : #'VectorGraphics-Kernel'
+	#category : #'VectorGraphics-kernel'
 }
 
 { #category : #'instance creation' }

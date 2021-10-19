@@ -7,7 +7,7 @@ Class {
 	#instVars : [
 		'auxStrokeWidthDilatedHalf'
 	],
-	#category : #'VectorGraphics-Kernel'
+	#category : #'VectorGraphics-kernel'
 }
 
 { #category : #'instance creation' }

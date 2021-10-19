@@ -5,7 +5,7 @@ edgeCounts and alphaMask are single byte per pixel.
 Class {
 	#name : #VectorEngineWholePixel,
 	#superclass : #VectorEnginePixel,
-	#category : #'VectorGraphics-Kernel'
+	#category : #'VectorGraphics-kernel'
 }
 
 { #category : #'instance creation' }
@@ -305,10 +305,10 @@ VectorEngineWholePixel >> updateAlphasForX: x y: y [
 		l to: r do: [ :displayX | 
 			pixelIndex := pixelIndex + 1.
 			prevAlpha := alphaMask at: pixelIndex.
-			prevAlpha = 16r7F ifFalse: [ 
+			prevAlpha = 16r7F ifFalse: [ "le précédent alpha était déjà dans la zone w-r"
 				dx := displayX - x.
-				distanceToAxisSquared := dx * dx + (dy * dy).
-				distanceToAxisSquared < auxStrokeWidthDilatedHalfSquared ifTrue: [ 
+				distanceToAxisSquared := dx * dx + (dy * dy). "pythagore, square distance"
+				distanceToAxisSquared < auxStrokeWidthDilatedHalfSquared "we are in the area to be colorred "ifTrue: [ 
 					alpha := distanceToAxisSquared <= auxStrokeWidthErodedHalfSquared
 						         ifTrue: [ 16r7F ]
 						         ifFalse: [ 
