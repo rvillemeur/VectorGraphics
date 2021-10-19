@@ -9,8 +9,6 @@ BaselineOfVectorGraphics >> baseline: spec [
 	<baseline>
 	spec for: #common do: [ spec
 
-		package: 'VectorGraphics-Kernel';
-		package: 'VectorGraphics-PathCommands';
-		package: 'VectorGraphics-TrueType'.
+		package: 'VectorGraphics'.
 ]
 ]
