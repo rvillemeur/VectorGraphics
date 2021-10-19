@@ -1,8 +1,48 @@
+"
+I'm the main class for Vector painting and drawing 
+
+This a quick summary to Juan Manuel Vuletich paper, with concrete element used in the code highlighted
+
+# assumption and model used
+The model use:
+- A line with a width **W** - **strokeWidth** in this class, and a color
+- The destination frame buffer, targetForm
+- a filter size parameter **r** - **antiAliasingWidth** in this class, the distance of the transition between transparent to opaque.
+- a prefiltering pen: a pen with an opaque center and translucent border. The area under the opacity function is the same as the line, and equals **strokeWidth**
+- An auxiliary distance buffer, with the same extent as the destination. It is needed to store for each pixel in the destination a number. **alphaMask ??**
+
+
+The value of the anti aliasing width can vary between 1 (very crisp, some jaggies are visible) to 2 (very soft, absolutely no jaggies or aliasing). 
+
+the transition from transparent to opaque is gradual, leading to a translucent stripe of width **antiAliasingWidth** at each border of the line drawn by the pen
+
+Each point can be seen as the center of a circle, with the following radius:
+- opaque radius: strokeWidth - antiAliasingWidth
+- translucent radius: strokeWidth
+- transparent radius: strokeWidth + antiAliasingWidth
+- jumps between each points: **hops**
+
+
+# algorithm
+The algorithm for drawing the Outline of a Shape is as follows:
+1. The Destination starts filled with whatever background we need to draw on top of. The distance buffer is assumed to be initially filled with 'infinite' (in practice, any sufficiently large value will do).
+
+2. The algorithm continues by following the trajectory specified by the outline. This is done in discrete steps or jumps (**hops**). At each step, the pen is moved to a new point in the trajectory, jumping by a fraction of a pixel. A step of about 1/4 of a pixel is small enough. => method _primLineFrom: aPoint1 to: aPoint2 hops: hops increment: aPoint3_ and other prim method
+
+3. For each step, the pen is at some point. The possibly affected pixels are in the circle defined by the pen outer diameter (w+r). For each of these pixels, the euclidean distance from the pixel center to the pen center is computed. This distance is stored in the distance buffer if it is less that the value already there. => method _updateAlphasFor: aPoint_ and _updateEdgesAndBoundsForX: x y: y_
+
+4. When the pen has finished following the prescribed trajectory, the distance buffer contains, for each pixel, the minimum distance d to the trajectory. The opacity value is obtained by evaluating the opacity function of the filtering pen at distance d. This opacity value is used to alpha-blend the shape color over the destination frame buffer. Afterwards, the distance buffer is filled with infinite, to be ready for the next call
+"
 Class {
 	#name : #VectorEngine,
 	#superclass : #Object,
 	#instVars : [
-		'targetForm'
+		'targetForm',
+		'strokeWidth',
+		'antiAliasingWidth',
+		'strokeWidthDilatedHalf',
+		'strokeWidthDilatedHalfSquared',
+		'strokeWidthErodedHalfSquared'
 	],
 	#category : #'VectorGraphics-kernel'
 }
@@ -17,6 +57,12 @@ VectorEngine class >> defaultAntiAliasingWidth [
 VectorEngine class >> onForm: aForm [
 
 	^ self new initializeOnForm: aForm
+]
+
+{ #category : #accessing }
+VectorEngine >> antiAliasingWidth: aNumber [
+
+	antiAliasingWidth := aNumber
 ]
 
 { #category : #initialization }
@@ -45,6 +91,63 @@ VectorEngine >> primLineFrom: aPoint1 to: aPoint2 hops: hops increment: aPoint3 
 VectorEngine >> pvtSetForm: aForm [
 
 	targetForm := aForm.
+]
+
+{ #category : #private }
+VectorEngine >> pvtStrokeWidth: aNumber [
+
+	| swErodedHalf translucentRadius transparentRadius |
+	strokeWidth := aNumber.
+	transparentRadius := strokeWidth + antiAliasingWidth.
+	translucentRadius := strokeWidth - antiAliasingWidth.
+
+	strokeWidthDilatedHalf := transparentRadius * 0.5.
+	strokeWidthDilatedHalfSquared := strokeWidthDilatedHalf squared.
+	swErodedHalf := translucentRadius * 0.5.
+	strokeWidthErodedHalfSquared := swErodedHalf squared
+	                                * swErodedHalf sign
+]
+
+{ #category : #'primitive algorithms - aux' }
+VectorEngine >> updateAlphasFor: aPoint [
+
+	"slight optimization possible when we know width = 0... perhaps implement: 
+			-we know palpha is never 127 
+			- we know distanceToEdge is always > erodedHalfWidth. 
+				In smalltalk, performance icrease 1.5%. Perhaps in c/asm it is more than that... 
+					Mas importante: 		Cuando width es medio grande, entonces dibujar la bolita rellena de entrada es importante... en los casos en que no necesito calcular la distancia"
+
+	| x y distanceToAxisSquared alpha t b l r prevAlpha dx dy pixelIndex  clipTop clipBottom clipLeft clipRight targetWidth alphaMask  auxAntiAliasingWidthScaledInverse |
+	"Compute affected rect. Honor clipRect"
+	x := aPoint x.
+	y := aPoint y.
+	
+	t := (y - strokeWidthDilatedHalf) truncated + 1.
+	t := t max: clipTop.
+	b := (y + strokeWidthDilatedHalf) truncated.
+	b := b min: clipBottom.
+	l := (x - strokeWidthDilatedHalf) truncated + 1.
+	l := l max: clipLeft.
+	r := (x + strokeWidthDilatedHalf) truncated.
+	r := r min: clipRight.
+
+	t to: b do: [ :displayY | 
+		pixelIndex := displayY * targetWidth + l.
+		dy := displayY - y.
+		l to: r do: [ :displayX | 
+			pixelIndex := pixelIndex + 1.
+			prevAlpha := alphaMask at: pixelIndex.
+			prevAlpha = 16r7F ifFalse: [ "le précédent alpha était déjà dans la zone w-r"
+				dx := displayX - x.
+				distanceToAxisSquared := dx * dx + (dy * dy). "pythagore, square distance"
+				distanceToAxisSquared < strokeWidthDilatedHalfSquared "we are in the area to be colorred "ifTrue: [ 
+					alpha := distanceToAxisSquared <= strokeWidthErodedHalfSquared
+						         ifTrue: [ 16r7F ]
+						         ifFalse: [ 
+							         (strokeWidthDilatedHalf
+							          - distanceToAxisSquared sqrt
+							          * auxAntiAliasingWidthScaledInverse) rounded ].
+					alpha > prevAlpha ifTrue: [ alphaMask at: pixelIndex put: alpha ] ] ] ] ]
 ]
 
 { #category : #'primitive algorithms - aux' }
