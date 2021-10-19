@@ -1912,7 +1912,7 @@ VectorEngineAbstract >> geometryTransformation: aGeometryTransformation [
 { #category : #private }
 VectorEngineAbstract >> initializeOnForm: aForm [
 
-	geometryTransformation := MorphicTranslation new. "Identity"
+	"geometryTransformation := MorphicTranslation new." "Identity"
 	clippingMorphId := 0.
 	currentMorphId := 0.
 	self pvtSetForm: aForm

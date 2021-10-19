@@ -100,6 +100,23 @@ VectorEnginePixel >> primCubicBezierFromX: xFrom y: yFrom toX: xTo y: yTo contro
 ]
 
 { #category : #'primitive algorithms' }
+VectorEnginePixel >> primLineFrom: aPoint1 to: aPoint2 hops: hops increment: aPoint3 [
+
+	| x y stepX stepY line|
+	x := aPoint1 x.
+	y := aPoint1 y.
+	stepX := aPoint3 x.
+	stepY := aPoint3 y.
+	line := OrderedCollection new.
+	hops timesRepeat: [ 
+		line add: x@y.
+		x := x + stepX.
+		y := y + stepY ].
+	line add: aPoint2.
+	^line
+]
+
+{ #category : #'primitive algorithms' }
 VectorEnginePixel >> primLineFromX: xFrom y: yFrom toX: xTo y: yTo hops: hops incrementX: incrementX incrementY: incrementY [
 
 	| x y |
