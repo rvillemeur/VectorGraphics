@@ -146,7 +146,7 @@ VectorEngine >> updateAlphasFor: aPoint [
 				In smalltalk, performance icrease 1.5%. Perhaps in c/asm it is more than that... 
 					Mas importante: 		Cuando width es medio grande, entonces dibujar la bolita rellena de entrada es importante... en los casos en que no necesito calcular la distancia"
 
-	| x y drawingArea distanceToAxisSquared alpha prevAlpha dx dy pixelIndex    |
+	| x y drawingArea distanceToAxisSquared alpha prevAlpha deltaX deltaY pixelIndex    |
 	x := aPoint x.
 	y := aPoint y.
 	
@@ -154,14 +154,14 @@ VectorEngine >> updateAlphasFor: aPoint [
 
 	drawingArea top to: drawingArea bottom do: [ :displayY | 
 		pixelIndex := displayY * (targetForm width) + drawingArea left.
-		dy := displayY - y.
+		deltaY := displayY - y.
 		drawingArea left to: drawingArea right do: [ :displayX | 
 			pixelIndex := pixelIndex + 1.
 			prevAlpha := alphaMask at: pixelIndex.
 			prevAlpha = 16r7F ifFalse: [ "le précédent alpha était déjà dans la zone w-r"
-				dx := displayX - x.
-				distanceToAxisSquared := dx squared + dy squared. "pythagore, square distance"
-				distanceToAxisSquared < halfTransparentRadiusSquared "we are in the area to be colorred "ifTrue: [ 
+				deltaX := displayX - x.
+				distanceToAxisSquared := deltaX squared + deltaY squared.
+				distanceToAxisSquared < halfTransparentRadiusSquared ifTrue: [ 
 					alpha := distanceToAxisSquared <= halfTranslucentRadiusSquared
 						         ifTrue: [ 16r7F ]
 						         ifFalse: [ 
