@@ -5,6 +5,18 @@ Class {
 }
 
 { #category : #tests }
+VectorEngineTest >> testDrawingArea [
+|engine area|
+
+engine := VectorEngine onForm: (Form extent: 10@10 depth: 32).
+engine antiAliasingWidth: 1.5.
+engine pvtStrokeWidth: 2.
+area :=  engine drawingAreaOf: 3@3
+
+
+]
+
+{ #category : #tests }
 VectorEngineTest >> testPrimLines [
 |engine line|
 

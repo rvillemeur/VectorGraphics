@@ -9,7 +9,7 @@ The model use:
 - The destination frame buffer, targetForm
 - a filter size parameter **r** - **antiAliasingWidth** in this class, the distance of the transition between transparent to opaque.
 - a prefiltering pen: a pen with an opaque center and translucent border. The area under the opacity function is the same as the line, and equals **strokeWidth**
-- An auxiliary distance buffer, with the same extent as the destination. It is needed to store for each pixel in the destination a number. **alphaMask ??**
+- An auxiliary distance buffer, with the same extent as the destination. It is needed to store for each pixel in the destination a number. **alphaMask and edgeCounts??**
 
 
 The value of the anti aliasing width can vary between 1 (very crisp, some jaggies are visible) to 2 (very soft, absolutely no jaggies or aliasing). 
@@ -40,9 +40,12 @@ Class {
 		'targetForm',
 		'strokeWidth',
 		'antiAliasingWidth',
-		'strokeWidthDilatedHalf',
-		'strokeWidthDilatedHalfSquared',
-		'strokeWidthErodedHalfSquared'
+		'auxAntiAliasingWidthScaledInverse',
+		'halfTransparentRadius',
+		'halfTransparentRadiusSquared',
+		'halfTranslucentRadiusSquared',
+		'alphaMask',
+		'edgeCounts'
 	],
 	#category : #'VectorGraphics-kernel'
 }
@@ -62,7 +65,29 @@ VectorEngine class >> onForm: aForm [
 { #category : #accessing }
 VectorEngine >> antiAliasingWidth: aNumber [
 
-	antiAliasingWidth := aNumber
+	antiAliasingWidth := aNumber.
+	auxAntiAliasingWidthScaledInverse := 127.0 / antiAliasingWidth
+]
+
+{ #category : #'as yet unclassified' }
+VectorEngine >> drawingAreaOf: aPoint [
+
+	"Compute affected rect. Honor clipRect"
+
+	| top bottom left right |
+	top := (aPoint y - halfTransparentRadius) truncated + 1.
+	top := top max: 0.
+	bottom := (aPoint y + halfTransparentRadius) truncated.
+	bottom := bottom min: targetForm height.
+	left := (aPoint x - halfTransparentRadius) truncated + 1.
+	left := left max: 0.
+	right := (aPoint x + halfTransparentRadius) truncated.
+	right := right min: targetForm width.
+	^ Rectangle
+		  left: left
+		  right: right
+		  top: top
+		  bottom: bottom
 ]
 
 { #category : #initialization }
@@ -89,23 +114,27 @@ VectorEngine >> primLineFrom: aPoint1 to: aPoint2 hops: hops increment: aPoint3 
 
 { #category : #private }
 VectorEngine >> pvtSetForm: aForm [
-
+|s|
 	targetForm := aForm.
+	
+	s := targetForm width * targetForm height.
+	alphaMask := ByteArray new: s.
+	edgeCounts := ByteArray new: s
 ]
 
 { #category : #private }
 VectorEngine >> pvtStrokeWidth: aNumber [
 
-	| swErodedHalf translucentRadius transparentRadius |
+	| halfTranslucentRadius translucentRadius transparentRadius |
 	strokeWidth := aNumber.
 	transparentRadius := strokeWidth + antiAliasingWidth.
 	translucentRadius := strokeWidth - antiAliasingWidth.
 
-	strokeWidthDilatedHalf := transparentRadius * 0.5.
-	strokeWidthDilatedHalfSquared := strokeWidthDilatedHalf squared.
-	swErodedHalf := translucentRadius * 0.5.
-	strokeWidthErodedHalfSquared := swErodedHalf squared
-	                                * swErodedHalf sign
+	halfTransparentRadius := transparentRadius / 2.
+	halfTransparentRadiusSquared := halfTransparentRadius squared.
+	halfTranslucentRadius := translucentRadius * 0.5.
+	halfTranslucentRadiusSquared := halfTranslucentRadius squared
+	                                * halfTranslucentRadius sign
 ]
 
 { #category : #'primitive algorithms - aux' }
@@ -117,34 +146,26 @@ VectorEngine >> updateAlphasFor: aPoint [
 				In smalltalk, performance icrease 1.5%. Perhaps in c/asm it is more than that... 
 					Mas importante: 		Cuando width es medio grande, entonces dibujar la bolita rellena de entrada es importante... en los casos en que no necesito calcular la distancia"
 
-	| x y distanceToAxisSquared alpha t b l r prevAlpha dx dy pixelIndex  clipTop clipBottom clipLeft clipRight targetWidth alphaMask  auxAntiAliasingWidthScaledInverse |
-	"Compute affected rect. Honor clipRect"
+	| x y drawingArea distanceToAxisSquared alpha prevAlpha dx dy pixelIndex    |
 	x := aPoint x.
 	y := aPoint y.
 	
-	t := (y - strokeWidthDilatedHalf) truncated + 1.
-	t := t max: clipTop.
-	b := (y + strokeWidthDilatedHalf) truncated.
-	b := b min: clipBottom.
-	l := (x - strokeWidthDilatedHalf) truncated + 1.
-	l := l max: clipLeft.
-	r := (x + strokeWidthDilatedHalf) truncated.
-	r := r min: clipRight.
+ 	drawingArea := self drawingAreaOf: aPoint.
 
-	t to: b do: [ :displayY | 
-		pixelIndex := displayY * targetWidth + l.
+	drawingArea top to: drawingArea bottom do: [ :displayY | 
+		pixelIndex := displayY * (targetForm width) + drawingArea left.
 		dy := displayY - y.
-		l to: r do: [ :displayX | 
+		drawingArea left to: drawingArea right do: [ :displayX | 
 			pixelIndex := pixelIndex + 1.
 			prevAlpha := alphaMask at: pixelIndex.
 			prevAlpha = 16r7F ifFalse: [ "le précédent alpha était déjà dans la zone w-r"
 				dx := displayX - x.
-				distanceToAxisSquared := dx * dx + (dy * dy). "pythagore, square distance"
-				distanceToAxisSquared < strokeWidthDilatedHalfSquared "we are in the area to be colorred "ifTrue: [ 
-					alpha := distanceToAxisSquared <= strokeWidthErodedHalfSquared
+				distanceToAxisSquared := dx squared + dy squared. "pythagore, square distance"
+				distanceToAxisSquared < halfTransparentRadiusSquared "we are in the area to be colorred "ifTrue: [ 
+					alpha := distanceToAxisSquared <= halfTranslucentRadiusSquared
 						         ifTrue: [ 16r7F ]
 						         ifFalse: [ 
-							         (strokeWidthDilatedHalf
+							         (halfTransparentRadius
 							          - distanceToAxisSquared sqrt
 							          * auxAntiAliasingWidthScaledInverse) rounded ].
 					alpha > prevAlpha ifTrue: [ alphaMask at: pixelIndex put: alpha ] ] ] ] ]
