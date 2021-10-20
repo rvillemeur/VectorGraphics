@@ -2,6 +2,8 @@
 I'm the main class for Vector painting and drawing 
 
 This a quick summary to Juan Manuel Vuletich paper, with concrete element used in the code highlighted
+The main paper is available at: [Prefiltering Antialiasing for General Vector Graphics](https://www.researchgate.net/publication/267152327_Prefiltering_Antialiasing_for_General_Vector_Graphics)
+More information are available on [juan manuel vuletich web site](https://jvuletich.org/Morphic3/Morphic3-201006.html)
 
 # assumption and model used
 The model use:
@@ -17,10 +19,16 @@ The value of the anti aliasing width can vary between 1 (very crisp, some jaggie
 the transition from transparent to opaque is gradual, leading to a translucent stripe of width **antiAliasingWidth** at each border of the line drawn by the pen
 
 Each point can be seen as the center of a circle, with the following radius:
-- opaque radius: strokeWidth - antiAliasingWidth
-- translucent radius: strokeWidth
-- transparent radius: strokeWidth + antiAliasingWidth
+- opaque radius: strokeWidth - antiAliasingWidth.
+- translucent radius: strokeWidth - alpha mask of 
+- tranparent radius: strokeWidth + antiAliasingWidth.
 - jumps between each points: **hops**
+
+Opacity if managed through the Alpha mask  channel.
+As a reminder:
+alpha mask = 16r00 -> completely opaque
+alpha mask = 16rff -> completely transparent
+alpha mask = 16r7f -> In between, this is the value used between opaque and translucent radius
 
 
 # algorithm
@@ -64,17 +72,17 @@ VectorEngine class >> onForm: aForm [
 
 { #category : #'as yet unclassified' }
 VectorEngine >> alphaValueAtDistance: deltaX and: deltaY [
-|distanceToAxisSquared alpha|
-distanceToAxisSquared := deltaX squared + deltaY squared.
-				distanceToAxisSquared < halfTransparentRadiusSquared ifTrue: [ 
-					alpha := distanceToAxisSquared <= halfTranslucentRadiusSquared
-						         ifTrue: [ 16r7F ]
-						         ifFalse: [ 
-							         (halfTransparentRadius
-							          - distanceToAxisSquared sqrt
-							          * auxAntiAliasingWidthScaledInverse) rounded ]].
-						
-					^alpha
+
+	| distanceToAxisSquared alpha |
+	distanceToAxisSquared := deltaX squared + deltaY squared.
+	distanceToAxisSquared < halfTransparentRadiusSquared ifTrue: [ 
+		alpha := distanceToAxisSquared <= halfTranslucentRadiusSquared
+			         ifTrue: [ 16r7F ]
+			         ifFalse: [ 
+				         (halfTransparentRadius - distanceToAxisSquared sqrt
+				          * auxAntiAliasingWidthScaledInverse) rounded ] ].
+
+	^ alpha
 ]
 
 { #category : #accessing }

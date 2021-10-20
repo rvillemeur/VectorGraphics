@@ -9,11 +9,27 @@ VectorEngineTest >> testDrawingArea [
 |engine area|
 
 engine := VectorEngine onForm: (Form extent: 10@10 depth: 32).
-engine antiAliasingWidth: 1.5.
-engine pvtStrokeWidth: 2.
-area :=  engine drawingAreaOf: 3@3
+engine antiAliasingWidth: 2.
+engine pvtStrokeWidth: 4.
+"top left corner"
+area :=  engine drawingAreaOf: 0@0.
+self assert: area closeTo: (Rectangle origin: 0@0 corner: 3@3).
 
+"bottom right corner"
+area := engine drawingAreaOf: 10@10.
+self assert: area closeTo: (Rectangle origin: 8@8 corner:10@10).
 
+"middle of the form"
+area := engine drawingAreaOf: 5@5.
+self assert: area closeTo: (Rectangle origin: 3@3 corner: 8@8).
+
+"left center"
+area := engine drawingAreaOf: 0@5.
+self assert: area closeTo: (Rectangle origin: 0@3 corner:3@8).
+
+"right center"
+area := engine drawingAreaOf: 10@5.
+self assert: area closeTo: (Rectangle origin: 8@3 corner:10@8).
 ]
 
 { #category : #tests }
