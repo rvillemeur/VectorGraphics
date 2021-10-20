@@ -62,6 +62,21 @@ VectorEngine class >> onForm: aForm [
 	^ self new initializeOnForm: aForm
 ]
 
+{ #category : #'as yet unclassified' }
+VectorEngine >> alphaValueAtDistance: deltaX and: deltaY [
+|distanceToAxisSquared alpha|
+distanceToAxisSquared := deltaX squared + deltaY squared.
+				distanceToAxisSquared < halfTransparentRadiusSquared ifTrue: [ 
+					alpha := distanceToAxisSquared <= halfTranslucentRadiusSquared
+						         ifTrue: [ 16r7F ]
+						         ifFalse: [ 
+							         (halfTransparentRadius
+							          - distanceToAxisSquared sqrt
+							          * auxAntiAliasingWidthScaledInverse) rounded ]].
+						
+					^alpha
+]
+
 { #category : #accessing }
 VectorEngine >> antiAliasingWidth: aNumber [
 
@@ -146,29 +161,22 @@ VectorEngine >> updateAlphasFor: aPoint [
 				In smalltalk, performance icrease 1.5%. Perhaps in c/asm it is more than that... 
 					Mas importante: 		Cuando width es medio grande, entonces dibujar la bolita rellena de entrada es importante... en los casos en que no necesito calcular la distancia"
 
-	| x y drawingArea distanceToAxisSquared alpha prevAlpha deltaX deltaY pixelIndex    |
+	| x y drawingArea alpha prevAlpha deltaX deltaY pixelIndex |
 	x := aPoint x.
 	y := aPoint y.
-	
- 	drawingArea := self drawingAreaOf: aPoint.
+
+	drawingArea := self drawingAreaOf: aPoint.
 
 	drawingArea top to: drawingArea bottom do: [ :displayY | 
-		pixelIndex := displayY * (targetForm width) + drawingArea left.
+		pixelIndex := displayY * targetForm width + drawingArea left.
 		deltaY := displayY - y.
 		drawingArea left to: drawingArea right do: [ :displayX | 
 			pixelIndex := pixelIndex + 1.
 			prevAlpha := alphaMask at: pixelIndex.
 			prevAlpha = 16r7F ifFalse: [ "le précédent alpha était déjà dans la zone w-r"
 				deltaX := displayX - x.
-				distanceToAxisSquared := deltaX squared + deltaY squared.
-				distanceToAxisSquared < halfTransparentRadiusSquared ifTrue: [ 
-					alpha := distanceToAxisSquared <= halfTranslucentRadiusSquared
-						         ifTrue: [ 16r7F ]
-						         ifFalse: [ 
-							         (halfTransparentRadius
-							          - distanceToAxisSquared sqrt
-							          * auxAntiAliasingWidthScaledInverse) rounded ].
-					alpha > prevAlpha ifTrue: [ alphaMask at: pixelIndex put: alpha ] ] ] ] ]
+				alpha := self alphaValueAtDistance: deltaX and: deltaY.
+				alpha > prevAlpha ifTrue: [ alphaMask at: pixelIndex put: alpha ] ] ] ]
 ]
 
 { #category : #'primitive algorithms - aux' }
