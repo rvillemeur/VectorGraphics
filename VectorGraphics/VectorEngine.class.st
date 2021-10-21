@@ -53,7 +53,8 @@ Class {
 		'halfTransparentRadiusSquared',
 		'halfTranslucentRadiusSquared',
 		'alphaMask',
-		'edgeCounts'
+		'edgeCounts',
+		'fillColor'
 	],
 	#category : #'VectorGraphics-kernel'
 }
@@ -80,7 +81,7 @@ VectorEngine >> alphaValueAtDistance: deltaX and: deltaY [
 			         ifTrue: [ 16r7F ]
 			         ifFalse: [ 
 				         (halfTransparentRadius - distanceToAxisSquared sqrt
-				          * auxAntiAliasingWidthScaledInverse) rounded ] ].
+				          * auxAntiAliasingWidthScaledInverse) rounded ] ] ifFalse:[alpha := 16r0].
 
 	^ alpha
 ]
@@ -162,59 +163,21 @@ VectorEngine >> pvtStrokeWidth: aNumber [
 
 { #category : #'primitive algorithms - aux' }
 VectorEngine >> updateAlphasFor: aPoint [
-	| drawingArea alpha prevAlpha deltaX deltaY pixelIndex |
+	| drawingArea alpha  prevAlpha deltaX deltaY pixelIndex |
 
 	drawingArea := self drawingAreaOf: aPoint.
 
-	drawingArea top to: drawingArea bottom do: [ :displayY | 
+	drawingArea top to: drawingArea bottom do: [ :displayY |
 		pixelIndex := displayY * targetForm width + drawingArea left.
 		deltaY := displayY - aPoint y.
-		drawingArea left to: drawingArea right do: [ :displayX | 
+		drawingArea left to: drawingArea right do: [ :displayX |
 			pixelIndex := pixelIndex + 1.
 			prevAlpha := alphaMask at: pixelIndex.
-			prevAlpha = 16r7F ifFalse: [
+			prevAlpha = 16r7F ifFalse: [  
 				deltaX := displayX - aPoint x.
 				alpha := self alphaValueAtDistance: deltaX and: deltaY.
-				alpha > prevAlpha ifTrue: [ alphaMask at: pixelIndex put: alpha ] ] ] ]
-]
-
-{ #category : #'primitive algorithms - aux' }
-VectorEngine >> updateAlphasForX: x y: y [
-
-	"slight optimization possible when we know width = 0... perhaps implement: 
-			-we know palpha is never 127 
-			- we know distanceToEdge is always > erodedHalfWidth. 
-				In smalltalk, performance icrease 1.5%. Perhaps in c/asm it is more than that... 
-					Mas importante: 		Cuando width es medio grande, entonces dibujar la bolita rellena de entrada es importante... en los casos en que no necesito calcular la distancia"
-
-	| distanceToAxisSquared alpha t b l r prevAlpha dx dy pixelIndex auxStrokeWidthDilatedHalf clipTop clipBottom clipLeft clipRight targetWidth alphaMask auxStrokeWidthDilatedHalfSquared auxStrokeWidthErodedHalfSquared auxAntiAliasingWidthScaledInverse |
-	"Compute affected rect. Honor clipRect"
-	t := (y - auxStrokeWidthDilatedHalf) truncated + 1.
-	t := t max: clipTop.
-	b := (y + auxStrokeWidthDilatedHalf) truncated.
-	b := b min: clipBottom.
-	l := (x - auxStrokeWidthDilatedHalf) truncated + 1.
-	l := l max: clipLeft.
-	r := (x + auxStrokeWidthDilatedHalf) truncated.
-	r := r min: clipRight.
-
-	t to: b do: [ :displayY | 
-		pixelIndex := displayY * targetWidth + l.
-		dy := displayY - y.
-		l to: r do: [ :displayX | 
-			pixelIndex := pixelIndex + 1.
-			prevAlpha := alphaMask at: pixelIndex.
-			prevAlpha = 16r7F ifFalse: [ "le précédent alpha était déjà dans la zone w-r"
-				dx := displayX - x.
-				distanceToAxisSquared := dx * dx + (dy * dy). "pythagore, square distance"
-				distanceToAxisSquared < auxStrokeWidthDilatedHalfSquared "we are in the area to be colorred "ifTrue: [ 
-					alpha := distanceToAxisSquared <= auxStrokeWidthErodedHalfSquared
-						         ifTrue: [ 16r7F ]
-						         ifFalse: [ 
-							         (auxStrokeWidthDilatedHalf
-							          - distanceToAxisSquared sqrt
-							          * auxAntiAliasingWidthScaledInverse) rounded ].
-					alpha > prevAlpha ifTrue: [ alphaMask at: pixelIndex put: alpha ] ] ] ] ]
+				alpha > prevAlpha ifTrue: [ alphaMask at: pixelIndex put: alpha ] ] ] ].
+	^alphaMask
 ]
 
 { #category : #'primitive algorithms - aux' }

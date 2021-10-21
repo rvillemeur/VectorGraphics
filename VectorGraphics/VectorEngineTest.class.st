@@ -5,6 +5,28 @@ Class {
 }
 
 { #category : #tests }
+VectorEngineTest >> testAlphaMasks [
+|engine alphaMask|
+
+engine := VectorEngine onForm: (Form extent: 10@10 depth: 32).
+engine antiAliasingWidth: 2.
+engine pvtStrokeWidth: 4.
+
+"alpha value decrease as the distance to the center increase, once we go over the opaque section
+alphaMask are distributed on a circle centered around the position"
+
+alphaMask := engine updateAlphasFor:5@5.
+self assert: (alphaMask  at: 55) equals: 16r7F.
+self assert: (alphaMask  at: 36) equals: 16r40.
+self assert: (alphaMask  at: 47) equals: 16r65.
+self assert: (alphaMask  at: 33) equals: 16r0.
+self assert: (alphaMask  at: 79) equals: 16r0.
+self assert: (alphaMask  at: 52) equals: 16r0.
+self assert: (alphaMask  at: 59) equals: 16r0.
+
+]
+
+{ #category : #tests }
 VectorEngineTest >> testAlphaValue [
 |engine alpha|
 
@@ -45,6 +67,9 @@ alpha := engine alphaValueAtDistance: -2 and:  -2.
 self assert: alpha equals: 16rB.
 
 alpha := engine alphaValueAtDistance: 2.12 and:  2.12.
+self assert: alpha equals: 16r0.
+
+alpha := engine alphaValueAtDistance: 3 and:  -2.
 self assert: alpha equals: 16r0.
 ]
 
