@@ -5,6 +5,50 @@ Class {
 }
 
 { #category : #tests }
+VectorEngineTest >> testAlphaValue [
+|engine alpha|
+
+engine := VectorEngine onForm: (Form extent: 10@10 depth: 32).
+engine antiAliasingWidth: 2.
+engine pvtStrokeWidth: 4.
+
+"alpha value decrease as the distance to the center increase, once we go over the opaque section"
+alpha := engine alphaValueAtDistance: 0 and:  0.
+self assert: alpha equals: 16r7F.
+
+alpha := engine alphaValueAtDistance: 0.5 and:  0.5.
+self assert: alpha equals: 16r7f.
+
+alpha := engine alphaValueAtDistance: 0.5 sqrt and:  0.5 sqrt.
+self assert: alpha equals: 16r7f.
+
+alpha := engine alphaValueAtDistance: 0.72 and:  0.72.
+self assert: alpha equals: 16r7e.
+
+alpha := engine alphaValueAtDistance: 1 and:  1.
+self assert: alpha equals: 16r65.
+
+alpha := engine alphaValueAtDistance: 1.5 and:  1.5.
+self assert: alpha equals: 16r38.
+
+"alpha are calculated as a circle around the position"
+alpha := engine alphaValueAtDistance: 2 and:  2.
+self assert: alpha equals: 16rB.
+
+alpha := engine alphaValueAtDistance: -2 and:  2.
+self assert: alpha equals: 16rB.
+
+alpha := engine alphaValueAtDistance: 2 and:  -2.
+self assert: alpha equals: 16rB.
+
+alpha := engine alphaValueAtDistance: -2 and:  -2.
+self assert: alpha equals: 16rB.
+
+alpha := engine alphaValueAtDistance: 2.12 and:  2.12.
+self assert: alpha equals: 16r0.
+]
+
+{ #category : #tests }
 VectorEngineTest >> testDrawingArea [
 |engine area|
 

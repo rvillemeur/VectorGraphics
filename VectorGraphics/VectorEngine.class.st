@@ -95,7 +95,7 @@ VectorEngine >> antiAliasingWidth: aNumber [
 { #category : #'as yet unclassified' }
 VectorEngine >> drawingAreaOf: aPoint [
 
-	"Compute affected rect. Honor clipRect"
+	"targetForm is a rectangle from 0@0 to width@height. Drawing area cannot be outside targetForm"
 
 	| top bottom left right |
 	top := (aPoint y - halfTransparentRadius) truncated + 1.
@@ -162,27 +162,18 @@ VectorEngine >> pvtStrokeWidth: aNumber [
 
 { #category : #'primitive algorithms - aux' }
 VectorEngine >> updateAlphasFor: aPoint [
-
-	"slight optimization possible when we know width = 0... perhaps implement: 
-			-we know palpha is never 127 
-			- we know distanceToEdge is always > erodedHalfWidth. 
-				In smalltalk, performance icrease 1.5%. Perhaps in c/asm it is more than that... 
-					Mas importante: 		Cuando width es medio grande, entonces dibujar la bolita rellena de entrada es importante... en los casos en que no necesito calcular la distancia"
-
-	| x y drawingArea alpha prevAlpha deltaX deltaY pixelIndex |
-	x := aPoint x.
-	y := aPoint y.
+	| drawingArea alpha prevAlpha deltaX deltaY pixelIndex |
 
 	drawingArea := self drawingAreaOf: aPoint.
 
 	drawingArea top to: drawingArea bottom do: [ :displayY | 
 		pixelIndex := displayY * targetForm width + drawingArea left.
-		deltaY := displayY - y.
+		deltaY := displayY - aPoint y.
 		drawingArea left to: drawingArea right do: [ :displayX | 
 			pixelIndex := pixelIndex + 1.
 			prevAlpha := alphaMask at: pixelIndex.
-			prevAlpha = 16r7F ifFalse: [ "le précédent alpha était déjà dans la zone w-r"
-				deltaX := displayX - x.
+			prevAlpha = 16r7F ifFalse: [
+				deltaX := displayX - aPoint x.
 				alpha := self alphaValueAtDistance: deltaX and: deltaY.
 				alpha > prevAlpha ifTrue: [ alphaMask at: pixelIndex put: alpha ] ] ] ]
 ]
