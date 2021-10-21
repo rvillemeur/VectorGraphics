@@ -137,6 +137,12 @@ VectorEngine >> primLineFrom: aPoint1 to: aPoint2 hops: hops increment: aPoint3 
 ]
 
 { #category : #private }
+VectorEngine >> pvtFillColor: aFillColorOrNil [
+
+	fillColor := aFillColorOrNil
+]
+
+{ #category : #private }
 VectorEngine >> pvtSetForm: aForm [
 |s|
 	targetForm := aForm.
@@ -181,9 +187,37 @@ VectorEngine >> updateAlphasFor: aPoint [
 ]
 
 { #category : #'primitive algorithms - aux' }
+VectorEngine >> updateEdgesAndBoundsFor: aPoint [
+
+	| thisYTruncated pixelY pixelIndex increment count pixelX blendLeft blendTop blendRight blendBottom clipTop clipBottom prevYTruncated clipLeft clipRight targetWidth |
+	blendLeft := blendLeft min: aPoint x.
+	blendTop := blendTop min: aPoint y.
+	blendRight := blendRight max: aPoint x.
+	blendBottom := blendBottom max: aPoint y.
+	fillColor notNil ifFalse: [ ^ self ].
+	thisYTruncated := aPoint y truncated.
+	(thisYTruncated between: clipTop - 1 and: clipBottom) ifTrue: [ 
+		prevYTruncated
+			ifNil: [ prevYTruncated := thisYTruncated ]
+			ifNotNil: [ 
+				thisYTruncated = prevYTruncated ifFalse: [ "All edge count at the left of the clipRect are added there (at the left of the clipRect).
+											The effect is the same, and we need to clean up less stuff afterwards.
+												More important, it avoids trying to acess pixels outside our form, i.e. invalid array acesses."
+					pixelX := aPoint x truncated + 1 max: clipLeft.
+					pixelX <= clipRight ifTrue: [ 
+						pixelY := thisYTruncated max: prevYTruncated.
+						increment := (thisYTruncated - prevYTruncated) sign.
+						pixelIndex := pixelY * targetWidth + pixelX + 1.
+						count := edgeCounts at: pixelIndex.
+						count := count + increment bitAnd: 16rFF.
+						edgeCounts at: pixelIndex put: count ].
+					prevYTruncated := thisYTruncated ] ] ]
+]
+
+{ #category : #'primitive algorithms - aux' }
 VectorEngine >> updateEdgesAndBoundsForX: x y: y [
 
-	| thisYTruncated pixelY pixelIndex increment count pixelX blendLeft blendTop blendRight blendBottom fillColor clipTop clipBottom prevYTruncated clipLeft clipRight targetWidth edgeCounts |
+	| thisYTruncated pixelY pixelIndex increment count pixelX blendLeft blendTop blendRight blendBottom fillColor clipTop clipBottom prevYTruncated clipLeft clipRight targetWidth |
 	blendLeft := blendLeft min: x.
 	blendTop := blendTop min: y.
 	blendRight := blendRight max: x.
