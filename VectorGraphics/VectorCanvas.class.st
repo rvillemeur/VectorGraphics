@@ -928,7 +928,6 @@ VectorCanvas >> setForm: aForm [
 		self error: 'VectorCanvas can only work on 32 bit destination' ].
 	form := aForm.
 	engine := VectorEngineWholePixel onForm: form.
-	boundsFinderEngine := VectorEngineBoundsFinder onForm: form.
 	self newClipRect: nil
 ]
 
