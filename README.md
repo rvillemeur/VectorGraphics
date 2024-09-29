@@ -6,4 +6,4 @@ Metacello new
 	repository: 'github://rvillemeur/VectorGraphics:main/src';
 	onConflictUseIncoming;
 	load
-`` 
+```
