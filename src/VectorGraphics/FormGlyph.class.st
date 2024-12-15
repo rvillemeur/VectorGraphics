@@ -6,18 +6,20 @@ https://www.freetype.org/freetype2/docs/glyphs/glyphs-3.html
 leftSideBearing, topSideBearing, advanceWidth are in (possibly fractional) pixels.
 "
 Class {
-	#name : #FormGlyph,
-	#superclass : #Object,
+	#name : 'FormGlyph',
+	#superclass : 'Object',
 	#instVars : [
 		'form',
 		'leftOffset',
 		'topOffset',
 		'advanceWidth'
 	],
-	#category : #'VectorGraphics-TrueType'
+	#category : 'VectorGraphics-TrueType',
+	#package : 'VectorGraphics',
+	#tag : 'TrueType'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 FormGlyph class >> form: aForm leftOffset: aNumber topOffset: otherNumber advanceWidth: deltaX [
 
 	^ self new
@@ -27,25 +29,25 @@ FormGlyph class >> form: aForm leftOffset: aNumber topOffset: otherNumber advanc
 		  advanceWidth: deltaX
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 FormGlyph >> advanceWidth [
 
 	^ advanceWidth
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 FormGlyph >> form [
 
 	^ form
 ]
 
-{ #category : #initialization }
+{ #category : 'initialization' }
 FormGlyph >> form: aForm [
 
 	form := aForm
 ]
 
-{ #category : #initialization }
+{ #category : 'initialization' }
 FormGlyph >> form: aForm leftOffset: aNumber topOffset: otherNumber advanceWidth: deltaX [
 
 	form := aForm.
@@ -54,25 +56,25 @@ FormGlyph >> form: aForm leftOffset: aNumber topOffset: otherNumber advanceWidth
 	advanceWidth := deltaX
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 FormGlyph >> leftOffset [
 
 	^ leftOffset
 ]
 
-{ #category : #copying }
+{ #category : 'copying' }
 FormGlyph >> postCopy [
 
 	form := form copy
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 FormGlyph >> rightOffset [
 
 	^ form width + leftOffset - advanceWidth
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 FormGlyph >> topOffset [
 
 	^ topOffset

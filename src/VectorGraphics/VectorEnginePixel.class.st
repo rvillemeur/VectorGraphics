@@ -1,6 +1,6 @@
 Class {
-	#name : #VectorEnginePixel,
-	#superclass : #VectorEngineAbstract,
+	#name : 'VectorEnginePixel',
+	#superclass : 'VectorEngineAbstract',
 	#instVars : [
 		'edgeCounts',
 		'alphaMask',
@@ -20,17 +20,19 @@ Class {
 		'auxStrokeWidthDilatedHalfSquared',
 		'auxStrokeWidthErodedHalfSquared'
 	],
-	#category : #'VectorGraphics-kernel'
+	#category : 'VectorGraphics-kernel',
+	#package : 'VectorGraphics',
+	#tag : 'kernel'
 }
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 VectorEnginePixel >> antiAliasingWidth: aNumber [
 
 	super antiAliasingWidth: aNumber.
 	auxAntiAliasingWidthScaledInverse := 127.0 / antiAliasingWidth
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 VectorEnginePixel >> clipRect: aRectangle [
 
 	"by convention, aRectangle includes left and top but does not include right and bottom.
@@ -45,7 +47,13 @@ VectorEnginePixel >> clipRect: aRectangle [
 	              - 1
 ]
 
-{ #category : #private }
+{ #category : 'abstract' }
+VectorEnginePixel >> finishPath: aPath [
+
+	^ self subclassResponsibility
+]
+
+{ #category : 'private' }
 VectorEnginePixel >> initializePath [
 
 	super initializePath.
@@ -56,13 +64,13 @@ VectorEnginePixel >> initializePath [
 	blendBottom := 0 "drawable top. Will later be refined."
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEnginePixel >> newTrajectoryFragment [
 
 	prevYTruncated := nil
 ]
 
-{ #category : #'primitive algorithms' }
+{ #category : 'primitive algorithms' }
 VectorEnginePixel >> primArcCenterX: cx centerY: cy radiusX: rx radiusY: ry start: startAngle rotationCos: thetaCos rotationSin: thetaSin hops: hops angleDelta: d [
 
 	| angle xp yp x y |
@@ -77,7 +85,7 @@ VectorEnginePixel >> primArcCenterX: cx centerY: cy radiusX: rx radiusY: ry star
 		angle := angle + d ]
 ]
 
-{ #category : #'primitive algorithms' }
+{ #category : 'primitive algorithms' }
 VectorEnginePixel >> primCubicBezierFromX: xFrom y: yFrom toX: xTo y: yTo control1X: xControl1 y: yControl1 control2X: xControl2 y: yControl2 hops: hops [
 
 	| t oneLessT increment f2 f3 f1 f23 f4 x y |
@@ -99,7 +107,7 @@ VectorEnginePixel >> primCubicBezierFromX: xFrom y: yFrom toX: xTo y: yTo contro
 	self updateEdgesAndBoundsForX: xTo y: yTo
 ]
 
-{ #category : #'primitive algorithms' }
+{ #category : 'primitive algorithms' }
 VectorEnginePixel >> primLineFromX: xFrom y: yFrom toX: xTo y: yTo hops: hops incrementX: incrementX incrementY: incrementY [
 
 	| x y |
@@ -114,7 +122,7 @@ VectorEnginePixel >> primLineFromX: xFrom y: yFrom toX: xTo y: yTo hops: hops in
 	self updateEdgesAndBoundsForX: xTo y: yTo
 ]
 
-{ #category : #'primitive algorithms' }
+{ #category : 'primitive algorithms' }
 VectorEnginePixel >> primQuadraticBezierFromX: xFrom y: yFrom toX: xTo y: yTo controlX: xControl y: yControl hops: hops [
 
 	| t oneLessT increment f2 f3 f1 x y |
@@ -134,19 +142,19 @@ VectorEnginePixel >> primQuadraticBezierFromX: xFrom y: yFrom toX: xTo y: yTo co
 	self updateEdgesAndBoundsForX: xTo y: yTo
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEnginePixel >> pvtFillColor: aFillColorOrNil [
 
 	fillColor := aFillColorOrNil
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEnginePixel >> pvtStrokeColor: aStrokeColorOrNil [
 
 	strokeColor := aStrokeColorOrNil
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEnginePixel >> pvtStrokeWidth: aNumber [
 
 	| swErodedHalf |
@@ -159,13 +167,13 @@ VectorEnginePixel >> pvtStrokeWidth: aNumber [
 	                                   * swErodedHalf sign
 ]
 
-{ #category : #'primitive algorithms - aux' }
+{ #category : 'primitive algorithms - aux' }
 VectorEnginePixel >> updateAlphasForX: x y: y [
 
 	^ self subclassResponsibility
 ]
 
-{ #category : #'primitive algorithms - aux' }
+{ #category : 'primitive algorithms - aux' }
 VectorEnginePixel >> updateEdgesAndBoundsForX: x y: y [
 
 	^ self subclassResponsibility

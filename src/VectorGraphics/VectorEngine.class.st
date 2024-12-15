@@ -42,8 +42,8 @@ The algorithm for drawing the Outline of a Shape is as follows:
 4. When the pen has finished following the prescribed trajectory, the distance buffer contains, for each pixel, the minimum distance d to the trajectory. The opacity value is obtained by evaluating the opacity function of the filtering pen at distance d. This opacity value is used to alpha-blend the shape color over the destination frame buffer. Afterwards, the distance buffer is filled with infinite, to be ready for the next call
 "
 Class {
-	#name : #VectorEngine,
-	#superclass : #Object,
+	#name : 'VectorEngine',
+	#superclass : 'Object',
 	#instVars : [
 		'targetForm',
 		'strokeWidth',
@@ -56,22 +56,24 @@ Class {
 		'edgeCounts',
 		'fillColor'
 	],
-	#category : #'VectorGraphics-kernel'
+	#category : 'VectorGraphics-kernel',
+	#package : 'VectorGraphics',
+	#tag : 'kernel'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 VectorEngine class >> defaultAntiAliasingWidth [
 
 	^ 1.0
 ]
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 VectorEngine class >> onForm: aForm [
 
 	^ self new initializeOnForm: aForm
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : 'as yet unclassified' }
 VectorEngine >> alphaValueAtDistance: deltaX and: deltaY [
 
 	| distanceToAxisSquared alpha |
@@ -86,14 +88,14 @@ VectorEngine >> alphaValueAtDistance: deltaX and: deltaY [
 	^ alpha
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 VectorEngine >> antiAliasingWidth: aNumber [
 
 	antiAliasingWidth := aNumber.
 	auxAntiAliasingWidthScaledInverse := 127.0 / antiAliasingWidth
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : 'as yet unclassified' }
 VectorEngine >> drawingAreaOf: aPoint [
 
 	"targetForm is a rectangle from 0@0 to width@height. Drawing area cannot be outside targetForm"
@@ -114,12 +116,12 @@ VectorEngine >> drawingAreaOf: aPoint [
 		  bottom: bottom
 ]
 
-{ #category : #initialization }
+{ #category : 'initialization' }
 VectorEngine >> initializeOnForm: aForm [
 	self pvtSetForm: aForm
 ]
 
-{ #category : #'primitive algorithms' }
+{ #category : 'primitive algorithms' }
 VectorEngine >> primLineFrom: aPoint1 to: aPoint2 hops: hops increment: aPoint3 [
 
 	| x y stepX stepY line|
@@ -136,13 +138,13 @@ VectorEngine >> primLineFrom: aPoint1 to: aPoint2 hops: hops increment: aPoint3 
 	^line
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEngine >> pvtFillColor: aFillColorOrNil [
 
 	fillColor := aFillColorOrNil
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEngine >> pvtSetForm: aForm [
 |s|
 	targetForm := aForm.
@@ -152,7 +154,7 @@ VectorEngine >> pvtSetForm: aForm [
 	edgeCounts := ByteArray new: s
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEngine >> pvtStrokeWidth: aNumber [
 
 	| halfTranslucentRadius translucentRadius transparentRadius |
@@ -167,7 +169,7 @@ VectorEngine >> pvtStrokeWidth: aNumber [
 	                                * halfTranslucentRadius sign
 ]
 
-{ #category : #'primitive algorithms - aux' }
+{ #category : 'primitive algorithms - aux' }
 VectorEngine >> updateAlphasFor: aPoint [
 	| drawingArea alpha  prevAlpha deltaX deltaY pixelIndex |
 
@@ -186,7 +188,7 @@ VectorEngine >> updateAlphasFor: aPoint [
 	^alphaMask
 ]
 
-{ #category : #'primitive algorithms - aux' }
+{ #category : 'primitive algorithms - aux' }
 VectorEngine >> updateEdgesAndBoundsFor: aPoint [
 
 	| thisYTruncated pixelY pixelIndex increment count pixelX blendLeft blendTop blendRight blendBottom clipTop clipBottom prevYTruncated clipLeft clipRight targetWidth |
@@ -214,7 +216,7 @@ VectorEngine >> updateEdgesAndBoundsFor: aPoint [
 					prevYTruncated := thisYTruncated ] ] ]
 ]
 
-{ #category : #'primitive algorithms - aux' }
+{ #category : 'primitive algorithms - aux' }
 VectorEngine >> updateEdgesAndBoundsForX: x y: y [
 
 	| thisYTruncated pixelY pixelIndex increment count pixelX blendLeft blendTop blendRight blendBottom fillColor clipTop clipBottom prevYTruncated clipLeft clipRight targetWidth |

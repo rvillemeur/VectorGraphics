@@ -1,13 +1,15 @@
 Class {
-	#name : #PathCommand,
-	#superclass : #Object,
+	#name : 'PathCommand',
+	#superclass : 'Object',
 	#instVars : [
 		'coordinatesAreRelative'
 	],
-	#category : #'VectorGraphics-PathCommands'
+	#category : 'VectorGraphics-PathCommands',
+	#package : 'VectorGraphics',
+	#tag : 'PathCommands'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathCommand class >> classFor: anSVGPathCommandName [
 
 	self allSubclassesDo: [ :cls | 
@@ -15,7 +17,7 @@ PathCommand class >> classFor: anSVGPathCommandName [
 	^ nil
 ]
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathCommand class >> from: commandChar stream: aStream [
 
 	| cls |
@@ -27,7 +29,7 @@ PathCommand class >> from: commandChar stream: aStream [
 	^ cls new buildFrom: commandChar stream: aStream
 ]
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathCommand class >> svgName [
 
 	"Answer the name of the svg elements we can represent"
@@ -35,25 +37,25 @@ PathCommand class >> svgName [
 	^ self subclassResponsibility
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathCommand >> buildFrom: commandChar stream: aStream [
 
 	coordinatesAreRelative := commandChar isLowercase
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathCommand >> buildFromStream: aStream in: parentToBe [
 
 	coordinatesAreRelative := aStream next isLowercase
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : 'as yet unclassified' }
 PathCommand >> coordinatesAreRelative [
 
 	^ coordinatesAreRelative
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 PathCommand >> privatePointsDo: aBlock [
 
 	"evaluate aBlock with the x and y coordinates for our defining points."
@@ -61,7 +63,7 @@ PathCommand >> privatePointsDo: aBlock [
 	self subclassResponsibility
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 PathCommand >> runOn: aCanvas [
 
 	self subclassResponsibility

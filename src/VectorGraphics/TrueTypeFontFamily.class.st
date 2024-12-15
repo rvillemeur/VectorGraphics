@@ -1,22 +1,24 @@
 Class {
-	#name : #TrueTypeFontFamily,
-	#superclass : #Object,
+	#name : 'TrueTypeFontFamily',
+	#superclass : 'Object',
 	#instVars : [
 		'baseTTFontDescription',
 		'ttFontDescriptionsByEmphasis',
 		'baseFontBySizes',
 		'familyName'
 	],
-	#category : #'VectorGraphics-TrueType'
+	#category : 'VectorGraphics-TrueType',
+	#package : 'VectorGraphics',
+	#tag : 'TrueType'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 TrueTypeFontFamily class >> baseTTFontDescription: aTTFontDescription [
 
 	^ self new baseTTFontDescription: aTTFontDescription
 ]
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 TrueTypeFontFamily class >> fileReaderServicesForFileEntry: filename suffix: suffix [
 
 	"FileList buttons that read a TrueType font on contents."
@@ -26,7 +28,7 @@ TrueTypeFontFamily class >> fileReaderServicesForFileEntry: filename suffix: suf
 	^ #(  )
 ]
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 TrueTypeFontFamily class >> read: aDirectoryEntry [
 
 	"	TrueTypeFontFamily read: '/home/juan/Downloads/DejaVu2.37/dejavu-fonts-ttf-2.37/ttf/' asDirectoryEntry
@@ -47,14 +49,14 @@ TrueTypeFontFamily class >> read: aDirectoryEntry [
 	^ readFamilyNames
 ]
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 TrueTypeFontFamily class >> readAdditionalFonts [
 
 	^ TrueTypeFontFamily read:
 		  DirectoryEntry smalltalkImageDirectory / 'TrueTypeFonts'
 ]
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 TrueTypeFontFamily class >> readTrueTypeFontEntry: ttFontFileEntry [
 
 	| ttFontDescription familyName ttFontFamily |
@@ -76,7 +78,7 @@ TrueTypeFontFamily class >> readTrueTypeFontEntry: ttFontFileEntry [
 	PopUpMenu inform: 'loaded font ' , familyName
 ]
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 TrueTypeFontFamily class >> serviceReadTTFont [
 
 	"Answer the service of reading a TrueType font"
@@ -93,7 +95,7 @@ TrueTypeFontFamily class >> serviceReadTTFont [
 		  fileList selectedFileEntry ]
 ]
 
-{ #category : #initialization }
+{ #category : 'initialization' }
 TrueTypeFontFamily >> addTTFontDescription: aTTFontDescription [
 
 	ttFontDescriptionsByEmphasis
@@ -101,7 +103,7 @@ TrueTypeFontFamily >> addTTFontDescription: aTTFontDescription [
 		put: aTTFontDescription
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFontFamily >> atPointSize: aNumber [
 
 	| baseFont |
@@ -124,7 +126,7 @@ TrueTypeFontFamily >> atPointSize: aNumber [
 	^ baseFont
 ]
 
-{ #category : #initialization }
+{ #category : 'initialization' }
 TrueTypeFontFamily >> baseTTFontDescription: aTTFontDescription [
 
 	self assert: aTTFontDescription emphasis = 0.
@@ -135,7 +137,7 @@ TrueTypeFontFamily >> baseTTFontDescription: aTTFontDescription [
 		ttFontDescriptionsByEmphasis := Dictionary new ]
 ]
 
-{ #category : #initialization }
+{ #category : 'initialization' }
 TrueTypeFontFamily >> clearCache [
 
 	"
@@ -148,19 +150,19 @@ TrueTypeFontFamily >> clearCache [
 	emphasized do: [ :each | self addTTFontDescription: each ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFontFamily >> folderName [
 
 	^ baseTTFontDescription folderName
 ]
 
-{ #category : #testing }
+{ #category : 'testing' }
 TrueTypeFontFamily >> isTrueTypeFontFamily [
 
 	^ true
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFontFamily >> pointSizes [
 
 	^ #( 6 7 8 9 10 11 12 13 14 15 18 22 26 36 48 72 )

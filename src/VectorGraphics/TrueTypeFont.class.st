@@ -6,8 +6,8 @@ In Cuis what is usually called TrueType Font is represented by TTFontDescription
 TrueTypeFonts, being part of the traditional AbstractFont hierarchy, adds a specific pointSize, and is the object used in texts.
 "
 Class {
-	#name : #TrueTypeFont,
-	#superclass : #AbstractFont,
+	#name : 'TrueTypeFont',
+	#superclass : 'AbstractFont',
 	#instVars : [
 		'ttFontDescription',
 		'pointSize',
@@ -18,10 +18,12 @@ Class {
 		'baseFont',
 		'derivativeFonts'
 	],
-	#category : #'VectorGraphics-TrueType'
+	#category : 'VectorGraphics-TrueType',
+	#package : 'VectorGraphics',
+	#tag : 'TrueType'
 }
 
-{ #category : #initialization }
+{ #category : 'initialization' }
 TrueTypeFont class >> assignmentGlyphSelectorPreferenceChanged [
 
 	| selector |
@@ -31,7 +33,7 @@ TrueTypeFont class >> assignmentGlyphSelectorPreferenceChanged [
 	self allInstancesDo: [ :each | each resetAssignmentGlyph ]
 ]
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 TrueTypeFont class >> family: aTrueTypeFontFamily ttFontDescription: aTTFontDescription pointSize: aNumber [
 
 	^ self new
@@ -40,13 +42,13 @@ TrueTypeFont class >> family: aTrueTypeFontFamily ttFontDescription: aTTFontDesc
 		  pointSize: aNumber
 ]
 
-{ #category : #initialization }
+{ #category : 'initialization' }
 TrueTypeFont >> addDerivativeFont: aTrueTypeFont [
 
 	derivativeFonts at: aTrueTypeFont emphasis put: aTrueTypeFont
 ]
 
-{ #category : #emphasis }
+{ #category : 'emphasis' }
 TrueTypeFont >> addEmphasis: code [
 
 	"Set the integer code for emphasis. See senders."
@@ -56,27 +58,27 @@ TrueTypeFont >> addEmphasis: code [
 		glyphForms := Array new: 256 ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFont >> ascent [
 
 	^ ttFontDescription ascent * pointSize
 	  / ttFontDescription letterMTopSideBearing * 1.0
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFont >> baseFont [
 
 	^ baseFont ifNil: [ self ]
 ]
 
-{ #category : #initialization }
+{ #category : 'initialization' }
 TrueTypeFont >> baseFont: aStrikeFont [
 
 	baseFont := aStrikeFont.
 	baseFont ifNotNil: [ derivativeFonts := nil ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFont >> baseKern [
 
 	"self forwarding: #baseKern printOneStack: true."
@@ -85,26 +87,26 @@ TrueTypeFont >> baseKern [
 	^ 0 "uh?"
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFont >> cachedFormDepth [
 
 	^ 32
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFont >> descent [
 
 	^ ttFontDescription descent negated * pointSize
 	  / ttFontDescription letterMTopSideBearing * 1.0
 ]
 
-{ #category : #emphasis }
+{ #category : 'emphasis' }
 TrueTypeFont >> emphasis [
 
 	^ emphasis
 ]
 
-{ #category : #emphasis }
+{ #category : 'emphasis' }
 TrueTypeFont >> emphasized: code [
 
 	"Answer a copy of the receiver with emphasis set to include code."
@@ -137,7 +139,7 @@ TrueTypeFont >> emphasized: code [
 	^ derivative
 ]
 
-{ #category : #initialization }
+{ #category : 'initialization' }
 TrueTypeFont >> family: aTrueTypeFontFamily ttFontDescription: aTTFontDescription pointSize: aNumber [
 
 	ttFontDescription := aTTFontDescription.
@@ -150,19 +152,19 @@ TrueTypeFont >> family: aTrueTypeFontFamily ttFontDescription: aTTFontDescriptio
 	derivativeFonts := emphasis = 0 ifTrue: [ Dictionary new ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFont >> familyName [
 
 	^ ttFontDescription familyName
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFont >> fontDescription [
 
 	^ ttFontDescription
 ]
 
-{ #category : #'glyph access' }
+{ #category : 'glyph access' }
 TrueTypeFont >> glyphAt: aCharacter [
 
 	"Needed only for BitBltCanvasEngine"
@@ -186,7 +188,7 @@ TrueTypeFont >> glyphAt: aCharacter [
 		  formGlyph ]
 ]
 
-{ #category : #'glyph access' }
+{ #category : 'glyph access' }
 TrueTypeFont >> glyphAtUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3OrNil byte4: byte4OrNil [
 
 	"Needed only for BitBltCanvasEngine"
@@ -228,62 +230,62 @@ TrueTypeFont >> glyphAtUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3OrNil byte
 		  formGlyph ]
 ]
 
-{ #category : #testing }
+{ #category : 'testing' }
 TrueTypeFont >> isBaseFont [
 
 	^ baseFont isNil
 ]
 
-{ #category : #testing }
+{ #category : 'testing' }
 TrueTypeFont >> isBold [
 
 	^ self emphasis allMask: 1
 ]
 
-{ #category : #testing }
+{ #category : 'testing' }
 TrueTypeFont >> isItalic [
 
 	^ self emphasis allMask: 2
 ]
 
-{ #category : #testing }
+{ #category : 'testing' }
 TrueTypeFont >> isST80Glyphs [
 
 	^ emphasis allMask: 64
 ]
 
-{ #category : #testing }
+{ #category : 'testing' }
 TrueTypeFont >> isStruckThrough [
 
 	^ emphasis allMask: 8
 ]
 
-{ #category : #testing }
+{ #category : 'testing' }
 TrueTypeFont >> isSubscript [
 
 	^ emphasis allMask: 32
 ]
 
-{ #category : #testing }
+{ #category : 'testing' }
 TrueTypeFont >> isSuperscript [
 
 	^ emphasis allMask: 16
 ]
 
-{ #category : #testing }
+{ #category : 'testing' }
 TrueTypeFont >> isUnderlined [
 
 	^ emphasis allMask: 4
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFont >> lineGap [
 
 	^ ttFontDescription lineGap * pointSize
 	  / ttFontDescription letterMTopSideBearing * 1.0
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : 'as yet unclassified' }
 TrueTypeFont >> lineSpacing [
 
 	"Answer the height of the receiver including any additional line gap."
@@ -291,7 +293,7 @@ TrueTypeFont >> lineSpacing [
 	^ self ascent + self descent
 ]
 
-{ #category : #'synthetic derivatives' }
+{ #category : 'synthetic derivatives' }
 TrueTypeFont >> makeStruckThroughGlyph: aFormGlyph [
 
 	| form |
@@ -300,7 +302,7 @@ TrueTypeFont >> makeStruckThroughGlyph: aFormGlyph [
 		(0 @ (aFormGlyph topOffset - self descent) extent: form width @ 1)
 ]
 
-{ #category : #'synthetic derivatives' }
+{ #category : 'synthetic derivatives' }
 TrueTypeFont >> makeUnderlinedGlyph: aFormGlyph [
 
 	| height y oldForm form d |
@@ -322,7 +324,7 @@ TrueTypeFont >> makeUnderlinedGlyph: aFormGlyph [
 	form fillBlack: (0 @ y extent: form width @ d)
 ]
 
-{ #category : #'objects from disk' }
+{ #category : 'objects from disk' }
 TrueTypeFont >> objectForDataStream: refStrm [
 
 	"I am about to be written on an object file.  Write a textual reference instead.
@@ -334,7 +336,7 @@ TrueTypeFont >> objectForDataStream: refStrm [
 		  args: (Array with: self familyName with: self pointSize)
 ]
 
-{ #category : #displaying }
+{ #category : 'displaying' }
 TrueTypeFont >> onBitBltCanvasEngine: engine displayString: aString from: startIndex to: stopIndex at: p color: color [
 
 	"Answer last affected pixel position.
@@ -349,7 +351,7 @@ TrueTypeFont >> onBitBltCanvasEngine: engine displayString: aString from: startI
 		  color: color
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFont >> pointSize [
 
 	"
@@ -362,7 +364,7 @@ scrollbarThickness
 	^ pointSize
 ]
 
-{ #category : #printing }
+{ #category : 'printing' }
 TrueTypeFont >> printOn: aStream [
 
 	aStream
@@ -374,7 +376,7 @@ TrueTypeFont >> printOn: aStream [
 		nextPut: $)
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : 'as yet unclassified' }
 TrueTypeFont >> releaseCachedState [
 
 	glyphForms atAllPut: nil.
@@ -384,7 +386,7 @@ TrueTypeFont >> releaseCachedState [
 			derivedFont releaseCachedState ] ]
 ]
 
-{ #category : #initialization }
+{ #category : 'initialization' }
 TrueTypeFont >> resetAssignmentGlyph [
 
 	"Uses ST80 glyphs:"
@@ -393,7 +395,7 @@ TrueTypeFont >> resetAssignmentGlyph [
 		glyphForms at: $_ numericValue + 1 put: nil ]
 ]
 
-{ #category : #'synthetic derivatives' }
+{ #category : 'synthetic derivatives' }
 TrueTypeFont >> syntheticSubscript [
 
 	"Build and answer a derivative that is Subscript."
@@ -409,7 +411,7 @@ StrikeFont allInstances do: [ :a | a reset ].
 "
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : 'as yet unclassified' }
 TrueTypeFont >> syntheticSuperscript [
 
 	"Build and answer a derivative that is Subscript."
@@ -425,13 +427,13 @@ StrikeFont allInstances do: [ :a | a reset ].
 "
 ]
 
-{ #category : #'swapping glyphs' }
+{ #category : 'swapping glyphs' }
 TrueTypeFont >> useShortUnderscore [
 
 	
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TrueTypeFont >> widthOf: aCharacter [
 
 	^ (aCharacter

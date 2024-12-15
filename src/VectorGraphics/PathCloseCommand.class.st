@@ -1,22 +1,24 @@
 Class {
-	#name : #PathCloseCommand,
-	#superclass : #PathCommand,
-	#category : #'VectorGraphics-PathCommands'
+	#name : 'PathCloseCommand',
+	#superclass : 'PathCommand',
+	#category : 'VectorGraphics-PathCommands',
+	#package : 'VectorGraphics',
+	#tag : 'PathCommands'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathCloseCommand class >> svgName [
 
 	^ $Z
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathCloseCommand >> buildFrom: commandChar stream: aStream [
 
 	super buildFrom: commandChar stream: aStream
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 PathCloseCommand >> privatePointsDo: aBlock [
 
 	"evaluate aBlock with the x and y coordinates for our defining points."
@@ -24,7 +26,7 @@ PathCloseCommand >> privatePointsDo: aBlock [
 	
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 PathCloseCommand >> runOn: aCanvas [
 
 	aCanvas closePath

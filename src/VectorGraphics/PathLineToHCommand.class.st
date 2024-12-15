@@ -1,19 +1,21 @@
 Class {
-	#name : #PathLineToHCommand,
-	#superclass : #PathCommand,
+	#name : 'PathLineToHCommand',
+	#superclass : 'PathCommand',
 	#instVars : [
 		'xs'
 	],
-	#category : #'VectorGraphics-PathCommands'
+	#category : 'VectorGraphics-PathCommands',
+	#package : 'VectorGraphics',
+	#tag : 'PathCommands'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathLineToHCommand class >> svgName [
 
 	^ $H
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathLineToHCommand >> buildFrom: commandChar stream: aStream [
 
 	| px |
@@ -24,7 +26,7 @@ PathLineToHCommand >> buildFrom: commandChar stream: aStream [
 		      px notNil ] whileTrue: [ strm nextPut: px ] ]
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 PathLineToHCommand >> runOn: aCanvas [
 
 	aCanvas multiLineTo: coordinatesAreRelative xs: xs

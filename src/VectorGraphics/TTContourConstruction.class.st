@@ -6,22 +6,24 @@ Instance variables:
 	controlPointFlags	<BitArray (ByteArray with bit content)> Flags for each point
 "
 Class {
-	#name : #TTContourConstruction,
-	#superclass : #Object,
+	#name : 'TTContourConstruction',
+	#superclass : 'Object',
 	#instVars : [
 		'points',
 		'controlPointFlags'
 	],
-	#category : #'VectorGraphics-TrueType'
+	#category : 'VectorGraphics-TrueType',
+	#package : 'VectorGraphics',
+	#tag : 'TrueType'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 TTContourConstruction class >> on: points [
 
 	^ self new points: points
 ]
 
-{ #category : #'primitive format' }
+{ #category : 'primitive format' }
 TTContourConstruction >> addContourDataTo: stream tx: aGeometryTransformationOrNil [
 
 	| bezierCount firstPoint cp ep prevEndPoint cpr epr |
@@ -58,13 +60,13 @@ TTContourConstruction >> addContourDataTo: stream tx: aGeometryTransformationOrN
 		prevEndPoint := ep ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTContourConstruction >> controlPointFlags [
 
 	^ controlPointFlags
 ]
 
-{ #category : #enumerating }
+{ #category : 'enumerating' }
 TTContourConstruction >> initialMoveToCommand: anAffineTransformationOrNil [
 
 	"TrueType reasonably assumes Y coordinates increase upwards."
@@ -76,13 +78,13 @@ TTContourConstruction >> initialMoveToCommand: anAffineTransformationOrNil [
 	^ PathMoveToCommand new toRelativePoint: p
 ]
 
-{ #category : #enumerating }
+{ #category : 'enumerating' }
 TTContourConstruction >> isEmpty [
 
 	^ points size < 2
 ]
 
-{ #category : #converting }
+{ #category : 'converting' }
 TTContourConstruction >> makePointsAbsolute: aPoint [
 
 	| t |
@@ -93,7 +95,7 @@ TTContourConstruction >> makePointsAbsolute: aPoint [
 	^ t
 ]
 
-{ #category : #enumerating }
+{ #category : 'enumerating' }
 TTContourConstruction >> pathCommand: anAffineTransformationOrNil [
 
 	"TrueType reasonably assumes Y coordinates increase upwards."
@@ -118,20 +120,20 @@ TTContourConstruction >> pathCommand: anAffineTransformationOrNil [
 		  controlPoints: controlPoints
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTContourConstruction >> points [
 
 	^ points
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTContourConstruction >> points: aShortPointArray [
 
 	points := aShortPointArray.
 	controlPointFlags := ByteArray newBits: aShortPointArray size
 ]
 
-{ #category : #printing }
+{ #category : 'printing' }
 TTContourConstruction >> printOn: aStream [
 
 	aStream
@@ -141,7 +143,7 @@ TTContourConstruction >> printOn: aStream [
 		"space; 		print: self type;"nextPut: $)
 ]
 
-{ #category : #enumerating }
+{ #category : 'enumerating' }
 TTContourConstruction >> quadraticBeziersDo: aBlock [
 
 	"Iterate over Bezier curves of the receiver.	

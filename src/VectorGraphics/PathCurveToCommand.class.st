@@ -1,21 +1,23 @@
 Class {
-	#name : #PathCurveToCommand,
-	#superclass : #PathCommand,
+	#name : 'PathCurveToCommand',
+	#superclass : 'PathCommand',
 	#instVars : [
 		'toPoints',
 		'control1Points',
 		'control2Points'
 	],
-	#category : #'VectorGraphics-PathCommands'
+	#category : 'VectorGraphics-PathCommands',
+	#package : 'VectorGraphics',
+	#tag : 'PathCommands'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathCurveToCommand class >> svgName [
 
 	^ $C
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathCurveToCommand >> buildFrom: commandChar stream: aStream [
 
 	| x1 y1 x2 y2 x y |
@@ -36,7 +38,7 @@ PathCurveToCommand >> buildFrom: commandChar stream: aStream [
 		control2Points add: x2 @ y2 ]
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 PathCurveToCommand >> privatePointsDo: aBlock [
 
 	"evaluate aBlock with the x and y coordinates for our defining points."
@@ -44,7 +46,7 @@ PathCurveToCommand >> privatePointsDo: aBlock [
 	toPoints do: aBlock
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 PathCurveToCommand >> runOn: aCanvas [
 
 	aCanvas

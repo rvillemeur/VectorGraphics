@@ -1,19 +1,21 @@
 Class {
-	#name : #PathQuadraticCurveToSmoothCommand,
-	#superclass : #PathCommand,
+	#name : 'PathQuadraticCurveToSmoothCommand',
+	#superclass : 'PathCommand',
 	#instVars : [
 		'toPoints'
 	],
-	#category : #'VectorGraphics-PathCommands'
+	#category : 'VectorGraphics-PathCommands',
+	#package : 'VectorGraphics',
+	#tag : 'PathCommands'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathQuadraticCurveToSmoothCommand class >> svgName [
 
 	^ $T
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathQuadraticCurveToSmoothCommand >> buildFrom: commandChar stream: aStream [
 
 	| x y |
@@ -25,7 +27,7 @@ PathQuadraticCurveToSmoothCommand >> buildFrom: commandChar stream: aStream [
 	y notNil ] whileTrue: [ toPoints add: x @ y ]
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 PathQuadraticCurveToSmoothCommand >> privatePointsDo: aBlock [
 
 	"evaluate aBlock with the x and y coordinates for our defining points."
@@ -33,7 +35,7 @@ PathQuadraticCurveToSmoothCommand >> privatePointsDo: aBlock [
 	toPoints do: aBlock
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 PathQuadraticCurveToSmoothCommand >> runOn: aCanvas [
 
 	aCanvas

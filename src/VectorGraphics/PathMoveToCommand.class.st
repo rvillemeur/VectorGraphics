@@ -1,19 +1,21 @@
 Class {
-	#name : #PathMoveToCommand,
-	#superclass : #PathCommand,
+	#name : 'PathMoveToCommand',
+	#superclass : 'PathCommand',
 	#instVars : [
 		'points'
 	],
-	#category : #'VectorGraphics-PathCommands'
+	#category : 'VectorGraphics-PathCommands',
+	#package : 'VectorGraphics',
+	#tag : 'PathCommands'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathMoveToCommand class >> svgName [
 
 	^ $M
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathMoveToCommand >> buildFrom: commandChar stream: aStream [
 
 	| px py |
@@ -25,7 +27,7 @@ PathMoveToCommand >> buildFrom: commandChar stream: aStream [
 		          py notNil ] whileTrue: [ strm nextPut: px @ py ] ]
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 PathMoveToCommand >> privatePointsDo: aBlock [
 
 	"evaluate aBlock with the x and y coordinates for our defining points."
@@ -33,20 +35,20 @@ PathMoveToCommand >> privatePointsDo: aBlock [
 	points do: aBlock
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 PathMoveToCommand >> runOn: aCanvas [
 
 	aCanvas multiMoveTo: coordinatesAreRelative points: points
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathMoveToCommand >> toPoint: endPoint [
 
 	coordinatesAreRelative := false.
 	points := { endPoint }
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathMoveToCommand >> toRelativePoint: endPoint [
 
 	coordinatesAreRelative := true.

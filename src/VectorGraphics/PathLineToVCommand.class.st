@@ -1,19 +1,21 @@
 Class {
-	#name : #PathLineToVCommand,
-	#superclass : #PathCommand,
+	#name : 'PathLineToVCommand',
+	#superclass : 'PathCommand',
 	#instVars : [
 		'ys'
 	],
-	#category : #'VectorGraphics-PathCommands'
+	#category : 'VectorGraphics-PathCommands',
+	#package : 'VectorGraphics',
+	#tag : 'PathCommands'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathLineToVCommand class >> svgName [
 
 	^ $V
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathLineToVCommand >> buildFrom: commandChar stream: aStream [
 
 	| py |
@@ -24,7 +26,7 @@ PathLineToVCommand >> buildFrom: commandChar stream: aStream [
 		      py notNil ] whileTrue: [ strm nextPut: py ] ]
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 PathLineToVCommand >> runOn: aCanvas [
 
 	aCanvas multiLineTo: coordinatesAreRelative ys: ys

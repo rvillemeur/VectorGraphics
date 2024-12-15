@@ -1,1 +1,1 @@
-Package { #name : #VectorGraphics }
+Package { #name : 'VectorGraphics' }

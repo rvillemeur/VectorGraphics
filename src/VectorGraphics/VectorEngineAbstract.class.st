@@ -19,8 +19,8 @@ Display forceToScreen.
 Display forceToScreen
 "
 Class {
-	#name : #VectorEngineAbstract,
-	#superclass : #Object,
+	#name : 'VectorEngineAbstract',
+	#superclass : 'Object',
 	#instVars : [
 		'targetForm',
 		'morphIds',
@@ -44,16 +44,18 @@ Class {
 		'previousCallControlX',
 		'previousCallControlY'
 	],
-	#category : #'VectorGraphics-kernel'
+	#category : 'VectorGraphics-kernel',
+	#package : 'VectorGraphics',
+	#tag : 'kernel'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 VectorEngineAbstract class >> defaultAntiAliasingWidth [
 
 	^ 1.0
 ]
 
-{ #category : #experiments }
+{ #category : 'experiments' }
 VectorEngineAbstract class >> experLinesAndShapes [
 
 	"	VectorEngineSubPixel experLinesAndShapes 	"
@@ -158,7 +160,7 @@ VectorEngineAbstract class >> experLinesAndShapes [
 	Display forceToScreen
 ]
 
-{ #category : #experiments }
+{ #category : 'experiments' }
 VectorEngineAbstract class >> experLinesAndShapes2 [
 
 	"	VectorEngineSubPixel experLinesAndShapes2	"
@@ -285,7 +287,7 @@ VectorEngineAbstract class >> experLinesAndShapes2 [
 	Display forceToScreen
 ]
 
-{ #category : #experiments }
+{ #category : 'experiments' }
 VectorEngineAbstract class >> experLinesAndShapes3 [
 
 	"	VectorEngineSubPixel experLinesAndShapes3	"
@@ -383,7 +385,7 @@ VectorEngineAbstract class >> experLinesAndShapes3 [
 	Display forceToScreen
 ]
 
-{ #category : #experiments }
+{ #category : 'experiments' }
 VectorEngineAbstract class >> experLinesAndShapes4 [
 
 	"	VectorEngineSubPixel experLinesAndShapes4	"
@@ -481,7 +483,7 @@ VectorEngineAbstract class >> experLinesAndShapes4 [
 	Display forceToScreen
 ]
 
-{ #category : #experiments }
+{ #category : 'experiments' }
 VectorEngineAbstract class >> experLinesAndShapesx [
 
 	"	VectorEngineSubPixel experLinesAndShapesx	"
@@ -532,7 +534,7 @@ VectorEngineAbstract class >> experLinesAndShapesx [
 	Display forceToScreen
 ]
 
-{ #category : #experiments }
+{ #category : 'experiments' }
 VectorEngineAbstract class >> experLinesAndShapesx2 [
 
 	"	VectorEngineSubPixel experLinesAndShapesx2	"
@@ -564,7 +566,7 @@ VectorEngineAbstract class >> experLinesAndShapesx2 [
 	Display forceToScreen
 ]
 
-{ #category : #samples }
+{ #category : 'samples' }
 VectorEngineAbstract class >> experiment1 [
 
 	"	No perfecto aun, pero se puede empezar a comparar con	http://www.hpl.hp.com/research/mmsl/projects/graphics/antialiasing/figure21.htm	Ni que hablar que es mucho mas rapido...	VectorEngineSubPixel experiment1	"
@@ -617,7 +619,7 @@ VectorEngineAbstract class >> experiment1 [
 	"	canvas removeSpuriousTranslucencyFloatAndBlendOver: Color red.	f writePNGfileNamed: 'pp17.png'"
 ]
 
-{ #category : #samples }
+{ #category : 'samples' }
 VectorEngineAbstract class >> experiment2 [
 
 	"	VectorEngineSubPixel experiment2	"
@@ -660,7 +662,7 @@ VectorEngineAbstract class >> experiment2 [
 	Display forceToScreen
 ]
 
-{ #category : #samples }
+{ #category : 'samples' }
 VectorEngineAbstract class >> experiment3 [
 
 	"	VectorEngineSubPixel experiment3	"
@@ -682,7 +684,7 @@ VectorEngineAbstract class >> experiment3 [
 	Display forceToScreen
 ]
 
-{ #category : #samples }
+{ #category : 'samples' }
 VectorEngineAbstract class >> experiment4 [
 
 	"	VectorEngineSubPixel experiment4	"
@@ -703,7 +705,7 @@ VectorEngineAbstract class >> experiment4 [
 	Display forceToScreen
 ]
 
-{ #category : #experiments }
+{ #category : 'experiments' }
 VectorEngineAbstract class >> experimentHopsPerPixel1 [
 
 	"Play with this to learn about the effect of hopsPerPixel
@@ -766,7 +768,7 @@ VectorEngineAbstract class >> experimentHopsPerPixel1 [
 			hops2 } print ]
 ]
 
-{ #category : #experiments }
+{ #category : 'experiments' }
 VectorEngineAbstract class >> experimentHopsPerPixel2 [
 
 	"Play with this to learn about the effect of hopsPerPixel
@@ -834,7 +836,7 @@ VectorEngineAbstract class >> experimentHopsPerPixel2 [
 			hops2 } print ]
 ]
 
-{ #category : #experiments }
+{ #category : 'experiments' }
 VectorEngineAbstract class >> experimentHopsPerPixel3 [
 
 	"Play with this to learn about the effect of hopsPerPixel 	Experiment 3: No stroke, just fill
@@ -887,13 +889,13 @@ VectorEngineAbstract class >> experimentHopsPerPixel3 [
 			hops2 } print ]
 ]
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 VectorEngineAbstract class >> onForm: aForm [
 
 	^ self new initializeOnForm: aForm
 ]
 
-{ #category : #samples }
+{ #category : 'samples' }
 VectorEngineAbstract class >> siemensStar [
 
 	"	VectorEngineSubPixel siemensStar display	"
@@ -923,7 +925,7 @@ VectorEngineAbstract class >> siemensStar [
 	^ form
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_ArcToX: cx y: cy radiusX: mrx radiusY: mry angleOfXAxis: theta largeFlag: doLargerArc sweepFlag: useIncreasingAngles [
 
 	" (VectorEngineSubPixel onForm: Display) 
@@ -947,7 +949,7 @@ VectorEngineAbstract >> abs_ArcToX: cx y: cy radiusX: mrx radiusY: mry angleOfXA
 		sweepFlag: useIncreasingAngles
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_CircleCenterX: cx y: cy radius: mr [
 
 	" (VectorEngineSubPixel onForm: Display) 	strokeWidth: 2.0 color: Color black do: [ :engine | 		engine 			abs_CircleCenterX: 200 y: 150 radius: 80]. Display forceToScreen " 
@@ -965,7 +967,7 @@ VectorEngineAbstract >> abs_CircleCenterX: cx y: cy radius: mr [
 		basicClosePath
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_CubicBezierSmoothToX: xTo y: yTo control2X: xC y: yC [
 
 	"Cubic Bezier
@@ -1022,7 +1024,7 @@ Display forceToScreen
 		y: yC
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_CubicBezierToX: xTo y: yTo control1X: xC1 y: yC1 control2X: xC2 y: yC2 [
 
 	"Cubic Bezier
@@ -1065,7 +1067,7 @@ Display forceToScreen
 	previousCallControlY := yC2
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_EllipseCenterX: cx y: cy radiusX: mrx radiusY: mry [
 
 	"
@@ -1099,7 +1101,7 @@ Display forceToScreen
 		basicClosePath
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_EllipseCenterX: cx y: cy radiusX: mrx radiusY: mry rotationAngle: theta [
 
 	"
@@ -1133,7 +1135,7 @@ Display forceToScreen
 		basicClosePath
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_EllipseCenterX: cx y: cy radiusX: mrx radiusY: mry rotationAngle: theta start: startAngle sweep: sweepAngle [
 
 	"Currently draws a line from pathCurrentX@pathCurrentY to start (if startAngle ~= 0.0 or sweepAngle ~= Float twoPi).
@@ -1174,7 +1176,7 @@ Display forceToScreen.
 		sweep: sweepAngle
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_LineToX: xTo [
 
 	"
@@ -1199,7 +1201,7 @@ Display forceToScreen
 	self abs_LineToX: xTo y: previousCallY
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_LineToX: xTo y: yTo [
 
 	"
@@ -1230,7 +1232,7 @@ Display forceToScreen
 	previousCallControlY := previousCallY
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_LineToY: yTo [
 
 	"
@@ -1255,7 +1257,7 @@ Display forceToScreen
 	self abs_LineToX: previousCallX y: yTo
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_MoveToX: x y: y [
 
 	"
@@ -1286,7 +1288,7 @@ Display forceToScreen
 	previousCallControlY := previousCallY
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_QuadraticBezierSmoothToX: xTo y: yTo [
 
 	"
@@ -1333,7 +1335,7 @@ Display forceToScreen
 		y: mirroredContolY
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> abs_QuadraticBezierToX: xTo y: yTo controlX: xC y: yC [
 
 	"
@@ -1368,13 +1370,13 @@ Display forceToScreen
 	previousCallControlY := yC
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 VectorEngineAbstract >> antiAliasingWidth: aNumber [
 
 	antiAliasingWidth := aNumber
 ]
 
-{ #category : #'private - paths - pixel coordinates' }
+{ #category : 'private - paths - pixel coordinates' }
 VectorEngineAbstract >> basicArcCenterX: cx centerY: cy radiusX: rx radiusY: ry rotationAngle: theta start: startAngle sweep: sweepAngle [
 
 	"
@@ -1423,7 +1425,7 @@ Display forceToScreen.
 	pathCurrentY := thetaSin * xp + (thetaCos * yp) + cy
 ]
 
-{ #category : #'private - paths - pixel coordinates' }
+{ #category : 'private - paths - pixel coordinates' }
 VectorEngineAbstract >> basicArcToX: x2 y: y2 radiusX: rx radiusY: ry angleOfXAxis: phi largeFlag: doLargerArc sweepFlag: useIncreasingAngles [
 
 	"
@@ -1543,7 +1545,7 @@ Ojo al primitivizar. Para ellos, el theta va entre -pi y pi. Para Squeak va entr
 		sweep: deltaTheta
 ]
 
-{ #category : #'private - paths - pixel coordinates' }
+{ #category : 'private - paths - pixel coordinates' }
 VectorEngineAbstract >> basicClosePath [
 
 	"
@@ -1559,7 +1561,7 @@ Display forceToScreen
 	self basicLineToX: pathFirstX y: pathFirstY
 ]
 
-{ #category : #'private - paths - pixel coordinates' }
+{ #category : 'private - paths - pixel coordinates' }
 VectorEngineAbstract >> basicCubicBezierToX: xTo y: yTo control1X: xC1 y: yC1 control2X: xC2 y: yC2 [
 
 	"Cubic Bezier
@@ -1605,7 +1607,7 @@ Display forceToScreen
 	pathCurrentY := yTo
 ]
 
-{ #category : #'private - paths - pixel coordinates' }
+{ #category : 'private - paths - pixel coordinates' }
 VectorEngineAbstract >> basicLineToX: xTo y: yTo [
 
 	"
@@ -1656,7 +1658,7 @@ Display forceToScreen
 	pathCurrentY := yTo
 ]
 
-{ #category : #'private - paths - pixel coordinates' }
+{ #category : 'private - paths - pixel coordinates' }
 VectorEngineAbstract >> basicMoveToX: x y: y [
 
 	"
@@ -1684,7 +1686,7 @@ Display forceToScreen
 	pathCurrentY := y
 ]
 
-{ #category : #'private - paths - pixel coordinates' }
+{ #category : 'private - paths - pixel coordinates' }
 VectorEngineAbstract >> basicQuadraticBezierToX: xTo y: yTo controlX: xC y: yC [
 
 	"
@@ -1722,19 +1724,19 @@ Display forceToScreen
 	pathCurrentY := yTo
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 VectorEngineAbstract >> clippingMorph: aMorph [
 
 	clippingMorphId := aMorph ifNil: [ 0 ] ifNotNil: [ aMorph morphId ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 VectorEngineAbstract >> currentMorph: aMorph [
 
 	currentMorphId := aMorph ifNil: [ 0 ] ifNotNil: [ aMorph morphId ]
 ]
 
-{ #category : #text }
+{ #category : 'text' }
 VectorEngineAbstract >> displayString: aString from: startIndex to: stopIndex at: aPoint trueTypeFont: aTTFontDescription useST80Glyphs: aBoolean color: aColor scaleX: ssx scaleY: ssy [
 
 	"ssx and ssy to honor font pointSize"
@@ -1792,7 +1794,7 @@ VectorEngineAbstract >> displayString: aString from: startIndex to: stopIndex at
 	^ destX ceiling @ destY
 ]
 
-{ #category : #text }
+{ #category : 'text' }
 VectorEngineAbstract >> displayUtf8: aByteArray at: aPoint trueTypeFont: aTTFontDescription color: aColor scaleX: ssx scaleY: ssy [
 
 	"ssx and ssy to honor font pointSize"
@@ -1851,7 +1853,7 @@ VectorEngineAbstract >> displayUtf8: aByteArray at: aPoint trueTypeFont: aTTFont
 					baseIndex := 0 ] ] ]
 ]
 
-{ #category : #'paths - absolute coordinates' }
+{ #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> do_ClosePath [
 
 	"abs/rel meaningless here"
@@ -1881,7 +1883,7 @@ Display forceToScreen
 	previousCallControlY := previousCallY
 ]
 
-{ #category : #'stroke & fill' }
+{ #category : 'stroke & fill' }
 VectorEngineAbstract >> fillColor: aFillColor do: pathCommandsBlock [
 
 	"Prepare parameters for drawing fill."
@@ -1896,12 +1898,12 @@ VectorEngineAbstract >> fillColor: aFillColor do: pathCommandsBlock [
 	self finishPath: true
 ]
 
-{ #category : #abstract }
+{ #category : 'abstract' }
 VectorEngineAbstract >> finishPath: aPath [
 ^ self subclassResponsibility 
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 VectorEngineAbstract >> geometryTransformation: aGeometryTransformation [
 
 	"geometryTransformation is a GeometryTransformation that when applied to points in the public path protocol (i.e. Morph or domain coordinate system), it transform them into global, i.e. targetForm pixel coordinates. Therefore, the method used for converting client coordinates to actual pixel coordinates in the targetForm is #externalizePosition:, while the seldom used conversion from pixel coordinates to client coordinates is #internalizePosition:"
@@ -1909,7 +1911,7 @@ VectorEngineAbstract >> geometryTransformation: aGeometryTransformation [
 	geometryTransformation := aGeometryTransformation
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEngineAbstract >> initializeOnForm: aForm [
 
 	"geometryTransformation := MorphicTranslation new." "Identity"
@@ -1918,7 +1920,7 @@ VectorEngineAbstract >> initializeOnForm: aForm [
 	self pvtSetForm: aForm
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEngineAbstract >> initializePath [
 
 	pathFirstX := 0.
@@ -1932,7 +1934,7 @@ VectorEngineAbstract >> initializePath [
 	self newTrajectoryFragment
 ]
 
-{ #category : #morphic }
+{ #category : 'morphic' }
 VectorEngineAbstract >> morph: aMorph isAtPoint: aPoint [
 
 	| index |
@@ -1941,7 +1943,7 @@ VectorEngineAbstract >> morph: aMorph isAtPoint: aPoint [
 	^ (morphIds at: index) = aMorph morphId
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 VectorEngineAbstract >> morphBoundsAfterDraw [
 
 	"In targetForm coordinates.
@@ -1952,39 +1954,39 @@ VectorEngineAbstract >> morphBoundsAfterDraw [
 		  morphBoundsRight @ morphBoundsBottom + 1
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEngineAbstract >> newTrajectoryFragment [
 ^self subclassResponsibility 
 	
 ]
 
-{ #category : #'primitive algorithms' }
+{ #category : 'primitive algorithms' }
 VectorEngineAbstract >> primArcCenterX: cx centerY: cy radiusX: rx radiusY: ry start: startAngle rotationCos: thetaCos rotationSin: thetaSin hops: hops angleDelta: d [
 ^self subclassResponsibility 
 ]
 
-{ #category : #'primitive algorithms' }
+{ #category : 'primitive algorithms' }
 VectorEngineAbstract >> primCubicBezierFromX: xFrom y: yFrom toX: xTo y: yTo control1X: xControl1 y: yControl1 control2X: xControl2 y: yControl2 hops: hops [
 ^self subclassResponsibility 
 ]
 
-{ #category : #'primitive algorithms' }
+{ #category : 'primitive algorithms' }
 VectorEngineAbstract >> primLineFromX: xFrom y: yFrom toX: xTo y: yTo hops: hops incrementX: incrementX incrementY: incrementY [
 
 ^self subclassResponsibility 
 ]
 
-{ #category : #'primitive algorithms' }
+{ #category : 'primitive algorithms' }
 VectorEngineAbstract >> primQuadraticBezierFromX: xFrom y: yFrom toX: xTo y: yTo controlX: xControl y: yControl hops: hops [
 	^self subclassResponsibility 
 ]
 
-{ #category : #abstract }
+{ #category : 'abstract' }
 VectorEngineAbstract >> pvtFillColor: aFillColor [
 ^ self subclassResponsibility 
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEngineAbstract >> pvtSetForm: aForm [
 
 	targetForm := aForm.
@@ -1995,18 +1997,18 @@ VectorEngineAbstract >> pvtSetForm: aForm [
 	self antiAliasingWidth: self class defaultAntiAliasingWidth
 ]
 
-{ #category : #abstract }
+{ #category : 'abstract' }
 VectorEngineAbstract >> pvtStrokeColor: aColor [
 ^self subclassResponsibility 
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEngineAbstract >> pvtStrokeWidth: aNumber [
 
 	strokeWidth := aNumber
 ]
 
-{ #category : #'paths - relative coordinates' }
+{ #category : 'paths - relative coordinates' }
 VectorEngineAbstract >> rel_ArcToX: cx y: cy radiusX: mrx radiusY: mry angleOfXAxis: theta largeFlag: doLargerArc sweepFlag: useIncreasingAngles [
 
 	"
@@ -2030,7 +2032,7 @@ Display forceToScreen
 		sweepFlag: useIncreasingAngles
 ]
 
-{ #category : #'paths - relative coordinates' }
+{ #category : 'paths - relative coordinates' }
 VectorEngineAbstract >> rel_CubicBezierSmoothToX: xTo y: yTo control2X: xC y: yC [
 
 	"Cubic Bezier
@@ -2082,7 +2084,7 @@ Display forceToScreen
 		y: previousCallY + yC
 ]
 
-{ #category : #'paths - relative coordinates' }
+{ #category : 'paths - relative coordinates' }
 VectorEngineAbstract >> rel_CubicBezierToX: xTo y: yTo control1X: xC1 y: yC1 control2X: xC2 y: yC2 [
 
 	"Cubic Bezier
@@ -2127,7 +2129,7 @@ Display forceToScreen
 		y: previousCallY + yC2
 ]
 
-{ #category : #'paths - relative coordinates' }
+{ #category : 'paths - relative coordinates' }
 VectorEngineAbstract >> rel_LineToX: xTo y: yTo [
 
 	"
@@ -2161,7 +2163,7 @@ Display forceToScreen
 	self abs_LineToX: previousCallX + xTo y: previousCallY + yTo
 ]
 
-{ #category : #'paths - relative coordinates' }
+{ #category : 'paths - relative coordinates' }
 VectorEngineAbstract >> rel_MoveToX: x y: y [
 
 	"
@@ -2195,7 +2197,7 @@ Display forceToScreen
 	self abs_MoveToX: previousCallX + x y: previousCallY + y
 ]
 
-{ #category : #'paths - relative coordinates' }
+{ #category : 'paths - relative coordinates' }
 VectorEngineAbstract >> rel_QuadraticBezierSmoothToX: xTo y: yTo [
 
 	"
@@ -2235,7 +2237,7 @@ Display forceToScreen
 		y: previousCallY + yTo
 ]
 
-{ #category : #'paths - relative coordinates' }
+{ #category : 'paths - relative coordinates' }
 VectorEngineAbstract >> rel_QuadraticBezierToX: xTo y: yTo controlX: xC y: yC [
 
 	"
@@ -2270,7 +2272,7 @@ Display forceToScreen
 		y: previousCallY + yC
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEngineAbstract >> resetMorphBounds [
 
 	morphBoundsTop := targetForm height - 1.
@@ -2279,7 +2281,7 @@ VectorEngineAbstract >> resetMorphBounds [
 	morphBoundsRight := 0
 ]
 
-{ #category : #'stroke & fill' }
+{ #category : 'stroke & fill' }
 VectorEngineAbstract >> strokeWidth: clientStrokeWidth color: aStrokeColor do: pathCommandsBlock [
 
 	"Prepare parameters for drawing stroke."
@@ -2291,7 +2293,7 @@ VectorEngineAbstract >> strokeWidth: clientStrokeWidth color: aStrokeColor do: p
 		ensureClosePath: false
 ]
 
-{ #category : #'stroke & fill' }
+{ #category : 'stroke & fill' }
 VectorEngineAbstract >> strokeWidth: clientStrokeWidth color: aStrokeColor do: pathCommandsBlock ensureClosePath: ensureClosePath [
 
 	"Prepare parameters for drawing stroke."
@@ -2318,7 +2320,7 @@ VectorEngineAbstract >> strokeWidth: clientStrokeWidth color: aStrokeColor do: p
 	self finishPath: ensureClosePath
 ]
 
-{ #category : #'stroke & fill' }
+{ #category : 'stroke & fill' }
 VectorEngineAbstract >> strokeWidth: clientStrokeWidth color: aStrokeColor fillColor: aFillColor do: pathCommandsBlock [
 
 	"Prepare parameters for drawing stroke, fill, or both."

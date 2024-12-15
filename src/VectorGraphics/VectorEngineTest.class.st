@@ -1,10 +1,12 @@
 Class {
-	#name : #VectorEngineTest,
-	#superclass : #TestCase,
-	#category : #'VectorGraphics-tests'
+	#name : 'VectorEngineTest',
+	#superclass : 'TestCase',
+	#category : 'VectorGraphics-tests',
+	#package : 'VectorGraphics',
+	#tag : 'tests'
 }
 
-{ #category : #tests }
+{ #category : 'tests' }
 VectorEngineTest >> testAlphaMasks [
 |engine alphaMask|
 
@@ -26,7 +28,7 @@ self assert: (alphaMask  at: 59) equals: 16r0.
 
 ]
 
-{ #category : #tests }
+{ #category : 'tests' }
 VectorEngineTest >> testAlphaValue [
 |engine alpha|
 
@@ -73,7 +75,7 @@ alpha := engine alphaValueAtDistance: 3 and:  -2.
 self assert: alpha equals: 16r0.
 ]
 
-{ #category : #tests }
+{ #category : 'tests' }
 VectorEngineTest >> testDrawingArea [
 |engine area|
 
@@ -101,7 +103,7 @@ area := engine drawingAreaOf: 10@5.
 self assert: area closeTo: (Rectangle origin: 8@3 corner:10@8).
 ]
 
-{ #category : #tests }
+{ #category : 'tests' }
 VectorEngineTest >> testPrimLines [
 |engine line|
 

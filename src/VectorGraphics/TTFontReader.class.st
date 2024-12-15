@@ -2,24 +2,26 @@
 TTFontReader builds a TTFontDescription from a TrueType font file (.ttf).
 "
 Class {
-	#name : #TTFontReader,
-	#superclass : #Object,
+	#name : 'TTFontReader',
+	#superclass : 'Object',
 	#instVars : [
 		'glyphs',
 		'nGlyphs',
 		'kernPairs',
 		'fontDescription'
 	],
-	#category : #'VectorGraphics-TrueType'
+	#category : 'VectorGraphics-TrueType',
+	#package : 'VectorGraphics',
+	#tag : 'TrueType'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 TTFontReader class >> readTTFFrom: aByteArray [
 
 	^ self new readTTFFrom: aByteArray
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 TTFontReader >> decodeCmapFmtTable: entry [
 
 	| cmapFmt length entryCount segCount segments offset cmap firstCode |
@@ -76,7 +78,7 @@ TTFontReader >> decodeCmapFmtTable: entry [
 	^ nil
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 TTFontReader >> getGlyphFlagsFrom: entry size: nPts [
 
 	"Read in the flags for this glyph.  The outer loop gathers the flags that
@@ -100,7 +102,7 @@ TTFontReader >> getGlyphFlagsFrom: entry size: nPts [
 	^ flags
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> getTableDirEntry: tagString from: fontData offset: offset [
 
 	"Find the table named tagString in fontData and return a table directory entry for it."
@@ -119,7 +121,7 @@ TTFontReader >> getTableDirEntry: tagString from: fontData offset: offset [
 	^ nil
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> mapAndStoreGlyphsUsing: characterMap [
 
 	"
@@ -169,7 +171,7 @@ TTFontReader >> mapAndStoreGlyphsUsing: characterMap [
 		unknownGlyph: unknownGlyph
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processCharacterMappingTable: entry [
 
 	"Read the font's character to glyph index mapping table.
@@ -190,7 +192,7 @@ TTFontReader >> processCharacterMappingTable: entry [
 	^ nil
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processCompositeGlyphFrom: entry [
 
 	"Read a composite glyph from the font data."
@@ -253,7 +255,7 @@ TTFontReader >> processCompositeGlyphFrom: entry [
 	^ glyph
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processFontHeaderTable: entry [
 
 	"Value				Data Type    Description
@@ -289,7 +291,7 @@ indexToLocFormat	SHORT       Used when processing the Index To Loc Table."
 	^ indexToLocFormat
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processGlyphDataTable: entry offsets: offsetArray [
 
 	"Read the actual glyph data from the font.
@@ -324,7 +326,7 @@ TTFontReader >> processGlyphDataTable: entry offsets: offsetArray [
 	glyphs do: [ :g | g replaceIndexesByComponentGlyphsIn: glyphs ]
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processHorizontalHeaderTable: entry [
 
 	"See 
@@ -362,7 +364,7 @@ numOfLongHorMetrics  	USHORT       Number of advance widths in metrics table (HT
 	^ numOfLongHorMetrics
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processHorizontalMetricsTable: entry length: numHMetrics [
 
 	"Extract the advance width, left side bearing, and right
@@ -387,7 +389,7 @@ TTFontReader >> processHorizontalMetricsTable: entry length: numHMetrics [
 		index := index + 1 ]
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processIndexToLocationTable: entry format: indexToLocFormat [
 
 	"glyphOffset    ULONG[numGlyphs]   An array that contains each glyph's
@@ -406,7 +408,7 @@ TTFontReader >> processIndexToLocationTable: entry format: indexToLocFormat [
 	^ glyphOffset
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processKerningSubTableType0: entry [
 
 	| kp nKernPairs |
@@ -424,7 +426,7 @@ TTFontReader >> processKerningSubTableType0: entry [
 	^ true
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processKerningTable: entry [
 
 	"Extract the kerning information for pairs of glyphs."
@@ -446,7 +448,7 @@ TTFontReader >> processKerningTable: entry [
 	^ self processKerningSubTableType0: entry
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processMaximumProfileTable: entry [
 
 	"
@@ -457,7 +459,7 @@ numGlyphs         USHORT      The number of glyphs in the font.
 	nGlyphs := entry nextUShort
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processNamingTable: entry [
 
 	"copyright         CHARPTR     The font's copyright notice.
@@ -506,7 +508,7 @@ versionName       CHARPTR     The font's version string.
 	fontDescription setStrings: strings
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processOSXKerningTable: entry [
 
 	"From Apple's TrueType reference:
@@ -530,7 +532,7 @@ TTFontReader >> processOSXKerningTable: entry [
 	^ self processKerningSubTableType0: entry
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> processSimpleGlyphContours: nContours from: entry [
 
 	| glyph endPts nPts iLength flags bb bl br bt |
@@ -568,7 +570,7 @@ TTFontReader >> processSimpleGlyphContours: nContours from: entry [
 	^ glyph
 ]
 
-{ #category : #processing }
+{ #category : 'processing' }
 TTFontReader >> readFrom: fontData fromOffset: offset [
 
 	| headerEntry maxProfileEntry nameEntry indexLocEntry charMapEntry glyphEntry horzHeaderEntry horzMetricsEntry kerningEntry glyphOffset characterMap numHMetrics indexToLocFormat |
@@ -644,7 +646,7 @@ TTFontReader >> readFrom: fontData fromOffset: offset [
 	fontDescription setKernPairs: kernPairs
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 TTFontReader >> readGlyphXCoords: entry glyph: glyph nContours: nContours flags: flags endPoints: endPts [
 
 	"Read the x coordinates for the given glyph from the font file."
@@ -681,7 +683,7 @@ TTFontReader >> readGlyphXCoords: entry glyph: glyph nContours: nContours flags:
 		startPoint := endPoint + 1 ]
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 TTFontReader >> readGlyphYCoords: entry glyph: glyph nContours: nContours flags: flags endPoints: endPts [
 
 	"Read the y coordinates for the given glyph from the font file."
@@ -709,7 +711,7 @@ TTFontReader >> readGlyphYCoords: entry glyph: glyph nContours: nContours flags:
 		startPoint := endPoint + 1 ]
 ]
 
-{ #category : #public }
+{ #category : 'public' }
 TTFontReader >> readTTFFrom: aByteArray [
 
 	"Read the raw font byte data"

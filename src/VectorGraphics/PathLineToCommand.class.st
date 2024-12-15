@@ -1,19 +1,21 @@
 Class {
-	#name : #PathLineToCommand,
-	#superclass : #PathCommand,
+	#name : 'PathLineToCommand',
+	#superclass : 'PathCommand',
 	#instVars : [
 		'points'
 	],
-	#category : #'VectorGraphics-PathCommands'
+	#category : 'VectorGraphics-PathCommands',
+	#package : 'VectorGraphics',
+	#tag : 'PathCommands'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathLineToCommand class >> svgName [
 
 	^ $L
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathLineToCommand >> buildFrom: commandChar stream: aStream [
 
 	| px py |
@@ -25,7 +27,7 @@ PathLineToCommand >> buildFrom: commandChar stream: aStream [
 		          py notNil ] whileTrue: [ strm nextPut: px @ py ] ]
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 PathLineToCommand >> privatePointsDo: aBlock [
 
 	"evaluate aBlock with the x and y coordinates for our defining points."
@@ -35,7 +37,7 @@ PathLineToCommand >> privatePointsDo: aBlock [
 	points do: aBlock
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 PathLineToCommand >> runOn: aCanvas [
 
 	aCanvas multiLineTo: coordinatesAreRelative points: points

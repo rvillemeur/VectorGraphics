@@ -2,15 +2,17 @@
 This class represents a composite TrueType glyph, e.g. one which contains many simple TTGlyphs.
 "
 Class {
-	#name : #TTCompositeGlyph,
-	#superclass : #TTGlyph,
+	#name : 'TTCompositeGlyph',
+	#superclass : 'TTGlyph',
 	#instVars : [
 		'glyphs'
 	],
-	#category : #'VectorGraphics-TrueType'
+	#category : 'VectorGraphics-TrueType',
+	#package : 'VectorGraphics',
+	#tag : 'TrueType'
 }
 
-{ #category : #'primitive format' }
+{ #category : 'primitive format' }
 TTCompositeGlyph >> addContourDataTo: stream tx: aGeometryTransformationOrNil [
 
 	| glyph tx |
@@ -22,13 +24,13 @@ TTCompositeGlyph >> addContourDataTo: stream tx: aGeometryTransformationOrNil [
 		glyph addContourDataTo: stream tx: tx ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTCompositeGlyph >> addGlyph: aGlyph transformation: aMatrix [
 
 	glyphs := glyphs copyWith: aMatrix -> aGlyph
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTCompositeGlyph >> contourCount [
 
 	| glyph count |
@@ -39,7 +41,7 @@ TTCompositeGlyph >> contourCount [
 	^ count
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 TTCompositeGlyph >> drawGlyphOn: aVectorCanvas [
 
 	glyphs do: [ :each | 
@@ -48,32 +50,32 @@ TTCompositeGlyph >> drawGlyphOn: aVectorCanvas [
 			geometryTransformation: each key ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTCompositeGlyph >> glyphs [
 
 	^ glyphs collect: [ :assoc | assoc value ]
 ]
 
-{ #category : #initialize }
+{ #category : 'initialize' }
 TTCompositeGlyph >> initialize [
 
 	glyphs := #(  )
 ]
 
-{ #category : #testing }
+{ #category : 'testing' }
 TTCompositeGlyph >> isComposite [
 
 	^ true
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTCompositeGlyph >> replaceIndexesByComponentGlyphsIn: anArray [
 
 	glyphs := glyphs collect: [ :assoc | 
 		          assoc key -> (anArray at: assoc value) ]
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 TTCompositeGlyph >> txAndContoursDo: aBlock [
 
 	glyphs do: [ :assoc | 

@@ -8,60 +8,62 @@ Instance variables:
 	mask <Integer>	An efficient representation for the left and the right value.
 "
 Class {
-	#name : #TTKernPair,
-	#superclass : #Object,
+	#name : 'TTKernPair',
+	#superclass : 'Object',
 	#instVars : [
 		'left',
 		'right',
 		'value',
 		'mask'
 	],
-	#category : #'VectorGraphics-TrueType'
+	#category : 'VectorGraphics-TrueType',
+	#package : 'VectorGraphics',
+	#tag : 'TrueType'
 }
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTKernPair class >> maskFor: left with: right [
 
 	^ (left bitShift: 12) + right
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTKernPair >> left [
 
 	^ left
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTKernPair >> left: aNumber [
 
 	left := aNumber
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTKernPair >> mask [
 
 	^ mask ifNil: [ mask := self class maskFor: left with: right ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTKernPair >> right [
 
 	^ right
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTKernPair >> right: aNumber [
 
 	right := aNumber
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTKernPair >> value [
 
 	^ value
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTKernPair >> value: aNumber [
 
 	value := aNumber

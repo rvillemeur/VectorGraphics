@@ -12,8 +12,8 @@ c fullDraw: self.
 Display forceToScreen
 "
 Class {
-	#name : #VectorCanvas,
-	#superclass : #Canvas,
+	#name : 'VectorCanvas',
+	#superclass : 'Canvas',
 	#instVars : [
 		'boundsFinderEngine',
 		'form',
@@ -22,10 +22,12 @@ Class {
 		'clippingMorphDisplayBounds',
 		'currentTransformation'
 	],
-	#category : #'VectorGraphics-kernel'
+	#category : 'VectorGraphics-kernel',
+	#package : 'VectorGraphics',
+	#tag : 'kernel'
 }
 
-{ #category : #'class initialization' }
+{ #category : 'class initialization' }
 VectorCanvas class >> initialize [
 
 	"	VectorCanvas initialize
@@ -38,7 +40,7 @@ VectorCanvas class >> initialize [
 	
 ]
 
-{ #category : #'Morphic support' }
+{ #category : 'Morphic support' }
 VectorCanvas >> boundingRectOfCurrentMorphAfterDraw [
 
 	"In targetForm coordinates.
@@ -51,19 +53,19 @@ VectorCanvas >> boundingRectOfCurrentMorphAfterDraw [
 		  ifNil: [ engine morphBoundsAfterDraw ]
 ]
 
-{ #category : #'Morphic support' }
+{ #category : 'Morphic support' }
 VectorCanvas >> clippingMorph: aMorph [
 
 	engine clippingMorph: aMorph
 ]
 
-{ #category : #paths }
+{ #category : 'paths' }
 VectorCanvas >> closePath [
 
 	engine do_ClosePath
 ]
 
-{ #category : #paths }
+{ #category : 'paths' }
 VectorCanvas >> cubicBezier: points [
 	"points must be of size 4
 	http://en.wikipedia.org/wiki/Bezier_curve"
@@ -80,7 +82,7 @@ VectorCanvas >> cubicBezier: points [
 		control2X: control2 x y: control2 y
 ]
 
-{ #category : #paths }
+{ #category : 'paths' }
 VectorCanvas >> curveToX: xTo y: yTo control1X: xC1 y: yC1 control2X: xC2 y: yC2 [
 
 	engine
@@ -92,7 +94,7 @@ VectorCanvas >> curveToX: xTo y: yTo control1X: xC1 y: yC1 control2X: xC2 y: yC2
 		y: yC2
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorCanvas >> doSubPixelAntiAliasing [
 
 	"
@@ -103,7 +105,7 @@ VectorCanvas >> doSubPixelAntiAliasing [
 	self newClipRect: nil
 ]
 
-{ #category : #'drawing - icons' }
+{ #category : 'drawing - icons' }
 VectorCanvas >> drawButtonIconFromCurrentMorph [
 
 	currentMorph iconName ifNotNil: [ :selector | 
@@ -112,7 +114,7 @@ VectorCanvas >> drawButtonIconFromCurrentMorph [
 	^ false
 ]
 
-{ #category : #'drawing - icons' }
+{ #category : 'drawing - icons' }
 VectorCanvas >> drawCloseIcon [
 
 	self strokeWidth: 1.0 color: Color black do: [ 
@@ -123,43 +125,43 @@ VectorCanvas >> drawCloseIcon [
 			ry: 6 ]
 ]
 
-{ #category : #'drawing - icons' }
+{ #category : 'drawing - icons' }
 VectorCanvas >> drawCollapseIcon [
 
 	self drawCloseIcon
 ]
 
-{ #category : #'drawing - icons' }
+{ #category : 'drawing - icons' }
 VectorCanvas >> drawDownIcon [
 
 	self drawCloseIcon
 ]
 
-{ #category : #'drawing - icons' }
+{ #category : 'drawing - icons' }
 VectorCanvas >> drawExpandIcon [
 
 	self drawCloseIcon
 ]
 
-{ #category : #'drawing - icons' }
+{ #category : 'drawing - icons' }
 VectorCanvas >> drawLeftIcon [
 
 	self drawCloseIcon
 ]
 
-{ #category : #'drawing - icons' }
+{ #category : 'drawing - icons' }
 VectorCanvas >> drawMenuIcon [
 
 	self drawCloseIcon
 ]
 
-{ #category : #'drawing - icons' }
+{ #category : 'drawing - icons' }
 VectorCanvas >> drawRightIcon [
 
 	self drawCloseIcon
 ]
 
-{ #category : #'drawing - text' }
+{ #category : 'drawing - text' }
 VectorCanvas >> drawString: aString from: firstIndex to: lastIndex at: aPoint font: fontOrNil color: aColor [
 
 	"
@@ -204,13 +206,13 @@ Display forceToScreen
 	
 ]
 
-{ #category : #'drawing - icons' }
+{ #category : 'drawing - icons' }
 VectorCanvas >> drawUpIcon [
 
 	self drawCloseIcon
 ]
 
-{ #category : #'drawing - text' }
+{ #category : 'drawing - text' }
 VectorCanvas >> drawUtf8: aByteArray at: aPoint font: aTrueTypeFont color: aColor [
 
 	"
@@ -252,7 +254,7 @@ Display forceToScreen
 	
 ]
 
-{ #category : #paths }
+{ #category : 'paths' }
 VectorCanvas >> ellipseCenterX: mcx y: mcy rx: mrx ry: mry [
 
 	engine
@@ -262,7 +264,7 @@ VectorCanvas >> ellipseCenterX: mcx y: mcy rx: mrx ry: mry [
 		radiusY: mry
 ]
 
-{ #category : #'drawing - FormCanvas protocol' }
+{ #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> ellipseCenterX: mcx y: mcy rx: mrx ry: mry borderWidth: morphStrokeWidth borderColor: strokeColorOrGradient fillColor: fillColorOrGradient [
 
 	self
@@ -277,13 +279,13 @@ VectorCanvas >> ellipseCenterX: mcx y: mcy rx: mrx ry: mry borderWidth: morphStr
 				ry: mry ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 VectorCanvas >> engine [
 
 	^ engine
 ]
 
-{ #category : #'context and parameters for path' }
+{ #category : 'context and parameters for path' }
 VectorCanvas >> fillColor: aFillColor do: pathCommandsBlock [
 
 	"Prepare parameters for drawing stroke, fill, or both."
@@ -291,7 +293,7 @@ VectorCanvas >> fillColor: aFillColor do: pathCommandsBlock [
 	engine fillColor: aFillColor do: pathCommandsBlock
 ]
 
-{ #category : #'drawing - FormCanvas protocol' }
+{ #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> fillRectangle: aRectangle color: aColor [
 
 	"For BitBltCanvas protocol, aRectangle:
@@ -305,7 +307,7 @@ VectorCanvas >> fillRectangle: aRectangle color: aColor [
 			maxY: aRectangle bottom - 0.5 ]
 ]
 
-{ #category : #'drawing - FormCanvas protocol' }
+{ #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> fillRectangle: aRectangle color: aColor borderWidth: morphStrokeWidth borderStyleSymbol: aSymbol baseColorForBorder: baseColorForBorder [
 
 	"For BitBltCanvas protocol, aRectangle:
@@ -342,7 +344,7 @@ VectorCanvas >> fillRectangle: aRectangle color: aColor borderWidth: morphStroke
 			self lineToX: aRectangle right - d2 y: aRectangle top + d1 ] ]
 ]
 
-{ #category : #'drawing - FormCanvas protocol' }
+{ #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> frameAndFillRectangle: aRectangle fillColor: aColor borderWidth: borderWidth borderColor: borderColor [
 
 	"For BitBltCanvas protocol, aRectangle:
@@ -360,7 +362,7 @@ VectorCanvas >> frameAndFillRectangle: aRectangle fillColor: aColor borderWidth:
 				maxY: aRectangle bottom - 0.5 ]
 ]
 
-{ #category : #'drawing - FormCanvas protocol' }
+{ #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> frameRectangle: aRectangle borderWidth: borderWidth color: borderColor [
 
 	"For BitBltCanvas protocol, aRectangle:
@@ -379,7 +381,7 @@ VectorCanvas >> frameRectangle: aRectangle borderWidth: borderWidth color: borde
 			maxY: aRectangle bottom - d2 ]
 ]
 
-{ #category : #'drawing - FormCanvas protocol' }
+{ #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> image: aForm multipliedBy: aColor at: aPoint [
 
 	"NO quiero usar imagenes en M3... ver como hacer... quizas meter un servicio en el canvas que en m2 use imagenes y en m3 no..."
@@ -391,14 +393,14 @@ VectorCanvas >> image: aForm multipliedBy: aColor at: aPoint [
 	super image: aForm multipliedBy: aColor at: aPoint
 ]
 
-{ #category : #'Morphic support' }
+{ #category : 'Morphic support' }
 VectorCanvas >> initializeWith: aForm origin: aPoint [
 
 	super initializeWith: aForm origin: aPoint.
 	engine geometryTransformation: currentTransformation
 ]
 
-{ #category : #'Morphic support' }
+{ #category : 'Morphic support' }
 VectorCanvas >> into: aMorph [
 
 	super into: aMorph.
@@ -407,7 +409,7 @@ VectorCanvas >> into: aMorph [
 	engine resetMorphBounds
 ]
 
-{ #category : #'drawing - FormCanvas protocol' }
+{ #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> line: pt1 to: pt2 width: morphStrokeWidth color: aStrokeColor [
 
 	self strokeWidth: morphStrokeWidth color: aStrokeColor do: [ 
@@ -415,25 +417,25 @@ VectorCanvas >> line: pt1 to: pt2 width: morphStrokeWidth color: aStrokeColor [
 		self lineToX: pt2 x y: pt2 y ]
 ]
 
-{ #category : #paths }
+{ #category : 'paths' }
 VectorCanvas >> lineToX: xTo y: yTo [
 
 	engine abs_LineToX: xTo y: yTo
 ]
 
-{ #category : #'Morphic support' }
+{ #category : 'Morphic support' }
 VectorCanvas >> morph: aMorph isAtPoint: aPoint [
 
 	^ engine morph: aMorph isAtPoint: aPoint
 ]
 
-{ #category : #paths }
+{ #category : 'paths' }
 VectorCanvas >> moveToX: x y: y [
 
 	engine abs_MoveToX: x y: y
 ]
 
-{ #category : #'paths - sequences' }
+{ #category : 'paths - sequences' }
 VectorCanvas >> multiArc: coordinatesAreRelative rs: rs xAxisRotations: xAxisRotations toPoints: toPoints doLargerArcs: doLargerArcs useIncreasingAngless: useIncreasingAngless [
 
 	| to r |
@@ -464,7 +466,7 @@ VectorCanvas >> multiArc: coordinatesAreRelative rs: rs xAxisRotations: xAxisRot
 					sweepFlag: (useIncreasingAngless at: i) ] ]
 ]
 
-{ #category : #'paths - sequences' }
+{ #category : 'paths - sequences' }
 VectorCanvas >> multiCurveTo: coordinatesAreRelative toPoints: toPoints control1Points: control1Points control2Points: control2Points [
 
 	| c1 c2 to |
@@ -495,7 +497,7 @@ VectorCanvas >> multiCurveTo: coordinatesAreRelative toPoints: toPoints control1
 					y: c2 y ] ]
 ]
 
-{ #category : #'paths - sequences' }
+{ #category : 'paths - sequences' }
 VectorCanvas >> multiCurveToSmooth: coordinatesAreRelative toPoints: toPoints control2Points: control2Points [
 
 	| c2 to |
@@ -520,7 +522,7 @@ VectorCanvas >> multiCurveToSmooth: coordinatesAreRelative toPoints: toPoints co
 					y: c2 y ] ]
 ]
 
-{ #category : #'paths - sequences' }
+{ #category : 'paths - sequences' }
 VectorCanvas >> multiLineTo: coordinatesAreRelative points: toPoints [
 
 	| to |
@@ -535,7 +537,7 @@ VectorCanvas >> multiLineTo: coordinatesAreRelative points: toPoints [
 				engine rel_LineToX: to x y: to y ] ]
 ]
 
-{ #category : #'paths - sequences' }
+{ #category : 'paths - sequences' }
 VectorCanvas >> multiLineTo: coordinatesAreRelative xs: xs [
 
 	coordinatesAreRelative
@@ -543,7 +545,7 @@ VectorCanvas >> multiLineTo: coordinatesAreRelative xs: xs [
 		ifTrue: [ xs do: [ :x | engine rel_LineToX: x y: 0 ] ]
 ]
 
-{ #category : #'paths - sequences' }
+{ #category : 'paths - sequences' }
 VectorCanvas >> multiLineTo: coordinatesAreRelative ys: ys [
 
 	coordinatesAreRelative
@@ -551,7 +553,7 @@ VectorCanvas >> multiLineTo: coordinatesAreRelative ys: ys [
 		ifTrue: [ ys do: [ :y | engine rel_LineToX: 0 y: y ] ]
 ]
 
-{ #category : #'paths - sequences' }
+{ #category : 'paths - sequences' }
 VectorCanvas >> multiMoveTo: coordinatesAreRelative points: points [
 
 	| isFirst |
@@ -571,7 +573,7 @@ VectorCanvas >> multiMoveTo: coordinatesAreRelative points: points [
 				isFirst := false ] ]
 ]
 
-{ #category : #'paths - sequences' }
+{ #category : 'paths - sequences' }
 VectorCanvas >> multiQuadraticCurveTo: coordinatesAreRelative toPoints: toPoints controlPoints: controlPoints [
 
 	| c to |
@@ -596,7 +598,7 @@ VectorCanvas >> multiQuadraticCurveTo: coordinatesAreRelative toPoints: toPoints
 					y: c y ] ]
 ]
 
-{ #category : #'paths - sequences' }
+{ #category : 'paths - sequences' }
 VectorCanvas >> multiQuadraticCurveToSmooth: coordinatesAreRelative toPoints: toPoints [
 
 	| to |
@@ -611,7 +613,7 @@ VectorCanvas >> multiQuadraticCurveToSmooth: coordinatesAreRelative toPoints: to
 				engine rel_QuadraticBezierSmoothToX: to x y: to y ] ]
 ]
 
-{ #category : #'Morphic support' }
+{ #category : 'Morphic support' }
 VectorCanvas >> outOfMorph [
 
 	super outOfMorph.
@@ -619,7 +621,7 @@ VectorCanvas >> outOfMorph [
 	engine geometryTransformation: currentTransformation
 ]
 
-{ #category : #paths }
+{ #category : 'paths' }
 VectorCanvas >> polyLine: points [
 
 	| p |
@@ -630,7 +632,7 @@ VectorCanvas >> polyLine: points [
 		engine abs_LineToX: p x y: p y ]
 ]
 
-{ #category : #paths }
+{ #category : 'paths' }
 VectorCanvas >> quadraticBezier: points [
 
 	"points must be of size 3
@@ -648,7 +650,7 @@ VectorCanvas >> quadraticBezier: points [
 		y: control y
 ]
 
-{ #category : #paths }
+{ #category : 'paths' }
 VectorCanvas >> rectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax [
 
 	engine
@@ -659,7 +661,7 @@ VectorCanvas >> rectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax [
 		do_ClosePath
 ]
 
-{ #category : #'Morphic support' }
+{ #category : 'Morphic support' }
 VectorCanvas >> restorePatch: savedPatch [
 
 	"Argument must previously be obtained by calling #savePatch:bounds:
@@ -702,7 +704,7 @@ VectorCanvas >> restorePatch: savedPatch [
 		copyBits
 ]
 
-{ #category : #paths }
+{ #category : 'paths' }
 VectorCanvas >> roundBottomRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax rx: mrx ry: mry [
 
 	| corner1 corner2 corner3 corner4 dx dy p5 p6 p7 p8 |
@@ -748,7 +750,7 @@ VectorCanvas >> roundBottomRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax 
 		do_ClosePath
 ]
 
-{ #category : #'drawing - FormCanvas protocol' }
+{ #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> roundRect: aRectangle color: aColor radius: r [
 
 	"For BitBltCanvas protocol, aRectangle:
@@ -764,7 +766,7 @@ VectorCanvas >> roundRect: aRectangle color: aColor radius: r [
 			ry: r ]
 ]
 
-{ #category : #paths }
+{ #category : 'paths' }
 VectorCanvas >> roundRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax rx: mrx ry: mry [
 
 	| corner1 corner2 corner3 corner4 dx dy p1 p2 p3 p4 p5 p6 p7 p8 |
@@ -824,7 +826,7 @@ VectorCanvas >> roundRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax rx: mr
 		do_ClosePath
 ]
 
-{ #category : #paths }
+{ #category : 'paths' }
 VectorCanvas >> roundTopRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax rx: mrx ry: mry [
 
 	| corner1 corner2 corner3 corner4 dx dy p1 p2 p3 p4 |
@@ -870,7 +872,7 @@ VectorCanvas >> roundTopRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax rx:
 		do_ClosePath
 ]
 
-{ #category : #'Morphic support' }
+{ #category : 'Morphic support' }
 VectorCanvas >> savePatch: prevSavedPatch bounds: aRectangle [
 
 	"Senders don't need to know any details of what is answered, but just store it for further calls, and calls to restorePatch:"
@@ -908,7 +910,7 @@ VectorCanvas >> savePatch: prevSavedPatch bounds: aRectangle [
 	^ answer
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorCanvas >> setClipRect: aRectangle [
 
 	"In targetForm coordinates"
@@ -917,7 +919,7 @@ VectorCanvas >> setClipRect: aRectangle [
 	engine clipRect: aRectangle
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorCanvas >> setForm: aForm [
 
 	"
@@ -931,7 +933,7 @@ VectorCanvas >> setForm: aForm [
 	self newClipRect: nil
 ]
 
-{ #category : #'context and parameters for path' }
+{ #category : 'context and parameters for path' }
 VectorCanvas >> strokeWidth: morphStrokeWidth color: aStrokeColor do: pathCommandsBlock [
 
 	"Prepare parameters for drawing stroke, fill, or both."
@@ -944,7 +946,7 @@ VectorCanvas >> strokeWidth: morphStrokeWidth color: aStrokeColor do: pathComman
 		do: pathCommandsBlock
 ]
 
-{ #category : #'context and parameters for path' }
+{ #category : 'context and parameters for path' }
 VectorCanvas >> strokeWidth: morphStrokeWidth color: aStrokeColor fillColor: aFillColor do: pathCommandsBlock [
 
 	"Prepare parameters for drawing stroke, fill, or both."
@@ -958,7 +960,7 @@ VectorCanvas >> strokeWidth: morphStrokeWidth color: aStrokeColor fillColor: aFi
 		do: pathCommandsBlock
 ]
 
-{ #category : #'drawing - FormCanvas protocol' }
+{ #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> textComposition: aTextComposition bounds: boundddsRect color: c selectionColor: sc [
 
 	"ojo que es un quad, o sea un rect en coordenadas del morph..."
@@ -972,7 +974,7 @@ VectorCanvas >> textComposition: aTextComposition bounds: boundddsRect color: c 
 		selectionColor: sc
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorCanvas >> updatingMorphBoundsDo: aBlock [
 
 	| prevEngine |
@@ -982,7 +984,7 @@ VectorCanvas >> updatingMorphBoundsDo: aBlock [
 	aBlock value ] ensure: [ engine := prevEngine ]
 ]
 
-{ #category : #'drawing - FormCanvas protocol' }
+{ #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> windowFrame: aRectangle color: aColor radius: r border: morphStrokeWidth labelHeight: lh gradientTop: topFactor gradientBottom: bottomFactor insideColor: insideColor [
 
 	"For BitBltCanvas protocol, aRectangle:

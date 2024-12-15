@@ -1,20 +1,22 @@
 Class {
-	#name : #PathCurveToSmoothCommand,
-	#superclass : #PathCommand,
+	#name : 'PathCurveToSmoothCommand',
+	#superclass : 'PathCommand',
 	#instVars : [
 		'toPoints',
 		'control2Points'
 	],
-	#category : #'VectorGraphics-PathCommands'
+	#category : 'VectorGraphics-PathCommands',
+	#package : 'VectorGraphics',
+	#tag : 'PathCommands'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathCurveToSmoothCommand class >> svgName [
 
 	^ $S
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathCurveToSmoothCommand >> buildFrom: commandChar stream: aStream [
 
 	| x2 y2 x y |
@@ -31,7 +33,7 @@ PathCurveToSmoothCommand >> buildFrom: commandChar stream: aStream [
 		control2Points add: x2 @ y2 ]
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 PathCurveToSmoothCommand >> privatePointsDo: aBlock [
 
 	"evaluate aBlock with the x and y coordinates for our defining points."
@@ -39,7 +41,7 @@ PathCurveToSmoothCommand >> privatePointsDo: aBlock [
 	toPoints do: aBlock
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 PathCurveToSmoothCommand >> runOn: aCanvas [
 
 	aCanvas

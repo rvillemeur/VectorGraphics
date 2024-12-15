@@ -1,19 +1,21 @@
 Class {
-	#name : #VectorEngineSubPixel,
-	#superclass : #VectorEnginePixel,
+	#name : 'VectorEngineSubPixel',
+	#superclass : 'VectorEnginePixel',
 	#instVars : [
 		'subPixelDelta'
 	],
-	#category : #'VectorGraphics-kernel'
+	#category : 'VectorGraphics-kernel',
+	#package : 'VectorGraphics',
+	#tag : 'kernel'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 VectorEngineSubPixel class >> defaultAntiAliasingWidth [
 
 	^ 1.4
 ]
 
-{ #category : #'private - blend with mask' }
+{ #category : 'private - blend with mask' }
 VectorEngineSubPixel >> blendFillOnly [
 
 	| edgesUpToThisPixelR edgesUpToThisPixelG edgesUpToThisPixelB edgesThisPixel edgesThisPixelR edgesThisPixelG edgesThisPixelB isRedInside isGreenInside isBlueInside pixelIndex morphAtThisPixelId |
@@ -60,7 +62,7 @@ VectorEngineSubPixel >> blendFillOnly [
 			alphaMask at: pixelIndex put: 0 ] ]
 ]
 
-{ #category : #'private - blend with mask' }
+{ #category : 'private - blend with mask' }
 VectorEngineSubPixel >> blendFillOnlyAtX: x y: y pixelIndex: pixelIndex redIsInside: isRedInside greenIsInside: isGreenInside blueIsInside: isBlueInside [
 
 	"targetForm only contains opaque colors. Assume its alpha is always one. Don't ask for it. Set it to one when writing.
@@ -120,7 +122,7 @@ VectorEngineSubPixel >> blendFillOnlyAtX: x y: y pixelIndex: pixelIndex redIsIns
 	targetForm bits bytesAt: pixelIndex put: targetWord
 ]
 
-{ #category : #'private - blend with mask' }
+{ #category : 'private - blend with mask' }
 VectorEngineSubPixel >> blendStrokeAndFill [
 
 	| edgesUpToThisPixelR edgesUpToThisPixelG edgesUpToThisPixelB edgesThisPixel edgesThisPixelR edgesThisPixelG edgesThisPixelB isRedInside isGreenInside isBlueInside pixelIndex morphAtThisPixelId |
@@ -167,7 +169,7 @@ VectorEngineSubPixel >> blendStrokeAndFill [
 			alphaMask at: pixelIndex put: 0 ] ]
 ]
 
-{ #category : #'private - blend with mask' }
+{ #category : 'private - blend with mask' }
 VectorEngineSubPixel >> blendStrokeAndFillAtX: x y: y pixelIndex: pixelIndex redIsInside: isRedInside greenIsInside: isGreenInside blueIsInside: isBlueInside [
 
 	"targetForm only contains opaque colors. Assume its alpha is always one. Don't ask for it. Set it to one when writing.
@@ -247,7 +249,7 @@ VectorEngineSubPixel >> blendStrokeAndFillAtX: x y: y pixelIndex: pixelIndex red
 	targetForm bits bytesAt: pixelIndex put: targetWord
 ]
 
-{ #category : #'private - blend with mask' }
+{ #category : 'private - blend with mask' }
 VectorEngineSubPixel >> blendStrokeOnly [
 
 	| pixelIndex morphAtThisPixelId |
@@ -266,7 +268,7 @@ VectorEngineSubPixel >> blendStrokeOnly [
 			alphaMask at: pixelIndex put: 0 ] ]
 ]
 
-{ #category : #'private - blend with mask' }
+{ #category : 'private - blend with mask' }
 VectorEngineSubPixel >> blendStrokeOnlyAtX: x y: y pixelIndex: pixelIndex [
 
 	"targetForm only contains opaque colors. Assume its alpha is always one. Don't ask for it. Set it to one when writing.
@@ -319,7 +321,7 @@ VectorEngineSubPixel >> blendStrokeOnlyAtX: x y: y pixelIndex: pixelIndex [
 		morphIds at: pixelIndex put: currentMorphId ]
 ]
 
-{ #category : #abstract }
+{ #category : 'abstract' }
 VectorEngineSubPixel >> finishPath: ensureClosePath [
 
 	"Blend stroke and/or fill over background, according to the just computed pen alphas (distance from pixel to center of stroke)"
@@ -367,7 +369,7 @@ VectorEngineSubPixel >> finishPath: ensureClosePath [
 	previousCallControlY := previousCallY
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEngineSubPixel >> pvtSetForm: aForm [
 
 	| s |
@@ -378,7 +380,7 @@ VectorEngineSubPixel >> pvtSetForm: aForm [
 	subPixelDelta := 0.25 "Values closer to 0.333 might produce a bit of coloring on some displays. Used to be 0.28"
 ]
 
-{ #category : #'primitive algorithms - aux' }
+{ #category : 'primitive algorithms - aux' }
 VectorEngineSubPixel >> updateAlphasForX: x y: y [
 
 	"slight optimization possible when we know width = 0... perhaps implement:
@@ -453,7 +455,7 @@ VectorEngineSubPixel >> updateAlphasForX: x y: y [
 				doUpdate ifTrue: [ alphaMask bytesAt: pixelIndex put: alphaWord ] ] ] ]
 ]
 
-{ #category : #'primitive algorithms - aux' }
+{ #category : 'primitive algorithms - aux' }
 VectorEngineSubPixel >> updateEdgeCountAtX: x y: y [
 
 	| thisYTruncated pixelY pixelIndexBase redPixelIndex greenPixelIndex bluePixelIndex increment countWord redCount greenCount blueCount redOffset greenOffset blueOffset |
@@ -527,7 +529,7 @@ VectorEngineSubPixel >> updateEdgeCountAtX: x y: y [
 						edgeCounts bytesAt: bluePixelIndex put: countWord ] ] ]
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : 'as yet unclassified' }
 VectorEngineSubPixel >> updateEdgesAndBoundsForX: x y: y [
 
 	"

@@ -3,18 +3,20 @@ Does only whole pixel anti aliasing. Appropriate for very high resolution displa
 edgeCounts and alphaMask are single byte per pixel.
 "
 Class {
-	#name : #VectorEngineWholePixel,
-	#superclass : #VectorEnginePixel,
-	#category : #'VectorGraphics-kernel'
+	#name : 'VectorEngineWholePixel',
+	#superclass : 'VectorEnginePixel',
+	#category : 'VectorGraphics-kernel',
+	#package : 'VectorGraphics',
+	#tag : 'kernel'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 VectorEngineWholePixel class >> defaultAntiAliasingWidth [
 
 	^ 1.7
 ]
 
-{ #category : #'private - blend with mask' }
+{ #category : 'private - blend with mask' }
 VectorEngineWholePixel >> blendFillOnly [
 
 	| edgesUpToThisPixel edgesThisPixel pixelIndex morphAtThisPixelId |
@@ -41,7 +43,7 @@ VectorEngineWholePixel >> blendFillOnly [
 			alphaMask at: pixelIndex put: 0 ] ]
 ]
 
-{ #category : #'private - blend with mask' }
+{ #category : 'private - blend with mask' }
 VectorEngineWholePixel >> blendFillOnlyAtX: x y: y pixelIndex: pixelIndex isInside: isInside [
 
 	"targetForm only contains opaque colors. Assume its alpha is always one. Don't ask for it. Set it to one when writing. 	Blends fill over background. Despite method selector, there might be a very thin stroke of the same color as the fill. Handle this by adjusting antiAliasAlphas.	For blending, alphas are in [0 .. 1.0] and R, G, B color components are in [0 .. 255]"
@@ -82,7 +84,7 @@ VectorEngineWholePixel >> blendFillOnlyAtX: x y: y pixelIndex: pixelIndex isInsi
 	targetForm bits bytesAt: pixelIndex put: targetWord
 ]
 
-{ #category : #'private - blend with mask' }
+{ #category : 'private - blend with mask' }
 VectorEngineWholePixel >> blendStrokeAndFill [
 
 	| edgesUpToThisPixel edgesThisPixel pixelIndex morphAtThisPixelId |
@@ -109,7 +111,7 @@ VectorEngineWholePixel >> blendStrokeAndFill [
 			alphaMask at: pixelIndex put: 0 ] ]
 ]
 
-{ #category : #'private - blend with mask' }
+{ #category : 'private - blend with mask' }
 VectorEngineWholePixel >> blendStrokeAndFillAtX: x y: y pixelIndex: pixelIndex isInside: isInside [
 
 	"targetForm only contains opaque colors. Assume its alpha is always one. Don't ask for it. Set it to one when writing. 	Do an appropriate (anti aliased) mix between stoke and fill (or pick just stroke or just fill). Blend this over background. 	For blending, alphas are in [0 .. 1.0] and R, G, B color components are in [0 .. 255]"
@@ -163,7 +165,7 @@ VectorEngineWholePixel >> blendStrokeAndFillAtX: x y: y pixelIndex: pixelIndex i
 	targetForm bits bytesAt: pixelIndex put: targetWord
 ]
 
-{ #category : #'private - blend with mask' }
+{ #category : 'private - blend with mask' }
 VectorEngineWholePixel >> blendStrokeOnly [
 
 	| pixelIndex morphAtThisPixelId |
@@ -182,7 +184,7 @@ VectorEngineWholePixel >> blendStrokeOnly [
 			alphaMask at: pixelIndex put: 0 ] ]
 ]
 
-{ #category : #'private - blend with mask' }
+{ #category : 'private - blend with mask' }
 VectorEngineWholePixel >> blendStrokeOnlyAtX: x y: y pixelIndex: pixelIndex [
 
 	"targetForm only contains opaque colors. Assume its alpha is always one. Don't ask for it. Set it to one when writing. 	Blends stroke over background. 	For blending, alphas are in [0 .. 1.0] and R, G, B color components are in [0 .. 255]"
@@ -222,7 +224,7 @@ VectorEngineWholePixel >> blendStrokeOnlyAtX: x y: y pixelIndex: pixelIndex [
 		morphIds at: pixelIndex put: currentMorphId ]
 ]
 
-{ #category : #abstract }
+{ #category : 'abstract' }
 VectorEngineWholePixel >> finishPath: ensureClosePath [
 
 	"Blend stroke and/or fill over background, according to the just computed pen alphas (distance from pixel to center of stroke)"
@@ -269,7 +271,7 @@ VectorEngineWholePixel >> finishPath: ensureClosePath [
 	previousCallControlY := previousCallY
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 VectorEngineWholePixel >> pvtSetForm: aForm [
 
 	| s |
@@ -279,7 +281,7 @@ VectorEngineWholePixel >> pvtSetForm: aForm [
 	edgeCounts := ByteArray new: s
 ]
 
-{ #category : #'primitive algorithms - aux' }
+{ #category : 'primitive algorithms - aux' }
 VectorEngineWholePixel >> updateAlphasForX: x y: y [
 
 	"slight optimization possible when we know width = 0... perhaps implement: 
@@ -318,7 +320,7 @@ VectorEngineWholePixel >> updateAlphasForX: x y: y [
 					alpha > prevAlpha ifTrue: [ alphaMask at: pixelIndex put: alpha ] ] ] ] ]
 ]
 
-{ #category : #'primitive algorithms - aux' }
+{ #category : 'primitive algorithms - aux' }
 VectorEngineWholePixel >> updateEdgesAndBoundsForX: x y: y [
 
 	| thisYTruncated pixelY pixelIndex increment count pixelX |

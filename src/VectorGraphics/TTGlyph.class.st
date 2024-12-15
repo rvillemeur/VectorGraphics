@@ -9,8 +9,8 @@ Instance variables:
 	rightSideBearing  	<Integer>	right side bearing
 "
 Class {
-	#name : #TTGlyph,
-	#superclass : #Object,
+	#name : 'TTGlyph',
+	#superclass : 'Object',
 	#instVars : [
 		'boundsLeft',
 		'boundsRight',
@@ -21,10 +21,12 @@ Class {
 		'leftSideBearing',
 		'rightSideBearing'
 	],
-	#category : #'VectorGraphics-TrueType'
+	#category : 'VectorGraphics-TrueType',
+	#package : 'VectorGraphics',
+	#tag : 'TrueType'
 }
 
-{ #category : #'primitive format' }
+{ #category : 'primitive format' }
 TTGlyph >> addContourDataTo: stream [
 
 	stream nextPut: self advanceWidth.
@@ -36,26 +38,26 @@ TTGlyph >> addContourDataTo: stream [
 	self addContourDataTo: stream tx: nil
 ]
 
-{ #category : #'primitive format' }
+{ #category : 'primitive format' }
 TTGlyph >> addContourDataTo: stream tx: aGeometryTransformationOrNil [
 
 	contours do: [ :c | 
 		c addContourDataTo: stream tx: aGeometryTransformationOrNil ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> advanceWidth [
 
 	^ advanceWidth
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> advanceWidth: aNumber [
 
 	advanceWidth := aNumber
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> boundsBottom [
 
 	^ boundsBottom
@@ -66,7 +68,7 @@ TTGlyph >> boundsBottom [
 	"
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> boundsLeft [
 
 	^ boundsLeft
@@ -77,7 +79,7 @@ TTGlyph >> boundsLeft [
 	"
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> boundsLeft: bl boundsRight: br boundsTop: bt boundsBottom: bm [
 
 	boundsLeft := bl.
@@ -86,7 +88,7 @@ TTGlyph >> boundsLeft: bl boundsRight: br boundsTop: bt boundsBottom: bm [
 	boundsBottom := bm
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> boundsRight [
 
 	^ boundsRight
@@ -97,7 +99,7 @@ TTGlyph >> boundsRight [
 	"
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> boundsTop [
 
 	^ boundsTop
@@ -108,31 +110,31 @@ TTGlyph >> boundsTop [
 	"
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> contourCount [
 
 	^ contours count: [ :each | each isEmpty not ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> contours [
 
 	^ contours
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> contours: aCollection [
 
 	contours := aCollection asArray
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 TTGlyph >> drawGlyphOn: aVectorCanvas [
 
 	self drawGlyphOn: aVectorCanvas geometryTransformation: nil
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 TTGlyph >> drawGlyphOn: aVectorCanvas geometryTransformation: txOrNil [
 
 	contours do: [ :contour | 
@@ -142,7 +144,7 @@ TTGlyph >> drawGlyphOn: aVectorCanvas geometryTransformation: txOrNil [
 			(contour pathCommand: txOrNil) runOn: aVectorCanvas ] ]
 ]
 
-{ #category : #'initialize-release' }
+{ #category : 'initialize-release' }
 TTGlyph >> initialize [
 
 	boundsLeft := boundsRight := boundsTop := boundsBottom := 0.
@@ -152,7 +154,7 @@ TTGlyph >> initialize [
 	rightSideBearing := 0
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTGlyph >> initializeContours: numContours with: endPoints [
 
 	"Initialize the contours for creation of the glyph."
@@ -162,30 +164,30 @@ TTGlyph >> initializeContours: numContours with: endPoints [
 	startPt := -1.
 	1 to: numContours do: [ :i | 
 		endPt := endPoints at: i.
-		pts := ShortPointArray new: endPt - startPt.
+		pts := Int16PointArray new: endPt - startPt.
 		contours at: i put: (TTContourConstruction on: pts).
 		startPt := endPt ]
 ]
 
-{ #category : #testing }
+{ #category : 'testing' }
 TTGlyph >> isComposite [
 
 	^ false
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> leftSideBearing [
 
 	^ leftSideBearing
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> leftSideBearing: aNumber [
 
 	leftSideBearing := aNumber
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTGlyph >> makePointsAbsolute [
 
 	"Build the contours in the receiver glyph.
@@ -199,7 +201,7 @@ TTGlyph >> makePointsAbsolute [
 		contourOrigin := contour makePointsAbsolute: contourOrigin ]
 ]
 
-{ #category : #printing }
+{ #category : 'printing' }
 TTGlyph >> printOn: aStream [
 
 	aStream
@@ -209,7 +211,7 @@ TTGlyph >> printOn: aStream [
 		nextPut: $)
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTGlyph >> replaceIndexesByComponentGlyphsIn: dummy [
 
 	"NOP"
@@ -217,19 +219,19 @@ TTGlyph >> replaceIndexesByComponentGlyphsIn: dummy [
 	
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> rightSideBearing [
 
 	^ rightSideBearing
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> rightSideBearing: aNumber [
 
 	rightSideBearing := aNumber
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTGlyph >> topSideBearing [
 
 	"
@@ -239,7 +241,7 @@ TTGlyph >> topSideBearing [
 	^ boundsBottom
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTGlyph >> updateRightSideBearing [
 
 	"Update the right side bearing value"

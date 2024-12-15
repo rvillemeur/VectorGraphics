@@ -5,8 +5,8 @@ See
 https://www.freetype.org/freetype2/docs/glyphs/glyphs-3.html
 "
 Class {
-	#name : #TTFontDescription,
-	#superclass : #Object,
+	#name : 'TTFontDescription',
+	#superclass : 'Object',
 	#instVars : [
 		'folderName',
 		'contourDataForIso8859s15',
@@ -33,10 +33,12 @@ Class {
 	#classVars : [
 		'Descriptions'
 	],
-	#category : #'VectorGraphics-TrueType'
+	#category : 'VectorGraphics-TrueType',
+	#package : 'VectorGraphics',
+	#tag : 'TrueType'
 }
 
-{ #category : #'class initialization' }
+{ #category : 'class initialization' }
 TTFontDescription class >> initialize [
 
 	"	TTFontDescription  initialize 	"
@@ -44,7 +46,7 @@ TTFontDescription class >> initialize [
 	Descriptions := nil
 ]
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 TTFontDescription class >> read: aDirectoryEntry [
 
 	"	TTFontDescription read: DirectoryEntry smalltalkImageDirectory / 'TrueTypeFonts'	"
@@ -65,7 +67,7 @@ TTFontDescription class >> read: aDirectoryEntry [
 	^ readFamilyNames
 ]
 
-{ #category : #'instance accessing' }
+{ #category : 'instance accessing' }
 TTFontDescription class >> withFamilyName: aString [
 
 	"	TTFontDescription withFamilyName: 'DejaVu Sans'	"
@@ -73,7 +75,7 @@ TTFontDescription class >> withFamilyName: aString [
 	^ Descriptions at: aString
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTFontDescription >> appendGlyphDataTo: stream glyphsArray: glyphsArray indexes: indexes base: baseIndex [
 
 	glyphsArray withIndexDo: [ :glyphOrArrayOrNil :index | 
@@ -94,7 +96,7 @@ TTFontDescription >> appendGlyphDataTo: stream glyphsArray: glyphsArray indexes:
 					glyphOrArrayOrNil addContourDataTo: stream ] ] ]
 ]
 
-{ #category : #properties }
+{ #category : 'properties' }
 TTFontDescription >> ascent [
 
 	"Ascent of the font. Relative to unitsPerEm. Usually positive."
@@ -102,31 +104,31 @@ TTFontDescription >> ascent [
 	^ ascent
 ]
 
-{ #category : #properties }
+{ #category : 'properties' }
 TTFontDescription >> bounds [
 
 	^ bounds
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontDescription >> contourDataForIso8859s15 [
 
 	^ contourDataForIso8859s15
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontDescription >> contourDataForUtf8 [
 
 	^ contourDataForUtf8
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontDescription >> contourDataIndexesByIso8859s15 [
 
 	^ contourDataIndexesByIso8859s15
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontDescription >> contourDataIndexesByIso8859s15ST80Glyphs: aBoolean [
 
 	^ aBoolean
@@ -134,19 +136,19 @@ TTFontDescription >> contourDataIndexesByIso8859s15ST80Glyphs: aBoolean [
 		  ifFalse: [ contourDataIndexesByIso8859s15 ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontDescription >> contourDataIndexesByUtf8 [
 
 	^ contourDataIndexesByUtf8
 ]
 
-{ #category : #information }
+{ #category : 'information' }
 TTFontDescription >> copyright [
 
 	^ copyright
 ]
 
-{ #category : #properties }
+{ #category : 'properties' }
 TTFontDescription >> descent [
 
 	"Descender of the font. Relative to unitsPerEm. Usually negative."
@@ -154,7 +156,7 @@ TTFontDescription >> descent [
 	^ descent
 ]
 
-{ #category : #emphasis }
+{ #category : 'emphasis' }
 TTFontDescription >> emphasis [
 
 	"Use same encoding as StrikeFont. See senders of emphasis:"
@@ -171,31 +173,31 @@ TTFontDescription >> emphasis [
 	^ emphasis
 ]
 
-{ #category : #information }
+{ #category : 'information' }
 TTFontDescription >> familyName [
 
 	^ familyName
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontDescription >> first [
 
 	^ self
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontDescription >> folderName [
 
 	^ folderName
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontDescription >> folderName: aString [
 
 	folderName := aString
 ]
 
-{ #category : #conversion }
+{ #category : 'conversion' }
 TTFontDescription >> formGlyphFor: aCharacter useST80Glyphs: aBoolean pixelSize: pixelSize [
 
 	"Needed only for BitBltCanvasEngine"
@@ -252,7 +254,7 @@ TTFontDescription >> formGlyphFor: aCharacter useST80Glyphs: aBoolean pixelSize:
 		  advanceWidth: advanceWidth * toPixelsScale
 ]
 
-{ #category : #conversion }
+{ #category : 'conversion' }
 TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3OrNil byte4: byte4OrNil pixelSize: pixelSize [
 
 	"Needed only for BitBltCanvasEngine"
@@ -323,13 +325,13 @@ TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3
 		  advanceWidth: advanceWidth * toPixelsScale
 ]
 
-{ #category : #information }
+{ #category : 'information' }
 TTFontDescription >> fullName [
 
 	^ fullName
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTFontDescription >> glyphsByIso8859s15: array8 glyphsByUtf8Bytes: arrayUtf8 unknownGlyph: theUnknownGlyph [
 
 	| mGlyph |
@@ -367,13 +369,13 @@ TTFontDescription >> glyphsByIso8859s15: array8 glyphsByUtf8Bytes: arrayUtf8 unk
 			                            IntegerArray ]
 ]
 
-{ #category : #testing }
+{ #category : 'testing' }
 TTFontDescription >> isBaseFont [
 
 	^ self emphasis = 0
 ]
 
-{ #category : #properties }
+{ #category : 'properties' }
 TTFontDescription >> letterMTopSideBearing [
 
 	"This number is what needs to be scaled by i.e. 12 to render a 12 pixel font"
@@ -381,7 +383,7 @@ TTFontDescription >> letterMTopSideBearing [
 	^ letterMTopSideBearing
 ]
 
-{ #category : #properties }
+{ #category : 'properties' }
 TTFontDescription >> lineGap [
 
 	"Leading of the font. Relative to unitsPerEm."
@@ -389,25 +391,25 @@ TTFontDescription >> lineGap [
 	^ lineGap
 ]
 
-{ #category : #properties }
+{ #category : 'properties' }
 TTFontDescription >> lineSpacing [
 
 	^ ascent - descent + lineGap
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontDescription >> name [
 
 	^ self familyName copyWithout: Character space
 ]
 
-{ #category : #information }
+{ #category : 'information' }
 TTFontDescription >> postscriptName [
 
 	^ postscriptName
 ]
 
-{ #category : #printing }
+{ #category : 'printing' }
 TTFontDescription >> printOn: aStream [
 
 	super printOn: aStream.
@@ -416,7 +418,7 @@ TTFontDescription >> printOn: aStream [
 	aStream nextPut: $)
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTFontDescription >> setAscent: asc descent: desc lineGap: lgap [
 
 	ascent := asc.
@@ -424,20 +426,20 @@ TTFontDescription >> setAscent: asc descent: desc lineGap: lgap [
 	lineGap := lgap
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTFontDescription >> setBounds: aRect unitsPerEm: aNumber [
 
 	bounds := aRect.
 	unitsPerEm := aNumber
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTFontDescription >> setKernPairs: array [
 
 	kernPairs := array
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTFontDescription >> setStrings: anArray [
 
 	copyright := anArray at: 1.
@@ -450,31 +452,31 @@ TTFontDescription >> setStrings: anArray [
 	trademark := anArray at: 8
 ]
 
-{ #category : #information }
+{ #category : 'information' }
 TTFontDescription >> subfamilyName [
 
 	^ subfamilyName
 ]
 
-{ #category : #information }
+{ #category : 'information' }
 TTFontDescription >> trademark [
 
 	^ trademark
 ]
 
-{ #category : #information }
+{ #category : 'information' }
 TTFontDescription >> uniqueName [
 
 	^ uniqueName
 ]
 
-{ #category : #properties }
+{ #category : 'properties' }
 TTFontDescription >> unitsPerEm [
 
 	^ unitsPerEm
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTFontDescription >> useAlwaysLeftArrow [
 
 	"Not only when Smalltalk glyphs requested."
@@ -499,7 +501,7 @@ TTFontDescription >> useAlwaysLeftArrow [
 			put: arrowIndex ]
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTFontDescription >> useLeftArrow [
 
 	"When Smalltalk glyphs requested"
@@ -521,7 +523,7 @@ TTFontDescription >> useLeftArrow [
 			put: arrowIndex ]
 ]
 
-{ #category : #'private-initialization' }
+{ #category : 'private-initialization' }
 TTFontDescription >> useRightArrow [
 
 	"When Smalltalk glyphs requested"
@@ -543,13 +545,13 @@ TTFontDescription >> useRightArrow [
 			put: arrowIndex ]
 ]
 
-{ #category : #information }
+{ #category : 'information' }
 TTFontDescription >> versionName [
 
 	^ versionName
 ]
 
-{ #category : #'glyph properties' }
+{ #category : 'glyph properties' }
 TTFontDescription >> widthOf: aCharacter useST80Glyphs: aBoolean [
 
 	| i advanceWidth |
@@ -559,7 +561,7 @@ TTFontDescription >> widthOf: aCharacter useST80Glyphs: aBoolean [
 	^ advanceWidth / letterMTopSideBearing
 ]
 
-{ #category : #'glyph properties' }
+{ #category : 'glyph properties' }
 TTFontDescription >> widthOfCodePoint: aUnicodeCodePoint [
 
 	| i advanceWidth |

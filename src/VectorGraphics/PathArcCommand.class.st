@@ -1,6 +1,6 @@
 Class {
-	#name : #PathArcCommand,
-	#superclass : #PathCommand,
+	#name : 'PathArcCommand',
+	#superclass : 'PathCommand',
 	#instVars : [
 		'rs',
 		'xAxisRotations',
@@ -8,16 +8,18 @@ Class {
 		'doLargerArcs',
 		'useIncreasingAngless'
 	],
-	#category : #'VectorGraphics-PathCommands'
+	#category : 'VectorGraphics-PathCommands',
+	#package : 'VectorGraphics',
+	#tag : 'PathCommands'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathArcCommand class >> svgName [
 
 	^ $A
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathArcCommand >> buildFrom: commandChar stream: aStream [
 
 	| rx ry xAxisRotation doLargerArc useIncreasingAngles x y |
@@ -43,7 +45,7 @@ PathArcCommand >> buildFrom: commandChar stream: aStream [
 		toPoints add: x @ y ]
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 PathArcCommand >> privatePointsDo: aBlock [
 	"evaluate aBlock with the x and y coordinates for our defining points."
 	
@@ -52,7 +54,7 @@ Y completar los que falten!"
 	toPoints do: aBlock
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 PathArcCommand >> runOn: aCanvas [
 	aCanvas multiArc: coordinatesAreRelative rs: rs xAxisRotations: xAxisRotations toPoints: toPoints doLargerArcs: doLargerArcs useIncreasingAngless: useIncreasingAngless
 ]

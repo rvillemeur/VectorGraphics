@@ -1,20 +1,22 @@
 Class {
-	#name : #PathQuadraticCurveToCommand,
-	#superclass : #PathCommand,
+	#name : 'PathQuadraticCurveToCommand',
+	#superclass : 'PathCommand',
 	#instVars : [
 		'toPoints',
 		'controlPoints'
 	],
-	#category : #'VectorGraphics-PathCommands'
+	#category : 'VectorGraphics-PathCommands',
+	#package : 'VectorGraphics',
+	#tag : 'PathCommands'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 PathQuadraticCurveToCommand class >> svgName [
 
 	^ $Q
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathQuadraticCurveToCommand >> buildFrom: commandChar stream: aStream [
 
 	| x1 y1 x y |
@@ -31,7 +33,7 @@ PathQuadraticCurveToCommand >> buildFrom: commandChar stream: aStream [
 		controlPoints add: x1 @ y1 ]
 ]
 
-{ #category : #private }
+{ #category : 'private' }
 PathQuadraticCurveToCommand >> privatePointsDo: aBlock [
 
 	"evaluate aBlock with the x and y coordinates for our defining points."
@@ -39,7 +41,7 @@ PathQuadraticCurveToCommand >> privatePointsDo: aBlock [
 	toPoints do: aBlock
 ]
 
-{ #category : #drawing }
+{ #category : 'drawing' }
 PathQuadraticCurveToCommand >> runOn: aCanvas [
 
 	aCanvas
@@ -48,7 +50,7 @@ PathQuadraticCurveToCommand >> runOn: aCanvas [
 		controlPoints: controlPoints
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathQuadraticCurveToCommand >> toPoints: endPoints controlPoints: aControlPoints [
 
 	coordinatesAreRelative := false.
@@ -56,7 +58,7 @@ PathQuadraticCurveToCommand >> toPoints: endPoints controlPoints: aControlPoints
 	controlPoints := aControlPoints
 ]
 
-{ #category : #building }
+{ #category : 'building' }
 PathQuadraticCurveToCommand >> toRelativePoints: endPoints controlPoints: aControlPoints [
 
 	coordinatesAreRelative := true.

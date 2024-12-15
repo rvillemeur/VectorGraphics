@@ -2,8 +2,8 @@
 This class represents an entry in a truetype font table directory. Used by TTFontReader only.
 "
 Class {
-	#name : #TTFontTableDirEntry,
-	#superclass : #Object,
+	#name : 'TTFontTableDirEntry',
+	#superclass : 'Object',
 	#instVars : [
 		'tag',
 		'fontData',
@@ -11,16 +11,18 @@ Class {
 		'length',
 		'checkSum'
 	],
-	#category : #'VectorGraphics-TrueType'
+	#category : 'VectorGraphics-TrueType',
+	#package : 'VectorGraphics',
+	#tag : 'TrueType'
 }
 
-{ #category : #'instance creation' }
+{ #category : 'instance creation' }
 TTFontTableDirEntry class >> on: fontData at: index [
 
 	^ self new on: fontData at: index
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontTableDirEntry >> nextByte [
 
 	| value |
@@ -29,14 +31,14 @@ TTFontTableDirEntry >> nextByte [
 	^ value
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontTableDirEntry >> nextBytes: numBytes into: array startingAt: byteOffset [
 
 	1 to: numBytes do: [ :i | 
 	array at: i put: (fontData byteAt: byteOffset + i - 1) ]
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontTableDirEntry >> nextLong [
 
 	| value |
@@ -45,7 +47,7 @@ TTFontTableDirEntry >> nextLong [
 	^ value
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontTableDirEntry >> nextShort [
 
 	| value |
@@ -54,7 +56,7 @@ TTFontTableDirEntry >> nextShort [
 	^ value
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontTableDirEntry >> nextULong [
 
 	| value |
@@ -63,7 +65,7 @@ TTFontTableDirEntry >> nextULong [
 	^ value
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontTableDirEntry >> nextUShort [
 
 	| value |
@@ -72,19 +74,19 @@ TTFontTableDirEntry >> nextUShort [
 	^ value
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontTableDirEntry >> offset [
 
 	^ offset
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontTableDirEntry >> offset: newOffset [
 
 	offset := newOffset
 ]
 
-{ #category : #'initialize-release' }
+{ #category : 'initialize-release' }
 TTFontTableDirEntry >> on: fd at: index [
 
 	fontData := fd.
@@ -94,7 +96,7 @@ TTFontTableDirEntry >> on: fd at: index [
 	length := fontData longAt: index + 12 bigEndian: true
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontTableDirEntry >> skip: n [
 
 	"Skip n bytes"
@@ -102,7 +104,7 @@ TTFontTableDirEntry >> skip: n [
 	offset := offset + n
 ]
 
-{ #category : #accessing }
+{ #category : 'accessing' }
 TTFontTableDirEntry >> stringAt: stringOffset length: byteLength multiByte: aBoolean [
 
 	| string index stringLength |
