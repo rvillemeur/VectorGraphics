@@ -17,7 +17,7 @@ Class {
 VectorCanvasExample class >> exampleCircleFill [
 	"Filled circle using fillColor:do: with an ellipse of equal radii.
 	VectorCanvasExample exampleCircleFill inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
@@ -30,7 +30,7 @@ VectorCanvasExample class >> exampleCircleFill [
 VectorCanvasExample class >> exampleCircleStroke [
 	"Stroked circle outline using strokeWidth:color:do:.
 	VectorCanvasExample exampleCircleStroke inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
@@ -43,7 +43,7 @@ VectorCanvasExample class >> exampleCircleStroke [
 VectorCanvasExample class >> exampleCompositeDrawing [
 	"Multiple shapes on one canvas demonstrating layering.
 	VectorCanvasExample exampleCompositeDrawing inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
@@ -116,7 +116,7 @@ VectorCanvasExample class >> exampleFilledRectangle [
 VectorCanvasExample class >> exampleLine [
 	"Simple stroked line from one point to another using strokeWidth:color:do:.
 	VectorCanvasExample exampleLine inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
@@ -130,7 +130,7 @@ VectorCanvasExample class >> exampleLine [
 VectorCanvasExample class >> exampleLineConvenience [
 	"Line using the FormCanvas-protocol convenience method line:to:width:color:.
 	VectorCanvasExample exampleLineConvenience inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
@@ -142,7 +142,7 @@ VectorCanvasExample class >> exampleLineConvenience [
 VectorCanvasExample class >> examplePolyLine [
 	"Polyline through multiple points using polyLine:.
 	VectorCanvasExample examplePolyLine inspect"
-
+<sampleInstance>
 	| form canvas points |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
@@ -161,7 +161,7 @@ VectorCanvasExample class >> examplePolyLine [
 VectorCanvasExample class >> exampleQuadraticBezier [
 	"Quadratic Bezier curve through 3 control points.
 	VectorCanvasExample exampleQuadraticBezier inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
@@ -177,7 +177,7 @@ VectorCanvasExample class >> exampleQuadraticBezier [
 VectorCanvasExample class >> exampleRoundedRectangle [
 	"Filled rounded-corner rectangle using roundRect:color:radius:.
 	VectorCanvasExample exampleRoundedRectangle inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
@@ -189,7 +189,7 @@ VectorCanvasExample class >> exampleRoundedRectangle [
 VectorCanvasExample class >> exampleStrokedAndFilledRectangle [
 	"Rectangle with both stroke and fill using frameAndFillRectangle:fillColor:borderWidth:borderColor:.
 	VectorCanvasExample exampleStrokedAndFilledRectangle inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
@@ -205,7 +205,7 @@ VectorCanvasExample class >> exampleStrokedAndFilledRectangle [
 VectorCanvasExample class >> exampleStrokedRectangle [
 	"Rectangle outline only using frameRectangle:borderWidth:color:.
 	VectorCanvasExample exampleStrokedRectangle inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
@@ -217,7 +217,7 @@ VectorCanvasExample class >> exampleStrokedRectangle [
 VectorCanvasExample class >> exampleTriangle [
 	"Triangle with stroke and fill using moveToX:y:, lineToX:y:, closePath.
 	VectorCanvasExample exampleTriangle inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
