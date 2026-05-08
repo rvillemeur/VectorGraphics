@@ -27,7 +27,6 @@ Class {
 		'targetWidth',
 		'antiAliasingWidth',
 		'strokeWidth',
-		'geometryTransformation',
 		'currentMorphId',
 		'clippingMorphId',
 		'morphBoundsLeft',
@@ -899,30 +898,11 @@ VectorEngineAbstract class >> onForm: aForm [
 VectorEngineAbstract class >> siemensStar [
 
 	"	VectorEngineSubPixel siemensStar display	"
+	"NOTE: This sample originally used AffineTransformation to place each wedge.
+	AffineTransformation (Cuis-specific) has been removed. The sample is disabled
+	until a Pharo-native geometry transformation is implemented."
 
-	| angle backColor canvas count extent foreColor form location offsetFromCenter |
-	count := 32.
-	angle := Float twoPi / count / 2.
-	extent := 512.
-	offsetFromCenter := 0.
-	backColor := 'Color gray: 50/255'.
-	foreColor := 'Color gray: 200/255'.
-	form := Form extent: extent asPoint depth: 32.
-	form fillColor: backColor.
-	canvas := VectorCanvas onForm: form.
-	1 to: count do: [ :i | 
-		location := AffineTransformation
-			            withRadians: i * angle * 2 + 0.02
-			            scale: extent * 0.45
-			            position: extent - 1 / 2.0 + offsetFromCenter.
-		canvas engine geometryTransformation: location.
-		canvas fillColor: foreColor do: [ 
-			canvas
-				moveToX: 0 y: 0;
-				lineToX: 1 y: 0;
-				lineToX: angle cos y: angle sin;
-				lineToX: 0 y: 0 ] ].
-	^ form
+	^ self error: 'siemensStar requires AffineTransformation — not yet ported to Pharo'
 ]
 
 { #category : 'paths - absolute coordinates' }
@@ -932,19 +912,13 @@ VectorEngineAbstract >> abs_ArcToX: cx y: cy radiusX: mrx radiusY: mry angleOfXA
 		strokeWidth: 1.0 color: Color black do: [ :engine | 
 					engine 			abs_MoveToX: 100 y: 100;			abs_ArcToX: 200 y: 200 radiusX: 200 radiusY: 100 angleOfXAxis: 0 largeFlag: true sweepFlag: true;			abs_MoveToX: 100 y: 100;			abs_ArcToX: 200 y: 200 radiusX: 200 radiusY: 100 angleOfXAxis: 0 largeFlag: true sweepFlag: false ].(VectorEngineSubPixel onForm: Display)	geometryTransformation: (AffineTransformation withRadians: 0.5 scale: 1.2 position: 200@100); 	strokeWidth: 1.0 color: Color black do: [ :engine |		engine 			abs_MoveToX: 100 y: 100;			abs_ArcToX: 200 y: 200 radiusX: 200 radiusY: 100 angleOfXAxis: 0 largeFlag: true sweepFlag: true;			abs_MoveToX: 100 y: 100;			abs_ArcToX: 200 y: 200 radiusX: 200 radiusY: 100 angleOfXAxis: 0 largeFlag: true sweepFlag: false ].Display forceToScreen"
 
-	| center dx dy phi rx ry |
-	center := geometryTransformation externalizePosition: cx @ cy.
-	dx := geometryTransformation externalizeDelta: mrx @ 0.
-	dy := geometryTransformation externalizeDelta: 0 @ mry.
-	rx := dx r.
-	ry := dy r.
-	phi := geometryTransformation radians + theta.
+	"geometryTransformation (AffineTransformation) removed — coordinates passed through as-is"
 	self
-		basicArcToX: center x
-		y: center y
-		radiusX: rx
-		radiusY: ry
-		angleOfXAxis: phi
+		basicArcToX: cx
+		y: cy
+		radiusX: mrx
+		radiusY: mry
+		angleOfXAxis: theta
 		largeFlag: doLargerArc
 		sweepFlag: useIncreasingAngles
 ]
@@ -953,14 +927,12 @@ VectorEngineAbstract >> abs_ArcToX: cx y: cy radiusX: mrx radiusY: mry angleOfXA
 VectorEngineAbstract >> abs_CircleCenterX: cx y: cy radius: mr [
 
 	" (VectorEngineSubPixel onForm: Display) 	strokeWidth: 2.0 color: Color black do: [ :engine | 		engine 			abs_CircleCenterX: 200 y: 150 radius: 80]. Display forceToScreen " 
-	| center r |
-	center := geometryTransformation externalizePosition: cx @ cy.
-	r := geometryTransformation externalizeScalar: mr.
+	"geometryTransformation (AffineTransformation) removed — coordinates passed through as-is"
 	self
-		basicArcCenterX: center x
-		centerY: center y
-		radiusX: r
-		radiusY: r
+		basicArcCenterX: cx
+		centerY: cy
+		radiusX: mr
+		radiusY: mr
 		rotationAngle: 0.0
 		start: 0.0
 		sweep: Float pi * 2;
@@ -1050,17 +1022,14 @@ Display forceToScreen
 Display forceToScreen
 	"
 
-	| c1 c2 to |
-	c1 := geometryTransformation externalizePosition: xC1 @ yC1.
-	c2 := geometryTransformation externalizePosition: xC2 @ yC2.
-	to := geometryTransformation externalizePosition: xTo @ yTo.
+	"geometryTransformation (AffineTransformation) removed — coordinates passed through as-is"
 	self
-		basicCubicBezierToX: to x
-		y: to y
-		control1X: c1 x
-		y: c1 y
-		control2X: c2 x
-		y: c2 y.
+		basicCubicBezierToX: xTo
+		y: yTo
+		control1X: xC1
+		y: yC1
+		control2X: xC2
+		y: yC2.
 	previousCallX := xTo.
 	previousCallY := yTo.
 	previousCallControlX := xC2.
@@ -1083,19 +1052,13 @@ VectorEngineAbstract >> abs_EllipseCenterX: cx y: cy radiusX: mrx radiusY: mry [
 Display forceToScreen
 "
 
-	| center dx dy phi rx ry |
-	center := geometryTransformation externalizePosition: cx @ cy.
-	dx := geometryTransformation externalizeDelta: mrx @ 0.
-	dy := geometryTransformation externalizeDelta: 0 @ mry.
-	rx := dx r.
-	ry := dy r.
-	phi := geometryTransformation radians.
+	"geometryTransformation (AffineTransformation) removed — coordinates passed through as-is"
 	self
-		basicArcCenterX: center x
-		centerY: center y
-		radiusX: rx
-		radiusY: ry
-		rotationAngle: phi
+		basicArcCenterX: cx
+		centerY: cy
+		radiusX: mrx
+		radiusY: mry
+		rotationAngle: 0.0
 		start: 0.0
 		sweep: Float pi * 2;
 		basicClosePath
@@ -1117,19 +1080,13 @@ VectorEngineAbstract >> abs_EllipseCenterX: cx y: cy radiusX: mrx radiusY: mry r
 Display forceToScreen
 "
 
-	| center dx dy phi rx ry |
-	center := geometryTransformation externalizePosition: cx @ cy.
-	dx := geometryTransformation externalizeDelta: mrx @ 0.
-	dy := geometryTransformation externalizeDelta: 0 @ mry.
-	rx := dx r.
-	ry := dy r.
-	phi := geometryTransformation radians + theta.
+	"geometryTransformation (AffineTransformation) removed — coordinates passed through as-is"
 	self
-		basicArcCenterX: center x
-		centerY: center y
-		radiusX: rx
-		radiusY: ry
-		rotationAngle: phi
+		basicArcCenterX: cx
+		centerY: cy
+		radiusX: mrx
+		radiusY: mry
+		rotationAngle: theta
 		start: 0.0
 		sweep: Float pi * 2;
 		basicClosePath
@@ -1159,19 +1116,13 @@ VectorEngineAbstract >> abs_EllipseCenterX: cx y: cy radiusX: mrx radiusY: mry r
 Display forceToScreen.
 "
 
-	| center dx dy phi rx ry |
-	center := geometryTransformation externalizePosition: cx @ cy.
-	dx := geometryTransformation externalizeDelta: mrx @ 0.
-	dy := geometryTransformation externalizeDelta: 0 @ mry.
-	rx := dx r.
-	ry := dy r.
-	phi := geometryTransformation radians + theta.
+	"geometryTransformation (AffineTransformation) removed — coordinates passed through as-is"
 	self
-		basicArcCenterX: center x
-		centerY: center y
-		radiusX: rx
-		radiusY: ry
-		rotationAngle: phi
+		basicArcCenterX: cx
+		centerY: cy
+		radiusX: mrx
+		radiusY: mry
+		rotationAngle: theta
 		start: startAngle
 		sweep: sweepAngle
 ]
@@ -1223,9 +1174,8 @@ Display forceToScreen
 Display forceToScreen
 "
 
-	| to |
-	to := geometryTransformation externalizePosition: xTo @ yTo.
-	self basicLineToX: to x y: to y.
+	"geometryTransformation (AffineTransformation) removed — coordinates passed through as-is"
+	self basicLineToX: xTo y: yTo.
 	previousCallX := xTo.
 	previousCallY := yTo.
 	previousCallControlX := previousCallX.
@@ -1279,9 +1229,8 @@ Display forceToScreen
 Display forceToScreen
 "
 
-	| p |
-	p := geometryTransformation externalizePosition: x @ y.
-	self basicMoveToX: p x y: p y.
+	"geometryTransformation (AffineTransformation) removed — coordinates passed through as-is"
+	self basicMoveToX: x y: y.
 	previousCallX := x.
 	previousCallY := y.
 	previousCallControlX := previousCallX.
@@ -1356,14 +1305,12 @@ Display forceToScreen
 Display forceToScreen
 	"
 
-	| c to |
-	c := geometryTransformation externalizePosition: xC @ yC.
-	to := geometryTransformation externalizePosition: xTo @ yTo.
+	"geometryTransformation (AffineTransformation) removed — coordinates passed through as-is"
 	self
-		basicQuadraticBezierToX: to x
-		y: to y
-		controlX: c x
-		y: c y.
+		basicQuadraticBezierToX: xTo
+		y: yTo
+		controlX: xC
+		y: yC.
 	previousCallX := xTo.
 	previousCallY := yTo.
 	previousCallControlX := xC.
@@ -1870,15 +1817,10 @@ VectorEngineAbstract >> do_ClosePath [
 Display forceToScreen
 "
 
-	| p2 |
+	"geometryTransformation (AffineTransformation) removed — coordinates passed through as-is"
 	self basicClosePath.
-
-	"pathCurrentX and pathCurrentY are in (float) targetForm pixel coordinates (i.e. engine basic coordinates). 
-	previousCallX, previousCallY, previousCallControlX, previousCallControlY are in client coordinates."
-	p2 := geometryTransformation internalizePosition:
-		      pathCurrentX @ pathCurrentY.
-	previousCallX := p2 x.
-	previousCallY := p2 y.
+	previousCallX := pathCurrentX.
+	previousCallY := pathCurrentY.
 	previousCallControlX := previousCallX.
 	previousCallControlY := previousCallY
 ]
@@ -1905,10 +1847,7 @@ VectorEngineAbstract >> finishPath: aPath [
 
 { #category : 'accessing' }
 VectorEngineAbstract >> geometryTransformation: aGeometryTransformation [
-
-	"geometryTransformation is a GeometryTransformation that when applied to points in the public path protocol (i.e. Morph or domain coordinate system), it transform them into global, i.e. targetForm pixel coordinates. Therefore, the method used for converting client coordinates to actual pixel coordinates in the targetForm is #externalizePosition:, while the seldom used conversion from pixel coordinates to client coordinates is #internalizePosition:"
-
-	geometryTransformation := aGeometryTransformation
+	"No-op. AffineTransformation (Cuis-specific) removed; coordinates pass directly to rendering primitives."
 ]
 
 { #category : 'private' }
@@ -2298,12 +2237,12 @@ VectorEngineAbstract >> strokeWidth: clientStrokeWidth color: aStrokeColor do: p
 
 	"Prepare parameters for drawing stroke."
 
+	"geometryTransformation (AffineTransformation) removed — stroke width used as-is"
 	| aStrokeWidth |
-	(aStrokeColor isNil or: [ aStrokeColor alpha = 0.0 ]) ifTrue: [ 
+	(aStrokeColor isNil or: [ aStrokeColor alpha = 0.0 ]) ifTrue: [
 		^ self ].
 	clientStrokeWidth = 0.0 ifTrue: [ ^ self ].
-	aStrokeWidth := geometryTransformation externalizeScalar:
-		                clientStrokeWidth.
+	aStrokeWidth := clientStrokeWidth.
 	aStrokeWidth < antiAliasingWidth
 		ifTrue: [ "If the requested stroke width is too thin, make them wide enough to be properly sampled."
 			self pvtStrokeWidth: antiAliasingWidth.
@@ -2339,8 +2278,8 @@ VectorEngineAbstract >> strokeWidth: clientStrokeWidth color: aStrokeColor fillC
 	"If stroke is thinner than antiAliasingWidth, we need to make it wider and less opaque.
 	But this requires doing fill first and the blending stroke over it, or else fill gets eroded by widened stroke.
 	(this is only relevant if fill ~= stroke~)"
-	aStrokeWidth := geometryTransformation externalizeScalar:
-		                clientStrokeWidth.
+	"geometryTransformation (AffineTransformation) removed — stroke width used as-is"
+	aStrokeWidth := clientStrokeWidth.
 	(aStrokeWidth < antiAliasingWidth and: [ aStrokeColor ~= aFillColor ]) 
 		ifTrue: [ 
 			self fillColor: aFillColor do: pathCommandsBlock.

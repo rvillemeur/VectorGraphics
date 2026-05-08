@@ -223,26 +223,21 @@ TTFontReader >> processCompositeGlyphFrom: entry [
 
 	(flags allMask: 2) ifFalse: [ self halt ]. "ARGS_ARE_XY_VALUES" "Unsupported"
 	"ROUND_XY_TO_GRID = 4. Ignored"
-	(flags anyMask: 8 + 64 + 128) ifFalse: [ 
-		geometryTransformation := MorphicTranslation withTranslation:
-			                          ofsX @ ofsY ].
-	(flags allMask: 8) ifTrue: [ 
-		geometryTransformation := AffineTransformation withScale:
-			                          entry nextShort asFloat / 16r4000 ]. "WE_HAVE_A_SCALE"
-	(flags allMask: 64) ifTrue: [ 
-		geometryTransformation := AffineTransformation
-			                          withPointScale:
-				                          entry nextShort asFloat / 16r4000
-				                          @ (entry nextShort asFloat / 16r4000)
-			                          position: ofsX @ ofsY ]. "WE_HAVE_AN_X_AND_Y_SCALE"
-	(flags allMask: 128) ifTrue: [ "2x2 transformation"
-		geometryTransformation := AffineTransformation new
-			                          a11: entry nextShort asFloat / 16r4000;
-			                          a21: entry nextShort asFloat / 16r4000;
-			                          a12: entry nextShort asFloat / 16r4000;
-			                          a22: entry nextShort asFloat / 16r4000;
-			                          a13: ofsX;
-			                          a23: ofsY ]. "WE_HAVE_A_TWO_BY_TWO"
+	"AffineTransformation and MorphicTranslation (Cuis-specific) removed.
+	Composite glyph sub-transformations are not applied — passed as nil.
+	Flags 8 (WE_HAVE_A_SCALE), 64 (WE_HAVE_AN_X_AND_Y_SCALE), 128 (WE_HAVE_A_TWO_BY_TWO)
+	still consume the correct number of bytes from the stream."
+	(flags anyMask: 8 + 64 + 128) ifFalse: [
+		geometryTransformation := nil ]. "was: MorphicTranslation withTranslation: ofsX@ofsY"
+	(flags allMask: 8) ifTrue: [
+		entry nextShort. "consume WE_HAVE_A_SCALE bytes"
+		geometryTransformation := nil ].
+	(flags allMask: 64) ifTrue: [
+		entry nextShort. entry nextShort. "consume WE_HAVE_AN_X_AND_Y_SCALE bytes"
+		geometryTransformation := nil ].
+	(flags allMask: 128) ifTrue: [
+		entry nextShort. entry nextShort. entry nextShort. entry nextShort. "consume 2x2 bytes"
+		geometryTransformation := nil ].
 
 	glyph addGlyph: glyphIndex transformation: geometryTransformation.
 	hasInstructions := hasInstructions or: [ 

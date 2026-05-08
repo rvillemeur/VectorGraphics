@@ -19,8 +19,7 @@ Class {
 		'form',
 		'engine',
 		'currentMorph',
-		'clippingMorphDisplayBounds',
-		'currentTransformation'
+		'clippingMorphDisplayBounds'
 	],
 	#category : 'VectorGraphics-kernel',
 	#package : 'VectorGraphics',
@@ -37,7 +36,19 @@ VectorCanvas class >> initialize [
 
 	" AffineTransformation doIntegerTransformations: false"
 
-	
+
+]
+
+{ #category : 'instance creation' }
+VectorCanvas class >> onForm: aForm [
+	"Create a VectorCanvas rendering directly to aForm.
+	In Cuis this was inherited from Canvas; Pharo's Canvas does not provide it.
+	AffineTransformation (Cuis-specific) removed — coordinates are pixel-direct."
+
+	| canvas |
+	canvas := self new.
+	canvas setForm: aForm.
+	^ canvas
 ]
 
 { #category : 'Morphic support' }
@@ -395,17 +406,17 @@ VectorCanvas >> image: aForm multipliedBy: aColor at: aPoint [
 
 { #category : 'Morphic support' }
 VectorCanvas >> initializeWith: aForm origin: aPoint [
+	"AffineTransformation / currentTransformation removed — Morphic integration stub only."
 
-	super initializeWith: aForm origin: aPoint.
-	engine geometryTransformation: currentTransformation
+	super initializeWith: aForm origin: aPoint
 ]
 
 { #category : 'Morphic support' }
 VectorCanvas >> into: aMorph [
+	"AffineTransformation / currentTransformation removed — Morphic integration stub only."
 
 	super into: aMorph.
 	engine currentMorph: currentMorph.
-	engine geometryTransformation: currentTransformation.
 	engine resetMorphBounds
 ]
 
@@ -615,10 +626,10 @@ VectorCanvas >> multiQuadraticCurveToSmooth: coordinatesAreRelative toPoints: to
 
 { #category : 'Morphic support' }
 VectorCanvas >> outOfMorph [
+	"AffineTransformation / currentTransformation removed — Morphic integration stub only."
 
 	super outOfMorph.
-	engine currentMorph: currentMorph.
-	engine geometryTransformation: currentTransformation
+	engine currentMorph: currentMorph
 ]
 
 { #category : 'paths' }
