@@ -941,7 +941,7 @@ VectorCanvas >> setForm: aForm [
 		self error: 'VectorCanvas can only work on 32 bit destination' ].
 	form := aForm.
 	engine := VectorEngineWholePixel onForm: form.
-	self newClipRect: nil
+	"self newClipRect: nil"
 ]
 
 { #category : 'context and parameters for path' }
