@@ -1,14 +1,14 @@
 Class {
-	#name : #BaselineOfVectorGraphics,
-	#superclass : #BaselineOf,
-	#category : #BaselineOfVectorGraphics
+	#name : 'BaselineOfVectorGraphics',
+	#superclass : 'BaselineOf',
+	#category : 'BaselineOfVectorGraphics',
+	#package : 'BaselineOfVectorGraphics'
 }
 
-{ #category : #baseline }
-BaselineOfVectorGraphics >> baseline: spec [
-	<baseline>
-	spec for: #common do: [ spec
+{ #category : 'baselines' }
+BaselineOfVectorGraphics >> baseline: spec [ 
 
-		package: 'VectorGraphics'.
-]
+	<baseline>
+	spec for: #common do: [ spec package: 'VectorGraphics' ]
+
 ]
