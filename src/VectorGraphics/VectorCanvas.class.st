@@ -57,25 +57,6 @@ VectorCanvas class >> onForm: aForm [
 	^ canvas
 ]
 
-{ #category : 'Morphic support' }
-VectorCanvas >> boundingRectOfCurrentMorphAfterDraw [
-
-	"In targetForm coordinates.
-	Clipped to owner if appropriate.
-	Only valid _after_ drawing currentMorph."
-
-	^ clippingMorphDisplayBounds
-		  ifNotNil: [ :ownerClips | 
-		  engine morphBoundsAfterDraw intersect: ownerClips ]
-		  ifNil: [ engine morphBoundsAfterDraw ]
-]
-
-{ #category : 'Morphic support' }
-VectorCanvas >> clippingMorph: aMorph [
-
-	engine clippingMorph: aMorph
-]
-
 { #category : 'paths' }
 VectorCanvas >> closePath [
 
@@ -366,22 +347,6 @@ VectorCanvas >> image: aForm multipliedBy: aColor at: aPoint [
 	super image: aForm multipliedBy: aColor at: aPoint
 ]
 
-{ #category : 'Morphic support' }
-VectorCanvas >> initializeWith: aForm origin: aPoint [
-	"AffineTransformation / currentTransformation removed — Morphic integration stub only."
-
-	super initializeWith: aForm origin: aPoint
-]
-
-{ #category : 'Morphic support' }
-VectorCanvas >> into: aMorph [
-	"AffineTransformation / currentTransformation removed — Morphic integration stub only."
-
-	super into: aMorph.
-	engine currentMorph: currentMorph.
-	engine resetMorphBounds
-]
-
 { #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> line: pt1 to: pt2 width: morphStrokeWidth color: aStrokeColor [
 
@@ -394,12 +359,6 @@ VectorCanvas >> line: pt1 to: pt2 width: morphStrokeWidth color: aStrokeColor [
 VectorCanvas >> lineToX: xTo y: yTo [
 
 	engine abs_LineToX: xTo y: yTo
-]
-
-{ #category : 'Morphic support' }
-VectorCanvas >> morph: aMorph isAtPoint: aPoint [
-
-	^ engine morph: aMorph isAtPoint: aPoint
 ]
 
 { #category : 'paths' }
@@ -586,14 +545,6 @@ VectorCanvas >> multiQuadraticCurveToSmooth: coordinatesAreRelative toPoints: to
 				engine rel_QuadraticBezierSmoothToX: to x y: to y ] ]
 ]
 
-{ #category : 'Morphic support' }
-VectorCanvas >> outOfMorph [
-	"AffineTransformation / currentTransformation removed — Morphic integration stub only."
-
-	super outOfMorph.
-	engine currentMorph: currentMorph
-]
-
 { #category : 'paths' }
 VectorCanvas >> polyLine: points [
 
@@ -632,49 +583,6 @@ VectorCanvas >> rectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax [
 		abs_LineToX: xMax y: yMax;
 		abs_LineToX: xMin y: yMax;
 		do_ClosePath
-]
-
-{ #category : 'Morphic support' }
-VectorCanvas >> restorePatch: savedPatch [
-
-	"Argument must previously be obtained by calling #savePatch:bounds:
-	Senders should not assume anything about the returned object, except that it will not be nil."
-
-	| savedIdsPatch hack bb savedDisplayPatch |
-	"	super restorePatch: savedPatch first.""aForm := savedPatch first.
-	self image: aForm
-		at: aForm offset
-		sourceRect: aForm boundingBox."
-	savedDisplayPatch := savedPatch first.
-	bb := BitBlt toForm: form.
-	bb
-		sourceForm: savedDisplayPatch;
-		combinationRule: Form over;
-		sourceX: 0;
-		sourceY: 0;
-		destX: savedDisplayPatch offset x
-		destY: savedDisplayPatch offset y
-		width: savedDisplayPatch width
-		height: savedDisplayPatch height;
-		copyBits.
-
-	"Tanto el hack como el bb podrian guardarse."
-	savedIdsPatch := savedPatch second.
-	hack := Form
-		        extent: form extent
-		        depth: 32
-		        bits: (engine instVarNamed: 'morphIds').
-	bb := BitBlt toForm: hack.
-	bb
-		sourceForm: savedIdsPatch;
-		combinationRule: Form over;
-		sourceX: 0;
-		sourceY: 0;
-		destX: savedIdsPatch offset x
-		destY: savedIdsPatch offset y
-		width: savedIdsPatch width
-		height: savedIdsPatch height;
-		copyBits
 ]
 
 { #category : 'paths' }
@@ -849,44 +757,6 @@ VectorCanvas >> roundTopRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax rx:
 VectorCanvas >> runPathCommands: aCollection [
 
 	aCollection do: [ :cmd | cmd runOn: self ]
-]
-
-{ #category : 'Morphic support' }
-VectorCanvas >> savePatch: prevSavedPatch bounds: aRectangle [
-
-	"Senders don't need to know any details of what is answered, but just store it for further calls, and calls to restorePatch:"
-
-	"Details: The previously used patch Form is recycled when possible to reduce the burden on storage management."
-
-	| patchForm savedIdsPatch hack bb answer morphIds |
-	self flag: #jmvHacks.
-	answer := prevSavedPatch.
-	(answer is: #Array) ifFalse: [ answer := Array new: 2 ].
-	patchForm := super savePatch: answer first bounds: aRectangle.
-
-	patchForm == answer first
-		ifTrue: [ 
-			savedIdsPatch := answer second.
-			savedIdsPatch offset: 0 @ 0 ]
-		ifFalse: [ 
-			savedIdsPatch := Form extent: aRectangle extent depth: 32.
-			answer at: 1 put: patchForm.
-			answer at: 2 put: savedIdsPatch ].
-
-	morphIds := engine instVarNamed: 'morphIds'.
-	"Tanto el hack como el bb podrian guardarse."
-	hack := Form extent: form extent depth: 32 bits: morphIds.
-	bb := BitBlt toForm: savedIdsPatch.
-	bb
-		sourceForm: hack;
-		combinationRule: Form over;
-		sourceX: aRectangle left;
-		sourceY: aRectangle top;
-		width: aRectangle width;
-		height: aRectangle height;
-		copyBits.
-	savedIdsPatch offset: aRectangle topLeft.
-	^ answer
 ]
 
 { #category : 'private' }
