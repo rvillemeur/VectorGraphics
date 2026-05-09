@@ -24,82 +24,13 @@ TTFontReader class >> readTTFFrom: aByteArray [
 { #category : 'private' }
 TTFontReader >> decodeCmapFmtTable: entry [
 
-	| cmapFmt length entryCount segCount segments offset cmap firstCode |
-	cmapFmt := entry nextUShort.
-	length := entry nextUShort.
-	entry skip: 2. "skip version"
-
-	cmapFmt = 0 ifTrue: [ "byte encoded table"
-		length := length - 6. "should be always 256"
-		length <= 0 ifTrue: [ ^ nil ]. "but sometimes, this table is empty"
-		cmap := Array new: length.
-		entry nextBytes: length into: cmap startingAt: entry offset.
-		^ cmap ].
-
-	cmapFmt = 4 ifTrue: [ "segment mapping to deltavalues"
-		segCount := entry nextUShort // 2.
-		entry skip: 6. "skip searchRange, entrySelector, rangeShift"
-		segments := Array new: segCount.
-		segments := (1 to: segCount) collect: [ :e | Array new: 4 ].
-		1 to: segCount do: [ :i | 
-		(segments at: i) at: 2 put: entry nextUShort ]. "endCount"
-		entry skip: 2. "skip reservedPad"
-		1 to: segCount do: [ :i | 
-		(segments at: i) at: 1 put: entry nextUShort ]. "startCount"
-		1 to: segCount do: [ :i | 
-		(segments at: i) at: 3 put: entry nextShort ]. "idDelta"
-		offset := entry offset.
-		1 to: segCount do: [ :i | 
-		(segments at: i) at: 4 put: entry nextUShort ]. "idRangeOffset"
-		entryCount := segments
-			              inject: 0
-			              into: [ :max :seg | max max: seg second ].
-		cmap := Array new: entryCount + 1 withAll: 0.
-		segments withIndexDo: [ :seg :si | 
-			| code |
-			seg first to: seg second do: [ :i | 
-				seg last > 0
-					ifTrue: [ "offset to glypthIdArray - this is really C-magic!"
-						entry offset:
-							i - seg first - 1 * 2 + seg last + si + si + offset.
-						code := entry nextUShort.
-						code > 0 ifTrue: [ code := code + seg third ] ]
-					ifFalse: [ "simple offset" code := i + seg third ].
-				cmap at: i + 1 put: code ] ].
-		^ cmap ].
-
-	cmapFmt = 6 ifTrue: [ "trimmed table"
-		firstCode := entry nextUShort.
-		entryCount := entry nextUShort.
-		cmap := Array new: entryCount + firstCode withAll: 0.
-		entryCount timesRepeat: [ 
-			cmap at: (firstCode := firstCode + 1) put: entry nextUShort ].
-		^ cmap ].
-	^ nil
+	^ TTFontParser parseCmap: entry
 ]
 
 { #category : 'private' }
 TTFontReader >> getGlyphFlagsFrom: entry size: nPts [
 
-	"Read in the flags for this glyph.  The outer loop gathers the flags that
-	are actually contained in the table.  If the repeat bit is set in a flag
-	then the next byte is read from the table; this is the number of times
-	to repeat the last flag.  The inner loop does this, incrementing the
-	outer loops index each time."
-
-	| flags index repCount flagBits |
-	flags := ByteArray new: nPts.
-	index := 1.
-	[ index <= nPts ] whileTrue: [ 
-		flagBits := entry nextByte.
-		flags at: index put: flagBits.
-		(flagBits allMask: 8) ifTrue: [ 
-			repCount := entry nextByte.
-			repCount timesRepeat: [ 
-				index := index + 1.
-				flags at: index put: flagBits ] ].
-		index := index + 1 ].
-	^ flags
+	^ TTFontParser parseGlyphFlags: entry size: nPts
 ]
 
 { #category : 'processing' }
@@ -338,18 +269,7 @@ TTFontReader >> processIndexToLocationTable: entry format: indexToLocFormat [
 { #category : 'processing' }
 TTFontReader >> processKerningSubTableType0: entry [
 
-	| kp nKernPairs |
-	nKernPairs := entry nextUShort.
-	entry skip: 2. "Skip search range"
-	entry skip: 2. "Skip entry selector"
-	entry skip: 2. "Skip range shift"
-	kernPairs := Array new: nKernPairs.
-	1 to: nKernPairs do: [ :i | 
-		kp := TTKernPair new.
-		kp left: entry nextUShort.
-		kp right: entry nextUShort.
-		kp value: entry nextShort.
-		kernPairs at: i put: kp ].
+	kernPairs := TTFontParser parseKernPairsType0: entry.
 	^ true
 ]
 
@@ -384,50 +304,7 @@ TTFontReader >> processMaximumProfileTable: entry [
 { #category : 'processing' }
 TTFontReader >> processNamingTable: entry [
 
-	"copyright         CHARPTR     The font's copyright notice.
-familyName        CHARPTR     The font's family name.
-subfamilyName     CHARPTR     The font's subfamily name.
-uniqueName        CHARPTR     A unique identifier for this font.
-fullName          CHARPTR     The font's full name (a combination of
-                                          familyName and subfamilyName).
-versionName       CHARPTR     The font's version string.
-"
-
-	| nRecords initialOffset format storageOffset strings |
-	strings := Array new: 8.
-	strings atAllPut: ''.
-	initialOffset := entry offset.
-	format := entry nextUShort.
-	format = 0 ifFalse: [ 
-		self error: 'Cannot handle format 1 naming tables' ].
-	"Get the number of name records"
-	nRecords := entry nextUShort.
-	"Offset from the beginning of this table"
-	storageOffset := entry nextUShort + initialOffset.
-	1 to: nRecords do: [ :i | 
-		| pID sID lID nID length offset multiBytes string |
-		pID := entry nextUShort.
-		sID := entry nextUShort.
-		lID := entry nextUShort.
-		nID := entry nextUShort.
-		length := entry nextUShort.
-		offset := entry nextUShort.
-		"Read only Macintosh or Microsoft strings"
-		(pID = 1 or: [ pID = 3 and: [ sID = 1 ] ]) ifTrue: [ "MS uses Unicode all others single byte"
-			multiBytes := pID = 3.
-			string := entry
-				          stringAt: storageOffset + offset
-				          length: length
-				          multiByte: multiBytes.
-
-			"Select only English names.
-			Note: We prefer Macintosh strings about everything."
-			((pID = 1 and: [ lID = 0 ]) or: [ pID = 3 and: [ lID = 16r0409 ] ]) 
-				ifTrue: [ "Put the name at the right location."
-					nID < strings size ifTrue: [ 
-						(pID = 1 or: [ (strings at: nID + 1) = '' ]) ifTrue: [ 
-							strings at: nID + 1 put: string ] ] ] ] ].
-	fontDescription setStrings: strings
+	fontDescription setStrings: (TTFontParser parseNamingTable: entry)
 ]
 
 { #category : 'processing' }

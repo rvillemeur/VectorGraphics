@@ -41,6 +41,28 @@ TTFontDescriptionTest >> makeMinimalDescription [
 ]
 
 { #category : 'tests' }
+TTFontDescriptionTest >> testComputeGlyphLayout [
+
+	"letterMTopSideBearing=100, pixelSize=10 → toPixelsScale=0.1.
+	left=10, right=90, top=-20, bottom=80."
+
+	| fd layout |
+	fd := self makeMinimalDescription.
+	fd instVarNamed: 'letterMTopSideBearing' put: 100.
+	layout := fd
+		          computeGlyphLayoutForLeft: 10
+		          right: 90
+		          top: -20
+		          bottom: 80
+		          pixelSize: 10.
+	self assert: (layout at: 1) equals: -2.  "leftPixelOffset"
+	self assert: (layout at: 2) equals: 11.  "topPixelOffset"
+	self assert: (layout at: 3) equals: 14.0. "formWidth"
+	self assert: (layout at: 4) equals: 16.0. "formHeight"
+	self assert: (layout at: 5) equals: 0.1   "toPixelsScale"
+]
+
+{ #category : 'tests' }
 TTFontDescriptionTest >> testContourDataPositionFallsBackToOneForUnknown [
 
 	"Index 0 means unknown glyph — falls back to position 1."

@@ -107,6 +107,21 @@ TTFontDescription >> bounds [
 	^ bounds
 ]
 
+{ #category : 'private' }
+TTFontDescription >> computeGlyphLayoutForLeft: boundsLeft right: boundsRight top: boundsTop bottom: boundsBottom pixelSize: pixelSize [
+
+	"Returns {leftPixelOffset. topPixelOffset. formWidth. formHeight. toPixelsScale}."
+
+	| xtra toPixelsScale leftPixelOffset topPixelOffset formWidth formHeight |
+	xtra := 3.
+	toPixelsScale := pixelSize * 1.0 / self letterMTopSideBearing.
+	leftPixelOffset := (boundsLeft * toPixelsScale - xtra) floor.
+	formWidth := boundsRight - boundsLeft * toPixelsScale + (xtra * 2).
+	topPixelOffset := (boundsBottom * toPixelsScale + xtra) ceiling.
+	formHeight := boundsBottom - boundsTop * toPixelsScale + (xtra * 2).
+	^ { leftPixelOffset. topPixelOffset. formWidth. formHeight. toPixelsScale }
+]
+
 { #category : 'accessing' }
 TTFontDescription >> contourDataForUtf8 [
 
@@ -198,7 +213,7 @@ TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3
 
 	"Needed only for BitBltCanvasEngine"
 
-	| utf8ByteArray toPixelsScale formWidth formHeight leftPixelOffset topPixelOffset xtraSpaceForAntiAliasingAndRounding horizontalStrokesAtPixelCenter form canvas advanceWidth boundsBottom boundsLeft boundsRight boundsTop i deltaXToCenter |
+	| utf8ByteArray toPixelsScale formWidth formHeight leftPixelOffset topPixelOffset horizontalStrokesAtPixelCenter form canvas advanceWidth boundsBottom boundsLeft boundsRight boundsTop i deltaXToCenter layout |
 	i := self
 		     contourDataPositionForByte1: byte1
 		     byte2: byte2OrNil
@@ -234,20 +249,17 @@ TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3
 	boundsBottom := contourDataForUtf8 at: i.
 
 	horizontalStrokesAtPixelCenter := 0.5.
-	xtraSpaceForAntiAliasingAndRounding := 3.
-	toPixelsScale := pixelSize * 1.0 / self letterMTopSideBearing.
-
-	"If positive, pixels we save at the left. if negative, xtra pix needed"
-	leftPixelOffset := (boundsLeft * toPixelsScale
-	                    - xtraSpaceForAntiAliasingAndRounding) floor.
-	formWidth := boundsRight - boundsLeft * toPixelsScale
-	             + (xtraSpaceForAntiAliasingAndRounding * 2).
-
-	"Usually positive. Needed pixels above the baseline"
-	topPixelOffset := (boundsBottom * toPixelsScale
-	                   + xtraSpaceForAntiAliasingAndRounding) ceiling.
-	formHeight := boundsBottom - boundsTop * toPixelsScale
-	              + (xtraSpaceForAntiAliasingAndRounding * 2).
+	layout := self
+		           computeGlyphLayoutForLeft: boundsLeft
+		           right: boundsRight
+		           top: boundsTop
+		           bottom: boundsBottom
+		           pixelSize: pixelSize.
+	leftPixelOffset := layout at: 1.
+	topPixelOffset := layout at: 2.
+	formWidth := layout at: 3.
+	formHeight := layout at: 4.
+	toPixelsScale := layout at: 5.
 
 	form := Form extent: formWidth @ formHeight depth: 32.
 	form fillColor: Color white.
