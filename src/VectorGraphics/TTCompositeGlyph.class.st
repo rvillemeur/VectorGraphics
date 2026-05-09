@@ -71,9 +71,10 @@ TTCompositeGlyph >> glyphs [
 	^ glyphs collect: [ :assoc | assoc value ]
 ]
 
-{ #category : 'initialize' }
+{ #category : 'initialization' }
 TTCompositeGlyph >> initialize [
 
+	super initialize.
 	glyphs := #(  )
 ]
 

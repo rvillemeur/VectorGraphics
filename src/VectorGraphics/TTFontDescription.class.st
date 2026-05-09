@@ -230,9 +230,8 @@ TTFontDescription >> folderName: aString [
 	folderName := aString
 ]
 
-{ #category : 'conversion' }
+{ #category : 'converting' }
 TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3OrNil byte4: byte4OrNil pixelSize: pixelSize [
-
 	"Needed only for BitBltCanvasEngine"
 
 	| utf8ByteArray toPixelsScale formWidth formHeight leftPixelOffset topPixelOffset horizontalStrokesAtPixelCenter form canvas advanceWidth boundsBottom boundsLeft boundsRight boundsTop i deltaXToCenter layout |
@@ -241,24 +240,24 @@ TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3
 		     byte2: byte2OrNil
 		     byte3: byte3OrNil
 		     byte4: byte4OrNil.
-	utf8ByteArray := byte2OrNil isNil
-		                 ifTrue: [ ByteArray with: byte1 ]
-		                 ifFalse: [
-			                 byte3OrNil isNil
-				                 ifTrue: [ ByteArray with: byte1 with: byte2OrNil ]
-				                 ifFalse: [
-					                 byte4OrNil isNil
-						                 ifTrue: [
-							                 ByteArray
-								                 with: byte1
-								                 with: byte2OrNil
-								                 with: byte3OrNil ]
-						                 ifFalse: [
-							                 ByteArray
-								                 with: byte1
-								                 with: byte2OrNil
-								                 with: byte3OrNil
-								                 with: byte4OrNil ] ] ].
+	utf8ByteArray := byte2OrNil
+		                 ifNil: [ ByteArray with: byte1 ]
+		                 ifNotNil: [
+				                 byte3OrNil
+					                 ifNil: [ ByteArray with: byte1 with: byte2OrNil ]
+					                 ifNotNil: [
+							                 byte4OrNil
+								                 ifNil: [
+								                 ByteArray
+									                 with: byte1
+									                 with: byte2OrNil
+									                 with: byte3OrNil ]
+								                 ifNotNil: [
+										                 ByteArray
+											                 with: byte1
+											                 with: byte2OrNil
+											                 with: byte3OrNil
+											                 with: byte4OrNil ] ] ].
 
 	advanceWidth := contourDataForUtf8 at: i.
 	i := i + 1.
@@ -272,12 +271,12 @@ TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3
 
 	horizontalStrokesAtPixelCenter := 0.5.
 	layout := self
-		           computeGlyphLayoutForLeft: boundsLeft
-		           right: boundsRight
-		           top: boundsTop
-		           bottom: boundsBottom
-		           pixelSize: pixelSize.
-	leftPixelOffset := layout at: 1.
+		          computeGlyphLayoutForLeft: boundsLeft
+		          right: boundsRight
+		          top: boundsTop
+		          bottom: boundsBottom
+		          pixelSize: pixelSize.
+	leftPixelOffset := layout first.
 	topPixelOffset := layout at: 2.
 	formWidth := layout at: 3.
 	formHeight := layout at: 4.
@@ -296,15 +295,17 @@ TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3
 		scaleX: 1.0 * pixelSize
 		scaleY: -1.0 * pixelSize.
 
-	deltaXToCenter := (advanceWidth - (boundsRight + boundsLeft * 0.51))
+	deltaXToCenter := advanceWidth - (boundsRight + boundsLeft * 0.51)
 	                  * toPixelsScale.
 	byte1 = 204 ifTrue: [
-		byte2OrNil = 128 ifTrue: [
-			deltaXToCenter := (advanceWidth - (boundsRight + boundsLeft * 0.43))
-			                  * toPixelsScale ].
-		byte2OrNil = 129 ifTrue: [
-			deltaXToCenter := (advanceWidth - (boundsRight + boundsLeft * 0.65))
-			                  * toPixelsScale ] ].
+			byte2OrNil = 128 ifTrue: [
+					deltaXToCenter := advanceWidth
+					                  - (boundsRight + boundsLeft * 0.43)
+					                  * toPixelsScale ].
+			byte2OrNil = 129 ifTrue: [
+					deltaXToCenter := advanceWidth
+					                  - (boundsRight + boundsLeft * 0.65)
+					                  * toPixelsScale ] ].
 
 	"DoubleWidth code points that combine above previous and following characters.
 	Codepoints between 16r035C and 16r0363. Example: o͢o. Don't center them."
@@ -315,8 +316,8 @@ TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3
 		   form: form
 		   leftOffset: leftPixelOffset
 		   topOffset: topPixelOffset
-		   advanceWidth: advanceWidth * toPixelsScale)
-		  deltaXToCenter: deltaXToCenter
+		   advanceWidth: advanceWidth * toPixelsScale) deltaXToCenter:
+		  deltaXToCenter
 ]
 
 { #category : 'information' }

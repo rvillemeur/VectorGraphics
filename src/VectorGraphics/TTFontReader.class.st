@@ -394,51 +394,48 @@ TTFontReader >> readFrom: fontData fromOffset: offset [
 	(headerEntry := self
 		                getTableDirEntry: 'head'
 		                from: fontData
-		                offset: offset) == nil ifTrue: [ 
+		                offset: offset) ifNil: [
 		^ self error: 'This font does not have a header table' ].
 	(maxProfileEntry := self
 		                    getTableDirEntry: 'maxp'
 		                    from: fontData
-		                    offset: offset) == nil ifTrue: [ 
+		                    offset: offset) ifNil: [
 		^ self error: 'This font does not have a maximum profile table' ].
 	(nameEntry := self
 		              getTableDirEntry: 'name'
 		              from: fontData
-		              offset: offset) == nil ifTrue: [ 
+		              offset: offset) ifNil: [
 		^ self error: 'This font does not have a name table' ].
 	(indexLocEntry := self
 		                  getTableDirEntry: 'loca'
 		                  from: fontData
-		                  offset: offset) == nil ifTrue: [ 
+		                  offset: offset) ifNil: [
 		^ self error: 'This font does not have a relocation table' ].
 	(charMapEntry := self
 		                 getTableDirEntry: 'cmap'
 		                 from: fontData
-		                 offset: offset) == nil ifTrue: [ 
+		                 offset: offset) ifNil: [
 		^ self error: 'This font does not have a character map table' ].
 	(glyphEntry := self
 		               getTableDirEntry: 'glyf'
 		               from: fontData
-		               offset: offset) == nil ifTrue: [ 
+		               offset: offset) ifNil: [
 		^ self error: 'This font does not have a glyph table' ].
 	(horzHeaderEntry := self
 		                    getTableDirEntry: 'hhea'
 		                    from: fontData
-		                    offset: offset) == nil ifTrue: [ 
+		                    offset: offset) ifNil: [
 		^ self error: 'This font does not have a horizontal header table' ].
 	(horzMetricsEntry := self
 		                     getTableDirEntry: 'hmtx'
 		                     from: fontData
-		                     offset: offset) == nil ifTrue: [ 
+		                     offset: offset) ifNil: [
 		^ self error: 'This font does not have a horizontal metrics table' ].
 	(kerningEntry := self
 		                 getTableDirEntry: 'kern'
 		                 from: fontData
-		                 offset: offset) == nil ifTrue: [ "Transcript cr; show:'This font does not have a kerning table';endEntry"
+		                 offset: offset) ifNil: [ "Transcript cr; show:'This font does not have a kerning table';endEntry"
 		 ].
-
-
-	"Process the data"
 	indexToLocFormat := self processFontHeaderTable: headerEntry.
 	self processMaximumProfileTable: maxProfileEntry.
 	self processNamingTable: nameEntry.
@@ -446,17 +443,17 @@ TTFontReader >> readFrom: fontData fromOffset: offset [
 		               processIndexToLocationTable: indexLocEntry
 		               format: indexToLocFormat.
 	characterMap := self processCharacterMappingTable: charMapEntry.
-	characterMap isNil ifTrue: [ 
+	characterMap ifNil: [
 		^ self error: 'This font has no Unicode character mappings' ].
 	self processGlyphDataTable: glyphEntry offsets: glyphOffset.
 	numHMetrics := self processHorizontalHeaderTable: horzHeaderEntry.
 	self
 		processHorizontalMetricsTable: horzMetricsEntry
 		length: numHMetrics.
-	kerningEntry isNil
-		ifTrue: [ kernPairs := #(  ) ]
-		ifFalse: [ self processKerningTable: kerningEntry ].
-	self mapAndStoreGlyphsUsing: characterMap.
+	kerningEntry
+		ifNil: [ kernPairs := #(  ) ]
+		ifNotNil: [ self processKerningTable: kerningEntry ].
+	self mapAndStoreGlyphsUsing: characterMap
 	"kernPairs refer to glyph numbers in the .ttf file, not Unicode code points.
 	Remapping is not yet implemented, so kern data is not stored."
 ]

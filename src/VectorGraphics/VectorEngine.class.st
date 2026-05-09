@@ -70,12 +70,14 @@ VectorEngine >> alphaValueAtDistance: deltaX and: deltaY [
 
 	| distanceToAxisSquared alpha |
 	distanceToAxisSquared := deltaX squared + deltaY squared.
-	distanceToAxisSquared < halfTransparentRadiusSquared ifTrue: [ 
-		alpha := distanceToAxisSquared <= halfTranslucentRadiusSquared
-			         ifTrue: [ 16r7F ]
-			         ifFalse: [ 
-				         (halfTransparentRadius - distanceToAxisSquared sqrt
-				          * auxAntiAliasingWidthScaledInverse) rounded ] ] ifFalse:[alpha := 16r0].
+	alpha := distanceToAxisSquared < halfTransparentRadiusSquared
+		         ifTrue: [
+				         distanceToAxisSquared <= halfTranslucentRadiusSquared
+					         ifTrue: [ 16r7F ]
+					         ifFalse: [
+							         (halfTransparentRadius - distanceToAxisSquared sqrt
+							          * auxAntiAliasingWidthScaledInverse) rounded ] ]
+		         ifFalse: [ 16r0 ].
 
 	^ alpha
 ]

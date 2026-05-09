@@ -156,9 +156,10 @@ TTGlyph >> drawGlyphOn: aVectorCanvas geometryTransformation: txOrNil [
 			(contour pathCommand: txOrNil) runOn: aVectorCanvas ] ]
 ]
 
-{ #category : 'initialize-release' }
+{ #category : 'initialization' }
 TTGlyph >> initialize [
 
+	super initialize.
 	boundsLeft := boundsRight := boundsTop := boundsBottom := 0.
 	contours := #(  ).
 	advanceWidth := 0.

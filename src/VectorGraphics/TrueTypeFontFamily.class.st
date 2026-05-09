@@ -90,7 +90,7 @@ TrueTypeFontFamily >> baseTTFontDescription: aTTFontDescription [
 	familyName := aTTFontDescription familyName.
 	baseFontBySizes := Dictionary new.
 	baseTTFontDescription := aTTFontDescription.
-	ttFontDescriptionsByEmphasis isNil ifTrue: [
+	ttFontDescriptionsByEmphasis ifNil: [
 		ttFontDescriptionsByEmphasis := Dictionary new ]
 ]
 
