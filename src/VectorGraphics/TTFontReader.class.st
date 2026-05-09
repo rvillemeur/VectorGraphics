@@ -248,37 +248,10 @@ TTFontReader >> processCompositeGlyphFrom: entry [
 { #category : 'processing' }
 TTFontReader >> processFontHeaderTable: entry [
 
-	"Value				Data Type    Description
-unitsPerEm			USHORT      Granularity of the font's em square.
-xMax				USHORT      Maximum X-coordinate for the entire font.
-xMin				USHORT      Minimum X-coordinate for the entire font.
-yMax				USHORT      Maximum Y-coordinate for the entire font.
-yMin				USHORT      Minimum Y-coordinate for the entire font.
-indexToLocFormat	SHORT       Used when processing the Index To Loc Table."
-
-	| origin corner units indexToLocFormat |
-	entry skip: 4. "Skip table version number"
-	entry skip: 4. "Skip font revision number"
-	entry skip: 4. "Skip check sum adjustment"
-	entry skip: 4. "Skip magic number"
-	entry skip: 2. "Skip flags"
-
-	units := entry nextUShort.
-
-	entry skip: 8. "Skip creation date"
-	entry skip: 8. "Skip modification date"
-
-	"Get min/max values of all glyphs"
-	origin := entry nextShort @ entry nextShort.
-	corner := entry nextShort @ entry nextShort.
-
-	entry skip: 2. "Skip mac style"
-	entry skip: 2. "Skip lowest rec PPEM"
-	entry skip: 2. "Skip font direction hint"
-	indexToLocFormat := entry nextShort.
-
-	fontDescription setBounds: (origin corner: corner) unitsPerEm: units.
-	^ indexToLocFormat
+	| data |
+	data := TTFontParser parseFontHeader: entry.
+	fontDescription setBounds: (data at: #bounds) unitsPerEm: (data at: #units).
+	^ data at: #indexToLocFormat
 ]
 
 { #category : 'processing' }
@@ -309,39 +282,13 @@ TTFontReader >> processGlyphDataTable: entry offsets: offsetArray [
 { #category : 'processing' }
 TTFontReader >> processHorizontalHeaderTable: entry [
 
-	"See 
-https://www.freetype.org/freetype2/docs/glyphs/glyphs-3.html
-https://docs.microsoft.com/en-us/typography/opentype/spec/hhea
-https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6hhea.html
-http://chanae.walon.org/pub/ttf/ttf_glyphs.htm
-
-https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6.html
-"
-
-	"
-ascent  						SHORT          Distance from baseline of highest ascender.
-descent  					SHORT          Distance from baseline of lowest descender.
-lineGap  					SHORT          Typographic line gap.
-numOfLongHorMetrics  	USHORT       Number of advance widths in metrics table (HTMX Table); may be smaller than the total number of glyphs.
-"
-
-	| ascent descent lineGap numOfLongHorMetrics |
-	entry skip: 4. "Skip table version"
-	ascent := entry nextShort.
-	descent := entry nextShort.
-	lineGap := entry nextShort.
-	entry skip: 2. "Skip advanceWidthMax"
-	entry skip: 2. "Skip minLeftSideBearing"
-	entry skip: 2. "Skip minRightSideBearing"
-	entry skip: 2. "Skip xMaxExtent"
-	entry skip: 2. "Skip caretSlopeRise"
-	entry skip: 2. "Skip caretSlopeRun"
-	entry skip: 10. "Skip 5 reserved shorts"
-	entry skip: 2. "Skip metricDataFormat"
-
-	numOfLongHorMetrics := entry nextUShort.
-	fontDescription setAscent: ascent descent: descent lineGap: lineGap.
-	^ numOfLongHorMetrics
+	| data |
+	data := TTFontParser parseHorizontalHeader: entry.
+	fontDescription
+		setAscent: (data at: #ascent)
+		descent: (data at: #descent)
+		lineGap: (data at: #lineGap).
+	^ data at: #numHMetrics
 ]
 
 { #category : 'processing' }
@@ -431,12 +378,7 @@ TTFontReader >> processKerningTable: entry [
 { #category : 'processing' }
 TTFontReader >> processMaximumProfileTable: entry [
 
-	"
-numGlyphs         USHORT      The number of glyphs in the font.
-"
-
-	entry skip: 4. "Skip Table version number"
-	nGlyphs := entry nextUShort
+	nGlyphs := TTFontParser parseMaximumProfile: entry
 ]
 
 { #category : 'processing' }

@@ -41,6 +41,28 @@ TTFontDescriptionTest >> makeMinimalDescription [
 ]
 
 { #category : 'tests' }
+TTFontDescriptionTest >> testContourDataPositionFallsBackToOneForUnknown [
+
+	"Index 0 means unknown glyph — falls back to position 1."
+
+	| fd |
+	fd := self makeMinimalDescription.
+	self assert: (fd contourDataPositionForByte1: 65 byte2: nil byte3: nil byte4: nil) equals: 1
+]
+
+{ #category : 'tests' }
+TTFontDescriptionTest >> testContourDataPositionKnownAsciiGlyph [
+
+	"Byte 65 ('A') → slot 66 in the index array."
+
+	| fd indexes |
+	fd := self makeMinimalDescription.
+	indexes := fd instVarNamed: 'contourDataIndexesByUtf8'.
+	indexes at: 66 put: 7.
+	self assert: (fd contourDataPositionForByte1: 65 byte2: nil byte3: nil byte4: nil) equals: 7
+]
+
+{ #category : 'tests' }
 TTFontDescriptionTest >> testEmphasisBold [
 
 	| fd |

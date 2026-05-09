@@ -21,7 +21,7 @@ Class {
 { #category : 'initialization' }
 FontFamily class >> addFamily: aFontFamily [
 
-	AvailableFamilies at: aFontFamily familyName put: aFontFamily
+	self availableFamilies at: aFontFamily familyName put: aFontFamily
 ]
 
 { #category : 'ui' }
@@ -51,6 +51,7 @@ FontFamily class >> addFontDir: dir to: menu current: currentNameOrNil [
 { #category : 'accessing' }
 FontFamily class >> availableFamilies [
 
+	AvailableFamilies ifNil: [ AvailableFamilies := Dictionary new ].
 	^ AvailableFamilies
 ]
 

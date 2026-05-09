@@ -22,6 +22,17 @@ TTFontTableDirEntry class >> on: fontData at: index [
 	^ self new on: fontData at: index
 ]
 
+{ #category : 'instance creation' }
+TTFontTableDirEntry class >> onBytes: aByteArray [
+
+	"Create an entry wrapping a raw ByteArray starting at position 1. Used for testing."
+
+	^ self new
+		  instVarNamed: 'fontData' put: aByteArray;
+		  instVarNamed: 'offset' put: 1;
+		  yourself
+]
+
 { #category : 'accessing' }
 TTFontTableDirEntry >> nextByte [
 

@@ -119,6 +119,18 @@ TTFontDescription >> contourDataIndexesByUtf8 [
 	^ contourDataIndexesByUtf8
 ]
 
+{ #category : 'private' }
+TTFontDescription >> contourDataPositionForByte1: b1 byte2: b2 byte3: b3 byte4: b4 [
+
+	| i |
+	i := contourDataIndexesByUtf8 at: b1 + 1.
+	b2 notNil ifTrue: [ i := contourDataIndexesByUtf8 at: i negated + b2 + 1 ].
+	b3 notNil ifTrue: [ i := contourDataIndexesByUtf8 at: i negated + b3 + 1 ].
+	b4 notNil ifTrue: [ i := contourDataIndexesByUtf8 at: i negated + b4 + 1 ].
+	i = 0 ifTrue: [ i := 1 ].
+	^ i
+]
+
 { #category : 'information' }
 TTFontDescription >> copyright [
 
@@ -187,26 +199,29 @@ TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3
 	"Needed only for BitBltCanvasEngine"
 
 	| utf8ByteArray toPixelsScale formWidth formHeight leftPixelOffset topPixelOffset xtraSpaceForAntiAliasingAndRounding horizontalStrokesAtPixelCenter form canvas advanceWidth boundsBottom boundsLeft boundsRight boundsTop i deltaXToCenter |
-	i := contourDataIndexesByUtf8 at: byte1 + 1.
-	utf8ByteArray := ByteArray with: byte1.
-	byte2OrNil notNil ifTrue: [
-		i := contourDataIndexesByUtf8 at: i negated + byte2OrNil + 1.
-		utf8ByteArray := ByteArray with: byte1 with: byte2OrNil.
-		byte3OrNil notNil ifTrue: [
-			i := contourDataIndexesByUtf8 at: i negated + byte3OrNil + 1.
-			utf8ByteArray := ByteArray
-				                 with: byte1
-				                 with: byte2OrNil
-				                 with: byte3OrNil.
-			byte4OrNil notNil ifTrue: [
-				i := contourDataIndexesByUtf8 at: i negated + byte4OrNil + 1.
-				utf8ByteArray := ByteArray
-					                 with: byte1
-					                 with: byte2OrNil
-					                 with: byte3OrNil
-					                 with: byte4OrNil ] ] ].
-
-	i = 0 ifTrue: [ i := 1 ].
+	i := self
+		     contourDataPositionForByte1: byte1
+		     byte2: byte2OrNil
+		     byte3: byte3OrNil
+		     byte4: byte4OrNil.
+	utf8ByteArray := byte2OrNil isNil
+		                 ifTrue: [ ByteArray with: byte1 ]
+		                 ifFalse: [
+			                 byte3OrNil isNil
+				                 ifTrue: [ ByteArray with: byte1 with: byte2OrNil ]
+				                 ifFalse: [
+					                 byte4OrNil isNil
+						                 ifTrue: [
+							                 ByteArray
+								                 with: byte1
+								                 with: byte2OrNil
+								                 with: byte3OrNil ]
+						                 ifFalse: [
+							                 ByteArray
+								                 with: byte1
+								                 with: byte2OrNil
+								                 with: byte3OrNil
+								                 with: byte4OrNil ] ] ].
 
 	advanceWidth := contourDataForUtf8 at: i.
 	i := i + 1.
@@ -432,32 +447,21 @@ TTFontDescription >> widthOf: aCharacter [
 { #category : 'glyph properties' }
 TTFontDescription >> widthOfCodePoint: aUnicodeCodePoint [
 
-	| bytes i advanceWidth |
+	| bytes |
 	bytes := Character utf8BytesOf: aUnicodeCodePoint.
-	i := contourDataIndexesByUtf8 at: (bytes at: 1) + 1.
-	bytes size > 1 ifTrue: [
-		i := contourDataIndexesByUtf8 at: i negated + (bytes at: 2) + 1.
-		bytes size > 2 ifTrue: [
-			i := contourDataIndexesByUtf8 at: i negated + (bytes at: 3) + 1.
-			bytes size > 3 ifTrue: [
-				i := contourDataIndexesByUtf8 at: i negated + (bytes at: 4) + 1 ] ] ].
-	i = 0 ifTrue: [ i := 1 ].
-	advanceWidth := contourDataForUtf8 at: i.
-	^ advanceWidth / letterMTopSideBearing
+	^ (contourDataForUtf8 at: (self
+		   contourDataPositionForByte1: (bytes at: 1)
+		   byte2: (bytes size >= 2 ifTrue: [ bytes at: 2 ])
+		   byte3: (bytes size >= 3 ifTrue: [ bytes at: 3 ])
+		   byte4: (bytes size >= 4 ifTrue: [ bytes at: 4 ]))) / letterMTopSideBearing
 ]
 
 { #category : 'glyph properties' }
 TTFontDescription >> widthOfUtf8Byte1: aByte1 b2: aByte2OrNil b3: aByte3OrNil b4: aByte4OrNil [
 
-	| i advanceWidth |
-	i := contourDataIndexesByUtf8 at: aByte1 + 1.
-	aByte2OrNil notNil ifTrue: [
-		i := contourDataIndexesByUtf8 at: i negated + aByte2OrNil + 1.
-		aByte3OrNil notNil ifTrue: [
-			i := contourDataIndexesByUtf8 at: i negated + aByte3OrNil + 1.
-			aByte4OrNil notNil ifTrue: [
-				i := contourDataIndexesByUtf8 at: i negated + aByte4OrNil + 1 ] ] ].
-	i = 0 ifTrue: [ i := 1 ].
-	advanceWidth := contourDataForUtf8 at: i.
-	^ advanceWidth / letterMTopSideBearing
+	^ (contourDataForUtf8 at: (self
+		   contourDataPositionForByte1: aByte1
+		   byte2: aByte2OrNil
+		   byte3: aByte3OrNil
+		   byte4: aByte4OrNil)) / letterMTopSideBearing
 ]
