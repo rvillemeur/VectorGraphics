@@ -68,7 +68,7 @@ VectorCanvasExample class >> exampleCompositeDrawing [
 VectorCanvasExample class >> exampleCubicBezier [
 	"Cubic Bezier curve through 4 control points.
 	VectorCanvasExample exampleCubicBezier inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
@@ -85,7 +85,7 @@ VectorCanvasExample class >> exampleCubicBezier [
 VectorCanvasExample class >> exampleEllipse [
 	"Ellipse with both stroke and fill using the FormCanvas-protocol method.
 	VectorCanvasExample exampleEllipse inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
@@ -104,7 +104,7 @@ VectorCanvasExample class >> exampleEllipse [
 VectorCanvasExample class >> exampleFilledRectangle [
 	"Solid filled rectangle using fillRectangle:color:.
 	VectorCanvasExample exampleFilledRectangle inspect"
-
+<sampleInstance>
 	| form canvas |
 	form := self newForm.
 	canvas := self newCanvasOn: form.
