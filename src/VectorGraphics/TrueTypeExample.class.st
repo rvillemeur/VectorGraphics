@@ -10,7 +10,7 @@ Class {
 TrueTypeExample class >> defaultFontPath [
 	"Override this or pass a path directly to loadFontFrom:.
 	Set this to the absolute path of any .ttf file on your system."
-	^ '/path/to/your/font.ttf'
+	^ '/home/renaud/Downloads/Digital7Mono-Yz9J4.ttf'
 ]
 
 { #category : 'examples' }

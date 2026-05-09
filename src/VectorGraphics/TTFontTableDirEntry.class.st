@@ -116,7 +116,7 @@ TTFontTableDirEntry >> stringAt: stringOffset length: byteLength multiByte: aBoo
 			1 to: stringLength do: [ :i | 
 				string
 					at: i
-					put: (Character asciiValue: (fontData byteAt: index + i - 1)) ].
+					put: (Character codePoint: (fontData byteAt: index + i - 1)) ].
 			^ string ]
 		ifTrue: [ "UTF-16BE
 		https://docs.microsoft.com/en-us/typography/opentype/spec/name#enc3
@@ -127,7 +127,7 @@ TTFontTableDirEntry >> stringAt: stringOffset length: byteLength multiByte: aBoo
 			1 to: stringLength do: [ :i | 
 				string
 					at: i
-					put: (Character asciiValue: (fontData byteAt: index + 1)).
+					put: (Character codePoint: (fontData byteAt: index + 1)).
 				index := index + 2 ].
 			^ string ]
 ]
