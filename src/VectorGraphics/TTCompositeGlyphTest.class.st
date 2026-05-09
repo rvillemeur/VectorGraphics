@@ -44,6 +44,17 @@ TTCompositeGlyphTest >> testAddContourDataToDelegatesToSubGlyphs [
 ]
 
 { #category : 'tests' }
+TTCompositeGlyphTest >> testAddGlyphAppearsInGlyphs [
+
+	| composite subGlyph |
+	subGlyph := TTGlyph new.
+	composite := TTCompositeGlyph new.
+	composite addGlyph: subGlyph transformation: nil.
+	self assert: composite glyphs size equals: 1.
+	self assert: composite glyphs first equals: subGlyph
+]
+
+{ #category : 'tests' }
 TTCompositeGlyphTest >> testAddMultipleGlyphs [
 
 	| composite g1 g2 |
@@ -89,6 +100,24 @@ TTCompositeGlyphTest >> testIsComposite [
 TTCompositeGlyphTest >> testIsCompositeContrastWithTTGlyph [
 
 	self deny: TTGlyph new isComposite
+]
+
+{ #category : 'tests' }
+TTCompositeGlyphTest >> testReplaceIndexesByComponentGlyphs [
+	"During parsing, glyphs are stored as integer indexes.
+	replaceIndexesByComponentGlyphsIn: resolves them to real TTGlyph instances."
+
+	| composite realGlyph glyphArray |
+	realGlyph := TTGlyph new.
+	glyphArray := Array new: 3.
+	glyphArray at: 2 put: realGlyph.
+
+	composite := TTCompositeGlyph new.
+	composite addGlyph: 2 transformation: nil. "2 = index, not yet resolved"
+	composite replaceIndexesByComponentGlyphsIn: glyphArray.
+
+	self assert: composite glyphs size equals: 1.
+	self assert: composite glyphs first identicalTo: realGlyph
 ]
 
 { #category : 'tests' }
