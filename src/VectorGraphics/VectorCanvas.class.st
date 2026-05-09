@@ -45,19 +45,6 @@ Class {
 	#tag : 'Kernel'
 }
 
-{ #category : 'class initialization' }
-VectorCanvas class >> initialize [
-
-	"	VectorCanvas initialize
-			0.33: r - b
-			0.1: b - r
-				"
-
-	" AffineTransformation doIntegerTransformations: false"
-
-
-]
-
 { #category : 'instance creation' }
 VectorCanvas class >> onForm: aForm [
 	"Create a VectorCanvas rendering directly to aForm.
