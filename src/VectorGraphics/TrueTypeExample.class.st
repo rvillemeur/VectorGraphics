@@ -1,3 +1,27 @@
+"
+Runnable examples for TrueType font loading and glyph rendering.
+
+All methods are class-side. Each example loads a .ttf file from `defaultFontPath`,
+exercises a specific part of the TTFontReader / TTFontDescription / FormGlyph pipeline,
+and returns an inspectable result (a Dictionary, a Form, etc.).
+
+To run an example, evaluate in a Playground:
+  TrueTypeExample exampleGlyphForm inspect
+  TrueTypeExample exampleMultipleGlyphs display
+  TrueTypeExample exampleFontMetadata inspect
+
+Override `defaultFontPath` or pass a path directly to `loadFontFrom:` to use a different
+.ttf file. The default path points to a font in the developer's local Downloads folder.
+
+## Key methods
+- `loadFontFrom: aPathString` — reads a .ttf file and returns a TTFontDescription
+- `exampleFontMetadata`       — returns a Dictionary of font name/metric strings
+- `exampleGlyphForm`          — renders 'A' at 48px; returns the Form
+- `exampleGlyphLarge`         — renders 'Q' at 96px
+- `exampleGlyphSmall`         — renders 'g' at 12px
+- `exampleMultipleGlyphs`     — renders 'Hello' side by side onto a 400×120 Form
+- `exampleCharacterWidths`    — returns a Dictionary mapping ASCII chars to advance widths
+"
 Class {
 	#name : 'TrueTypeExample',
 	#superclass : 'Object',
@@ -120,5 +144,5 @@ TrueTypeExample class >> loadFontFrom: aPathString [
 ]
 
 { #category : 'see class side' }
-TrueTypeExample >> seeClassSide [ 
+TrueTypeExample >> seeClassSide [
 ]

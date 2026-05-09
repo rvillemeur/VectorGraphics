@@ -1,3 +1,14 @@
+"
+SVG path command L/l — line to.
+
+Parses pairs of numbers (x y) until the stream is exhausted; stores them as an Array of Points.
+
+## Key instVar
+- `points`  Array of Point (each parsed x @ y destination)
+
+## Canvas message
+`runOn:` sends `multiLineTo: coordinatesAreRelative points: points`.
+"
 Class {
 	#name : 'PathLineToCommand',
 	#superclass : 'PathCommand',

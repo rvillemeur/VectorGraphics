@@ -1,12 +1,24 @@
 "
-This class represents a glyph of a TrueType font.
+One simple glyph from a TrueType font, holding its outline geometry and metrics.
 
-Instance variables:
-	bounds					<Rectangle>	The receiver's bounds
-	contours					<Array of: TTContourConstruction>
-	advanceWidth			<Integer>	advance width of the glyph
-	leftSideBearing  		<Integer>	left side bearing
-	rightSideBearing  	<Integer>	right side bearing
+Created by TTFontReader during font loading and stored inside TTFontDescription.
+At render time, TTFontDescription draws each glyph's contours onto a VectorCanvas
+via `addContourDataTo:stream tx:`, which walks the contours and emits Bézier curves.
+
+Subclass: TTCompositeGlyph (a glyph built from references to other TTGlyphs).
+
+## Key instVars
+- `boundsLeft/Right/Top/Bottom`  glyph bounding box in font design units
+- `contours`                     Array of TTContourConstruction (outline segments)
+- `advanceWidth`                 horizontal advance in font design units
+- `leftSideBearing`              distance from origin to leftmost outline point
+- `rightSideBearing`             distance from rightmost point to the advance width
+
+## Key methods
+- `addContourDataTo: stream tx: transformation` — emits path data (move/line/curve)
+  for rendering onto a VectorCanvas or collecting into TTFontDescription's contour cache
+- `boundsLeft`, `boundsTop`, `boundsRight`, `boundsBottom` — metric accessors
+- `advanceWidth` — used by TrueTypeFont for character spacing
 "
 Class {
 	#name : 'TTGlyph',

@@ -1,3 +1,14 @@
+"
+SVG path command H/h — horizontal line to.
+
+Parses a sequence of single x values; the y coordinate is implicitly the current point's y.
+
+## Key instVar
+- `xs`  Array of Number
+
+## Canvas message
+`runOn:` sends `multiLineTo: coordinatesAreRelative xs: xs`.
+"
 Class {
 	#name : 'PathLineToHCommand',
 	#superclass : 'PathCommand',

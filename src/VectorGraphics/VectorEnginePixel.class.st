@@ -1,108 +1,35 @@
 "
-# can you explain simply the difference between VectorEnginePixel, VectorEngineSubPixel and VectorEngineWholePixel ?
+Abstract middle layer between VectorEngineAbstract (path state) and the concrete renderers.
 
+VectorEnginePixel owns the pixel buffers (`alphaMask`, `edgeCounts`), the blending logic, and
+the auxiliary stroke-width precomputed values. Subclasses differ only in buffer layout and
+how they read/write per-pixel alpha values:
 
-## Three levels, same algorithm, different anti-aliasing resolution:
+  VectorEngineWholePixel  — 1 byte/pixel (ByteArray), whole-pixel AA, good for hi-DPI displays
+  VectorEngineSubPixel    — 4 bytes/pixel (WordArray, 3 used for R/G/B), sub-pixel AA for LCD
 
-  ---
-  VectorEnginePixel (abstract base)
-  Owns alphaMask and edgeCounts buffers. Defines the shared path-traversal and Bézier logic. Subclasses differ only in how those buffers are sized and read.
+## Selection
+VectorCanvas defaults to VectorEngineWholePixel. Calling `canvas doSubPixelAntiAliasing`
+replaces it with VectorEngineSubPixel (done automatically by TTFontDescription for text).
 
-  ---
-  VectorEngineWholePixel
-  - 1 byte per pixel for both buffers (ByteArray)
-  - Treats each screen pixel as a single unit
-  - Good for hi-DPI displays where physical pixels are already tiny — no sub-pixel trickery needed
-  - Less memory, simpler blending
+## Key instVars
+- `alphaMask`          — per-pixel minimum distance to trajectory; 16r7F=opaque, 16r00=transparent
+- `edgeCounts`         — per-pixel winding-number deltas (for fill rendering)
+- `blendLeft/Right/Top/Bottom` — bounding box of affected pixels (optimises blend pass)
+- `strokeColor`, `fillColor`   — current drawing colors
+- `clipLeft/Right/Top/Bottom`  — clipping rectangle in targetForm coordinates
+- `auxStrokeWidthDilatedHalf`  — (strokeWidth + antiAliasingWidth) * 0.5
+- `auxStrokeWidthDilatedHalfSquared` — square of the above (for distance comparisons)
+- `auxStrokeWidthErodedHalfSquared`  — signed square of (strokeWidth - antiAliasingWidth) * 0.5
 
-  ---
-  VectorEngineSubPixel
-  - 1 word (4 bytes) per pixel — 3 bytes used for R, G, B channels independently (WordArray, accessed via bytesAt:)
-  - Shifts the red and blue sub-pixel samples by ±subPixelDelta (0.25 pixel)
-  - Exploits LCD sub-pixel layout: each channel hits a different physical stripe, tripling effective horizontal resolution
-  - Best for normal-DPI screens with RGB stripe LCDs — edges look sharper
-  - More memory, more complex blending (per-channel alpha)
-
-  ---
-  Summary table:
-
-  ┌────────────────┬─────────────────┬────────────────┐
-  │                │   WholePixel    │    SubPixel    │
-  ├────────────────┼─────────────────┼────────────────┤
-  │ Buffer type    │ ByteArray       │ WordArray      │
-  ├────────────────┼─────────────────┼────────────────┤
-  │ Bytes/pixel    │ 1               │ 4 (3 used)     │
-  ├────────────────┼─────────────────┼────────────────┤
-  │ Channels       │ 1 (luminance)   │ 3 (R, G, B)    │
-  ├────────────────┼─────────────────┼────────────────┤
-  │ Target display │ hi-DPI / retina │ normal-DPI LCD │
-  ├────────────────┼─────────────────┼────────────────┤
-  │ AA quality     │ whole-pixel AA  │ sub-pixel AA   │
-  └────────────────┴─────────────────┴────────────────┘
-
-
-❯ how do you tell which engine to use ?
-
-  Searched for 2 patterns, read 1 file (ctrl+o to expand)
-
-● Two places decide:
-
-  1. VectorCanvas >> setForm: (line 943) — called during initialization via onForm:. Always starts with VectorEngineWholePixel.
-
-  2. VectorCanvas >> doSubPixelAntiAliasing (line 115) — called explicitly to switch to VectorEngineSubPixel. Replaces the engine on the existing canvas.
-
-  So the flow is:
-  VectorCanvas onForm: aForm
-      → setForm: aForm
-      → engine := VectorEngineWholePixel onForm: form   ← default
-
-  canvas doSubPixelAntiAliasing                          ← opt-in upgrade
-      → engine := VectorEngineSubPixel onForm: form
-
-  TTFontDescription calls doSubPixelAntiAliasing automatically when rendering text glyphs (lines 238, 312) — sub-pixel is used for fonts by default. For
-  everything else (shapes, paths) you get whole-pixel AA unless you call doSubPixelAntiAliasing yourself.
-
-
-❯ how do you tell which engine to use ?
-
-  Searched for 2 patterns, read 1 file (ctrl+o to expand)
-
-● Two places decide:
-
-  1. VectorCanvas >> setForm: (line 943) — called during initialization via onForm:. Always starts with VectorEngineWholePixel.
-
-  2. VectorCanvas >> doSubPixelAntiAliasing (line 115) — called explicitly to switch to VectorEngineSubPixel. Replaces the engine on the existing canvas.
-
-  So the flow is:
-  VectorCanvas onForm: aForm
-      → setForm: aForm
-      → engine := VectorEngineWholePixel onForm: form   ← default
-
-  canvas doSubPixelAntiAliasing                          ← opt-in upgrade
-      → engine := VectorEngineSubPixel onForm: form
-
-  TTFontDescription calls doSubPixelAntiAliasing automatically when rendering text glyphs (lines 238, 312) — sub-pixel is used for fonts by default. For
-  everything else (shapes, paths) you get whole-pixel AA unless you call doSubPixelAntiAliasing yourself.
-
-. VectorEngine (superclass: Object) is a sibling of VectorEngineAbstract, not a subclass. It's the standalone reference implementation.
-
-  Full actual hierarchy:
-
-  Object
-  ├── VectorEngine          (standalone, test reference — ByteArray buffers, simple)
-  └── VectorEngineAbstract  (abstract — path state, drawing API)
-          └── VectorEnginePixel   (abstract — pixel buffers, blend machinery)
-                  ├── VectorEngineSubPixel
-                  └── VectorEngineWholePixel
-
-  Merging VectorEnginePixel into VectorEngineAbstract would load blendLeft/Right/Top/Bottom, strokeColor, fillColor, clipLeft/Right/Top/Bottom, alphaMask,
-  edgeCounts, prevYTruncated, and all the aux* instVars onto VectorEngineAbstract — even though nothing needs them there. It would also make the class harder
-   to understand (path logic mixed with pixel buffer logic).
-
-  VectorEnginePixel earns its place: it groups everything specific to the buffer/blending layer, keeping VectorEngineAbstract focused on path state and the
-  drawing API.
-
-
+## Key methods
+- `computeStrokeRadii: strokeWidth antiAliasingWidth: aaw` (class side)
+  — pure computation of the three aux values; testable without a Form
+- `pvtStrokeWidth: aNumber` — sets strokeWidth and refreshes all aux radius values
+- `finishPath: ensureClosePath` — blend buffers into targetForm, reset alphaMask/edgeCounts
+- `blendStrokeOnly`, `blendFillOnly`, `blendStrokeAndFill` — pixel-level compositing passes
+- `primLineFromX:y:toX:y:hops:incrementX:incrementY:` — concrete hop walker (overrides abstract)
+- `updateAlphasForX:y:` — subclassResponsibility (implemented by WholePixel and SubPixel)
 "
 Class {
 	#name : 'VectorEnginePixel',

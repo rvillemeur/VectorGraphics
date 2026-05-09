@@ -1,3 +1,21 @@
+"
+A compact array of signed 16-bit integer points, used to store TrueType glyph coordinates.
+
+Subclasses DoubleByteArray (each slot is a uint16) and interprets pairs of slots as signed
+(x, y) points. This matches the int16 coordinate format used in TrueType 'glyf' table data.
+
+Pharo has no built-in ShortPointArray (Cuis has one); this class fills that gap. It stores
+n points as 2n uint16 slots in the underlying DoubleByteArray, using `signedAt:` to reinterpret
+unsigned storage as signed values.
+
+## Used by
+TTContourConstruction stores glyph outline points in an Int16PointArray.
+
+## Key methods
+- `at: index`         — returns a Point (signedX @ signedY) for the given 1-based point index
+- `at: index put: pt` — stores a Point at the given index
+- `signedAt: i`       — reads a uint16 slot as a signed int16 (handles values > 32767)
+"
 Class {
 	#name : 'Int16PointArray',
 	#superclass : 'DoubleByteArray',

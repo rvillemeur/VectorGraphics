@@ -1,5 +1,26 @@
 "
-Also called Typeface.
+Registry and abstract base for a typeface (also called a font family).
+
+FontFamily maintains a class-side dictionary of all loaded families (AvailableFamilies),
+keyed by family name. It also tracks the system-wide default family name and default point
+size. Subclass TrueTypeFontFamily extends this with TrueType-specific loading and emphasis
+(bold/italic) handling.
+
+## Relationships
+- Subclassed by TrueTypeFontFamily.
+- Each family holds TrueTypeFont instances (via `baseFontBySizes`) at different point sizes.
+- TrueTypeFont instances are retrieved via `familyName:pointSize:` or `defaultFamilyAndPointSize`.
+
+## Key class-side methods
+- `familyName: aString pointSize: aNumber` — returns (or creates) the font at a given size
+- `familyNamed: aString` — looks up an already-registered family
+- `defaultFamilyAndPointSize` — returns the default family at the default size
+- `addFamily: aFontFamily` — registers a new family in AvailableFamilies
+- `readIfNeeded: dir` — loads TrueType fonts from a directory if not yet loaded
+
+## Key instance methods
+- `atPointSize: aNumber` — returns a TrueTypeFont at the requested size (creating it if needed)
+- `familyName` — the human-readable family name (e.g. 'Source Sans Pro')
 "
 Class {
 	#name : 'FontFamily',

@@ -1,3 +1,14 @@
+"
+SVG path command V/v — vertical line to.
+
+Parses a sequence of single y values; the x coordinate is implicitly the current point's x.
+
+## Key instVar
+- `ys`  Array of Number
+
+## Canvas message
+`runOn:` sends `multiLineTo: coordinatesAreRelative ys: ys`.
+"
 Class {
 	#name : 'PathLineToVCommand',
 	#superclass : 'PathCommand',

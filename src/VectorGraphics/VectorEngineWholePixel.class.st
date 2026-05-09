@@ -1,6 +1,21 @@
 "
-Does only whole pixel anti aliasing. Appropriate for very high resolution displays.
-edgeCounts and alphaMask are single byte per pixel.
+Concrete VectorEnginePixel for whole-pixel anti-aliasing.
+
+Uses 1 byte per pixel for both `alphaMask` and `edgeCounts` (both allocated as ByteArrays
+sized width × height). Each pixel is treated as an indivisible unit; there is no sub-pixel
+R/G/B channel shifting. This is appropriate for hi-DPI (Retina) displays where physical
+pixels are already tiny enough that sub-pixel tricks add no visible benefit.
+
+This is the default engine used by VectorCanvas (created in `setForm:`). It is also the
+engine used in VectorEngineAbstractTest and VectorEngineWholePixelTest.
+
+Default antiAliasingWidth: 1.7 (slightly softer than VectorEngineAbstract's 1.0).
+
+## Key methods (overrides from VectorEnginePixel)
+- `pvtSetForm: aForm`      — allocates alphaMask and edgeCounts ByteArrays (width × height)
+- `updateAlphasForX: x y: y` — updates alphaMask for all pixels within the dilation radius
+  of the given hop position, using the precomputed aux stroke-width values
+- `blendStrokeOnly`, `blendFillOnly`, `blendStrokeAndFill` — composite the buffers into targetForm
 "
 Class {
 	#name : 'VectorEngineWholePixel',

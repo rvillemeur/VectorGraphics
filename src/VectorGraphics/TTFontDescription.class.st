@@ -1,8 +1,30 @@
 "
-Holds a TrueType font in memory.
+In-memory representation of a loaded TrueType font.
 
-See
-https://www.freetype.org/freetype2/docs/glyphs/glyphs-3.html
+TTFontReader parses a .ttf file and populates a TTFontDescription with all data needed for
+rendering: glyph outlines (pre-converted to compact path byte arrays indexed by UTF-8 byte
+sequence), kerning pairs, font metrics, and name strings.
+
+At render time, TrueTypeFont calls `formGlyphForUtf8Byte1:byte2:byte3:byte4:pixelSize:` to
+rasterize a character into a FormGlyph. This method draws the glyph's contours onto an
+off-screen VectorCanvas (using VectorEngineSubPixel) and caches the result.
+
+## Key instVars
+- `contourDataForUtf8`        ByteArray — compact path data for all glyphs, concatenated
+- `contourDataIndexesByUtf8`  Nested Array indexed by UTF-8 bytes — byte offsets into contourDataForUtf8
+- `kernPairs`                 Array of TTKernPair (sorted by mask for binary search)
+- `bounds`                    Rectangle in font design units
+- `unitsPerEm`                design units per em square
+- `ascent`, `descent`, `lineGap`  vertical metrics in design units
+- `familyName`, `subfamilyName`, `fullName`, etc. — strings from the 'name' table
+
+## Key methods
+- `formGlyphForUtf8Byte1:byte2:byte3:byte4:pixelSize:` — rasterizes and returns a FormGlyph
+- `contourDataPositionForByte1:byte2:byte3:byte4:` — fast UTF-8 to contour offset lookup
+- `glyphsByUtf8Bytes:unknownGlyph:` — stores the glyph-index map (called by TTFontReader)
+- `read: aDirectoryEntry` (class side) — loads all .ttf files from a directory
+
+See: https://www.freetype.org/freetype2/docs/glyphs/glyphs-3.html
 "
 Class {
 	#name : 'TTFontDescription',

@@ -1,5 +1,20 @@
 "
-This class represents a composite TrueType glyph, e.g. one which contains many simple TTGlyphs.
+A composite TrueType glyph composed of references to one or more simple TTGlyphs.
+
+Composite glyphs are used in fonts for characters that combine existing glyphs with optional
+transformations (e.g. accented letters built from a base letter + a diacritic glyph).
+
+TTFontReader creates TTCompositeGlyph when the glyph table entry has a negative contour count
+(the TrueType spec's flag for composite glyphs). It stores each component as a (transform, glyph)
+Association in the `glyphs` collection.
+
+## Key instVar
+- `glyphs`  OrderedCollection of Association (key: transformation, value: TTGlyph)
+
+## Key method override
+- `addContourDataTo: stream tx: aGeometryTransformationOrNil`
+  Delegates to each component glyph with its combined transformation, producing the
+  same path output as a simple glyph but from multiple source glyphs.
 "
 Class {
 	#name : 'TTCompositeGlyph',

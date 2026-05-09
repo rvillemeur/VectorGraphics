@@ -1,9 +1,22 @@
 "
-This class represents a temporary contour structure during the construction of a TTGlyph from a TrueType file.
+Temporary contour structure built during TrueType glyph parsing.
 
-Instance variables:
-	points				<ShortPointArray>	The points defining this contour
-	controlPointFlags	<BitArray (ByteArray with bit content)> Flags for each point
+TTFontReader creates one TTContourConstruction per contour while reading the 'glyf' table.
+Once all contours are assembled, TTGlyph converts them to compact path data (Bézier curves)
+stored in TTFontDescription for fast rendering.
+
+The TrueType contour format uses on-curve and off-curve points; `addContourDataTo:stream tx:`
+reconstructs the quadratic Bézier segments from those flags.
+
+## Key instVars
+- `points`             Int16PointArray — x/y coordinates in font design units
+- `controlPointFlags`  ByteArray — bit 0 = on-curve (1) / off-curve (0) per point
+
+## Key methods
+- `addContourDataTo: stream tx: transformation`
+  Converts the raw point/flag sequence to move-to / line-to / quadratic-curve-to operations,
+  inferring implicit on-curve midpoints between consecutive off-curve points.
+- `points:flags:` — initialisation from TTFontReader parse results
 "
 Class {
 	#name : 'TTContourConstruction',

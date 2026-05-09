@@ -1,3 +1,23 @@
+"
+SVG path command A/a — elliptical arc.
+
+Parses groups of 7 numbers per arc segment: rx ry xAxisRotation largeArcFlag sweepFlag x y.
+Multiple arc segments can be chained in one command (the loop reads until the stream
+returns nil).
+
+## Key instVars
+- `rs`                  OrderedCollection of Point (rx @ ry per arc)
+- `xAxisRotations`      OrderedCollection of Float (angle in radians, converted from degrees during parse)
+- `toPoints`            OrderedCollection of Point (destination x @ y per arc)
+- `doLargerArcs`        OrderedCollection of Boolean
+- `useIncreasingAngless` OrderedCollection of Boolean (flag controls sweep direction)
+
+## Canvas message
+`runOn:` sends:
+  multiArc: coordinatesAreRelative
+  rs: rs xAxisRotations: xAxisRotations toPoints: toPoints
+  doLargerArcs: doLargerArcs useIncreasingAngless: useIncreasingAngless
+"
 Class {
 	#name : 'PathArcCommand',
 	#superclass : 'PathCommand',

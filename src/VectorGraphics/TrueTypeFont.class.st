@@ -1,8 +1,25 @@
 "
-TrueType fonts are the most widely used format for pixel independent vector Fonts.
+A TrueType font at a specific point size, integrated into Pharo's AbstractFont hierarchy.
 
-TrueTypeFonts, being part of the traditional AbstractFont hierarchy, adds a specific
-pointSize, and is the object used in texts.
+TrueTypeFont is the object that Morphic and text renderers interact with. It wraps a
+TTFontDescription (the parsed font data) and a pointSize, and caches pre-rendered FormGlyph
+instances for each character as they are first drawn.
+
+Instances are created and managed by TrueTypeFontFamily (and ultimately by FontFamily) when
+a point size is requested. They are not created directly.
+
+## Key instVars
+- `ttFontDescription`   TTFontDescription — the shared parsed font data
+- `pointSize`           Number — rendering size in points
+- `emphasis`            Integer — 0=regular, 1=bold, 2=italic, 3=bold-italic, etc.
+- `glyphFormsByUtf8`    cached Array of FormGlyph instances, indexed by UTF-8 byte sequence
+- `family`              TrueTypeFontFamily — the owning family
+
+## Key methods (AbstractFont protocol)
+- `widthOf: aString` — measures string width in pixels using advance widths and kern pairs
+- `displayString: s on: canvas at: pt color: c` — renders a string glyph by glyph
+- `height`, `ascent`, `descent` — vertical metrics scaled from design units to pixels
+- `glyphFormForCharacter: aCharacter` — returns (or renders) the FormGlyph for one character
 "
 Class {
 	#name : 'TrueTypeFont',

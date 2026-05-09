@@ -1,3 +1,19 @@
+"
+SVG path command C/c — cubic Bézier curve.
+
+Parses groups of 6 numbers per segment: x1 y1 x2 y2 x y, where (x1,y1) is control point 1,
+(x2,y2) is control point 2, and (x,y) is the destination. Multiple segments are chained.
+
+## Key instVars
+- `toPoints`       OrderedCollection of Point (destination per segment)
+- `control1Points` OrderedCollection of Point
+- `control2Points` OrderedCollection of Point
+
+## Canvas message
+`runOn:` sends:
+  multiCurveTo: coordinatesAreRelative
+  toPoints: toPoints control1Points: control1Points control2Points: control2Points
+"
 Class {
 	#name : 'PathCurveToCommand',
 	#superclass : 'PathCommand',

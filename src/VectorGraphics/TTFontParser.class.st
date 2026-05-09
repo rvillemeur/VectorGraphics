@@ -1,8 +1,24 @@
 "
-Pure byte-parsing helpers extracted from TTFontReader.
-Each class-side method takes a TTFontTableDirEntry and returns structured data
-(a Dictionary) with no side effects on any font description.
-This separation makes table parsing independently testable.
+Pure stateless byte-parsing helpers for TrueType font tables.
+
+Each class-side method takes a TTFontTableDirEntry positioned at the start of a named
+table and returns structured data (a Dictionary, Array, or scalar) with no side effects.
+TTFontReader calls these methods to delegate all binary parsing, keeping itself free of
+format-specific byte manipulation.
+
+This separation makes each parser independently testable via TTFontParserTest using
+synthetic byte arrays, without needing a real .ttf file.
+
+## Key methods (all class-side)
+- `parseCmap: entry`                  — parse 'cmap' subtable (formats 0, 4, 6); returns glyph-index Array
+- `parseFontHeader: entry`            — parse 'head' table; returns Dict with #bounds, #units, #indexToLocFormat
+- `parseHorizontalHeader: entry`      — parse 'hhea' table; returns Dict with #ascent, #descent, #lineGap, #numHMetrics
+- `parseMaximumProfile: entry`        — parse 'maxp' table; returns numGlyphs Integer
+- `parseGlyphFlags: entry size: n`    — parse glyph flag bytes (with repeat expansion) from 'glyf'
+- `parseKernPairsType0: entry`        — parse kern subtable type 0; returns Array of TTKernPair
+- `parseNamingTable: entry`           — parse 'name' table; returns Array of name strings
+- `selectGlyphFor:from:glyphs:unknownGlyph:` — select the best glyph for a code point,
+  substituting WIDE MINUS (U+2212) for ASCII dash and CENTERED ASTERISK (U+2217) for ASCII star
 "
 Class {
 	#name : 'TTFontParser',

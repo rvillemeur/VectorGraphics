@@ -1,3 +1,20 @@
+"
+SVG path command M/m — move to.
+
+Starts a new subpath at the given coordinates without drawing anything. Multiple points
+can be listed; each after the first is treated as an implicit L (line-to) in SVG spec,
+though VectorEngineAbstract handles this inside `multiMoveTo:points:`.
+
+## Key instVar
+- `points`  Array of Point
+
+## Canvas message
+`runOn:` sends `multiMoveTo: coordinatesAreRelative points: points`.
+
+## Convenience setters (used by test helpers and direct construction)
+- `toPoint: endPoint` — sets single absolute destination
+- `toRelativePoint: endPoint` — sets single relative destination
+"
 Class {
 	#name : 'PathMoveToCommand',
 	#superclass : 'PathCommand',

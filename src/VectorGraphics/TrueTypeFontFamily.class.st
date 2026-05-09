@@ -1,3 +1,24 @@
+"
+A FontFamily backed by one or more TrueType font files, grouped by emphasis (regular/bold/italic/...).
+
+TrueTypeFontFamily holds the TTFontDescription objects for all emphasis variants of a single
+typeface. The regular (emphasis=0) variant is the `baseTTFontDescription`; others are stored
+in `ttFontDescriptionsByEmphasis`.
+
+Instances are created by `readAllTrueTypeFontsIn: aDirectoryEntry` which scans a directory
+for .ttf files, calls TTFontDescription >> read:, groups results by family name, and registers
+each family into FontFamily's AvailableFamilies dictionary.
+
+## Key instVars
+- `baseTTFontDescription`        TTFontDescription — the regular (emphasis 0) variant
+- `ttFontDescriptionsByEmphasis` Dictionary — emphasis code → TTFontDescription
+
+## Key methods
+- `baseTTFontDescription: aTTFontDescription` — initialiser
+- `addTTFontDescription: aTTFontDescription`  — registers a variant by its emphasis code
+- `ttFontDescriptionForEmphasis: anEmphasis`  — retrieves the appropriate variant
+- `readAllTrueTypeFontsIn: aDirectoryEntry`   — class-side font loading entry point
+"
 Class {
 	#name : 'TrueTypeFontFamily',
 	#superclass : 'FontFamily',

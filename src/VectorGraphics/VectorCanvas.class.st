@@ -1,15 +1,34 @@
 "
-A canvas specially built for Morphic 3.
+A Morphic Canvas subclass that renders vector graphics using the VectorEngine pipeline.
 
-self runningWorld backgroundImage displayAt: 0@0. (VectorCanvas onForm: Display) fullDraw: self runningWorld. Display copy inspect.
-Display writePNGfileNamed: 'm3z.png'
+VectorCanvas bridges Pharo's Morphic drawing protocol to the VectorEngineAbstract path API.
+It owns a VectorEngineWholePixel by default; calling `doSubPixelAntiAliasing` replaces it
+with VectorEngineSubPixel for higher-quality text rendering (TTFontDescription does this
+automatically when rendering glyphs).
 
-On any Morph:
-| c |
-c := VectorCanvas onForm: Display.
-self allOwnersReverseDo: [ :m | c into: m ].
-c fullDraw: self.
-Display forceToScreen
+## Relationships
+- Wraps a VectorEngineWholePixel or VectorEngineSubPixel.
+- PathCommand >> runOn: sends canvas messages (multiLineTo:, closePath, etc.) to VectorCanvas,
+  which delegates them to the engine's abs_*/do_* methods.
+- TTFontDescription uses VectorCanvas to rasterize glyph outlines into FormGlyph instances.
+- Subclasses Pharo's Canvas; Morphic calls standard methods (drawString:, fillRect:, etc.).
+
+## Entry point
+`VectorCanvas class >> onForm: aForm` — creates a canvas backed by the given Form.
+
+## Key methods
+- `doSubPixelAntiAliasing`          — switch to sub-pixel engine (called before text rendering)
+- `strokeWidth: color: do:`         — stroke a path at the given width and color
+- `fillColor: do:`                  — fill a closed path
+- `strokeWidth: color: fillColor: do:` — combined stroke + fill
+- `multiLineTo:points:`, `multiMoveTo:points:`, `multiCurveTo:...`, `closePath`, etc.
+                                    — path construction messages received from PathCommand >> runOn:
+- `fullDraw: aMorph`                — renders a Morph and all sub-morphs onto the backing Form
+
+Example:
+  (VectorCanvas onForm: Display) strokeWidth: 1.0 color: Color black do: [ :c |
+      c abs_MoveToX: 10 y: 10; abs_LineToX: 100 y: 100 ].
+  Display forceToScreen
 "
 Class {
 	#name : 'VectorCanvas',

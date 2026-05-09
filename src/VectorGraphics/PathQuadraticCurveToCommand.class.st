@@ -1,3 +1,22 @@
+"
+SVG path command Q/q — quadratic Bézier curve.
+
+Parses groups of 4 numbers per segment: x1 y1 x y, where (x1,y1) is the single control point
+and (x,y) is the destination.
+
+## Key instVars
+- `toPoints`      OrderedCollection of Point
+- `controlPoints` OrderedCollection of Point
+
+## Canvas message
+`runOn:` sends:
+  multiQuadraticCurveTo: coordinatesAreRelative
+  toPoints: toPoints controlPoints: controlPoints
+
+## Convenience setters
+- `toPoints:controlPoints:` — absolute
+- `toRelativePoints:controlPoints:` — relative
+"
 Class {
 	#name : 'PathQuadraticCurveToCommand',
 	#superclass : 'PathCommand',

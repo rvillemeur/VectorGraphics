@@ -1,5 +1,31 @@
 "
-TTFontReader builds a TTFontDescription from a TrueType font file (.ttf).
+Reads a raw TrueType font file (.ttf) and builds a TTFontDescription from it.
+
+TTFontReader is the top-level parser. It reads the font's table directory, locates each
+named table (head, hhea, maxp, cmap, glyf, loca, hmtx, kern, name), and orchestrates the
+full parsing pipeline. Binary table parsing is delegated to TTFontParser class methods.
+Glyph selection with Unicode substitution is delegated to TTFontParser >> selectGlyphFor:from:glyphs:unknownGlyph:.
+
+## Entry point
+`TTFontReader class >> readTTFFrom: aByteArray` — parses the byte array and returns a
+fully initialised TTFontDescription.
+
+## Pipeline (all private)
+1. Read table directory → build TTFontTableDirEntry map
+2. `parseFontHeader` → bounds, unitsPerEm, indexToLocFormat
+3. `parseMaximumProfile` → nGlyphs
+4. `parseHorizontalHeader` → ascent, descent, lineGap, numHMetrics
+5. `parseGlyphs` → Array of TTGlyph / TTCompositeGlyph (via parseSimpleGlyph / parseCompositeGlyph)
+6. `parseHorizontalMetrics` → advanceWidth, leftSideBearing per glyph
+7. `decodeCmapTable` → character map (codePoint → glyph index)
+8. `mapAndStoreGlyphsUsing:` → UTF-8 glyph-index map stored in TTFontDescription
+9. `parseKerningTable` → kern pairs stored in TTFontDescription
+10. `parseNamingTable` → font name strings stored in TTFontDescription
+
+## Key instVars
+- `glyphs`           Array of TTGlyph (built during step 5)
+- `kernPairs`        Array of TTKernPair
+- `fontDescription`  TTFontDescription being populated
 "
 Class {
 	#name : 'TTFontReader',

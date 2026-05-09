@@ -1,5 +1,30 @@
 "
-This class represents an entry in a truetype font table directory. Used by TTFontReader only.
+A cursor into a raw TrueType font byte array, positioned at one named table (e.g. 'cmap',
+'glyf', 'kern'). Provides sequential reading primitives used by TTFontReader and TTFontParser.
+
+TTFontReader creates one instance per table found in the font's table directory, then passes
+each entry to the corresponding TTFontParser class method for parsing.
+
+## Key instVars
+- `fontData`  ByteArray — the complete raw .ttf file contents
+- `offset`    Integer — byte position of this table within fontData (1-based)
+- `length`    Integer — byte length of the table
+- `tag`       String — 4-character table identifier (e.g. 'cmap')
+- `checkSum`  Integer — stored but not currently verified
+
+## Key methods (reading primitives)
+- `nextByte`         — read 1 unsigned byte, advance offset
+- `nextShort`        — read 2-byte signed big-endian integer
+- `nextUShort`       — read 2-byte unsigned big-endian integer
+- `nextLong`         — read 4-byte signed big-endian integer
+- `nextULong`        — read 4-byte unsigned big-endian integer
+- `skip: n`          — advance offset by n bytes
+- `stringAt:length:multiByte:` — read a name-table string (Mac or Windows encoding)
+- `nextBytes:into:startingAt:` — bulk-copy bytes into an existing array
+
+## Factory
+- `TTFontTableDirEntry class >> on: fontData at: index` — used by TTFontReader during directory scan
+- `TTFontTableDirEntry class >> onBytes: aByteArray` — used in tests (wraps a synthetic byte array)
 "
 Class {
 	#name : 'TTFontTableDirEntry',

@@ -1,9 +1,31 @@
 "
-Examples showing how to use VectorCanvas to draw vector graphics onto a Form.
+Runnable examples demonstrating VectorCanvas rendering capabilities.
 
-Run any class-side method and inspect or display the returned Form:
-    VectorCanvasExample exampleLine inspect
-    VectorCanvasExample exampleCompositeDrawing display
+All methods are class-side. Each example creates an off-screen Form, draws on it via
+VectorCanvas, and returns the Form for inspection or display.
+
+To run an example, evaluate in a Playground:
+  VectorCanvasExample exampleLine inspect
+  VectorCanvasExample exampleTriangle display
+  VectorCanvasExample exampleCompositeDrawing display
+
+The private helpers `newForm` and `newCanvasOn:` are shared across all examples.
+
+## Examples by shape type
+- `exampleLine`                    — single diagonal line (strokeWidth:color:do:)
+- `exampleLineConvenience`         — same via line:to:width:color: convenience method
+- `examplePolyLine`                — connected polyline through multiple points
+- `exampleCubicBezier`             — cubic Bézier through 4 control points
+- `exampleQuadraticBezier`         — quadratic Bézier through 3 control points
+- `exampleCircleStroke`            — stroked circle (ellipse with equal radii)
+- `exampleCircleFill`              — filled circle
+- `exampleEllipse`                 — ellipse with stroke + fill
+- `exampleFilledRectangle`         — solid rectangle via fillRectangle:color:
+- `exampleStrokedRectangle`        — rectangle outline via frameRectangle:borderWidth:color:
+- `exampleStrokedAndFilledRectangle` — rectangle with both stroke and fill
+- `exampleRoundedRectangle`        — filled rounded-corner rectangle
+- `exampleTriangle`                — triangle with stroke and semi-transparent fill
+- `exampleCompositeDrawing`        — multiple shapes layered on one canvas
 "
 Class {
 	#name : 'VectorCanvasExample',

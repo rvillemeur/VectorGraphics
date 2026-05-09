@@ -1,11 +1,19 @@
 "
-A TTKernPair represents a TrueType kerning pair.
+One kerning pair from a TrueType font's kern table.
 
-Instance variables:
-	left	<Integer>	The glyph index for the left character.
-	right <Integer>	The glyph index for the right character.
-	value <Integer>	The amount of kerning.
-	mask <Integer>	An efficient representation for the left and the right value.
+Kerning adjusts the horizontal spacing between specific adjacent glyph pairs (e.g. 'AV').
+Created by TTFontParser >> parseKernPairsType0: and stored in TTFontDescription >> kernPairs.
+TrueTypeFont uses the sorted collection for fast lookup during string measurement.
+
+## Key instVars
+- `left`   glyph index of the left character
+- `right`  glyph index of the right character
+- `value`  kerning adjustment in font design units (negative = tighter, positive = looser)
+- `mask`   packed integer `(left bitShift: 12) + right`, used as the sort/search key
+
+## Key methods
+- `TTKernPair class >> maskFor:with:` — computes the mask for binary-search lookup
+- `mask` — lazy, caches the computed mask on first access
 "
 Class {
 	#name : 'TTKernPair',

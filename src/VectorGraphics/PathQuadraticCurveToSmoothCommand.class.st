@@ -1,3 +1,16 @@
+"
+SVG path command T/t — smooth quadratic Bézier curve.
+
+Like PathQuadraticCurveToCommand but omits the control point; the canvas derives it by
+mirroring the previous quadratic command's control point across the current point.
+Parses pairs of numbers (x y) per segment.
+
+## Key instVar
+- `toPoints`  OrderedCollection of Point
+
+## Canvas message
+`runOn:` sends `multiQuadraticCurveToSmooth: coordinatesAreRelative toPoints: toPoints`.
+"
 Class {
 	#name : 'PathQuadraticCurveToSmoothCommand',
 	#superclass : 'PathCommand',

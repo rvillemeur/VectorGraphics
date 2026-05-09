@@ -1,22 +1,46 @@
 "
-A Vector Graphics rasterizer for Morphic 3.
-Supports most SVG primitives.
-Gives exceptional quality.
+Abstract base for the production vector rasterizer. Owns the path state machine and the
+complete SVG-style drawing API. Concrete rendering is left to VectorEnginePixel subclasses.
 
-(VectorEngineSubPixel onForm: Display)
-	strokeWidth: 1.0 color: Color black do: [ :engine |
-		engine abs_EllipseCenterX: 100 y: 100 radiusX: 80 radiusY: 40 rotationAngle: -0.2 start: 0 sweep: Float pi * 2 ].
-Display forceToScreen.
+## Class hierarchy
+  VectorEngineAbstract (path state + drawing API)
+    └── VectorEnginePixel (alphaMask + edgeCounts buffers, blend logic)
+            ├── VectorEngineWholePixel  (1 byte/pixel, hi-DPI)
+            └── VectorEngineSubPixel    (4 bytes/pixel, sub-pixel AA for LCD)
 
-(VectorEngineSubPixel onForm: Display)
-	strokeWidth: 1.0 color: Color black fillColor: Color red do: [ :engine |
-		engine abs_EllipseCenterX: 100 y: 100 radiusX: 80 radiusY: 40 rotationAngle: -0.2 start: 0 sweep: Float pi * 2 ].
-Display forceToScreen.
+## Path state machine
+Drawing methods are prefixed `abs_` (absolute coordinates) or `rel_` (relative).
+All path state is managed in instVars:
+- `pathCurrentX/Y`       — current pen position, updated by every drawing operation
+- `pathFirstX/Y`         — position of the most recent `abs_MoveToX:y:`, used by `do_ClosePath`
+- `previousCallX/Y`      — previous call's endpoint, used by smooth Bézier commands
+- `previousCallControlX/Y` — previous control point, used by smooth quadratic commands
+- `hopsPerPixel`         — sub-pixel sampling density (higher = smoother curves, slower)
 
-(VectorEngineSubPixel onForm: Display)
-	fillColor: Color red do: [ :engine |
-		engine abs_EllipseCenterX: 100 y: 100 radiusX: 80 radiusY: 40 rotationAngle: -0.2 start: 0 sweep: Float pi * 2 ].
-Display forceToScreen
+## Stroke/fill entry points
+All drawing must happen inside one of:
+- `strokeWidth: color: do:`           — stroke only
+- `fillColor: do:`                    — fill only
+- `strokeWidth: color: fillColor: do:` — both
+These set up state (hopsPerPixel, strokeWidth, initializePath) and call `finishPath:` after.
+
+## Key drawing methods (abs_ variants; rel_ variants delegate to abs_)
+- `abs_MoveToX:y:`         — start new subpath
+- `abs_LineToX:y:`         — straight line
+- `abs_LineToX:`           — horizontal line (keeps current y)
+- `abs_LineToY:`           — vertical line (keeps current x)
+- `abs_CubicBezierToX:y:control1X:y:control2X:y:` — cubic Bézier
+- `abs_QuadraticBezierToX:y:controlX:y:` — quadratic Bézier
+- `abs_ArcToX:y:radiusX:radiusY:...`   — elliptical arc
+- `abs_EllipseCenterX:y:radiusX:radiusY:...` — full ellipse
+- `do_ClosePath`           — line back to pathFirstX/Y
+
+## Subclass responsibilities
+- `newTrajectoryFragment`  — called at start of each subpath
+- `primLineFromX:y:toX:y:hops:incrementX:incrementY:` — low-level hop walker
+- `primCubicBezierFromX:...`, `primQuadraticBezierFromX:...`, `primArcCenterX:...`
+- `finishPath: ensureClosePath`        — blend alphaMask into targetForm and reset buffers
+- `updateAlphasForX:y:`, `updateEdgesAndBoundsForX:y:` — per-hop pixel updates
 "
 Class {
 	#name : 'VectorEngineAbstract',

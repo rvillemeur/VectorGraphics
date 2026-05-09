@@ -1,28 +1,29 @@
 "
-❯ some method like blenFillOnly or blendFillOnlyAtX: x y: y pixelIndex: pixelIndex redIsInside: isRedInside greenIsInside: isGreenInside blueIsInside:
-  isBlueInside a quite long. would it make sense to break them into smaller method ?
+Concrete VectorEnginePixel for sub-pixel anti-aliasing on RGB LCD screens.
 
-● Two different situations in these methods:
+Uses 4 bytes per pixel (WordArray, 3 bytes used for R, G, B channels independently). The red
+and blue channel samples are shifted by ±subPixelDelta (0.25 pixel) horizontally to exploit
+the physical RGB stripe layout of LCD panels, tripling effective horizontal resolution.
+This produces visibly sharper text and thin-line edges on normal-DPI screens.
 
-  blendFillOnly / blendStrokeAndFill outer loops (~40 lines each)
-  Already well-structured. They orchestrate: accumulate edge counts → check morph clip → delegate to AtX: inner method → reset mask. Each step is necessary
-  and cohesive. Extracting sub-methods here would just scatter one logical flow across multiple methods with no clarity gain.
+VectorCanvas switches to this engine when `doSubPixelAntiAliasing` is called. TTFontDescription
+always uses it when rasterizing glyph outlines into FormGlyph instances.
 
-  blendFillOnlyAtX:... / blendStrokeOnlyAtX:... inner methods (~60 lines each)
-  The repeated per-channel blending formula is the real duplication. In blendStrokeOnlyAtX: the same 5-line block appears 3 times (for R, G, B):
-  alphaR := antiAliasRedAlpha * strokeColor alpha.
-  unAlphaR := 1.0 - alphaR.
-  resultAlpha := alphaR + (unAlphaR * targetAlpha).
-  resultR := alphaR * strokeColor red * 255 + (unAlphaR * (targetWord at: 3) * targetAlpha).
-  targetWord at: 3 put: (resultR / resultAlpha) rounded
+## Performance note
+The per-pixel blending methods (`blendStrokeOnlyAtX:y:pixelIndex:`,
+`blendFillOnlyAtX:y:pixelIndex:isInside:`) repeat the same 5-line alpha-blend formula three
+times (once per RGB channel). This is intentional inlining — these are the hottest methods in
+the engine, called once per pixel per draw call. Each extra message send in this loop has
+measurable cost in Smalltalk.
 
-  You could extract this. But these are the hottest methods in the whole engine — called once per pixel per draw call, potentially millions of times. In
-  Smalltalk, each extra message send in an inner pixel loop has real measurable cost. The original author inlined this deliberately.
+## Key instVar
+- `subPixelDelta`  horizontal sampling offset for R and B channels (default 0.25 pixel)
 
-  Verdict: Leave the inner AtX: methods as-is. The length is a performance trade-off, not an oversight. Only extract if you have profiling data showing it
-  doesn't matter, or if you're targeting a Pharo image with a good JIT that inlines small methods.
-
-
+## Key methods (overrides from VectorEnginePixel)
+- `pvtSetForm: aForm`        — allocates alphaMask as WordArray (1 word/pixel, 3 bytes used for R/G/B)
+- `updateAlphasForX: x y: y` — updates R, G, B channel alphas separately at x±subPixelDelta
+- `blendStrokeOnly`, `blendFillOnly` — per-channel compositing into targetForm
+- `blendHorizontalExpansion`  — returns subPixelDelta (extra horizontal margin for shifted R/B)
 "
 Class {
 	#name : 'VectorEngineSubPixel',

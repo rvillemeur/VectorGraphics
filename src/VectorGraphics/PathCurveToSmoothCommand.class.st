@@ -1,3 +1,19 @@
+"
+SVG path command S/s — smooth cubic Bézier curve.
+
+Like PathCurveToCommand but omits control point 1; the canvas derives it by mirroring the
+previous command's second control point across the current point. Parses groups of 4 numbers
+per segment: x2 y2 x y.
+
+## Key instVars
+- `toPoints`       OrderedCollection of Point
+- `control2Points` OrderedCollection of Point
+
+## Canvas message
+`runOn:` sends:
+  multiCurveToSmooth: coordinatesAreRelative
+  toPoints: toPoints control2Points: control2Points
+"
 Class {
 	#name : 'PathCurveToSmoothCommand',
 	#superclass : 'PathCommand',
