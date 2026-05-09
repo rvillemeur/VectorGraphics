@@ -21,7 +21,9 @@ TrueTypeExample class >> exampleCharacterWidths [
 	| font widths |
 	font := self loadFontFrom: self defaultFontPath.
 	widths := Dictionary new.
-	(Character value: 32) to: (Character value: 126) do: [ :char |
+	32 to: 126 do: [ :code |
+		| char |
+		char := Character value: code.
 		widths at: char put: (font widthOf: char) ].
 	^ widths
 ]
