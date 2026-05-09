@@ -7,6 +7,9 @@ the current point back to the most recent move-to point, closing the open subpat
 ## Canvas message
 `runOn:` sends `closePath` to the canvas with no arguments.
 VectorEngineAbstract >> do_ClosePath implements this as basicLineToX: pathFirstX y: pathFirstY.
+
+## Direct construction
+`PathCloseCommand new` — no arguments needed.
 "
 Class {
 	#name : 'PathCloseCommand',
@@ -15,6 +18,12 @@ Class {
 	#package : 'VectorGraphics',
 	#tag : 'PathCommands'
 }
+
+{ #category : 'instance creation' }
+PathCloseCommand class >> new [
+
+	^ super new init
+]
 
 { #category : 'instance creation' }
 PathCloseCommand class >> svgName [
@@ -26,6 +35,12 @@ PathCloseCommand class >> svgName [
 PathCloseCommand >> buildFrom: commandChar stream: aStream [
 
 	super buildFrom: commandChar stream: aStream
+]
+
+{ #category : 'initialization' }
+PathCloseCommand >> init [
+
+	coordinatesAreRelative := false
 ]
 
 { #category : 'private' }

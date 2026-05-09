@@ -889,6 +889,12 @@ VectorCanvas >> roundTopRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax rx:
 		do_ClosePath
 ]
 
+{ #category : 'paths' }
+VectorCanvas >> runPathCommands: aCollection [
+
+	aCollection do: [ :cmd | cmd runOn: self ]
+]
+
 { #category : 'Morphic support' }
 VectorCanvas >> savePatch: prevSavedPatch bounds: aRectangle [
 

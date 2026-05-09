@@ -11,9 +11,11 @@ though VectorEngineAbstract handles this inside `multiMoveTo:points:`.
 ## Canvas message
 `runOn:` sends `multiMoveTo: coordinatesAreRelative points: points`.
 
-## Convenience setters (used by test helpers and direct construction)
-- `toPoint: endPoint` — sets single absolute destination
-- `toRelativePoint: endPoint` — sets single relative destination
+## Direct construction (without stream parsing)
+- `PathMoveToCommand to: aPoint`       — absolute destination (class-side factory)
+- `PathMoveToCommand toRelative: aPoint` — relative offset (class-side factory)
+- `toPoint: endPoint`                  — instance-side absolute setter
+- `toRelativePoint: endPoint`          — instance-side relative setter
 "
 Class {
 	#name : 'PathMoveToCommand',
@@ -30,6 +32,18 @@ Class {
 PathMoveToCommand class >> svgName [
 
 	^ $M
+]
+
+{ #category : 'instance creation' }
+PathMoveToCommand class >> to: aPoint [
+
+	^ self new toPoint: aPoint
+]
+
+{ #category : 'instance creation' }
+PathMoveToCommand class >> toRelative: aPoint [
+
+	^ self new toRelativePoint: aPoint
 ]
 
 { #category : 'building' }

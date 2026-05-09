@@ -11,7 +11,7 @@ To run an example, evaluate in a Playground:
 
 The private helpers `newForm` and `newCanvasOn:` are shared across all examples.
 
-## Examples by shape type
+## Direct canvas API examples
 - `exampleLine`                    — single diagonal line (strokeWidth:color:do:)
 - `exampleLineConvenience`         — same via line:to:width:color: convenience method
 - `examplePolyLine`                — connected polyline through multiple points
@@ -26,6 +26,15 @@ The private helpers `newForm` and `newCanvasOn:` are shared across all examples.
 - `exampleRoundedRectangle`        — filled rounded-corner rectangle
 - `exampleTriangle`                — triangle with stroke and semi-transparent fill
 - `exampleCompositeDrawing`        — multiple shapes layered on one canvas
+
+## PathCommand object examples (using runPathCommands:)
+These show building a collection of PathCommand objects and running them via
+`canvas runPathCommands: cmds` — the pattern used when loading SVG path data.
+- `examplePathCommandTriangle`     — triangle from M + L + L + Z commands
+- `examplePathCommandRelativeLines` — zigzag from M + relative l commands
+- `examplePathCommandCubicBezier` — cubic Bézier from M + C commands
+- `examplePathCommandArc`          — elliptical arc from M + A commands
+- `examplePathCommandMixed`        — star using M + multi-point L + Z
 "
 Class {
 	#name : 'VectorCanvasExample',
@@ -157,6 +166,110 @@ VectorCanvasExample class >> exampleLineConvenience [
 	form := self newForm.
 	canvas := self newCanvasOn: form.
 	canvas line: 30 @ 50 to: 270 @ 150 width: 3.0 color: Color purple.
+	^ form
+]
+
+{ #category : 'path command examples' }
+VectorCanvasExample class >> examplePathCommandArc [
+	"Elliptical arc drawn via PathArcCommand — SVG 'A' command.
+	Draws a large-arc sweep from (50,100) to (250,100) with rx=100 ry=60.
+	VectorCanvasExample examplePathCommandArc inspect"
+<sampleInstance>
+	| form canvas cmds |
+	form := self newForm.
+	canvas := self newCanvasOn: form.
+	cmds := OrderedCollection new.
+	cmds add: (PathMoveToCommand to: 50 @ 100).
+	cmds add: (PathArcCommand
+		to: 250 @ 100
+		rx: 100 ry: 60
+		xAxisRotationDegrees: 0
+		largeArc: true
+		sweep: true).
+	canvas strokeWidth: 2.0 color: Color blue do: [ canvas runPathCommands: cmds ].
+	^ form
+]
+
+{ #category : 'path command examples' }
+VectorCanvasExample class >> examplePathCommandCubicBezier [
+	"Cubic Bézier curve built from PathMoveToCommand + PathCurveToCommand.
+	Equivalent to SVG path 'M 30 150 C 100 20 200 20 270 150'.
+	VectorCanvasExample examplePathCommandCubicBezier inspect"
+<sampleInstance>
+	| form canvas cmds |
+	form := self newForm.
+	canvas := self newCanvasOn: form.
+	cmds := OrderedCollection new.
+	cmds add: (PathMoveToCommand to: 30 @ 150).
+	cmds add: (PathCurveToCommand
+		to: 270 @ 150
+		control1: 100 @ 20
+		control2: 200 @ 20).
+	canvas strokeWidth: 2.0 color: Color blue do: [ canvas runPathCommands: cmds ].
+	^ form
+]
+
+{ #category : 'path command examples' }
+VectorCanvasExample class >> examplePathCommandMixed [
+	"Star shape combining PathMoveToCommand, PathLineToCommand, and PathCloseCommand.
+	Demonstrates running a mixed collection of PathCommand objects on one canvas.
+	VectorCanvasExample examplePathCommandMixed inspect"
+<sampleInstance>
+	| form canvas cmds |
+	form := self newForm.
+	canvas := self newCanvasOn: form.
+	cmds := OrderedCollection new.
+	cmds add: (PathMoveToCommand to: 150 @ 20).
+	cmds add: (PathLineToCommand toPoints: {
+		58 @ 190. 270 @ 75. 30 @ 75. 242 @ 190 }).
+	cmds add: PathCloseCommand new.
+	canvas
+		strokeWidth: 2.0
+		color: Color black
+		fillColor: (Color yellow alpha: 0.6)
+		do: [ canvas runPathCommands: cmds ].
+	^ form
+]
+
+{ #category : 'path command examples' }
+VectorCanvasExample class >> examplePathCommandRelativeLines [
+	"Zigzag drawn with relative PathLineToCommands (SVG 'l' lowercase).
+	Each line-to is offset from the current pen position.
+	VectorCanvasExample examplePathCommandRelativeLines inspect"
+<sampleInstance>
+	| form canvas cmds |
+	form := self newForm.
+	canvas := self newCanvasOn: form.
+	cmds := OrderedCollection new.
+	cmds add: (PathMoveToCommand to: 20 @ 100).
+	cmds add: (PathLineToCommand toRelativePoint: 50 @ -60).
+	cmds add: (PathLineToCommand toRelativePoint: 50 @ 60).
+	cmds add: (PathLineToCommand toRelativePoint: 50 @ -60).
+	cmds add: (PathLineToCommand toRelativePoint: 50 @ 60).
+	cmds add: (PathLineToCommand toRelativePoint: 50 @ -60).
+	canvas strokeWidth: 2.0 color: Color magenta do: [ canvas runPathCommands: cmds ].
+	^ form
+]
+
+{ #category : 'path command examples' }
+VectorCanvasExample class >> examplePathCommandTriangle [
+	"Triangle drawn entirely via PathCommand objects instead of canvas API calls.
+	Equivalent to SVG path 'M 150 25 L 270 175 L 30 175 Z'.
+	VectorCanvasExample examplePathCommandTriangle inspect"
+<sampleInstance>
+	| form canvas cmds |
+	form := self newForm.
+	canvas := self newCanvasOn: form.
+	cmds := OrderedCollection new.
+	cmds add: (PathMoveToCommand to: 150 @ 25).
+	cmds add: (PathLineToCommand toPoint: 270 @ 175).
+	cmds add: (PathLineToCommand toPoint: 30 @ 175).
+	cmds add: PathCloseCommand new.
+	canvas
+		strokeWidth: 2.0
+		color: Color black
+		fillColor: (Color red alpha: 0.7)
+		do: [ canvas runPathCommands: cmds ].
 	^ form
 ]
 

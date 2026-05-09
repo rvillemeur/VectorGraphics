@@ -8,6 +8,11 @@ Parses pairs of numbers (x y) until the stream is exhausted; stores them as an A
 
 ## Canvas message
 `runOn:` sends `multiLineTo: coordinatesAreRelative points: points`.
+
+## Direct construction (without stream parsing)
+- `PathLineToCommand to: aPoint`           — single absolute destination
+- `PathLineToCommand toPoints: anArray`    — multiple absolute destinations (polyline segment)
+- `PathLineToCommand toRelativePoint: aPoint` — single relative offset from current position
 "
 Class {
 	#name : 'PathLineToCommand',
@@ -24,6 +29,24 @@ Class {
 PathLineToCommand class >> svgName [
 
 	^ $L
+]
+
+{ #category : 'instance creation' }
+PathLineToCommand class >> toPoint: aPoint [
+
+	^ self new toPoint: aPoint
+]
+
+{ #category : 'instance creation' }
+PathLineToCommand class >> toPoints: anArray [
+
+	^ self new toPoints: anArray
+]
+
+{ #category : 'instance creation' }
+PathLineToCommand class >> toRelativePoint: aPoint [
+
+	^ self new toRelativePoint: aPoint
 ]
 
 { #category : 'building' }
@@ -52,4 +75,25 @@ PathLineToCommand >> privatePointsDo: aBlock [
 PathLineToCommand >> runOn: aCanvas [
 
 	aCanvas multiLineTo: coordinatesAreRelative points: points
+]
+
+{ #category : 'building' }
+PathLineToCommand >> toPoint: aPoint [
+
+	coordinatesAreRelative := false.
+	points := { aPoint }
+]
+
+{ #category : 'building' }
+PathLineToCommand >> toPoints: anArray [
+
+	coordinatesAreRelative := false.
+	points := anArray
+]
+
+{ #category : 'building' }
+PathLineToCommand >> toRelativePoint: aPoint [
+
+	coordinatesAreRelative := true.
+	points := { aPoint }
 ]

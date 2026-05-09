@@ -39,6 +39,18 @@ PathArcCommand class >> svgName [
 	^ $A
 ]
 
+{ #category : 'instance creation' }
+PathArcCommand class >> to: endPoint rx: rx ry: ry xAxisRotationDegrees: angleDeg largeArc: doLargeArc sweep: doSweep [
+
+	^ self new
+		  to: endPoint
+		  rx: rx
+		  ry: ry
+		  xAxisRotationDegrees: angleDeg
+		  largeArc: doLargeArc
+		  sweep: doSweep
+]
+
 { #category : 'building' }
 PathArcCommand >> buildFrom: commandChar stream: aStream [
 
@@ -77,4 +89,15 @@ Y completar los que falten!"
 { #category : 'drawing' }
 PathArcCommand >> runOn: aCanvas [
 	aCanvas multiArc: coordinatesAreRelative rs: rs xAxisRotations: xAxisRotations toPoints: toPoints doLargerArcs: doLargerArcs useIncreasingAngless: useIncreasingAngless
+]
+
+{ #category : 'building' }
+PathArcCommand >> to: endPoint rx: rx ry: ry xAxisRotationDegrees: angleDeg largeArc: doLargeArc sweep: doSweep [
+
+	coordinatesAreRelative := false.
+	rs := OrderedCollection with: rx @ ry.
+	xAxisRotations := OrderedCollection with: angleDeg degreesToRadians.
+	toPoints := OrderedCollection with: endPoint.
+	doLargerArcs := OrderedCollection with: doLargeArc.
+	useIncreasingAngless := OrderedCollection with: doSweep
 ]
