@@ -1,3 +1,29 @@
+"
+❯ some method like blenFillOnly or blendFillOnlyAtX: x y: y pixelIndex: pixelIndex redIsInside: isRedInside greenIsInside: isGreenInside blueIsInside:
+  isBlueInside a quite long. would it make sense to break them into smaller method ?
+
+● Two different situations in these methods:
+
+  blendFillOnly / blendStrokeAndFill outer loops (~40 lines each)
+  Already well-structured. They orchestrate: accumulate edge counts → check morph clip → delegate to AtX: inner method → reset mask. Each step is necessary
+  and cohesive. Extracting sub-methods here would just scatter one logical flow across multiple methods with no clarity gain.
+
+  blendFillOnlyAtX:... / blendStrokeOnlyAtX:... inner methods (~60 lines each)
+  The repeated per-channel blending formula is the real duplication. In blendStrokeOnlyAtX: the same 5-line block appears 3 times (for R, G, B):
+  alphaR := antiAliasRedAlpha * strokeColor alpha.
+  unAlphaR := 1.0 - alphaR.
+  resultAlpha := alphaR + (unAlphaR * targetAlpha).
+  resultR := alphaR * strokeColor red * 255 + (unAlphaR * (targetWord at: 3) * targetAlpha).
+  targetWord at: 3 put: (resultR / resultAlpha) rounded
+
+  You could extract this. But these are the hottest methods in the whole engine — called once per pixel per draw call, potentially millions of times. In
+  Smalltalk, each extra message send in an inner pixel loop has real measurable cost. The original author inlined this deliberately.
+
+  Verdict: Leave the inner AtX: methods as-is. The length is a performance trade-off, not an oversight. Only extract if you have profiling data showing it
+  doesn't matter, or if you're targeting a Pharo image with a good JIT that inlines small methods.
+
+
+"
 Class {
 	#name : 'VectorEngineSubPixel',
 	#superclass : 'VectorEnginePixel',
