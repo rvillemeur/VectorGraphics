@@ -242,21 +242,6 @@ FontFamily class >> promptUserAlt [
 ]
 
 { #category : 'ui' }
-FontFamily class >> promptUserAndSetDefault [
-	"Present a menu of available font families, and if one is chosen, change to it.
-	FontFamily promptUserAndSetDefault
-	"
-
-	(self promptUser: FontFamily defaultFamilyName includeNonASCII: false)
-		ifNotNil: [ :fontFamily |
-			fontFamily includesAscii
-				ifTrue: [ PreferenceSet setDefaultFont: fontFamily familyName ]
-				ifFalse: [
-					self inform:
-						'Selected font does not include ASCII characters. Can not be set as default.' ] ]
-]
-
-{ #category : 'ui' }
 FontFamily class >> promptUserForSize: currentSize fontFamily: fontFamily [
 
 	| menu |

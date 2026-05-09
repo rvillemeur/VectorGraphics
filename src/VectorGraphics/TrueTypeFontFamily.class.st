@@ -73,26 +73,6 @@ TrueTypeFontFamily class >> readTrueTypeFontEntry: ttFontFileEntry [
 				ifTrue: [ fam baseTTFontDescription: ttFontDescription ]
 				ifFalse: [ fam addTTFontDescription: ttFontDescription ].
 			fam clearCache ].
-	familyName = FontFamily defaultFamilyName ifTrue: [ 
-		Preferences setDefaultFont: familyName ].
-	PopUpMenu inform: 'loaded font ' , familyName
-]
-
-{ #category : 'instance creation' }
-TrueTypeFontFamily class >> serviceReadTTFont [
-
-	"Answer the service of reading a TrueType font"
-
-	^ (SimpleServiceEntry
-		   provider: self
-		   label: 'load font'
-		   selector: #readTrueTypeFontEntry:
-		   description: 'load TrueType font'
-		   buttonLabel: 'read font'
-		   icon:
-			   ((Theme content from: 'Theme' get: { '16x16'. 'mimetypes' }) 
-				    at: 'font-x-generic.png')) argumentGetter: [ :fileList | 
-		  fileList selectedFileEntry ]
 ]
 
 { #category : 'initialization' }

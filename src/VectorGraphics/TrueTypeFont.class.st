@@ -23,16 +23,6 @@ Class {
 	#tag : 'TrueType'
 }
 
-{ #category : 'initialization' }
-TrueTypeFont class >> assignmentGlyphSelectorPreferenceChanged [
-
-	| selector |
-	selector := Preferences assignmentGlyphSelector.
-	TTFontDescription allInstancesDo: [ :ttFontDescription | 
-		ttFontDescription perform: selector ].
-	self allInstancesDo: [ :each | each resetAssignmentGlyph ]
-]
-
 { #category : 'instance creation' }
 TrueTypeFont class >> family: aTrueTypeFontFamily ttFontDescription: aTTFontDescription pointSize: aNumber [
 
@@ -322,18 +312,6 @@ TrueTypeFont >> makeUnderlinedGlyph: aFormGlyph [
 			rule: Form over.
 		aFormGlyph form: form ].
 	form fillBlack: (0 @ y extent: form width @ d)
-]
-
-{ #category : 'objects from disk' }
-TrueTypeFont >> objectForDataStream: refStrm [
-
-	"I am about to be written on an object file.  Write a textual reference instead.
-	Warning: This saves a lot of space, but might fail if using other fonts than those in AvailableFonts"
-
-	^ DiskProxy
-		  global: #FontFamily
-		  selector: #familyName:pointSize:
-		  args: (Array with: self familyName with: self pointSize)
 ]
 
 { #category : 'displaying' }
