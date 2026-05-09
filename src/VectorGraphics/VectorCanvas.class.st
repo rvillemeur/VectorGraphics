@@ -180,47 +180,26 @@ VectorCanvas >> drawRightIcon [
 
 { #category : 'drawing - text' }
 VectorCanvas >> drawString: aString from: firstIndex to: lastIndex at: aPoint font: fontOrNil color: aColor [
+	"Render a substring of aString onto the canvas using the VectorEngine text pipeline.
+	aPoint is the top-left corner in Morphic coordinates; the baseline offset and y-axis
+	flip are applied here before delegating to engine >> displayUtf8:at:trueTypeFont:..."
 
-	"
-| s c f |
-c := VectorCanvas onForm: Display.
-c engine geometryTransformation: (AffineTransformation withRadians: 0.1).
-f := FontFamily familyName: 'DejaVu Sans' pointSize: 72.
-s := 'Latin text in VectorGraphics'.
-c drawString:  s from: 1 to: s size at: 10@10 font: f color: Color black.
-Display forceToScreen
-	"
-
-	"Slight optimization when there's nothing to do."
-
-	"
-	port clipHeight = 0 ifTrue: [^self].
-	port clipWidth = 0 ifTrue: [^self].
-	"
-
-	"	| font |
-	font := FontFamily defaultOrTrueTypeFamilyAndPointSize.
-	^font
-		ifNil: [ aPoint ] 
-		ifNotNil: [
-			engine
-				displayString: aString
-				from: firstIndex
-				to: lastIndex
-				at: aPoint + (0@(font ascent + font lineGap-1))
-				trueTypeFont: font fontDescription
-				useST80Glyphs: font isST80Glyphs
-				color: aColor
-				scaleX: 1.0 * font pointSize
-				scaleY: -1.0 * font pointSize ]"
-
-	"The conversion from top of glyph (morphic canvas) to baseline (engine, TrueType) is done here.
-	The conversion from Y-increases-downwards (morphic canvas) to Y-increases-upwards (engine, TrueType) is done here.
-	
-	The scaling of internal TrueType integer points to FloatingPoint where[0.0...1.0] equals #letterMTopSideBearing is done in the engine.
-	It should actually be done in TrueType. No one else cares!"
-
-	
+	| font utf8 baseline |
+	font := fontOrNil ifNil: [ FontFamily defaultFamilyAndPointSize ].
+	font ifNil: [ ^ self ].
+	utf8 := ByteArray streamContents: [ :stream |
+		firstIndex to: lastIndex do: [ :i |
+			Character
+				evaluate: [ :b | stream nextPut: b ]
+				withUtf8BytesOf: (aString at: i) codePoint ] ].
+	baseline := aPoint + (0 @ (font ascent + font lineGap - 1)).
+	engine
+		displayUtf8: utf8
+		at: baseline
+		trueTypeFont: font fontDescription
+		color: aColor
+		scaleX: 1.0 * font pointSize
+		scaleY: -1.0 * font pointSize
 ]
 
 { #category : 'drawing - icons' }
@@ -231,44 +210,21 @@ VectorCanvas >> drawUpIcon [
 
 { #category : 'drawing - text' }
 VectorCanvas >> drawUtf8: aByteArray at: aPoint font: aTrueTypeFont color: aColor [
+	"Render pre-encoded UTF-8 bytes onto the canvas using the VectorEngine text pipeline.
+	aPoint is the top-left corner in Morphic coordinates; the baseline offset and y-axis
+	flip are applied here before delegating to engine >> displayUtf8:at:trueTypeFont:..."
 
-	"
-| c f |
-Preferences disable: #loadOnlyLatinGlyphData. 'And now load optional fonts'.
-c := VectorCanvas onForm: Display.
-f := FontFamily familyName: 'DejaVu Sans' pointSize: 72.
-c drawString: 'Hola' at: 10@10 font: f color: Color random.
-c drawUtf8: #[208 176 208 177 208 178 208 179 208 180 208 181 209 145 208 182 208 183 208 184 208 185 208 186 208 187 208 188 208 189 208 190 209 143 209 142 209 141 209 140 209 139 209 138 209 137 209 136 209 135 209 134 209 133 209 132 209 131 209 130 209 129 209 128 208 191] at: 10@100 font: f color: Color random.
-c drawUtf8:  #[208 146 208 190 209 130 32 208 184 208 183 32 208 181 208 189 32 208 184 208 179 208 183 208 176 208 188 208 191 208 187 32 208 190 209 132 32 208 181 208 189 32 208 152 208 189 208 179 208 187 208 184 209 136 32 209 130 208 181 208 186 209 129 209 130 32 209 128 208 184 209 130 208 189 32 208 184 208 189 32 208 180 32 208 161 208 184 209 128 208 184 208 187 208 184 208 186 32 208 176 208 187 209 132 208 176 208 177 208 181 209 130 63]  at: 10@200 font: f color: Color random.
-c drawString: 'a񯧠at: 10@300 font: f color: Color random.
-c drawUtf8:  #[97 195 177 111 ]  at: 10@400 font: f color: Color random.
-Display forceToScreen
-	"
-
-	"Slight optimization when there's nothing to do."
-
-	"
-	port clipHeight = 0 ifTrue: [^self].
-	port clipWidth = 0 ifTrue: [^self].
-	"
-
-	"| font |
-	font := aTrueTypeFont ifNil: [ FreeTypeFontFamily  defaultFamilyAndPointSize ].
+	| font baseline |
+	font := aTrueTypeFont ifNil: [ FontFamily defaultFamilyAndPointSize ].
+	font ifNil: [ ^ self ].
+	baseline := aPoint + (0 @ (font ascent + font lineGap - 1)).
 	engine
 		displayUtf8: aByteArray
-		at: aPoint + (0@font ascent + font lineGap-1)
+		at: baseline
 		trueTypeFont: font fontDescription
 		color: aColor
 		scaleX: 1.0 * font pointSize
-		scaleY: -1.0 * font pointSize"
-
-	"The conversion from top of glyph (morphic canvas) to baseline (engine, TrueType) is done here.
-	The conversion from Y-increases-downwards (morphic canvas) to Y-increases-upwards (engine, TrueType) is done here.
-	
-	The scaling of internal TrueType integer points to FloatingPoint where[0.0...1.0] equals #letterMTopSideBearing is done in the engine.
-	It should actually be done in TrueType. No one else cares!"
-
-	
+		scaleY: -1.0 * font pointSize
 ]
 
 { #category : 'paths' }

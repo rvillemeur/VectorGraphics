@@ -42,6 +42,13 @@ command letters and delegates number parsing to `SVGNumberStream`.
 - `exampleSvgStar`   — five-pointed star via `M L L L L Z`
 - `exampleSvgHeart`  — heart shape via `M C C C C C C Z` (cubic Béziers)
 - `exampleSvgArrow`  — right-pointing arrow via `M L L L L L L Z`
+
+## Text rendering examples (using drawString: and drawUtf8:)
+These demonstrate vector text rendering via the VectorEngine glyph pipeline.
+A TTF font is loaded from `TrueTypeExample defaultFontPath`; override that method to
+point to any .ttf file on your system.
+- `exampleDrawString`   — renders a Latin string via drawString:from:to:at:font:color:
+- `exampleDrawUtf8`     — renders pre-encoded UTF-8 bytes via drawUtf8:at:font:color:
 "
 Class {
 	#name : 'VectorCanvasExample',
@@ -116,6 +123,49 @@ VectorCanvasExample class >> exampleCubicBezier [
 				100 @ 20.
 				200 @ 180.
 				270 @ 100 } ].
+	^ form
+]
+
+{ #category : 'text examples' }
+VectorCanvasExample class >> exampleDrawString [
+	"Render a Latin string using drawString:from:to:at:font:color:.
+	Requires a TTF font at TrueTypeExample defaultFontPath.
+	VectorCanvasExample exampleDrawString inspect"
+<sampleInstance>
+	| form canvas font str |
+	font := (TrueTypeFontFamily
+		baseTTFontDescription: (TrueTypeExample loadFontFrom: TrueTypeExample defaultFontPath))
+		atPointSize: 28.
+	form := self newForm.
+	form fillColor: Color white.
+	canvas := self newCanvasOn: form.
+	str := 'Hello, VectorCanvas!'.
+	canvas drawString: str from: 1 to: str size at: 10 @ 10 font: font color: Color black.
+	str := '0123456789'.
+	canvas drawString: str from: 1 to: str size at: 10 @ 80 font: font color: Color blue.
+	^ form
+]
+
+{ #category : 'text examples' }
+VectorCanvasExample class >> exampleDrawUtf8 [
+	"Render pre-encoded UTF-8 bytes using drawUtf8:at:font:color:.
+	Demonstrates multi-byte characters: 'café' encodes é as #[195 169].
+	Requires a TTF font at TrueTypeExample defaultFontPath.
+	VectorCanvasExample exampleDrawUtf8 inspect"
+<sampleInstance>
+	| form canvas font cafe greeting |
+	font := (TrueTypeFontFamily
+		baseTTFontDescription: (TrueTypeExample loadFontFrom: TrueTypeExample defaultFontPath))
+		atPointSize: 28.
+	form := self newForm.
+	form fillColor: Color white.
+	canvas := self newCanvasOn: form.
+	"UTF-8 for 'café': c a f é (é = 195, 169)"
+	cafe := #[99 97 102 195 169].
+	canvas drawUtf8: cafe at: 10 @ 10 font: font color: Color black.
+	"UTF-8 for 'naïve': n a ï (195, 175) v e"
+	greeting := #[110 97 195 175 118 101].
+	canvas drawUtf8: greeting at: 10 @ 80 font: font color: (Color blue darker).
 	^ form
 ]
 
