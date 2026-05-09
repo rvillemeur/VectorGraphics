@@ -7,64 +7,65 @@ Class {
 	#tag : 'TrueType'
 }
 
+{ #category : 'instance creation' }
+Int16PointArray class >> new: n [
+	"Allocate n points — each point needs 2 uint16 slots in the underlying DoubleByteArray."
+	^ super new: n * 2
+]
+
 { #category : 'accessing' }
 Int16PointArray >> at: index [
-	"Return the element (e.g., point) at the given index"
-	^(self signedAt: index * 2 - 1) @ (self signedAt: index * 2).
+	"Return the point at the given index."
+	^ (self signedAt: index * 2 - 1) @ (self signedAt: index * 2)
 ]
 
 { #category : 'accessing' }
 Int16PointArray >> at: index put: aPoint [
-	"Store the argument aPoint at the given index"
+	"Store aPoint at the given index."
 	self signedAt: index * 2 - 1 put: aPoint x asInteger.
 	self signedAt: index * 2 put: aPoint y asInteger.
-	^aPoint.
+	^ aPoint
 ]
 
 { #category : 'accessing' }
 Int16PointArray >> at: index putX: aNumber [
-	"Store the argument aPoint at the given index"
-	self signedAt: index * 2 - 1 put: aNumber asInteger.
+	"Store only the x coordinate at the given index."
+	self signedAt: index * 2 - 1 put: aNumber asInteger
 ]
 
 { #category : 'accessing' }
 Int16PointArray >> at: index putY: aNumber [
-	"Store the argument aPoint at the given index"
-	self signedAt: index * 2 put: aNumber asInteger.
+	"Store only the y coordinate at the given index."
+	self signedAt: index * 2 put: aNumber asInteger
 ]
 
 { #category : 'accessing' }
 Int16PointArray >> defaultElement [
-	"Return the default element of the receiver"
-	^0@0.
+	^ 0 @ 0
 ]
 
 { #category : 'accessing' }
 Int16PointArray >> signedAt: index [
-	"Return the 16-bit signed integer value at the given index of the receiver."
-
-	<primitive: 143>
-	index isInteger ifTrue: [self errorSubscriptBounds: index].
-	index isNumber ifTrue: [^ self at: index truncated].
-	self errorNonIntegerIndex.
+	"Return the 16-bit signed integer at the given slot index.
+	Converts from unsigned uint16 (stored by DoubleByteArray) to signed."
+	| val |
+	val := super at: index.
+	val > 32767 ifTrue: [ val := val - 65536 ].
+	^ val
 ]
 
 { #category : 'accessing' }
 Int16PointArray >> signedAt: index put: value [
-	"Store the given 16-bit signed integer at the given index in the receiver."
-
-	<primitive: 144>
-	index isInteger
-		ifTrue: [
-			(index >= 1 and: [index <= self size])
-				ifTrue: [self errorImproperStore]
-				ifFalse: [self errorSubscriptBounds: index]].
-	index isNumber ifTrue: [^ self at: index truncated put: value].
-	self errorNonIntegerIndex.
+	"Store a 16-bit signed integer at the given slot index.
+	Converts from signed to unsigned uint16 before storing."
+	| unsigned |
+	unsigned := value < 0 ifTrue: [ value + 65536 ] ifFalse: [ value ].
+	super at: index put: unsigned.
+	^ value
 ]
 
 { #category : 'accessing' }
 Int16PointArray >> size [
-	"Return the number of elements in the receiver"
-	^ super size // 2.
+	"Number of points (each point occupies 2 uint16 slots)."
+	^ super size // 2
 ]
