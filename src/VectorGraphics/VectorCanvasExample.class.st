@@ -35,6 +35,13 @@ These show building a collection of PathCommand objects and running them via
 - `examplePathCommandCubicBezier` — cubic Bézier from M + C commands
 - `examplePathCommandArc`          — elliptical arc from M + A commands
 - `examplePathCommandMixed`        — star using M + multi-point L + Z
+
+## SVG path string examples (using SVGPathParser)
+These parse a real SVG path string via `SVGPathParser parse: aString`, which tokenizes on
+command letters and delegates number parsing to `SVGNumberStream`.
+- `exampleSvgStar`   — five-pointed star via `M L L L L Z`
+- `exampleSvgHeart`  — heart shape via `M C C C C C C Z` (cubic Béziers)
+- `exampleSvgArrow`  — right-pointing arrow via `M L L L L L L Z`
 "
 Class {
 	#name : 'VectorCanvasExample',
@@ -345,6 +352,60 @@ VectorCanvasExample class >> exampleStrokedRectangle [
 	form := self newForm.
 	canvas := self newCanvasOn: form.
 	canvas frameRectangle: (50 @ 40 extent: 200 @ 120) borderWidth: 3.0 color: Color red.
+	^ form
+]
+
+{ #category : 'svg examples' }
+VectorCanvasExample class >> exampleSvgArrow [
+	"Right-pointing arrow parsed from an SVG path string.
+	VectorCanvasExample exampleSvgArrow inspect"
+<sampleInstance>
+	| form canvas cmds |
+	form := self newForm.
+	canvas := self newCanvasOn: form.
+	cmds := SVGPathParser parse:
+		'M 10 90 L 150 90 L 150 60 L 260 100 L 150 140 L 150 110 L 10 110 Z'.
+	canvas
+		strokeWidth: 1.5
+		color: Color darkGray
+		fillColor: (Color blue alpha: 0.7)
+		do: [ canvas runPathCommands: cmds ].
+	^ form
+]
+
+{ #category : 'svg examples' }
+VectorCanvasExample class >> exampleSvgHeart [
+	"Heart shape built from cubic Bézier curves, parsed from an SVG path string.
+	VectorCanvasExample exampleSvgHeart inspect"
+<sampleInstance>
+	| form canvas cmds |
+	form := self newForm.
+	canvas := self newCanvasOn: form.
+	cmds := SVGPathParser parse:
+		'M 150 80 C 150 65 130 45 110 45 C 75 45 75 90 75 90 C 75 120 110 145 150 165 C 190 145 225 120 225 90 C 225 90 225 45 190 45 C 170 45 150 65 150 80 Z'.
+	canvas
+		strokeWidth: 1.5
+		color: Color darkGray
+		fillColor: (Color red alpha: 0.8)
+		do: [ canvas runPathCommands: cmds ].
+	^ form
+]
+
+{ #category : 'svg examples' }
+VectorCanvasExample class >> exampleSvgStar [
+	"Five-pointed star parsed from an SVG path string, drawn by connecting every other vertex.
+	VectorCanvasExample exampleSvgStar inspect"
+<sampleInstance>
+	| form canvas cmds |
+	form := self newForm.
+	canvas := self newCanvasOn: form.
+	cmds := SVGPathParser parse:
+		'M 150 20 L 197 165 L 74 75 L 226 75 L 103 165 Z'.
+	canvas
+		strokeWidth: 1.5
+		color: Color black
+		fillColor: (Color yellow alpha: 0.8)
+		do: [ canvas runPathCommands: cmds ].
 	^ form
 ]
 
