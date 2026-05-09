@@ -1,3 +1,46 @@
+"
+# can you explain simply the difference between VectorEnginePixel, VectorEngineSubPixel and VectorEngineWholePixel ?
+
+
+## Three levels, same algorithm, different anti-aliasing resolution:
+
+  ---
+  VectorEnginePixel (abstract base)
+  Owns alphaMask and edgeCounts buffers. Defines the shared path-traversal and Bézier logic. Subclasses differ only in how those buffers are sized and read.
+
+  ---
+  VectorEngineWholePixel
+  - 1 byte per pixel for both buffers (ByteArray)
+  - Treats each screen pixel as a single unit
+  - Good for hi-DPI displays where physical pixels are already tiny — no sub-pixel trickery needed
+  - Less memory, simpler blending
+
+  ---
+  VectorEngineSubPixel
+  - 1 word (4 bytes) per pixel — 3 bytes used for R, G, B channels independently (WordArray, accessed via bytesAt:)
+  - Shifts the red and blue sub-pixel samples by ±subPixelDelta (0.25 pixel)
+  - Exploits LCD sub-pixel layout: each channel hits a different physical stripe, tripling effective horizontal resolution
+  - Best for normal-DPI screens with RGB stripe LCDs — edges look sharper
+  - More memory, more complex blending (per-channel alpha)
+
+  ---
+  Summary table:
+
+  ┌────────────────┬─────────────────┬────────────────┐
+  │                │   WholePixel    │    SubPixel    │
+  ├────────────────┼─────────────────┼────────────────┤
+  │ Buffer type    │ ByteArray       │ WordArray      │
+  ├────────────────┼─────────────────┼────────────────┤
+  │ Bytes/pixel    │ 1               │ 4 (3 used)     │
+  ├────────────────┼─────────────────┼────────────────┤
+  │ Channels       │ 1 (luminance)   │ 3 (R, G, B)    │
+  ├────────────────┼─────────────────┼────────────────┤
+  │ Target display │ hi-DPI / retina │ normal-DPI LCD │
+  ├────────────────┼─────────────────┼────────────────┤
+  │ AA quality     │ whole-pixel AA  │ sub-pixel AA   │
+  └────────────────┴─────────────────┴────────────────┘
+
+"
 Class {
 	#name : 'VectorEnginePixel',
 	#superclass : 'VectorEngineAbstract',
