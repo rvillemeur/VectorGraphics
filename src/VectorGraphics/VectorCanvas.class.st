@@ -21,9 +21,9 @@ Class {
 		'currentMorph',
 		'clippingMorphDisplayBounds'
 	],
-	#category : 'VectorGraphics-kernel',
+	#category : 'VectorGraphics-Kernel',
 	#package : 'VectorGraphics',
-	#tag : 'kernel'
+	#tag : 'Kernel'
 }
 
 { #category : 'class initialization' }

@@ -8,9 +8,9 @@ Run any class-side method and inspect or display the returned Form:
 Class {
 	#name : 'VectorCanvasExample',
 	#superclass : 'Object',
-	#category : 'VectorGraphics-examples',
+	#category : 'VectorGraphics-Examples',
 	#package : 'VectorGraphics',
-	#tag : 'examples'
+	#tag : 'Examples'
 }
 
 { #category : 'examples' }
@@ -248,4 +248,8 @@ VectorCanvasExample class >> newForm [
 	form := Form extent: 300 @ 200 depth: 32.
 	form fillColor: Color white.
 	^ form
+]
+
+{ #category : 'see class side' }
+VectorCanvasExample >> seeClassSide [
 ]

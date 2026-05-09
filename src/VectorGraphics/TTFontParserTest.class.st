@@ -1,9 +1,9 @@
 Class {
 	#name : 'TTFontParserTest',
 	#superclass : 'TestCase',
-	#category : 'VectorGraphics-tests',
+	#category : 'VectorGraphics-Tests',
 	#package : 'VectorGraphics',
-	#tag : 'tests'
+	#tag : 'Tests'
 }
 
 { #category : 'helpers' }
@@ -257,4 +257,45 @@ TTFontParserTest >> testParseNamingTableFamilyName [
 	strings := TTFontParser parseNamingTable: entry.
 	self assert: strings size equals: 8.
 	self assert: (strings at: 2) equals: 'Test'
+]
+
+{ #category : 'tests' }
+TTFontParserTest >> testSelectGlyphDashFallsBackWhenWideMinusAbsent [
+
+	"codePoint 45 ($-). Preferred 16r2212 maps to unknownGlyph, so fallback to index 45."
+
+	| characterMap glyphs unknownGlyph dashGlyph result |
+	unknownGlyph := 'unknown'.
+	dashGlyph := 'dash'.
+	glyphs := Array new: 5 withAll: unknownGlyph.
+	glyphs at: 2 put: dashGlyph.
+	characterMap := Array new: 16r2213 withAll: 0. "0 → glyphs at: 1 = unknownGlyph"
+	characterMap at: 46 put: 1. "codePoint 45 + 1 → glyphIndex 1 → glyphs at: 2 = dashGlyph"
+	result := TTFontParser
+		          selectGlyphFor: 45
+		          from: characterMap
+		          glyphs: glyphs
+		          unknownGlyph: unknownGlyph.
+	self assert: result equals: dashGlyph
+]
+
+{ #category : 'tests' }
+TTFontParserTest >> testSelectGlyphDashPrefersWideMinus [
+
+	"codePoint 45 ($-). Preferred 16r2212 maps to a real glyph."
+
+	| characterMap glyphs unknownGlyph wideMinus result |
+	unknownGlyph := 'unknown'.
+	wideMinus := 'wide-minus'.
+	glyphs := Array new: 5 withAll: unknownGlyph.
+	glyphs at: 3 put: wideMinus.
+	characterMap := Array new: 16r2213 withAll: 0.
+	characterMap at: 46 put: 0. "codePoint 45 → unknownGlyph"
+	characterMap at: 16r2213 put: 2. "16r2212+1 → glyphIndex 2 → glyphs at: 3 = wideMinus"
+	result := TTFontParser
+		          selectGlyphFor: 45
+		          from: characterMap
+		          glyphs: glyphs
+		          unknownGlyph: unknownGlyph.
+	self assert: result equals: wideMinus
 ]

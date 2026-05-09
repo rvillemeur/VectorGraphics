@@ -43,9 +43,9 @@ Class {
 		'previousCallControlX',
 		'previousCallControlY'
 	],
-	#category : 'VectorGraphics-kernel',
+	#category : 'VectorGraphics-Kernel',
 	#package : 'VectorGraphics',
-	#tag : 'kernel'
+	#tag : 'Kernel'
 }
 
 { #category : 'instance creation' }

@@ -126,10 +126,24 @@ Class {
 		'auxStrokeWidthDilatedHalfSquared',
 		'auxStrokeWidthErodedHalfSquared'
 	],
-	#category : 'VectorGraphics-kernel',
+	#category : 'VectorGraphics-Kernel',
 	#package : 'VectorGraphics',
-	#tag : 'kernel'
+	#tag : 'Kernel'
 }
+
+{ #category : 'private' }
+VectorEnginePixel class >> computeStrokeRadii: strokeWidth antiAliasingWidth: antiAliasingWidth [
+
+	| dilatedHalf erodedHalf erodedHalfSquared |
+	dilatedHalf := (strokeWidth + antiAliasingWidth) * 0.5.
+	erodedHalf := (strokeWidth - antiAliasingWidth) * 0.5.
+	erodedHalfSquared := erodedHalf * erodedHalf * erodedHalf sign.
+	^ Dictionary new
+		  at: #dilatedHalf put: dilatedHalf;
+		  at: #dilatedHalfSquared put: dilatedHalf * dilatedHalf;
+		  at: #erodedHalfSquared put: erodedHalfSquared;
+		  yourself
+]
 
 { #category : 'accessing' }
 VectorEnginePixel >> antiAliasingWidth: aNumber [
@@ -324,14 +338,12 @@ VectorEnginePixel >> pvtStrokeColor: aStrokeColorOrNil [
 { #category : 'private' }
 VectorEnginePixel >> pvtStrokeWidth: aNumber [
 
-	| swErodedHalf |
+	| radii |
 	super pvtStrokeWidth: aNumber.
-	auxStrokeWidthDilatedHalf := strokeWidth + antiAliasingWidth * 0.5.
-	auxStrokeWidthDilatedHalfSquared := auxStrokeWidthDilatedHalf
-	                                    * auxStrokeWidthDilatedHalf.
-	swErodedHalf := strokeWidth - antiAliasingWidth * 0.5.
-	auxStrokeWidthErodedHalfSquared := swErodedHalf * swErodedHalf
-	                                   * swErodedHalf sign
+	radii := self class computeStrokeRadii: strokeWidth antiAliasingWidth: antiAliasingWidth.
+	auxStrokeWidthDilatedHalf := radii at: #dilatedHalf.
+	auxStrokeWidthDilatedHalfSquared := radii at: #dilatedHalfSquared.
+	auxStrokeWidthErodedHalfSquared := radii at: #erodedHalfSquared
 ]
 
 { #category : 'primitive algorithms - aux' }

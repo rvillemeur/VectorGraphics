@@ -59,22 +59,13 @@ TTFontReader >> mapAndStoreGlyphsUsing: characterMap [
 	https://developer.apple.com/fonts/TrueType-Reference-Manual/RM07/appendixB.html
 	"
 
-	| glyphsByUTF8 unknownGlyph spaceGlyph mapSize preferredCodePoint |
+	| glyphsByUTF8 unknownGlyph spaceGlyph mapSize |
 	unknownGlyph := glyphs first.
 	mapSize := characterMap size.
 	glyphsByUTF8 := Array new: 256.
 	0 to: mapSize - 1 do: [ :codePoint |
 		| g array prevByte |
-		preferredCodePoint := codePoint.
-		codePoint = $- codePoint ifTrue: [ preferredCodePoint := 16r2212 ]. "WIDE MINUS"
-		codePoint = $* codePoint ifTrue: [ preferredCodePoint := 16r2217 ]. "CENTERED ASTERISK"
-		g := glyphs
-			     at: (characterMap at: preferredCodePoint + 1) + 1
-			     ifAbsent: [ unknownGlyph ].
-		g == unknownGlyph ifTrue: [
-			g := glyphs
-				     at: (characterMap at: codePoint + 1) + 1
-				     ifAbsent: [ unknownGlyph ] ].
+		g := TTFontParser selectGlyphFor: codePoint from: characterMap glyphs: glyphs unknownGlyph: unknownGlyph.
 
 		array := glyphsByUTF8.
 		prevByte := nil.

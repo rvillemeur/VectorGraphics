@@ -1,9 +1,9 @@
 Class {
 	#name : 'TrueTypeFontFamilyTest',
 	#superclass : 'TestCase',
-	#category : 'VectorGraphics-tests',
+	#category : 'VectorGraphics-Tests',
 	#package : 'VectorGraphics',
-	#tag : 'tests'
+	#tag : 'Tests'
 }
 
 { #category : 'helpers' }

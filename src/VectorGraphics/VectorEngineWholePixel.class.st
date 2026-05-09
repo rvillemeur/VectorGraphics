@@ -5,9 +5,9 @@ edgeCounts and alphaMask are single byte per pixel.
 Class {
 	#name : 'VectorEngineWholePixel',
 	#superclass : 'VectorEnginePixel',
-	#category : 'VectorGraphics-kernel',
+	#category : 'VectorGraphics-Kernel',
 	#package : 'VectorGraphics',
-	#tag : 'kernel'
+	#tag : 'Kernel'
 }
 
 { #category : 'instance creation' }

@@ -192,3 +192,20 @@ TTFontParser class >> parseNamingTable: entry [
 							strings at: nID + 1 put: string ] ] ] ] ].
 	^ strings
 ]
+
+{ #category : 'parsing' }
+TTFontParser class >> selectGlyphFor: codePoint from: characterMap glyphs: glyphs unknownGlyph: unknownGlyph [
+
+	"Select the best glyph for codePoint. Substitutes wide minus and centered asterisk
+	Unicode code points for the ASCII dash and star. Falls back to the original codePoint
+	if the preferred substitute is absent from the font."
+
+	| preferredCodePoint g |
+	preferredCodePoint := codePoint.
+	codePoint = $- codePoint ifTrue: [ preferredCodePoint := 16r2212 ].
+	codePoint = $* codePoint ifTrue: [ preferredCodePoint := 16r2217 ].
+	g := glyphs at: (characterMap at: preferredCodePoint + 1) + 1 ifAbsent: [ unknownGlyph ].
+	g == unknownGlyph ifTrue: [
+		g := glyphs at: (characterMap at: codePoint + 1) + 1 ifAbsent: [ unknownGlyph ] ].
+	^ g
+]

@@ -1,9 +1,9 @@
 Class {
 	#name : 'PathQuadraticCurveCommandTest',
 	#superclass : 'TestCase',
-	#category : 'VectorGraphics-tests',
+	#category : 'VectorGraphics-Tests',
 	#package : 'VectorGraphics',
-	#tag : 'tests'
+	#tag : 'Tests'
 }
 
 { #category : 'tests' }

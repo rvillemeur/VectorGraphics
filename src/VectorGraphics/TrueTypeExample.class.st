@@ -1,9 +1,9 @@
 Class {
 	#name : 'TrueTypeExample',
 	#superclass : 'Object',
-	#category : 'VectorGraphics-examples',
+	#category : 'VectorGraphics-Examples',
 	#package : 'VectorGraphics',
-	#tag : 'examples'
+	#tag : 'Examples'
 }
 
 { #category : 'private' }
@@ -117,4 +117,8 @@ TrueTypeExample class >> loadFontFrom: aPathString [
 	| bytes |
 	bytes := aPathString asFileReference binaryReadStreamDo: [ :s | s contents ].
 	^ TTFontReader readTTFFrom: bytes
+]
+
+{ #category : 'see class side' }
+TrueTypeExample >> seeClassSide [ 
 ]
