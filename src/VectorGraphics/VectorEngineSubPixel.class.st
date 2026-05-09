@@ -123,6 +123,11 @@ VectorEngineSubPixel >> blendFillOnlyAtX: x y: y pixelIndex: pixelIndex redIsIns
 ]
 
 { #category : 'private - blend with mask' }
+VectorEngineSubPixel >> blendHorizontalExpansion [
+	^ subPixelDelta
+]
+
+{ #category : 'private - blend with mask' }
 VectorEngineSubPixel >> blendStrokeAndFill [
 
 	| edgesUpToThisPixelR edgesUpToThisPixelG edgesUpToThisPixelB edgesThisPixel edgesThisPixelR edgesThisPixelG edgesThisPixelB isRedInside isGreenInside isBlueInside pixelIndex morphAtThisPixelId |
@@ -250,25 +255,6 @@ VectorEngineSubPixel >> blendStrokeAndFillAtX: x y: y pixelIndex: pixelIndex red
 ]
 
 { #category : 'private - blend with mask' }
-VectorEngineSubPixel >> blendStrokeOnly [
-
-	| pixelIndex morphAtThisPixelId |
-	blendTop to: blendBottom do: [ :displayY | 
-		pixelIndex := displayY * targetWidth + blendLeft.
-		blendLeft to: blendRight do: [ :displayX | 
-			pixelIndex := pixelIndex + 1.
-			(clippingMorphId = 0 or: [ 
-				 morphAtThisPixelId := morphIds at: pixelIndex.
-				 morphAtThisPixelId = clippingMorphId or: [ 
-					 morphAtThisPixelId = currentMorphId ] ]) ifTrue: [ 
-				self
-					blendStrokeOnlyAtX: displayX
-					y: displayY
-					pixelIndex: pixelIndex ].
-			alphaMask at: pixelIndex put: 0 ] ]
-]
-
-{ #category : 'private - blend with mask' }
 VectorEngineSubPixel >> blendStrokeOnlyAtX: x y: y pixelIndex: pixelIndex [
 
 	"targetForm only contains opaque colors. Assume its alpha is always one. Don't ask for it. Set it to one when writing.
@@ -319,54 +305,6 @@ VectorEngineSubPixel >> blendStrokeOnlyAtX: x y: y pixelIndex: pixelIndex [
 
 	antiAliasGreenAlpha > 0.5 ifTrue: [ 
 		morphIds at: pixelIndex put: currentMorphId ]
-]
-
-{ #category : 'abstract' }
-VectorEngineSubPixel >> finishPath: ensureClosePath [
-
-	"Blend stroke and/or fill over background, according to the just computed pen alphas (distance from pixel to center of stroke)"
-
-	"If we are doing a fill, and caller forgot to close the trajectory, then do it anyway."
-
-	ensureClosePath ifTrue: [ 
-		(pathFirstX = pathCurrentX and: [ pathFirstY = pathCurrentY ]) 
-			ifFalse: [ "This is actually an error condition. If we are asked to fill, then the path should be closed. 	This is a workaround. If width > 0.0, we'll be adding a visible edge to the path." 
-				self basicClosePath ] ].
-
-	blendLeft := (blendLeft - auxStrokeWidthDilatedHalf - subPixelDelta)
-		             truncated + 1.
-	blendTop := (blendTop - auxStrokeWidthDilatedHalf) truncated + 1.
-	blendRight := (blendRight + auxStrokeWidthDilatedHalf + subPixelDelta)
-		              truncated + 1. "Make room not just for updated mask, but also edges (hence, +1)"
-	blendBottom := (blendBottom + auxStrokeWidthDilatedHalf) truncated.
-
-	"morphBounds is not affected by clipRect"
-	morphBoundsLeft := morphBoundsLeft min: blendLeft.
-	morphBoundsTop := morphBoundsTop min: blendTop.
-	morphBoundsRight := morphBoundsRight max: blendRight.
-	morphBoundsBottom := morphBoundsBottom max: blendBottom.
-
-	blendLeft := blendLeft max: clipLeft.
-	blendTop := blendTop max: clipTop.
-	blendRight := blendRight min: clipRight.
-	blendBottom := blendBottom min: clipBottom.
-
-	(blendRight >= blendLeft and: [ blendBottom >= blendTop ]) ifTrue: [ 
-		fillColor notNil
-			ifTrue: [ 
-				strokeColor notNil
-					ifTrue: [ self blendStrokeAndFill ]
-					ifFalse: [ self blendFillOnly ] ]
-			ifFalse: [ self blendStrokeOnly ] ].
-
-	pathFirstX := 0.0.
-	pathFirstY := 0.0.
-	pathCurrentX := 0.0.
-	pathCurrentY := 0.0.
-	previousCallX := 0.0.
-	previousCallY := 0.0.
-	previousCallControlX := previousCallX.
-	previousCallControlY := previousCallY
 ]
 
 { #category : 'private' }

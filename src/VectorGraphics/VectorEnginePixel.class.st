@@ -40,6 +40,69 @@
   │ AA quality     │ whole-pixel AA  │ sub-pixel AA   │
   └────────────────┴─────────────────┴────────────────┘
 
+
+❯ how do you tell which engine to use ?
+
+  Searched for 2 patterns, read 1 file (ctrl+o to expand)
+
+● Two places decide:
+
+  1. VectorCanvas >> setForm: (line 943) — called during initialization via onForm:. Always starts with VectorEngineWholePixel.
+
+  2. VectorCanvas >> doSubPixelAntiAliasing (line 115) — called explicitly to switch to VectorEngineSubPixel. Replaces the engine on the existing canvas.
+
+  So the flow is:
+  VectorCanvas onForm: aForm
+      → setForm: aForm
+      → engine := VectorEngineWholePixel onForm: form   ← default
+
+  canvas doSubPixelAntiAliasing                          ← opt-in upgrade
+      → engine := VectorEngineSubPixel onForm: form
+
+  TTFontDescription calls doSubPixelAntiAliasing automatically when rendering text glyphs (lines 238, 312) — sub-pixel is used for fonts by default. For
+  everything else (shapes, paths) you get whole-pixel AA unless you call doSubPixelAntiAliasing yourself.
+
+
+❯ how do you tell which engine to use ?
+
+  Searched for 2 patterns, read 1 file (ctrl+o to expand)
+
+● Two places decide:
+
+  1. VectorCanvas >> setForm: (line 943) — called during initialization via onForm:. Always starts with VectorEngineWholePixel.
+
+  2. VectorCanvas >> doSubPixelAntiAliasing (line 115) — called explicitly to switch to VectorEngineSubPixel. Replaces the engine on the existing canvas.
+
+  So the flow is:
+  VectorCanvas onForm: aForm
+      → setForm: aForm
+      → engine := VectorEngineWholePixel onForm: form   ← default
+
+  canvas doSubPixelAntiAliasing                          ← opt-in upgrade
+      → engine := VectorEngineSubPixel onForm: form
+
+  TTFontDescription calls doSubPixelAntiAliasing automatically when rendering text glyphs (lines 238, 312) — sub-pixel is used for fonts by default. For
+  everything else (shapes, paths) you get whole-pixel AA unless you call doSubPixelAntiAliasing yourself.
+
+. VectorEngine (superclass: Object) is a sibling of VectorEngineAbstract, not a subclass. It's the standalone reference implementation.
+
+  Full actual hierarchy:
+
+  Object
+  ├── VectorEngine          (standalone, test reference — ByteArray buffers, simple)
+  └── VectorEngineAbstract  (abstract — path state, drawing API)
+          └── VectorEnginePixel   (abstract — pixel buffers, blend machinery)
+                  ├── VectorEngineSubPixel
+                  └── VectorEngineWholePixel
+
+  Merging VectorEnginePixel into VectorEngineAbstract would load blendLeft/Right/Top/Bottom, strokeColor, fillColor, clipLeft/Right/Top/Bottom, alphaMask,
+  edgeCounts, prevYTruncated, and all the aux* instVars onto VectorEngineAbstract — even though nothing needs them there. It would also make the class harder
+   to understand (path logic mixed with pixel buffer logic).
+
+  VectorEnginePixel earns its place: it groups everything specific to the buffer/blending layer, keeping VectorEngineAbstract focused on path state and the
+  drawing API.
+
+
 "
 Class {
 	#name : 'VectorEnginePixel',
@@ -75,6 +138,31 @@ VectorEnginePixel >> antiAliasingWidth: aNumber [
 	auxAntiAliasingWidthScaledInverse := 127.0 / antiAliasingWidth
 ]
 
+{ #category : 'private - blend with mask' }
+VectorEnginePixel >> blendHorizontalExpansion [
+	"Extra horizontal pixel margin needed by sub-pixel sampling. Zero for whole-pixel AA."
+	^ 0.0
+]
+
+{ #category : 'private - blend with mask' }
+VectorEnginePixel >> blendStrokeOnly [
+
+	| pixelIndex morphAtThisPixelId |
+	blendTop to: blendBottom do: [ :displayY |
+		pixelIndex := displayY * targetWidth + blendLeft.
+		blendLeft to: blendRight do: [ :displayX |
+			pixelIndex := pixelIndex + 1.
+			(clippingMorphId = 0 or: [
+				 morphAtThisPixelId := morphIds at: pixelIndex.
+				 morphAtThisPixelId = clippingMorphId or: [
+					 morphAtThisPixelId = currentMorphId ] ]) ifTrue: [
+				self
+					blendStrokeOnlyAtX: displayX
+					y: displayY
+					pixelIndex: pixelIndex ].
+			alphaMask at: pixelIndex put: 0 ] ]
+]
+
 { #category : 'accessing' }
 VectorEnginePixel >> clipRect: aRectangle [
 
@@ -91,9 +179,45 @@ VectorEnginePixel >> clipRect: aRectangle [
 ]
 
 { #category : 'abstract' }
-VectorEnginePixel >> finishPath: aPath [
+VectorEnginePixel >> finishPath: ensureClosePath [
 
-	^ self subclassResponsibility
+	| hExp |
+	ensureClosePath ifTrue: [
+		(pathFirstX = pathCurrentX and: [ pathFirstY = pathCurrentY ])
+			ifFalse: [ self basicClosePath ] ].
+
+	hExp := self blendHorizontalExpansion.
+	blendLeft   := (blendLeft   - auxStrokeWidthDilatedHalf - hExp) truncated + 1.
+	blendTop    := (blendTop    - auxStrokeWidthDilatedHalf) truncated + 1.
+	blendRight  := (blendRight  + auxStrokeWidthDilatedHalf + hExp) truncated + 1.
+	blendBottom := (blendBottom + auxStrokeWidthDilatedHalf) truncated.
+
+	morphBoundsLeft   := morphBoundsLeft   min: blendLeft.
+	morphBoundsTop    := morphBoundsTop    min: blendTop.
+	morphBoundsRight  := morphBoundsRight  max: blendRight.
+	morphBoundsBottom := morphBoundsBottom max: blendBottom.
+
+	blendLeft   := blendLeft   max: clipLeft.
+	blendTop    := blendTop    max: clipTop.
+	blendRight  := blendRight  min: clipRight.
+	blendBottom := blendBottom min: clipBottom.
+
+	(blendRight >= blendLeft and: [ blendBottom >= blendTop ]) ifTrue: [
+		fillColor notNil
+			ifTrue: [
+				strokeColor notNil
+					ifTrue: [ self blendStrokeAndFill ]
+					ifFalse: [ self blendFillOnly ] ]
+			ifFalse: [ self blendStrokeOnly ] ].
+
+	pathFirstX := 0.0.
+	pathFirstY := 0.0.
+	pathCurrentX := 0.0.
+	pathCurrentY := 0.0.
+	previousCallX := 0.0.
+	previousCallY := 0.0.
+	previousCallControlX := previousCallX.
+	previousCallControlY := previousCallY
 ]
 
 { #category : 'private' }
@@ -118,7 +242,7 @@ VectorEnginePixel >> primArcCenterX: cx centerY: cy radiusX: rx radiusY: ry star
 
 	| angle xp yp x y |
 	angle := startAngle.
-	hops + 1 timesRepeat: [ 
+	hops + 1 timesRepeat: [
 		xp := angle cos * rx.
 		yp := angle sin * ry.
 		x := thetaCos * xp - (thetaSin * yp) + cx.
@@ -134,7 +258,7 @@ VectorEnginePixel >> primCubicBezierFromX: xFrom y: yFrom toX: xTo y: yTo contro
 	| t oneLessT increment f2 f3 f1 f23 f4 x y |
 	t := 0.0.
 	increment := 1.0 / hops.
-	hops timesRepeat: [ 
+	hops timesRepeat: [
 		oneLessT := 1.0 - t.
 		f1 := oneLessT * oneLessT * oneLessT.
 		f23 := 3 * oneLessT * t.
@@ -156,7 +280,7 @@ VectorEnginePixel >> primLineFromX: xFrom y: yFrom toX: xTo y: yTo hops: hops in
 	| x y |
 	x := xFrom.
 	y := yFrom.
-	hops timesRepeat: [ 
+	hops timesRepeat: [
 		self updateAlphasForX: x y: y.
 		self updateEdgesAndBoundsForX: x y: y.
 		x := x + incrementX.
@@ -171,7 +295,7 @@ VectorEnginePixel >> primQuadraticBezierFromX: xFrom y: yFrom toX: xTo y: yTo co
 	| t oneLessT increment f2 f3 f1 x y |
 	t := 0.0.
 	increment := 1.0 / hops.
-	hops timesRepeat: [ 
+	hops timesRepeat: [
 		oneLessT := 1.0 - t.
 		f1 := oneLessT * oneLessT.
 		f2 := 2 * oneLessT * t.
