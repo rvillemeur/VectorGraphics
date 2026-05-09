@@ -12,7 +12,8 @@ Class {
 		'form',
 		'leftOffset',
 		'topOffset',
-		'advanceWidth'
+		'advanceWidth',
+		'deltaXToCenter'
 	],
 	#category : 'VectorGraphics-TrueType',
 	#package : 'VectorGraphics',
@@ -33,6 +34,18 @@ FormGlyph class >> form: aForm leftOffset: aNumber topOffset: otherNumber advanc
 FormGlyph >> advanceWidth [
 
 	^ advanceWidth
+]
+
+{ #category : 'accessing' }
+FormGlyph >> deltaXToCenter [
+
+	^ deltaXToCenter
+]
+
+{ #category : 'accessing' }
+FormGlyph >> deltaXToCenter: aNumber [
+
+	deltaXToCenter := aNumber
 ]
 
 { #category : 'accessing' }

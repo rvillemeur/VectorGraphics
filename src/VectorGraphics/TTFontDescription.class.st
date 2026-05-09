@@ -9,9 +9,6 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'folderName',
-		'contourDataForIso8859s15',
-		'contourDataIndexesByIso8859s15',
-		'contourDataIndexesForSmalltalkGlyphs',
 		'contourDataForUtf8',
 		'contourDataIndexesByUtf8',
 		'kernPairs',
@@ -41,7 +38,7 @@ Class {
 { #category : 'class initialization' }
 TTFontDescription class >> initialize [
 
-	"	TTFontDescription  initialize 	"
+	"	TTFontDescription initialize 	"
 
 	Descriptions := nil
 ]
@@ -55,7 +52,7 @@ TTFontDescription class >> read: aDirectoryEntry [
 	Descriptions ifNil: [ Descriptions := Dictionary new ].
 	readFamilyNames := Set new.
 	aDirectoryEntry
-		allFilesDo: [ :file | 
+		allFilesDo: [ :file |
 			| ttf |
 			ttf := TTFontReader readTTFFrom: file binaryContents.
 			ttf folderName: file parent name.
@@ -78,10 +75,10 @@ TTFontDescription class >> withFamilyName: aString [
 { #category : 'private-initialization' }
 TTFontDescription >> appendGlyphDataTo: stream glyphsArray: glyphsArray indexes: indexes base: baseIndex [
 
-	glyphsArray withIndexDo: [ :glyphOrArrayOrNil :index | 
-		glyphOrArrayOrNil notNil ifTrue: [ 
+	glyphsArray withIndexDo: [ :glyphOrArrayOrNil :index |
+		glyphOrArrayOrNil notNil ifTrue: [
 			glyphOrArrayOrNil isArray
-				ifTrue: [ 
+				ifTrue: [
 					| nextBaseIndex |
 					nextBaseIndex := indexes size - 128.
 					indexes addAll: (IntegerArray new: 64).
@@ -91,7 +88,7 @@ TTFontDescription >> appendGlyphDataTo: stream glyphsArray: glyphsArray indexes:
 						glyphsArray: glyphOrArrayOrNil
 						indexes: indexes
 						base: nextBaseIndex ]
-				ifFalse: [ 
+				ifFalse: [
 					indexes at: baseIndex + index put: stream position + 1.
 					glyphOrArrayOrNil addContourDataTo: stream ] ] ]
 ]
@@ -111,29 +108,9 @@ TTFontDescription >> bounds [
 ]
 
 { #category : 'accessing' }
-TTFontDescription >> contourDataForIso8859s15 [
-
-	^ contourDataForIso8859s15
-]
-
-{ #category : 'accessing' }
 TTFontDescription >> contourDataForUtf8 [
 
 	^ contourDataForUtf8
-]
-
-{ #category : 'accessing' }
-TTFontDescription >> contourDataIndexesByIso8859s15 [
-
-	^ contourDataIndexesByIso8859s15
-]
-
-{ #category : 'accessing' }
-TTFontDescription >> contourDataIndexesByIso8859s15ST80Glyphs: aBoolean [
-
-	^ aBoolean
-		  ifTrue: [ contourDataIndexesForSmalltalkGlyphs ]
-		  ifFalse: [ contourDataIndexesByIso8859s15 ]
 ]
 
 { #category : 'accessing' }
@@ -164,11 +141,11 @@ TTFontDescription >> emphasis [
 	| emphasis |
 	familyName = fullName ifTrue: [ ^ 0 ].
 	emphasis := 0.
-	('*Bold*' match: subfamilyName) ifTrue: [ 
+	('*Bold*' match: subfamilyName) ifTrue: [
 		emphasis := emphasis bitOr: 1 ].
-	('*Oblique*' match: subfamilyName) ifTrue: [ 
+	('*Oblique*' match: subfamilyName) ifTrue: [
 		emphasis := emphasis bitOr: 2 ].
-	('*Italic*' match: subfamilyName) ifTrue: [ 
+	('*Italic*' match: subfamilyName) ifTrue: [
 		emphasis := emphasis bitOr: 2 ].
 	^ emphasis
 ]
@@ -177,6 +154,13 @@ TTFontDescription >> emphasis [
 TTFontDescription >> familyName [
 
 	^ familyName
+]
+
+{ #category : 'private-initialization' }
+TTFontDescription >> familyName: aString subFamilyName: anotherString [
+
+	familyName := aString.
+	subfamilyName := anotherString
 ]
 
 { #category : 'accessing' }
@@ -198,86 +182,31 @@ TTFontDescription >> folderName: aString [
 ]
 
 { #category : 'conversion' }
-TTFontDescription >> formGlyphFor: aCharacter useST80Glyphs: aBoolean pixelSize: pixelSize [
-
-	"Needed only for BitBltCanvasEngine"
-
-	| toPixelsScale formWidth formHeight leftPixelOffset topPixelOffset xtraSpaceForAntiAliasingAndRounding horizontalStrokesAtPixelCenter form canvas advanceWidth boundsBottom boundsLeft boundsRight boundsTop i |
-	i := (self contourDataIndexesByIso8859s15ST80Glyphs: aBoolean) at:
-		     aCharacter numericValue + 1.
-	advanceWidth := contourDataForIso8859s15 at: i.
-	i := i + 1.
-	boundsLeft := contourDataForIso8859s15 at: i.
-	i := i + 1.
-	boundsRight := contourDataForIso8859s15 at: i.
-	i := i + 1.
-	boundsTop := contourDataForIso8859s15 at: i.
-	i := i + 1.
-	boundsBottom := contourDataForIso8859s15 at: i.
-	i := i + 1.
-
-	horizontalStrokesAtPixelCenter := 0.5.
-	xtraSpaceForAntiAliasingAndRounding := 3.
-	toPixelsScale := pixelSize * 1.0 / self letterMTopSideBearing.
-
-	"If positive, pixels we save at the left. if negative, xtra pix needed"
-	leftPixelOffset := (boundsLeft * toPixelsScale
-	                    - xtraSpaceForAntiAliasingAndRounding) floor.
-	formWidth := boundsRight - boundsLeft * toPixelsScale
-	             + (xtraSpaceForAntiAliasingAndRounding * 2).
-
-	"Usually positive. Needed pixels above the baseline"
-	topPixelOffset := (boundsBottom * toPixelsScale
-	                   + xtraSpaceForAntiAliasingAndRounding) ceiling.
-	formHeight := boundsBottom - boundsTop * toPixelsScale
-	              + (xtraSpaceForAntiAliasingAndRounding * 2).
-
-	form := Form extent: formWidth @ formHeight depth: 32.
-	form fillColor: Color white.
-	canvas := VectorCanvas onForm: form.
-	canvas doSubPixelAntiAliasing.
-	canvas engine
-		displayString: aCharacter asString
-		from: 1
-		to: 1
-		at: leftPixelOffset negated
-			@ (topPixelOffset - horizontalStrokesAtPixelCenter)
-		trueTypeFont: self
-		useST80Glyphs: aBoolean
-		color: Color black
-		scaleX: 1.0 * pixelSize
-		scaleY: -1.0 * pixelSize.
-	^ FormGlyph
-		  form: form
-		  leftOffset: leftPixelOffset
-		  topOffset: topPixelOffset
-		  advanceWidth: advanceWidth * toPixelsScale
-]
-
-{ #category : 'conversion' }
 TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3OrNil byte4: byte4OrNil pixelSize: pixelSize [
 
 	"Needed only for BitBltCanvasEngine"
 
-	| utf8ByteArray toPixelsScale formWidth formHeight leftPixelOffset topPixelOffset xtraSpaceForAntiAliasingAndRounding horizontalStrokesAtPixelCenter form canvas advanceWidth boundsBottom boundsLeft boundsRight boundsTop i |
+	| utf8ByteArray toPixelsScale formWidth formHeight leftPixelOffset topPixelOffset xtraSpaceForAntiAliasingAndRounding horizontalStrokesAtPixelCenter form canvas advanceWidth boundsBottom boundsLeft boundsRight boundsTop i deltaXToCenter |
 	i := contourDataIndexesByUtf8 at: byte1 + 1.
 	utf8ByteArray := ByteArray with: byte1.
-	byte2OrNil notNil ifTrue: [ 
+	byte2OrNil notNil ifTrue: [
 		i := contourDataIndexesByUtf8 at: i negated + byte2OrNil + 1.
 		utf8ByteArray := ByteArray with: byte1 with: byte2OrNil.
-		byte3OrNil notNil ifTrue: [ 
+		byte3OrNil notNil ifTrue: [
 			i := contourDataIndexesByUtf8 at: i negated + byte3OrNil + 1.
 			utf8ByteArray := ByteArray
 				                 with: byte1
 				                 with: byte2OrNil
 				                 with: byte3OrNil.
-			byte4OrNil notNil ifTrue: [ 
+			byte4OrNil notNil ifTrue: [
 				i := contourDataIndexesByUtf8 at: i negated + byte4OrNil + 1.
 				utf8ByteArray := ByteArray
 					                 with: byte1
 					                 with: byte2OrNil
 					                 with: byte3OrNil
 					                 with: byte4OrNil ] ] ].
+
+	i = 0 ifTrue: [ i := 1 ].
 
 	advanceWidth := contourDataForUtf8 at: i.
 	i := i + 1.
@@ -288,7 +217,6 @@ TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3
 	boundsTop := contourDataForUtf8 at: i.
 	i := i + 1.
 	boundsBottom := contourDataForUtf8 at: i.
-	i := i + 1.
 
 	horizontalStrokesAtPixelCenter := 0.5.
 	xtraSpaceForAntiAliasingAndRounding := 3.
@@ -318,11 +246,28 @@ TTFontDescription >> formGlyphForUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3
 		color: Color black
 		scaleX: 1.0 * pixelSize
 		scaleY: -1.0 * pixelSize.
-	^ FormGlyph
-		  form: form
-		  leftOffset: leftPixelOffset
-		  topOffset: topPixelOffset
-		  advanceWidth: advanceWidth * toPixelsScale
+
+	deltaXToCenter := (advanceWidth - (boundsRight + boundsLeft * 0.51))
+	                  * toPixelsScale.
+	byte1 = 204 ifTrue: [
+		byte2OrNil = 128 ifTrue: [
+			deltaXToCenter := (advanceWidth - (boundsRight + boundsLeft * 0.43))
+			                  * toPixelsScale ].
+		byte2OrNil = 129 ifTrue: [
+			deltaXToCenter := (advanceWidth - (boundsRight + boundsLeft * 0.65))
+			                  * toPixelsScale ] ].
+
+	"DoubleWidth code points that combine above previous and following characters.
+	Codepoints between 16r035C and 16r0363. Example: o͢o. Don't center them."
+	(byte1 = 205 and: [ byte2OrNil between: 156 and: 163 ]) ifTrue: [
+		deltaXToCenter := 0 ].
+
+	^ (FormGlyph
+		   form: form
+		   leftOffset: leftPixelOffset
+		   topOffset: topPixelOffset
+		   advanceWidth: advanceWidth * toPixelsScale)
+		  deltaXToCenter: deltaXToCenter
 ]
 
 { #category : 'information' }
@@ -332,41 +277,31 @@ TTFontDescription >> fullName [
 ]
 
 { #category : 'private-initialization' }
-TTFontDescription >> glyphsByIso8859s15: array8 glyphsByUtf8Bytes: arrayUtf8 unknownGlyph: theUnknownGlyph [
+TTFontDescription >> glyphsByUtf8Bytes: glyphsByUTF8 unknownGlyph: theUnknownGlyph [
 
 	| mGlyph |
-	mGlyph := array8 at: $M numericValue + 1.
-	letterMTopSideBearing := mGlyph topSideBearing.
+	mGlyph := glyphsByUTF8 at: $M numericValue + 1.
+	letterMTopSideBearing := (mGlyph ifNil: [ theUnknownGlyph ]) topSideBearing.
 
-	contourDataIndexesByIso8859s15 := IntegerArray new: array8 size.
-	contourDataForIso8859s15 := Float32Array streamContents: [ :stream | 
-		                            theUnknownGlyph addContourDataTo: stream. "First data is for unknownGlyph"
-		                            array8 withIndexDo: [ :ttGlyphOrNil :index | 
-			                            ttGlyphOrNil notNil
-				                            ifTrue: [ 
-					                            contourDataIndexesByIso8859s15
-						                            at: index
-						                            put: stream position + 1.
-					                            ttGlyphOrNil addContourDataTo: stream ]
-				                            ifFalse: [ 
-				                            contourDataIndexesByIso8859s15
-					                            at: index
-					                            put: 1 ] ] ].
-	self perform: Preferences assignmentGlyphSelector.
+	contourDataIndexesByUtf8 := (IntegerArray new: 256) as: OrderedCollection.
+	contourDataForUtf8 := Float32Array streamContents: [ :stream |
+		theUnknownGlyph addContourDataTo: stream tx: nil. "First data is for unknownGlyph"
+		self
+			appendGlyphDataTo: stream
+			glyphsArray: glyphsByUTF8
+			indexes: contourDataIndexesByUtf8
+			base: 0 ].
+	contourDataIndexesByUtf8 := contourDataIndexesByUtf8 as: IntegerArray
+]
 
-	"This takes a significant amout of space, makes loading slower, and we're still not able to take full advantage of it."
-	Preferences loadOnlyLatinGlyphData ifFalse: [ 
-		contourDataIndexesByUtf8 := (IntegerArray new: 256) as:
-			                            OrderedCollection.
-		contourDataForUtf8 := Float32Array streamContents: [ :stream | 
-			                      theUnknownGlyph addContourDataTo: stream. "First data is for unknownGlyph"
-			                      self
-				                      appendGlyphDataTo: stream
-				                      glyphsArray: arrayUtf8
-				                      indexes: contourDataIndexesByUtf8
-				                      base: 0 ].
-		contourDataIndexesByUtf8 := contourDataIndexesByUtf8 as:
-			                            IntegerArray ]
+{ #category : 'testing' }
+TTFontDescription >> includesAscii [
+
+	"Answer true if we include the basic ASCII characters.
+	If not, we are not suitable for displaying Smalltalk code."
+
+	^ (33 to: 127) allSatisfy: [ :codePoint |
+		  (contourDataIndexesByUtf8 at: codePoint + 1) > 1 ]
 ]
 
 { #category : 'testing' }
@@ -476,75 +411,6 @@ TTFontDescription >> unitsPerEm [
 	^ unitsPerEm
 ]
 
-{ #category : 'private-initialization' }
-TTFontDescription >> useAlwaysLeftArrow [
-
-	"Not only when Smalltalk glyphs requested."
-
-	| arrowIndex |
-	contourDataIndexesForSmalltalkGlyphs := contourDataIndexesByIso8859s15
-		                                        copy.
-	arrowIndex := contourDataIndexesByIso8859s15 at:
-		              Character arrowLeft numericValue + 1.
-	arrowIndex = 1 ifFalse: [ "If font doesn't include the arrow, don't do substitution."
-		contourDataIndexesByIso8859s15
-			at: $_ numericValue + 1
-			put: arrowIndex.
-		contourDataIndexesForSmalltalkGlyphs
-			at: $_ numericValue + 1
-			put: arrowIndex ].
-	arrowIndex := contourDataIndexesByIso8859s15 at:
-		              Character arrowUp numericValue + 1.
-	arrowIndex = 1 ifFalse: [ "If font doesn't include the arrow, don't do substitution."
-		contourDataIndexesForSmalltalkGlyphs
-			at: $^ numericValue + 1
-			put: arrowIndex ]
-]
-
-{ #category : 'private-initialization' }
-TTFontDescription >> useLeftArrow [
-
-	"When Smalltalk glyphs requested"
-
-	| arrowIndex |
-	contourDataIndexesForSmalltalkGlyphs := contourDataIndexesByIso8859s15
-		                                        copy.
-	arrowIndex := contourDataIndexesByIso8859s15 at:
-		              Character arrowLeft numericValue + 1.
-	arrowIndex = 1 ifFalse: [ "If font doesn't include the arrow, don't do substitution."
-		contourDataIndexesForSmalltalkGlyphs
-			at: $_ numericValue + 1
-			put: arrowIndex ].
-	arrowIndex := contourDataIndexesByIso8859s15 at:
-		              Character arrowUp numericValue + 1.
-	arrowIndex = 1 ifFalse: [ "If font doesn't include the arrow, don't do substitution."
-		contourDataIndexesForSmalltalkGlyphs
-			at: $^ numericValue + 1
-			put: arrowIndex ]
-]
-
-{ #category : 'private-initialization' }
-TTFontDescription >> useRightArrow [
-
-	"When Smalltalk glyphs requested"
-
-	| arrowIndex |
-	contourDataIndexesForSmalltalkGlyphs := contourDataIndexesByIso8859s15
-		                                        copy.
-	arrowIndex := contourDataIndexesByIso8859s15 at:
-		              Character arrowRight numericValue + 1.
-	arrowIndex = 1 ifFalse: [ "If font doesn't include the arrow, don't do substitution."
-		contourDataIndexesForSmalltalkGlyphs
-			at: $_ numericValue + 1
-			put: arrowIndex ].
-	arrowIndex := contourDataIndexesByIso8859s15 at:
-		              Character arrowUp numericValue + 1.
-	arrowIndex = 1 ifFalse: [ "If font doesn't include the arrow, don't do substitution."
-		contourDataIndexesForSmalltalkGlyphs
-			at: $^ numericValue + 1
-			put: arrowIndex ]
-]
-
 { #category : 'information' }
 TTFontDescription >> versionName [
 
@@ -552,30 +418,46 @@ TTFontDescription >> versionName [
 ]
 
 { #category : 'glyph properties' }
-TTFontDescription >> widthOf: aCharacter useST80Glyphs: aBoolean [
+TTFontDescription >> widthOf: aCharacter [
 
-	| i advanceWidth |
-	i := (self contourDataIndexesByIso8859s15ST80Glyphs: aBoolean) at:
-		     aCharacter numericValue + 1.
-	advanceWidth := contourDataForIso8859s15 at: i.
-	^ advanceWidth / letterMTopSideBearing
+	| bytes |
+	bytes := Character utf8BytesOf: aCharacter codePoint.
+	^ self
+		  widthOfUtf8Byte1: (bytes at: 1)
+		  b2: (bytes size >= 2 ifTrue: [ bytes at: 2 ])
+		  b3: (bytes size >= 3 ifTrue: [ bytes at: 3 ])
+		  b4: (bytes size >= 4 ifTrue: [ bytes at: 4 ])
 ]
 
 { #category : 'glyph properties' }
 TTFontDescription >> widthOfCodePoint: aUnicodeCodePoint [
 
+	| bytes i advanceWidth |
+	bytes := Character utf8BytesOf: aUnicodeCodePoint.
+	i := contourDataIndexesByUtf8 at: (bytes at: 1) + 1.
+	bytes size > 1 ifTrue: [
+		i := contourDataIndexesByUtf8 at: i negated + (bytes at: 2) + 1.
+		bytes size > 2 ifTrue: [
+			i := contourDataIndexesByUtf8 at: i negated + (bytes at: 3) + 1.
+			bytes size > 3 ifTrue: [
+				i := contourDataIndexesByUtf8 at: i negated + (bytes at: 4) + 1 ] ] ].
+	i = 0 ifTrue: [ i := 1 ].
+	advanceWidth := contourDataForUtf8 at: i.
+	^ advanceWidth / letterMTopSideBearing
+]
+
+{ #category : 'glyph properties' }
+TTFontDescription >> widthOfUtf8Byte1: aByte1 b2: aByte2OrNil b3: aByte3OrNil b4: aByte4OrNil [
+
 	| i advanceWidth |
-	i := contourDataIndexesByUtf8 at: aUnicodeCodePoint + 1.
-	Character
-		evaluateOnce: [ :byte1 :byte2OrNil :byte3OrNil :byte4OrNil | 
-			i := contourDataIndexesByUtf8 at: byte1 + 1.
-			byte2OrNil notNil ifTrue: [ 
-				i := contourDataIndexesByUtf8 at: i negated + byte2OrNil + 1.
-				byte3OrNil notNil ifTrue: [ 
-					i := contourDataIndexesByUtf8 at: i negated + byte3OrNil + 1.
-					byte4OrNil notNil ifTrue: [ 
-						i := contourDataIndexesByUtf8 at: i negated + byte4OrNil + 1 ] ] ] ]
-		withUtf8BytesOfUnicodeCodePoint: aUnicodeCodePoint.
+	i := contourDataIndexesByUtf8 at: aByte1 + 1.
+	aByte2OrNil notNil ifTrue: [
+		i := contourDataIndexesByUtf8 at: i negated + aByte2OrNil + 1.
+		aByte3OrNil notNil ifTrue: [
+			i := contourDataIndexesByUtf8 at: i negated + aByte3OrNil + 1.
+			aByte4OrNil notNil ifTrue: [
+				i := contourDataIndexesByUtf8 at: i negated + aByte4OrNil + 1 ] ] ].
+	i = 0 ifTrue: [ i := 1 ].
 	advanceWidth := contourDataForUtf8 at: i.
 	^ advanceWidth / letterMTopSideBearing
 ]

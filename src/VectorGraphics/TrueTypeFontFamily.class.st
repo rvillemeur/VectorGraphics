@@ -1,11 +1,9 @@
 Class {
 	#name : 'TrueTypeFontFamily',
-	#superclass : 'Object',
+	#superclass : 'FontFamily',
 	#instVars : [
 		'baseTTFontDescription',
-		'ttFontDescriptionsByEmphasis',
-		'baseFontBySizes',
-		'familyName'
+		'ttFontDescriptionsByEmphasis'
 	],
 	#category : 'VectorGraphics-TrueType',
 	#package : 'VectorGraphics',
@@ -19,60 +17,20 @@ TrueTypeFontFamily class >> baseTTFontDescription: aTTFontDescription [
 ]
 
 { #category : 'instance creation' }
-TrueTypeFontFamily class >> fileReaderServicesForFileEntry: filename suffix: suffix [
-
-	"FileList buttons that read a TrueType font on contents."
-
-	(#( 'ttf' ) includes: suffix) ifTrue: [ ^ { self serviceReadTTFont } ].
-
-	^ #(  )
-]
-
-{ #category : 'instance creation' }
-TrueTypeFontFamily class >> read: aDirectoryEntry [
-
-	"	TrueTypeFontFamily read: '/home/juan/Downloads/DejaVu2.37/dejavu-fonts-ttf-2.37/ttf/' asDirectoryEntry
-"
+TrueTypeFontFamily class >> readAllTrueTypeFontsIn: aDirectoryEntry [
 
 	| readFamilyNames |
 	readFamilyNames := TTFontDescription read: aDirectoryEntry.
-	readFamilyNames do: [ :familyName | 
+	readFamilyNames do: [ :aFamilyName |
 		| ttDescriptions baseTTDescription family |
-		ttDescriptions := TTFontDescription withFamilyName: familyName.
+		ttDescriptions := TTFontDescription withFamilyName: aFamilyName.
 		baseTTDescription := ttDescriptions at: 0.
-		family := TrueTypeFontFamily baseTTFontDescription:
-			          baseTTDescription.
-		ttDescriptions do: [ :ttfDesc | 
-			ttfDesc emphasis = 0 ifFalse: [ 
+		family := TrueTypeFontFamily baseTTFontDescription: baseTTDescription.
+		ttDescriptions do: [ :ttfDesc |
+			ttfDesc emphasis = 0 ifFalse: [
 				family addTTFontDescription: ttfDesc ] ].
 		FontFamily addFamily: family ].
 	^ readFamilyNames
-]
-
-{ #category : 'instance creation' }
-TrueTypeFontFamily class >> readAdditionalFonts [
-
-	^ TrueTypeFontFamily read:
-		  DirectoryEntry smalltalkImageDirectory / 'TrueTypeFonts'
-]
-
-{ #category : 'instance creation' }
-TrueTypeFontFamily class >> readTrueTypeFontEntry: ttFontFileEntry [
-
-	| ttFontDescription familyName ttFontFamily |
-	ttFontDescription := TTFontReader readTTFFrom:
-		                     ttFontFileEntry binaryContents.
-	familyName := ttFontDescription familyName.
-	ttFontFamily := FontFamily familyNamed: familyName.
-	ttFontFamily
-		ifNil: [ 
-			FontFamily addFamily:
-				(self new baseTTFontDescription: ttFontDescription) ]
-		ifNotNil: [ :fam | 
-			ttFontDescription emphasis = 0
-				ifTrue: [ fam baseTTFontDescription: ttFontDescription ]
-				ifFalse: [ fam addTTFontDescription: ttFontDescription ].
-			fam clearCache ].
 ]
 
 { #category : 'initialization' }
@@ -87,15 +45,13 @@ TrueTypeFontFamily >> addTTFontDescription: aTTFontDescription [
 TrueTypeFontFamily >> atPointSize: aNumber [
 
 	| baseFont |
-	baseFontBySizes
-		at: aNumber
-		ifPresent: [ :existingBaseFont | ^ existingBaseFont ].
+	baseFontBySizes at: aNumber ifPresent: [ :existingBaseFont | ^ existingBaseFont ].
 	baseFont := TrueTypeFont
 		            family: self
 		            ttFontDescription: baseTTFontDescription
 		            pointSize: aNumber.
 	baseFontBySizes at: aNumber put: baseFont.
-	ttFontDescriptionsByEmphasis do: [ :emphasizedTTFontDescription | 
+	ttFontDescriptionsByEmphasis do: [ :emphasizedTTFontDescription |
 		| emphasizedFont |
 		emphasizedFont := TrueTypeFont
 			                  family: self
@@ -113,7 +69,7 @@ TrueTypeFontFamily >> baseTTFontDescription: aTTFontDescription [
 	familyName := aTTFontDescription familyName.
 	baseFontBySizes := Dictionary new.
 	baseTTFontDescription := aTTFontDescription.
-	ttFontDescriptionsByEmphasis isNil ifTrue: [ 
+	ttFontDescriptionsByEmphasis isNil ifTrue: [
 		ttFontDescriptionsByEmphasis := Dictionary new ]
 ]
 
@@ -121,7 +77,7 @@ TrueTypeFontFamily >> baseTTFontDescription: aTTFontDescription [
 TrueTypeFontFamily >> clearCache [
 
 	"
-	TrueTypeFontFamily  allInstancesDo: [ :each | each clearCache ].
+	TrueTypeFontFamily allInstancesDo: [ :each | each clearCache ].
 	"
 
 	| emphasized |
@@ -137,6 +93,15 @@ TrueTypeFontFamily >> folderName [
 ]
 
 { #category : 'testing' }
+TrueTypeFontFamily >> includesAscii [
+
+	"Answer true if we include the basic ASCII characters.
+	If not, we are not suitable for displaying Smalltalk code."
+
+	^ baseTTFontDescription includesAscii
+]
+
+{ #category : 'testing' }
 TrueTypeFontFamily >> isTrueTypeFontFamily [
 
 	^ true
@@ -145,5 +110,5 @@ TrueTypeFontFamily >> isTrueTypeFontFamily [
 { #category : 'accessing' }
 TrueTypeFontFamily >> pointSizes [
 
-	^ #( 6 7 8 9 10 11 12 13 14 15 18 22 26 36 48 72 )
+	^ #( 6 7 8 9 10 11 12 13 14 15 18 22 26 36 48 72 96 144 )
 ]

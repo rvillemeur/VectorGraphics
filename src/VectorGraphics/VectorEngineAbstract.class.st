@@ -1684,64 +1684,6 @@ VectorEngineAbstract >> currentMorph: aMorph [
 ]
 
 { #category : 'text' }
-VectorEngineAbstract >> displayString: aString from: startIndex to: stopIndex at: aPoint trueTypeFont: aTTFontDescription useST80Glyphs: aBoolean color: aColor scaleX: ssx scaleY: ssy [
-
-	"ssx and ssy to honor font pointSize"
-
-	| destX destY sx sy contourData contourDataIndexes trueTypeScale cpX cpY epX epY moveToX moveToY advanceWidth boundsLeft boundsRight boundsTop boundsBottom numContours numBeziers |
-	trueTypeScale := 1.0 / aTTFontDescription letterMTopSideBearing.
-	sx := ssx * trueTypeScale.
-	sy := ssy * trueTypeScale.
-	contourData := aTTFontDescription contourDataForIso8859s15.
-	contourDataIndexes := aTTFontDescription 
-		                      contourDataIndexesByIso8859s15ST80Glyphs:
-		                      aBoolean.
-	self fillColor: aColor do: [ 
-		destY := aPoint y.
-		destX := aPoint x.
-		startIndex to: stopIndex do: [ :charIndex | 
-			| iso8859s15 i |
-			iso8859s15 := (aString at: charIndex) iso8859s15Code.
-			i := contourDataIndexes at: iso8859s15 + 1.
-			advanceWidth := contourData at: i.
-			i := i + 1.
-			boundsLeft := contourData at: i.
-			i := i + 1.
-			boundsRight := contourData at: i.
-			i := i + 1.
-			boundsTop := contourData at: i.
-			i := i + 1.
-			boundsBottom := contourData at: i.
-			i := i + 1.
-			numContours := (contourData at: i) asInteger.
-			i := i + 1.
-			numContours timesRepeat: [ 
-				numBeziers := (contourData at: i) asInteger.
-				i := i + 1.
-				moveToX := contourData at: i.
-				i := i + 1.
-				moveToY := contourData at: i.
-				i := i + 1.
-				self abs_MoveToX: moveToX * sx + destX y: moveToY * sy + destY.
-				numBeziers timesRepeat: [ 
-					epX := contourData at: i.
-					i := i + 1.
-					epY := contourData at: i.
-					i := i + 1.
-					cpX := contourData at: i.
-					i := i + 1.
-					cpY := contourData at: i.
-					i := i + 1.
-					self
-						rel_QuadraticBezierToX: epX * sx
-						y: epY * sy
-						controlX: cpX * sx
-						y: cpY * sy ] ].
-			destX := destX + (advanceWidth * sx) ] ].
-	^ destX ceiling @ destY
-]
-
-{ #category : 'text' }
 VectorEngineAbstract >> displayUtf8: aByteArray at: aPoint trueTypeFont: aTTFontDescription color: aColor scaleX: ssx scaleY: ssy [
 
 	"ssx and ssy to honor font pointSize"

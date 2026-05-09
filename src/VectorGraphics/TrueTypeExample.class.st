@@ -22,7 +22,7 @@ TrueTypeExample class >> exampleCharacterWidths [
 	font := self loadFontFrom: self defaultFontPath.
 	widths := Dictionary new.
 	(Character value: 32) to: (Character value: 126) do: [ :char |
-		widths at: char put: (font widthOf: char useST80Glyphs: false) ].
+		widths at: char put: (font widthOf: char) ].
 	^ widths
 ]
 
@@ -51,9 +51,13 @@ TrueTypeExample class >> exampleGlyphForm [
 	"Render a single character glyph to a Form and inspect it.
 	TrueTypeExample exampleGlyphForm inspect"
 
-	| font |
+	| font bytes |
 	font := self loadFontFrom: self defaultFontPath.
-	^ (font formGlyphFor: $A useST80Glyphs: false pixelSize: 48) form
+	bytes := Character utf8BytesOf: $A codePoint.
+	^ (font
+		formGlyphForUtf8Byte1: (bytes at: 1)
+		byte2: nil byte3: nil byte4: nil
+		pixelSize: 48) form
 ]
 
 { #category : 'examples' }
@@ -61,9 +65,13 @@ TrueTypeExample class >> exampleGlyphLarge [
 	"Render a glyph at large size (96px).
 	TrueTypeExample exampleGlyphLarge inspect"
 
-	| font |
+	| font bytes |
 	font := self loadFontFrom: self defaultFontPath.
-	^ (font formGlyphFor: $Q useST80Glyphs: false pixelSize: 96) form
+	bytes := Character utf8BytesOf: $Q codePoint.
+	^ (font
+		formGlyphForUtf8Byte1: (bytes at: 1)
+		byte2: nil byte3: nil byte4: nil
+		pixelSize: 96) form
 ]
 
 { #category : 'examples' }
@@ -71,9 +79,13 @@ TrueTypeExample class >> exampleGlyphSmall [
 	"Render a glyph at small size (12px).
 	TrueTypeExample exampleGlyphSmall inspect"
 
-	| font |
+	| font bytes |
 	font := self loadFontFrom: self defaultFontPath.
-	^ (font formGlyphFor: $g useST80Glyphs: false pixelSize: 12) form
+	bytes := Character utf8BytesOf: $g codePoint.
+	^ (font
+		formGlyphForUtf8Byte1: (bytes at: 1)
+		byte2: nil byte3: nil byte4: nil
+		pixelSize: 12) form
 ]
 
 { #category : 'examples' }
@@ -81,13 +93,17 @@ TrueTypeExample class >> exampleMultipleGlyphs [
 	"Render several glyphs side by side onto a single Form.
 	TrueTypeExample exampleMultipleGlyphs inspect"
 
-	| font form x glyphForm |
+	| font form x glyphForm bytes |
 	font := self loadFontFrom: self defaultFontPath.
 	form := Form extent: 400 @ 120 depth: 32.
 	form fillColor: Color white.
 	x := 10.
 	'Hello' do: [ :char |
-		glyphForm := (font formGlyphFor: char useST80Glyphs: false pixelSize: 48) form.
+		bytes := Character utf8BytesOf: char codePoint.
+		glyphForm := (font
+			formGlyphForUtf8Byte1: (bytes at: 1)
+			byte2: nil byte3: nil byte4: nil
+			pixelSize: 48) form.
 		glyphForm displayOn: form at: x @ 20 rule: Form paint.
 		x := x + glyphForm width + 4 ].
 	^ form

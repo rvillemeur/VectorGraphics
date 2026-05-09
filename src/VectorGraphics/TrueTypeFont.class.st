@@ -1,9 +1,8 @@
 "
 TrueType fonts are the most widely used format for pixel independent vector Fonts.
 
-In Cuis what is usually called TrueType Font is represented by TTFontDescription.
-
-TrueTypeFonts, being part of the traditional AbstractFont hierarchy, adds a specific pointSize, and is the object used in texts.
+TrueTypeFonts, being part of the traditional AbstractFont hierarchy, adds a specific
+pointSize, and is the object used in texts.
 "
 Class {
 	#name : 'TrueTypeFont',
@@ -12,7 +11,6 @@ Class {
 		'ttFontDescription',
 		'pointSize',
 		'emphasis',
-		'glyphForms',
 		'glyphFormsByUtf8',
 		'family',
 		'baseFont',
@@ -44,8 +42,8 @@ TrueTypeFont >> addEmphasis: code [
 	"Set the integer code for emphasis. See senders."
 
 	emphasis := code.
-	(emphasis anyMask: 4 + 8 + 64) ifTrue: [ "They need to be recreated" 
-		glyphForms := Array new: 256 ]
+	(emphasis anyMask: 4 + 8) ifTrue: [ "They need to be recreated"
+		glyphFormsByUtf8 := Array new: 256 ]
 ]
 
 { #category : 'accessing' }
@@ -62,19 +60,10 @@ TrueTypeFont >> baseFont [
 ]
 
 { #category : 'initialization' }
-TrueTypeFont >> baseFont: aStrikeFont [
+TrueTypeFont >> baseFont: aFont [
 
-	baseFont := aStrikeFont.
+	baseFont := aFont.
 	baseFont ifNotNil: [ derivativeFonts := nil ]
-]
-
-{ #category : 'accessing' }
-TrueTypeFont >> baseKern [
-
-	"self forwarding: #baseKern printOneStack: true."
-
-	self revisar.
-	^ 0 "uh?"
 ]
 
 { #category : 'accessing' }
@@ -102,31 +91,44 @@ TrueTypeFont >> emphasized: code [
 	"Answer a copy of the receiver with emphasis set to include code."
 
 	| derivative addedEmphasis derivedFrom |
-	self isBaseFont ifFalse: [ 
+	self isBaseFont ifFalse: [
 		^ self baseFont emphasized: (code bitOr: emphasis) ].
 	code = 0 ifTrue: [ ^ self ].
 
 	derivativeFonts ifNil: [ derivativeFonts := Dictionary new ].
-	derivative := derivativeFonts at: code ifPresent: [ :der | ^ der ]. "Already have this style"
+	derivativeFonts at: code ifPresent: [ :der | ^ der ]. "Already have this style"
+
+	"Bold+Italic requested but not available.
+	Handle this case before decomposing, because neither can be built synthetic.
+	Answer Italic if present. Otherwise answer Bold if present. Or just the base font."
+	code = 3 ifTrue: [
+		derivativeFonts at: 2 ifPresent: [ :der | ^ der ].
+		derivativeFonts at: 1 ifPresent: [ :der | ^ der ].
+		^ self baseFont ].
+	"Bold or Italic requested but not available. Just use base font."
+	code < 3 ifTrue: [ ^ self baseFont ].
 
 	"Dont have it -- derive from another with one with less emphasis"
 	addedEmphasis := 1 bitShift: code highBit - 1.
 	derivedFrom := self emphasized: code - addedEmphasis.
 
-	"Order is Bold(B), Italic(i), Underlined(U), StruckThrough(X), Superscript(Sup), Subscript(Sub), WithST80Glyphs(ST80)"
-	derivative := addedEmphasis caseOf: { 
-			              ([ 1 ] -> [ ^ derivedFrom ]). "No synthetic Bold or Italic. Just use whatever we have."
-			              ([ 2 ] -> [ ^ derivedFrom ]). "No synthetic Bold or Italic. Just use whatever we have."
-			              ([ 4 ] -> [ derivedFrom copy ]).
-			              ([ 8 ] -> [ derivedFrom copy ]).
-			              ([ 16 ] -> [ derivedFrom syntheticSuperscript ]).
-			              ([ 32 ] -> [ derivedFrom syntheticSubscript ]).
-			              ([ 64 ] -> [ derivedFrom copy ]) }.
+	derivative := addedEmphasis caseOf: {
+		[ 4 ]  -> [ derivedFrom copy ].
+		[ 8 ]  -> [ derivedFrom copy ].
+		[ 16 ] -> [ derivedFrom syntheticSuperscript ].
+		[ 32 ] -> [ derivedFrom syntheticSubscript ]
+	}.
 
 	derivative baseFont: self.
 	derivative addEmphasis: code.
 	derivativeFonts at: code put: derivative.
 	^ derivative
+]
+
+{ #category : 'accessing' }
+TrueTypeFont >> family [
+
+	^ family
 ]
 
 { #category : 'initialization' }
@@ -135,7 +137,6 @@ TrueTypeFont >> family: aTrueTypeFontFamily ttFontDescription: aTTFontDescriptio
 	ttFontDescription := aTTFontDescription.
 	emphasis := aTTFontDescription emphasis.
 	pointSize := aNumber.
-	glyphForms := Array new: 256.
 	glyphFormsByUtf8 := Array new: 256.
 	family := aTrueTypeFontFamily.
 	baseFont := nil.
@@ -145,37 +146,13 @@ TrueTypeFont >> family: aTrueTypeFontFamily ttFontDescription: aTTFontDescriptio
 { #category : 'accessing' }
 TrueTypeFont >> familyName [
 
-	^ ttFontDescription familyName
+	^ family familyName
 ]
 
 { #category : 'accessing' }
 TrueTypeFont >> fontDescription [
 
 	^ ttFontDescription
-]
-
-{ #category : 'glyph access' }
-TrueTypeFont >> glyphAt: aCharacter [
-
-	"Needed only for BitBltCanvasEngine"
-
-	| index |
-	index := aCharacter numericValue + 1.
-	^ (glyphForms at: index) ifNil: [ 
-		  | formGlyph |
-		  formGlyph := (ttFontDescription
-			                formGlyphFor: aCharacter
-			                useST80Glyphs: self isST80Glyphs
-			                pixelSize: pointSize)
-			               ifNil: [ #absentGlyph ]
-			               ifNotNil: [ :theGlyph | 
-				               (emphasis allMask: 4) ifTrue: [ 
-					               self makeUnderlinedGlyph: theGlyph ].
-				               (emphasis allMask: 8) ifTrue: [ 
-					               self makeStruckThroughGlyph: theGlyph ].
-				               theGlyph ].
-		  glyphForms at: index put: formGlyph.
-		  formGlyph ]
 ]
 
 { #category : 'glyph access' }
@@ -186,22 +163,22 @@ TrueTypeFont >> glyphAtUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3OrNil byte
 	| lastArray lastIndex |
 	lastArray := glyphFormsByUtf8.
 	lastIndex := byte1 + 1.
-	byte2OrNil notNil ifTrue: [ 
-		(lastArray at: lastIndex) ifNil: [ 
+	byte2OrNil notNil ifTrue: [
+		(lastArray at: lastIndex) ifNil: [
 			lastArray at: lastIndex put: (Array new: 64) ].
 		lastArray := lastArray at: lastIndex.
 		lastIndex := (byte2OrNil bitAnd: 63) + 1.
-		byte3OrNil notNil ifTrue: [ 
-			(lastArray at: lastIndex) ifNil: [ 
+		byte3OrNil notNil ifTrue: [
+			(lastArray at: lastIndex) ifNil: [
 				lastArray at: lastIndex put: (Array new: 64) ].
 			lastArray := lastArray at: lastIndex.
 			lastIndex := (byte3OrNil bitAnd: 63) + 1.
-			byte4OrNil notNil ifTrue: [ 
-				(lastArray at: lastIndex) ifNil: [ 
+			byte4OrNil notNil ifTrue: [
+				(lastArray at: lastIndex) ifNil: [
 					lastArray at: lastIndex put: (Array new: 64) ].
 				lastArray := lastArray at: lastIndex.
 				lastIndex := (byte4OrNil bitAnd: 63) + 1 ] ] ].
-	^ (lastArray at: lastIndex) ifNil: [ 
+	^ (lastArray at: lastIndex) ifNil: [
 		  | formGlyph |
 		  formGlyph := (ttFontDescription
 			                formGlyphForUtf8Byte1: byte1
@@ -210,10 +187,10 @@ TrueTypeFont >> glyphAtUtf8Byte1: byte1 byte2: byte2OrNil byte3: byte3OrNil byte
 			                byte4: byte4OrNil
 			                pixelSize: pointSize)
 			               ifNil: [ #absentGlyph ]
-			               ifNotNil: [ :theGlyph | 
-				               (emphasis allMask: 4) ifTrue: [ 
+			               ifNotNil: [ :theGlyph |
+				               self isUnderlined ifTrue: [
 					               self makeUnderlinedGlyph: theGlyph ].
-				               (emphasis allMask: 8) ifTrue: [ 
+				               self isStruckThrough ifTrue: [
 					               self makeStruckThroughGlyph: theGlyph ].
 				               theGlyph ].
 		  lastArray at: lastIndex put: formGlyph.
@@ -236,12 +213,6 @@ TrueTypeFont >> isBold [
 TrueTypeFont >> isItalic [
 
 	^ self emphasis allMask: 2
-]
-
-{ #category : 'testing' }
-TrueTypeFont >> isST80Glyphs [
-
-	^ emphasis allMask: 64
 ]
 
 { #category : 'testing' }
@@ -275,7 +246,7 @@ TrueTypeFont >> lineGap [
 	  / ttFontDescription letterMTopSideBearing * 1.0
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'accessing' }
 TrueTypeFont >> lineSpacing [
 
 	"Answer the height of the receiver including any additional line gap."
@@ -300,44 +271,22 @@ TrueTypeFont >> makeUnderlinedGlyph: aFormGlyph [
 	y := aFormGlyph topOffset + d.
 	form := aFormGlyph form.
 	height := aFormGlyph topOffset + (2 * d).
-	height > form height ifTrue: [ 
+	height > form height ifTrue: [
 		oldForm := form.
 		form := Form extent: oldForm width @ height depth: oldForm depth.
 		form fillWhite.
 		form
 			copyBits: oldForm boundingBox
 			from: oldForm
-			at: '0@0'
+			at: 0 @ 0
 			clippingBox: form boundingBox
 			rule: Form over.
 		aFormGlyph form: form ].
 	form fillBlack: (0 @ y extent: form width @ d)
 ]
 
-{ #category : 'displaying' }
-TrueTypeFont >> onBitBltCanvasEngine: engine displayString: aString from: startIndex to: stopIndex at: p color: color [
-
-	"Answer last affected pixel position.
-	Answer nil if nothing was done."
-
-	^ aString
-		  displayOnBitBltCanvasEngine: engine
-		  from: startIndex
-		  to: stopIndex
-		  at: p
-		  trueTypeFont: self
-		  color: color
-]
-
 { #category : 'accessing' }
 TrueTypeFont >> pointSize [
-
-	"
-p.ej.
-scrollbarThickness
-"
-
-	"self forwarding: #pointSize printOneStack: true."
 
 	^ pointSize
 ]
@@ -351,26 +300,18 @@ TrueTypeFont >> printOn: aStream [
 		nextPutAll: ''' ';
 		space;
 		print: self pointSize;
+		space;
+		nextPutAll: ttFontDescription subfamilyName;
 		nextPut: $)
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'caching' }
 TrueTypeFont >> releaseCachedState [
 
-	glyphForms atAllPut: nil.
 	glyphFormsByUtf8 atAllPut: nil.
-	derivativeFonts notNil ifTrue: [ 
-		derivativeFonts keysAndValuesDo: [ :anEmphasis :derivedFont | 
+	derivativeFonts notNil ifTrue: [
+		derivativeFonts keysAndValuesDo: [ :anEmphasis :derivedFont |
 			derivedFont releaseCachedState ] ]
-]
-
-{ #category : 'initialization' }
-TrueTypeFont >> resetAssignmentGlyph [
-
-	"Uses ST80 glyphs:"
-
-	(emphasis anyMask: 64) ifTrue: [ "Re-cache glyphs that could have changed" 
-		glyphForms at: $_ numericValue + 1 put: nil ]
 ]
 
 { #category : 'synthetic derivatives' }
@@ -379,42 +320,32 @@ TrueTypeFont >> syntheticSubscript [
 	"Build and answer a derivative that is Subscript."
 
 	| derivative |
-	derivative := (family atPointSize: pointSize * 0.68) emphasized:
-		              emphasis.
+	derivative := (family atPointSize: pointSize * 0.68) emphasized: emphasis.
 	^ derivative copy
-
-	"
-StrikeFont allInstances do: [ :a | a reset ].
-('Hi ', (Text string: 'there' attribute: TextEmphasis superscript), ' how ', (Text string: 'are' attribute: TextEmphasis subscript), ' you?') edit.
-"
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'synthetic derivatives' }
 TrueTypeFont >> syntheticSuperscript [
 
-	"Build and answer a derivative that is Subscript."
+	"Build and answer a derivative that is Superscript."
 
 	| derivative |
-	derivative := (family atPointSize: pointSize * 0.68) emphasized:
-		              emphasis.
+	derivative := (family atPointSize: pointSize * 0.68) emphasized: emphasis.
 	^ derivative copy
-
-	"
-StrikeFont allInstances do: [ :a | a reset ].
-('Hi ', (Text string: 'there' attribute: TextEmphasis superscript), ' how ', (Text string: 'are' attribute: TextEmphasis subscript), ' you?') edit.
-"
-]
-
-{ #category : 'swapping glyphs' }
-TrueTypeFont >> useShortUnderscore [
-
-	
 ]
 
 { #category : 'accessing' }
 TrueTypeFont >> widthOf: aCharacter [
 
-	^ (aCharacter
-		   widthInTrueTypeFontDescription: ttFontDescription
-		   useST80Glyphs: self isST80Glyphs) * pointSize
+	^ (ttFontDescription widthOf: aCharacter) * pointSize
+]
+
+{ #category : 'accessing' }
+TrueTypeFont >> widthOfUtf8Byte1: aByte1 b2: aByte2OrNil b3: aByte3OrNil b4: aByte4OrNil [
+
+	^ (ttFontDescription
+		   widthOfUtf8Byte1: aByte1
+		   b2: aByte2OrNil
+		   b3: aByte3OrNil
+		   b4: aByte4OrNil) * pointSize
 ]

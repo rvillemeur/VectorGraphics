@@ -128,13 +128,11 @@ TTFontReader >> mapAndStoreGlyphsUsing: characterMap [
 	https://developer.apple.com/fonts/TrueType-Reference-Manual/RM07/appendixB.html
 	"
 
-	| glyphsByIso5559s15 glyphsByUTF8 unknownGlyph nullGlyph spaceGlyph mapSize preferredCodePoint |
+	| glyphsByUTF8 unknownGlyph spaceGlyph mapSize preferredCodePoint |
 	unknownGlyph := glyphs first.
-	nullGlyph := glyphs second.
 	mapSize := characterMap size.
-	glyphsByIso5559s15 := Array new: 256.
 	glyphsByUTF8 := Array new: 256.
-	0 to: mapSize - 1 do: [ :codePoint | 
+	0 to: mapSize - 1 do: [ :codePoint |
 		| g array prevByte |
 		preferredCodePoint := codePoint.
 		codePoint = $- codePoint ifTrue: [ preferredCodePoint := 16r2212 ]. "WIDE MINUS"
@@ -142,31 +140,28 @@ TTFontReader >> mapAndStoreGlyphsUsing: characterMap [
 		g := glyphs
 			     at: (characterMap at: preferredCodePoint + 1) + 1
 			     ifAbsent: [ unknownGlyph ].
-		g == unknownGlyph ifTrue: [ 
+		g == unknownGlyph ifTrue: [
 			g := glyphs
 				     at: (characterMap at: codePoint + 1) + 1
 				     ifAbsent: [ unknownGlyph ] ].
 
-		g == unknownGlyph ifFalse: [ 
-			(Character utf8BytesOf: codePoint) ifNotNil: [ 
-				:iso8859s15 | glyphsByIso5559s15 at: iso8859s15 + 1 put: g ] ].
-
 		array := glyphsByUTF8.
 		prevByte := nil.
 		Character
-			evaluate: [ :byte | 
-				prevByte notNil ifTrue: [ 
-					array := (array at: prevByte + 1) ifNil: [ 
+			evaluate: [ :byte |
+				prevByte notNil ifTrue: [
+					array := (array at: prevByte + 1) ifNil: [
 						         array at: prevByte + 1 put: (Array new: 256) ] ].
 				prevByte := byte ]
 			withUtf8BytesOf: codePoint.
 		array at: prevByte + 1 put: g.
 		codePoint = 32 ifTrue: [ spaceGlyph := g ] ].
-	Character separators do: [ :s | 
-		glyphsByIso5559s15 at: s codePoint + 1 put: spaceGlyph.
-		glyphsByUTF8 at: s codePoint + 1 put: spaceGlyph ].
+
+	"Map separators (tab, newline, etc.) to space glyph"
+	{ 9. 10. 11. 12. 13 } do: [ :cp |
+		glyphsByUTF8 at: cp + 1 put: spaceGlyph ].
+
 	fontDescription
-		glyphsByIso8859s15: glyphsByIso5559s15
 		glyphsByUtf8Bytes: glyphsByUTF8
 		unknownGlyph: unknownGlyph
 ]
@@ -626,9 +621,8 @@ TTFontReader >> readFrom: fontData fromOffset: offset [
 		ifTrue: [ kernPairs := #(  ) ]
 		ifFalse: [ self processKerningTable: kerningEntry ].
 	self mapAndStoreGlyphsUsing: characterMap.
-	"jmv kernPairs refer to glyph number (in the .ttf file) while fontDescription glyphs are indexed by Unicode code point...
-	Correct this before making any use of the kernPairs data."
-	fontDescription setKernPairs: kernPairs
+	"kernPairs refer to glyph numbers in the .ttf file, not Unicode code points.
+	Remapping is not yet implemented, so kern data is not stored."
 ]
 
 { #category : 'private' }
