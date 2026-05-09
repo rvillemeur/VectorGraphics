@@ -280,7 +280,7 @@ TTFontDescription >> fullName [
 TTFontDescription >> glyphsByUtf8Bytes: glyphsByUTF8 unknownGlyph: theUnknownGlyph [
 
 	| mGlyph |
-	mGlyph := glyphsByUTF8 at: $M numericValue + 1.
+	mGlyph := glyphsByUTF8 at: $M codePoint + 1.
 	letterMTopSideBearing := (mGlyph ifNil: [ theUnknownGlyph ]) topSideBearing.
 
 	contourDataIndexesByUtf8 := (IntegerArray new: 256) as: OrderedCollection.

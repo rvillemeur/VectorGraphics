@@ -17,7 +17,7 @@ TrueTypeExample class >> defaultFontPath [
 TrueTypeExample class >> exampleCharacterWidths [
 	"Inspect the advance widths of printable ASCII characters.
 	TrueTypeExample exampleCharacterWidths inspect"
-
+<sampleInstance>
 	| font widths |
 	font := self loadFontFrom: self defaultFontPath.
 	widths := Dictionary new.
@@ -30,7 +30,7 @@ TrueTypeExample class >> exampleCharacterWidths [
 TrueTypeExample class >> exampleFontMetadata [
 	"Load a TTF file and inspect its metadata.
 	TrueTypeExample exampleFontMetadata inspect"
-
+<sampleInstance>
 	| font info |
 	font := self loadFontFrom: self defaultFontPath.
 	info := Dictionary new.
@@ -50,7 +50,7 @@ TrueTypeExample class >> exampleFontMetadata [
 TrueTypeExample class >> exampleGlyphForm [
 	"Render a single character glyph to a Form and inspect it.
 	TrueTypeExample exampleGlyphForm inspect"
-
+<sampleInstance>
 	| font bytes |
 	font := self loadFontFrom: self defaultFontPath.
 	bytes := Character utf8BytesOf: $A codePoint.
@@ -64,7 +64,7 @@ TrueTypeExample class >> exampleGlyphForm [
 TrueTypeExample class >> exampleGlyphLarge [
 	"Render a glyph at large size (96px).
 	TrueTypeExample exampleGlyphLarge inspect"
-
+<sampleInstance>
 	| font bytes |
 	font := self loadFontFrom: self defaultFontPath.
 	bytes := Character utf8BytesOf: $Q codePoint.
@@ -78,7 +78,7 @@ TrueTypeExample class >> exampleGlyphLarge [
 TrueTypeExample class >> exampleGlyphSmall [
 	"Render a glyph at small size (12px).
 	TrueTypeExample exampleGlyphSmall inspect"
-
+<sampleInstance>
 	| font bytes |
 	font := self loadFontFrom: self defaultFontPath.
 	bytes := Character utf8BytesOf: $g codePoint.
@@ -92,7 +92,7 @@ TrueTypeExample class >> exampleGlyphSmall [
 TrueTypeExample class >> exampleMultipleGlyphs [
 	"Render several glyphs side by side onto a single Form.
 	TrueTypeExample exampleMultipleGlyphs inspect"
-
+<sampleInstance>
 	| font form x glyphForm bytes |
 	font := self loadFontFrom: self defaultFontPath.
 	form := Form extent: 400 @ 120 depth: 32.

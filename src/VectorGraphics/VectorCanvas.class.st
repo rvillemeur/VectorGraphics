@@ -113,7 +113,7 @@ VectorCanvas >> doSubPixelAntiAliasing [
 	"
 
 	engine := VectorEngineSubPixel onForm: form.
-	self newClipRect: nil
+	"self newClipRect: nil"
 ]
 
 { #category : 'drawing - icons' }
