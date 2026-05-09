@@ -148,7 +148,7 @@ TTFontReader >> mapAndStoreGlyphsUsing: characterMap [
 				     ifAbsent: [ unknownGlyph ] ].
 
 		g == unknownGlyph ifFalse: [ 
-			(Character iso8859s15CodeForUnicodeCodePoint: codePoint) ifNotNil: [ 
+			(Character utf8BytesOf: codePoint) ifNotNil: [ 
 				:iso8859s15 | glyphsByIso5559s15 at: iso8859s15 + 1 put: g ] ].
 
 		array := glyphsByUTF8.
@@ -159,7 +159,7 @@ TTFontReader >> mapAndStoreGlyphsUsing: characterMap [
 					array := (array at: prevByte + 1) ifNil: [ 
 						         array at: prevByte + 1 put: (Array new: 256) ] ].
 				prevByte := byte ]
-			withUtf8BytesOfUnicodeCodePoint: codePoint.
+			withUtf8BytesOf: codePoint.
 		array at: prevByte + 1 put: g.
 		codePoint = 32 ifTrue: [ spaceGlyph := g ] ].
 	Character separators do: [ :s | 
@@ -292,32 +292,22 @@ TTFontReader >> processGlyphDataTable: entry offsets: offsetArray [
 	"Read the actual glyph data from the font.
 	offsetArray contains the start offsets in the data for each glyph."
 
-	| initialOffset |
+	| initialOffset glyph glyphOffset nextOffset glyphLength numberOfContours |
 	initialOffset := entry offset.
 	glyphs := Array new: nGlyphs.
-	'Reading glyph data'
-		displayProgressAt: 100 @ 100
-		from: 1
-		to: nGlyphs
-		during: [ :bar | 
-			| glyph glyphOffset nextOffset glyphLength numberOfContours |
-			1 to: nGlyphs do: [ :glyphIndex | 
-				bar value: glyphIndex.
-				glyphOffset := offsetArray at: glyphIndex.
-				nextOffset := offsetArray at: glyphIndex + 1.
-				glyphLength := nextOffset - glyphOffset.
-				glyph := glyphLength = 0
-					         ifTrue: [ TTGlyph new ]
-					         ifFalse: [ 
-						         entry offset: initialOffset + glyphOffset.
-						         numberOfContours := entry nextShort.
-						         numberOfContours >= 0
-							         ifTrue: [ 
-							         self
-								         processSimpleGlyphContours: numberOfContours
-								         from: entry ]
-							         ifFalse: [ self processCompositeGlyphFrom: entry ] ].
-				glyphs at: glyphIndex put: glyph ] ].
+	1 to: nGlyphs do: [ :glyphIndex |
+		glyphOffset := offsetArray at: glyphIndex.
+		nextOffset := offsetArray at: glyphIndex + 1.
+		glyphLength := nextOffset - glyphOffset.
+		glyph := glyphLength = 0
+			         ifTrue: [ TTGlyph new ]
+			         ifFalse: [
+				         entry offset: initialOffset + glyphOffset.
+				         numberOfContours := entry nextShort.
+				         numberOfContours >= 0
+					         ifTrue: [ self processSimpleGlyphContours: numberOfContours from: entry ]
+					         ifFalse: [ self processCompositeGlyphFrom: entry ] ].
+		glyphs at: glyphIndex put: glyph ].
 	glyphs do: [ :g | g replaceIndexesByComponentGlyphsIn: glyphs ]
 ]
 
