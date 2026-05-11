@@ -42,20 +42,19 @@ TTHmtxTableParser >> initWithEntry: anEntry glyphs: glyphsArray numHMetrics: n [
 { #category : 'parsing' }
 TTHmtxTableParser >> process [
 
-	| index lastAW glyph |
-	index := 1.
-	[ index <= numHMetrics ] whileTrue: [
-		glyph := glyphs at: index.
+	| lastAW |
+	1 to: numHMetrics do: [ :i |
+		| glyph |
+		glyph := glyphs at: i.
 		glyph advanceWidth: entry nextUShort.
 		glyph leftSideBearing: entry nextShort.
-		glyph updateRightSideBearing.
-		index := index + 1 ].
-	index = (glyphs size + 1) ifTrue: [ ^ self ].
-	lastAW := (glyphs at: index - 1) advanceWidth.
-	[ index <= glyphs size ] whileTrue: [
-		glyph := glyphs at: index.
+		glyph updateRightSideBearing ].
+	numHMetrics = glyphs size ifTrue: [ ^ self ].
+	lastAW := (glyphs at: numHMetrics) advanceWidth.
+	numHMetrics + 1 to: glyphs size do: [ :i |
+		| glyph |
+		glyph := glyphs at: i.
 		glyph advanceWidth: lastAW.
 		glyph leftSideBearing: entry nextShort.
-		glyph updateRightSideBearing.
-		index := index + 1 ]
+		glyph updateRightSideBearing ]
 ]
