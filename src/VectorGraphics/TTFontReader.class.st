@@ -1,39 +1,31 @@
 "
-Reads a raw TrueType font file (.ttf) and builds a TTFontDescription from it.
-
-TTFontReader is the top-level parser. It reads the font's table directory, locates each
-named table (head, hhea, maxp, cmap, glyf, loca, hmtx, kern, name), and orchestrates the
-full parsing pipeline. Binary table parsing is delegated to TTFontParser class methods.
-Glyph selection with Unicode substitution is delegated to TTFontParser >> selectGlyphFor:from:glyphs:unknownGlyph:.
+Orchestrates TrueType font parsing: locates all tables in the binary font data, creates
+the appropriate TTFontParser subclass for each table, runs them in dependency order, and
+assembles the results into a TTFontDescription.
 
 ## Entry point
-`TTFontReader class >> readTTFFrom: aByteArray` — parses the byte array and returns a
-fully initialised TTFontDescription.
+  `TTFontReader class >> readTTFFrom: aByteArray`
 
-## Pipeline (all private)
-1. Read table directory → build TTFontTableDirEntry map
-2. `parseFontHeader` → bounds, unitsPerEm, indexToLocFormat
-3. `parseMaximumProfile` → nGlyphs
-4. `parseHorizontalHeader` → ascent, descent, lineGap, numHMetrics
-5. `parseGlyphs` → Array of TTGlyph / TTCompositeGlyph (via parseSimpleGlyph / parseCompositeGlyph)
-6. `parseHorizontalMetrics` → advanceWidth, leftSideBearing per glyph
-7. `decodeCmapTable` → character map (codePoint → glyph index)
-8. `mapAndStoreGlyphsUsing:` → UTF-8 glyph-index map stored in TTFontDescription
-9. `parseKerningTable` → kern pairs stored in TTFontDescription
-10. `parseNamingTable` → font name strings stored in TTFontDescription
+## Pipeline (readFrom:fromOffset:)
+1.  `buildTableDirectory:offset:` — scan the font's table directory into a tag→entry Dictionary
+2.  TTHeadTableParser     → bounds, unitsPerEm, indexToLocFormat
+3.  TTMaxpTableParser     → nGlyphs
+4.  TTNameTableParser     → font name strings
+5.  TTHheaTableParser     → ascent, descent, lineGap, numHMetrics
+6.  TTLocaTableParser     → glyph byte-offset array (needs indexToLocFormat + nGlyphs)
+7.  TTCmapTableParser     → Unicode character map (nil → error)
+8.  TTGlyfTableParser     → Array of TTGlyph (needs nGlyphs + loca offsets)
+9.  TTHmtxTableParser     → mutates glyphs with advance widths (needs numHMetrics)
+10. TTKernTableParser     → kern pairs (optional table; absent → empty array)
+11. `mapAndStoreGlyphsUsing:glyphs:` → UTF-8 glyph map stored in TTFontDescription
 
-## Key instVars
-- `glyphs`           Array of TTGlyph (built during step 5)
-- `kernPairs`        Array of TTKernPair
-- `fontDescription`  TTFontDescription being populated
+## Key instVar
+- `fontDescription`  TTFontDescription being assembled
 "
 Class {
 	#name : 'TTFontReader',
 	#superclass : 'Object',
 	#instVars : [
-		'glyphs',
-		'nGlyphs',
-		'kernPairs',
 		'fontDescription'
 	],
 	#category : 'VectorGraphics-TrueType',
@@ -48,42 +40,28 @@ TTFontReader class >> readTTFFrom: aByteArray [
 ]
 
 { #category : 'private' }
-TTFontReader >> decodeCmapFmtTable: entry [
+TTFontReader >> buildTableDirectory: fontData offset: anOffset [
 
-	^ TTFontParser parseCmap: entry
+	"Scan the font's table directory and return a Dictionary mapping 4-char tag strings
+	to TTFontTableDirEntry instances. Each entry in the directory is 16 bytes."
+
+	| numTables pos directory tagStr |
+	numTables := fontData shortAt: 5 + anOffset bigEndian: true.
+	directory := Dictionary new: numTables.
+	pos := 13 + anOffset.
+	1 to: numTables do: [ :i |
+		tagStr := String new: 4.
+		1 to: 4 do: [ :j | tagStr at: j put: (Character value: (fontData byteAt: pos + j - 1)) ].
+		directory at: tagStr put: (TTFontTableDirEntry on: fontData at: pos).
+		pos := pos + 16 ].
+	^ directory
 ]
 
 { #category : 'private' }
-TTFontReader >> getGlyphFlagsFrom: entry size: nPts [
+TTFontReader >> mapAndStoreGlyphsUsing: characterMap glyphs: glyphs [
 
-	^ TTFontParser parseGlyphFlags: entry size: nPts
-]
-
-{ #category : 'processing' }
-TTFontReader >> getTableDirEntry: tagString from: fontData offset: offset [
-
-	"Find the table named tagString in fontData and return a table directory entry for it."
-
-	| numTables pos currentTag tag |
-	numTables := fontData shortAt: 5 + offset bigEndian: true.
-	tag := ByteArray new: 4.
-	1 to: 4 do: [ :i | tag byteAt: i put: (tagString at: i) asciiValue ].
-	tag := tag longAt: 1 bigEndian: true.
-	pos := 13 + offset.
-	1 to: numTables do: [ :i | 
-		currentTag := fontData longAt: pos bigEndian: true.
-		currentTag = tag ifTrue: [ 
-			^ TTFontTableDirEntry on: fontData at: pos ].
-		pos := pos + 16 ].
-	^ nil
-]
-
-{ #category : 'processing' }
-TTFontReader >> mapAndStoreGlyphsUsing: characterMap [
-
-	"
-	https://developer.apple.com/fonts/TrueType-Reference-Manual/RM07/appendixB.html
-	"
+	"Build the UTF-8 → glyph map and store it in fontDescription.
+	https://developer.apple.com/fonts/TrueType-Reference-Manual/RM07/appendixB.html"
 
 	| glyphsByUTF8 unknownGlyph spaceGlyph mapSize |
 	unknownGlyph := glyphs first.
@@ -91,8 +69,11 @@ TTFontReader >> mapAndStoreGlyphsUsing: characterMap [
 	glyphsByUTF8 := Array new: 256.
 	0 to: mapSize - 1 do: [ :codePoint |
 		| g array prevByte |
-		g := TTFontParser selectGlyphFor: codePoint from: characterMap glyphs: glyphs unknownGlyph: unknownGlyph.
-
+		g := TTFontParser
+			     selectGlyphFor: codePoint
+			     from: characterMap
+			     glyphs: glyphs
+			     unknownGlyph: unknownGlyph.
 		array := glyphsByUTF8.
 		prevByte := nil.
 		Character
@@ -105,7 +86,7 @@ TTFontReader >> mapAndStoreGlyphsUsing: characterMap [
 		array at: prevByte + 1 put: g.
 		codePoint = 32 ifTrue: [ spaceGlyph := g ] ].
 
-	"Map separators (tab, newline, etc.) to space glyph"
+	"Map whitespace separators (tab, newline, etc.) to the space glyph"
 	{ 9. 10. 11. 12. 13 } do: [ :cp |
 		glyphsByUTF8 at: cp + 1 put: spaceGlyph ].
 
@@ -114,419 +95,61 @@ TTFontReader >> mapAndStoreGlyphsUsing: characterMap [
 		unknownGlyph: unknownGlyph
 ]
 
-{ #category : 'processing' }
-TTFontReader >> processCharacterMappingTable: entry [
-
-	"Read the font's character to glyph index mapping table.
-	If an appropriate mapping can be found then return an association
-	with the format identifier and the contents of the table"
-
-	| initialOffset nSubTables platformID platformSpecificEncodingID offset |
-	initialOffset := entry offset.
-	entry skip: 2. "Skip table version"
-	nSubTables := entry nextUShort.
-	1 to: nSubTables do: [ :i | 
-		platformID := entry nextUShort.
-		platformSpecificEncodingID := entry nextUShort.
-		offset := entry nextULong.
-		platformID = 0 ifTrue: [ "Only consider Unicode""Go to the beginning of the table"
-			entry offset: initialOffset + offset.
-			^ self decodeCmapFmtTable: entry ] ].
-	^ nil
-]
-
-{ #category : 'processing' }
-TTFontReader >> processCompositeGlyphFrom: entry [
-
-	"Read a composite glyph from the font data."
-
-	| glyph flags glyphIndex hasInstructions ofsX ofsY iLen geometryTransformation bb bl br bt |
-	glyph := TTCompositeGlyph new.
-	bl := entry nextShort.
-	bt := entry nextShort.
-	br := entry nextShort.
-	bb := entry nextShort.
-	glyph
-		boundsLeft: bl
-		boundsRight: br
-		boundsTop: bt
-		boundsBottom: bb.
-	hasInstructions := false.
-	[ 
-	flags := entry nextUShort.
-	glyphIndex := entry nextUShort + 1.
-
-	(flags allMask: 1)
-		ifTrue: [ "'Hay Offset short x@y' print."
-			ofsX := entry nextShort.
-			ofsY := entry nextShort ]
-		ifFalse: [ "'Hay Offset byte x@y' print."
-			(ofsX := entry nextByte) > 127 ifTrue: [ ofsX := ofsX - 256 ].
-			(ofsY := entry nextByte) > 127 ifTrue: [ ofsY := ofsY - 256 ] ]. "ARG_1_AND_2_ARE_WORDS"
-
-	(flags allMask: 2) ifFalse: [ self halt ]. "ARGS_ARE_XY_VALUES" "Unsupported"
-	"ROUND_XY_TO_GRID = 4. Ignored"
-	"AffineTransformation and MorphicTranslation (Cuis-specific) removed.
-	Composite glyph sub-transformations are not applied — passed as nil.
-	Flags 8 (WE_HAVE_A_SCALE), 64 (WE_HAVE_AN_X_AND_Y_SCALE), 128 (WE_HAVE_A_TWO_BY_TWO)
-	still consume the correct number of bytes from the stream."
-	(flags anyMask: 8 + 64 + 128) ifFalse: [
-		geometryTransformation := nil ]. "was: MorphicTranslation withTranslation: ofsX@ofsY"
-	(flags allMask: 8) ifTrue: [
-		entry nextShort. "consume WE_HAVE_A_SCALE bytes"
-		geometryTransformation := nil ].
-	(flags allMask: 64) ifTrue: [
-		entry nextShort. entry nextShort. "consume WE_HAVE_AN_X_AND_Y_SCALE bytes"
-		geometryTransformation := nil ].
-	(flags allMask: 128) ifTrue: [
-		entry nextShort. entry nextShort. entry nextShort. entry nextShort. "consume 2x2 bytes"
-		geometryTransformation := nil ].
-
-	glyph addGlyph: glyphIndex transformation: geometryTransformation.
-	hasInstructions := hasInstructions or: [ 
-		                   flags allMask: 256 "WE_HAVE_INSTRUCTIONS" ].
-	"Continue as long as the MORE_COMPONENTS bit is set"
-	flags allMask: 32 "MORE_COMPONENTS" ] whileTrue.
-	hasInstructions ifTrue: [ "Ignore them"
-		iLen := entry nextUShort.
-		entry skip: iLen ].
-	^ glyph
-]
-
-{ #category : 'processing' }
-TTFontReader >> processFontHeaderTable: entry [
-
-	| data |
-	data := TTFontParser parseFontHeader: entry.
-	fontDescription setBounds: (data at: #bounds) unitsPerEm: (data at: #units).
-	^ data at: #indexToLocFormat
-]
-
-{ #category : 'processing' }
-TTFontReader >> processGlyphDataTable: entry offsets: offsetArray [
-
-	"Read the actual glyph data from the font.
-	offsetArray contains the start offsets in the data for each glyph."
-
-	| initialOffset glyph glyphOffset nextOffset glyphLength numberOfContours |
-	initialOffset := entry offset.
-	glyphs := Array new: nGlyphs.
-	1 to: nGlyphs do: [ :glyphIndex |
-		glyphOffset := offsetArray at: glyphIndex.
-		nextOffset := offsetArray at: glyphIndex + 1.
-		glyphLength := nextOffset - glyphOffset.
-		glyph := glyphLength = 0
-			         ifTrue: [ TTGlyph new ]
-			         ifFalse: [
-				         entry offset: initialOffset + glyphOffset.
-				         numberOfContours := entry nextShort.
-				         numberOfContours >= 0
-					         ifTrue: [ self processSimpleGlyphContours: numberOfContours from: entry ]
-					         ifFalse: [ self processCompositeGlyphFrom: entry ] ].
-		glyphs at: glyphIndex put: glyph ].
-	glyphs do: [ :g | g replaceIndexesByComponentGlyphsIn: glyphs ]
-]
-
-{ #category : 'processing' }
-TTFontReader >> processHorizontalHeaderTable: entry [
-
-	| data |
-	data := TTFontParser parseHorizontalHeader: entry.
-	fontDescription
-		setAscent: (data at: #ascent)
-		descent: (data at: #descent)
-		lineGap: (data at: #lineGap).
-	^ data at: #numHMetrics
-]
-
-{ #category : 'processing' }
-TTFontReader >> processHorizontalMetricsTable: entry length: numHMetrics [
-
-	"Extract the advance width, left side bearing, and right
-	side bearing for each glyph from the Horizontal Metrics Table."
-
-	| index lastAW glyph |
-	index := 1.
-	[ index <= numHMetrics ] whileTrue: [ 
-		glyph := glyphs at: index.
-		glyph advanceWidth: entry nextUShort.
-		glyph leftSideBearing: entry nextShort.
-		glyph updateRightSideBearing.
-		index := index + 1 ].
-	index = (nGlyphs + 1) ifTrue: [ ^ true ].
-	lastAW := (glyphs at: index - 1) advanceWidth.
-
-	[ index <= nGlyphs ] whileTrue: [ 
-		glyph := glyphs at: index.
-		glyph advanceWidth: lastAW.
-		glyph leftSideBearing: entry nextShort.
-		glyph updateRightSideBearing.
-		index := index + 1 ]
-]
-
-{ #category : 'processing' }
-TTFontReader >> processIndexToLocationTable: entry format: indexToLocFormat [
-
-	"glyphOffset    ULONG[numGlyphs]   An array that contains each glyph's
-                                 offset into the Glyph Data Table.
-"
-
-	| glyphOffset offset |
-	glyphOffset := Array new: nGlyphs + 1.
-	1 to: nGlyphs + 1 do: [ :i | 
-		indexToLocFormat = 0
-			ifTrue: [ "Format0: offset/2 is stored" 
-			offset := entry nextUShort * 2 ]
-			ifFalse: [ "Format1: store actual offset" 
-			offset := entry nextULong ].
-		glyphOffset at: i put: offset ].
-	^ glyphOffset
-]
-
-{ #category : 'processing' }
-TTFontReader >> processKerningSubTableType0: entry [
-
-	kernPairs := TTFontParser parseKernPairsType0: entry.
-	^ true
-]
-
-{ #category : 'processing' }
-TTFontReader >> processKerningTable: entry [
-
-	"Extract the kerning information for pairs of glyphs."
-
-	| version nTables covLow covHigh |
-	version := entry nextUShort. "Skip table version"
-	nTables := entry nextUShort. "Skip number of sub tables -- we're using the first one only"
-	nTables = 0 ifTrue: [ " This detection is hacky "
-		entry skip: -4. "rewind"
-		^ self processOSXKerningTable: entry ].
-	entry skip: 2. "Skip current subtable number"
-	entry skip: 2. "Skip length of subtable"
-	covHigh := entry nextByte.
-	covLow := entry nextByte.
-
-	"Make sure the format is right (kerning table and format type 0)"
-	((covLow allMask: 2) or: [ covHigh ~= 0 ]) ifTrue: [ ^ false ].
-	"Subtable"
-	^ self processKerningSubTableType0: entry
-]
-
-{ #category : 'processing' }
-TTFontReader >> processMaximumProfileTable: entry [
-
-	nGlyphs := TTFontParser parseMaximumProfile: entry
-]
-
-{ #category : 'processing' }
-TTFontReader >> processNamingTable: entry [
-
-	fontDescription setStrings: (TTFontParser parseNamingTable: entry)
-]
-
-{ #category : 'processing' }
-TTFontReader >> processOSXKerningTable: entry [
-
-	"From Apple's TrueType reference:
-	
-	Previous versions of the 'kern' table defined both the version and nTables fields in the header as UInt16 values and not UInt32 values. Use of the older format on OS X is discouraged (although AAT can sense an old kerning table and still make correct use of it). Microsoft Windows still uses the older format for the 'kern' table and will not recognize the newer one. Fonts targeted for OS X only should use the new format; fonts targeted for both OS X and Windows should use the old format.
-	"
-
-	"Extract the kerning information for pairs of glyphs."
-
-	| version nTables length coverage tupleIndex |
-	version := entry nextULong. "Skip table version"
-	nTables := entry nextULong. "Skip number of sub tables -- we're using the first one only"
-
-	length := entry nextULong. "Skip length of subtable"
-	coverage := entry nextUShort.
-	tupleIndex := entry nextUShort. "Skip tuple index"
-	coverage = 0 ifFalse: [ ^ false ].
-	"Make sure the format is right (kerning table and format type 0)"
-
-	"Subtable"
-	^ self processKerningSubTableType0: entry
-]
-
-{ #category : 'processing' }
-TTFontReader >> processSimpleGlyphContours: nContours from: entry [
-
-	| glyph endPts nPts iLength flags bb bl br bt |
-	glyph := TTGlyph new.
-	bl := entry nextShort.
-	bt := entry nextShort.
-	br := entry nextShort.
-	bb := entry nextShort.
-	glyph
-		boundsLeft: bl
-		boundsRight: br
-		boundsTop: bt
-		boundsBottom: bb.
-	endPts := Array new: nContours.
-	1 to: nContours do: [ :i | endPts at: i put: entry nextUShort ].
-	glyph initializeContours: nContours with: endPts.
-	nContours = 0 ifTrue: [ ^ self ].
-	nPts := endPts last + 1.
-	iLength := entry nextUShort. "instruction length"
-	entry skip: iLength.
-	flags := self getGlyphFlagsFrom: entry size: nPts.
-	self
-		readGlyphXCoords: entry
-		glyph: glyph
-		nContours: nContours
-		flags: flags
-		endPoints: endPts.
-	self
-		readGlyphYCoords: entry
-		glyph: glyph
-		nContours: nContours
-		flags: flags
-		endPoints: endPts.
-	glyph makePointsAbsolute.
-	^ glyph
-]
-
-{ #category : 'processing' }
+{ #category : 'private' }
 TTFontReader >> readFrom: fontData fromOffset: offset [
 
-	| headerEntry maxProfileEntry nameEntry indexLocEntry charMapEntry glyphEntry horzHeaderEntry horzMetricsEntry kerningEntry glyphOffset characterMap numHMetrics indexToLocFormat |
-	"Search the tables required to build the font"
-	(headerEntry := self
-		                getTableDirEntry: 'head'
-		                from: fontData
-		                offset: offset) ifNil: [
-		^ self error: 'This font does not have a header table' ].
-	(maxProfileEntry := self
-		                    getTableDirEntry: 'maxp'
-		                    from: fontData
-		                    offset: offset) ifNil: [
-		^ self error: 'This font does not have a maximum profile table' ].
-	(nameEntry := self
-		              getTableDirEntry: 'name'
-		              from: fontData
-		              offset: offset) ifNil: [
-		^ self error: 'This font does not have a name table' ].
-	(indexLocEntry := self
-		                  getTableDirEntry: 'loca'
-		                  from: fontData
-		                  offset: offset) ifNil: [
-		^ self error: 'This font does not have a relocation table' ].
-	(charMapEntry := self
-		                 getTableDirEntry: 'cmap'
-		                 from: fontData
-		                 offset: offset) ifNil: [
-		^ self error: 'This font does not have a character map table' ].
-	(glyphEntry := self
-		               getTableDirEntry: 'glyf'
-		               from: fontData
-		               offset: offset) ifNil: [
-		^ self error: 'This font does not have a glyph table' ].
-	(horzHeaderEntry := self
-		                    getTableDirEntry: 'hhea'
-		                    from: fontData
-		                    offset: offset) ifNil: [
-		^ self error: 'This font does not have a horizontal header table' ].
-	(horzMetricsEntry := self
-		                     getTableDirEntry: 'hmtx'
-		                     from: fontData
-		                     offset: offset) ifNil: [
-		^ self error: 'This font does not have a horizontal metrics table' ].
-	(kerningEntry := self
-		                 getTableDirEntry: 'kern'
-		                 from: fontData
-		                 offset: offset) ifNil: [ "Transcript cr; show:'This font does not have a kerning table';endEntry"
-		 ].
-	indexToLocFormat := self processFontHeaderTable: headerEntry.
-	self processMaximumProfileTable: maxProfileEntry.
-	self processNamingTable: nameEntry.
-	glyphOffset := self
-		               processIndexToLocationTable: indexLocEntry
-		               format: indexToLocFormat.
-	characterMap := self processCharacterMappingTable: charMapEntry.
+	| tables headData nGlyphs hheaData glyphOffsets glyphs characterMap |
+	tables := self buildTableDirectory: fontData offset: offset.
+
+	"Validate required tables are present"
+	#( 'head' 'maxp' 'name' 'hhea' 'loca' 'cmap' 'glyf' 'hmtx' ) do: [ :tag |
+		(tables includesKey: tag) ifFalse: [
+			self error: 'Missing required TrueType table: ' , tag ] ].
+
+	headData := (TTHeadTableParser on: (tables at: 'head')) process.
+	fontDescription
+		setBounds: (headData at: #bounds)
+		unitsPerEm: (headData at: #units).
+
+	nGlyphs := (TTMaxpTableParser on: (tables at: 'maxp')) process.
+
+	fontDescription setStrings: ((TTNameTableParser on: (tables at: 'name')) process).
+
+	hheaData := (TTHheaTableParser on: (tables at: 'hhea')) process.
+	fontDescription
+		setAscent: (hheaData at: #ascent)
+		descent: (hheaData at: #descent)
+		lineGap: (hheaData at: #lineGap).
+
+	glyphOffsets := (TTLocaTableParser
+		                 on: (tables at: 'loca')
+		                 format: (headData at: #indexToLocFormat)
+		                 nGlyphs: nGlyphs) process.
+
+	characterMap := (TTCmapTableParser on: (tables at: 'cmap')) process.
 	characterMap ifNil: [
 		^ self error: 'This font has no Unicode character mappings' ].
-	self processGlyphDataTable: glyphEntry offsets: glyphOffset.
-	numHMetrics := self processHorizontalHeaderTable: horzHeaderEntry.
-	self
-		processHorizontalMetricsTable: horzMetricsEntry
-		length: numHMetrics.
-	kerningEntry
-		ifNil: [ kernPairs := #(  ) ]
-		ifNotNil: [ self processKerningTable: kerningEntry ].
-	self mapAndStoreGlyphsUsing: characterMap
-	"kernPairs refer to glyph numbers in the .ttf file, not Unicode code points.
-	Remapping is not yet implemented, so kern data is not stored."
-]
 
-{ #category : 'private' }
-TTFontReader >> readGlyphXCoords: entry glyph: glyph nContours: nContours flags: flags endPoints: endPts [
+	glyphs := (TTGlyfTableParser
+		           on: (tables at: 'glyf')
+		           nGlyphs: nGlyphs
+		           offsets: glyphOffsets) process.
 
-	"Read the x coordinates for the given glyph from the font file."
+	(TTHmtxTableParser
+		 on: (tables at: 'hmtx')
+		 glyphs: glyphs
+		 numHMetrics: (hheaData at: #numHMetrics)) process.
 
-	| startPoint endPoint flagBits xValue contour |
-	startPoint := 1.
-	1 to: nContours do: [ :i | 
-		contour := glyph contours at: i.
-		"Get the end point"
-		endPoint := (endPts at: i) + 1.
-		"Store number of points"
-		startPoint to: endPoint do: [ :j | 
-			flagBits := flags at: j.
-			"If bit zero in the flag is set then this point is an on-curve
-			point, if not, then it is an off-curve point."
-			contour controlPointFlags
-				bitAt: j - startPoint + 1
-				put: 1 - (flagBits bitAnd: 1).
-			"First we check to see if bit one is set.  This would indicate that
-			the corresponding coordinate data in the table is 1 byte long.
-			If the bit is not set, then the coordinate data is 2 bytes long."
-			xValue := (flagBits allMask: 2)
-				          ifTrue: [ "one byte"
-					          (flagBits allMask: 16)
-						          ifTrue: [ entry nextByte ]
-						          ifFalse: [ entry nextByte negated ] ]
-				          ifFalse: [ "two byte""If bit four is set, then this coordinate is the same as the
-					last one, so the relative offset (of zero) is stored.  If bit
-					is not set, then read in two bytes and store it as a signed value."
-					          (flagBits allMask: 16)
-						          ifTrue: [ 0 ]
-						          ifFalse: [ entry nextShort ] ].
-			contour points at: j - startPoint + 1 putX: xValue ].
-		startPoint := endPoint + 1 ]
-]
+	"kern is optional — absent in many fonts"
+	(tables at: 'kern' ifAbsent: [ nil ])
+		ifNotNil: [ :e | (TTKernTableParser on: e) process ].
+	"kern pairs refer to glyph indices not Unicode code points; remapping not yet implemented."
 
-{ #category : 'private' }
-TTFontReader >> readGlyphYCoords: entry glyph: glyph nContours: nContours flags: flags endPoints: endPts [
-
-	"Read the y coordinates for the given glyph from the font file."
-
-	| startPoint endPoint flagBits yValue contour |
-	startPoint := 1.
-	1 to: nContours do: [ :i | 
-		contour := glyph contours at: i.
-		"Get the end point"
-		endPoint := (endPts at: i) + 1.
-		"Store number of points"
-		startPoint to: endPoint do: [ :j | 
-			flagBits := flags at: j.
-			"Check if this value one or two byte encoded"
-			yValue := (flagBits allMask: 4)
-				          ifTrue: [ "one byte"
-					          (flagBits allMask: 32)
-						          ifTrue: [ entry nextByte ]
-						          ifFalse: [ entry nextByte negated ] ]
-				          ifFalse: [ "two byte"
-					          (flagBits allMask: 32)
-						          ifTrue: [ 0 ]
-						          ifFalse: [ entry nextShort ] ].
-			contour points at: j - startPoint + 1 putY: yValue ].
-		startPoint := endPoint + 1 ]
+	self mapAndStoreGlyphsUsing: characterMap glyphs: glyphs
 ]
 
 { #category : 'public' }
 TTFontReader >> readTTFFrom: aByteArray [
-
-	"Read the raw font byte data"
 
 	fontDescription := TTFontDescription new.
 	self readFrom: aByteArray fromOffset: 0.
