@@ -41,8 +41,8 @@ VectorEngineWholePixelTest >> testStrokeWritesNonZeroPixels [
 		strokeWidth: 3.0
 		color: Color black
 		do: [
-			engine abs_MoveToX: 5 y: 25.
-			engine abs_LineToX: 45 y: 25 ].
+			engine abs_MoveTo: 5 @ 25.
+			engine abs_LineTo: 45 @ 25 ].
 	pixelsAfter := form bits.
 	changed := false.
 	1 to: pixelsAfter size do: [ :i |

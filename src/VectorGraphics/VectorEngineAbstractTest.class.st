@@ -18,8 +18,8 @@ VectorEngineAbstractTest >> testClosePathRestoresFirstPoint [
 	| engine capturedX capturedY |
 	engine := self engineOnSmallForm.
 	engine strokeWidth: 2.0 color: Color black do: [
-		engine abs_MoveToX: 10 y: 20.
-		engine abs_LineToX: 40 y: 45.
+		engine abs_MoveTo: 10 @ 20.
+		engine abs_LineTo: 40 @ 45.
 		engine do_ClosePath.
 		capturedX := engine instVarNamed: 'previousCallX'.
 		capturedY := engine instVarNamed: 'previousCallY' ].
@@ -33,7 +33,7 @@ VectorEngineAbstractTest >> testInitializePathResetsState [
 	| engine pathFirstX pathFirstY pathCurrentX pathCurrentY prevX prevY |
 	engine := self engineOnSmallForm.
 	engine strokeWidth: 2.0 color: Color black do: [
-		engine abs_MoveToX: 33 y: 44.
+		engine abs_MoveTo: 33 @ 44.
 		engine initializePath.
 		pathFirstX := engine instVarNamed: 'pathFirstX'.
 		pathFirstY := engine instVarNamed: 'pathFirstY'.
@@ -55,8 +55,8 @@ VectorEngineAbstractTest >> testLineToUpdatesCurrentPoint [
 	| engine capturedX capturedY |
 	engine := self engineOnSmallForm.
 	engine strokeWidth: 2.0 color: Color black do: [
-		engine abs_MoveToX: 5 y: 5.
-		engine abs_LineToX: 40 y: 30.
+		engine abs_MoveTo: 5 @ 5.
+		engine abs_LineTo: 40 @ 30.
 		capturedX := engine instVarNamed: 'pathCurrentX'.
 		capturedY := engine instVarNamed: 'pathCurrentY' ].
 	self assert: capturedX equals: 40.
@@ -69,7 +69,7 @@ VectorEngineAbstractTest >> testMoveToSetsAllPathState [
 	| engine pathFirstX pathFirstY pathCurrentX pathCurrentY prevX prevY |
 	engine := self engineOnSmallForm.
 	engine strokeWidth: 2.0 color: Color black do: [
-		engine abs_MoveToX: 10 y: 20.
+		engine abs_MoveTo: 10 @ 20.
 		pathFirstX := engine instVarNamed: 'pathFirstX'.
 		pathFirstY := engine instVarNamed: 'pathFirstY'.
 		pathCurrentX := engine instVarNamed: 'pathCurrentX'.
@@ -90,9 +90,9 @@ VectorEngineAbstractTest >> testMultipleMoveToUpdatesFirstPoint [
 	| engine capturedFirstX capturedFirstY |
 	engine := self engineOnSmallForm.
 	engine strokeWidth: 2.0 color: Color black do: [
-		engine abs_MoveToX: 10 y: 20.
-		engine abs_LineToX: 30 y: 30.
-		engine abs_MoveToX: 45 y: 48.
+		engine abs_MoveTo: 10 @ 20.
+		engine abs_LineTo: 30 @ 30.
+		engine abs_MoveTo: 45 @ 48.
 		capturedFirstX := engine instVarNamed: 'pathFirstX'.
 		capturedFirstY := engine instVarNamed: 'pathFirstY' ].
 	self assert: capturedFirstX equals: 45.
@@ -105,8 +105,8 @@ VectorEngineAbstractTest >> testRelativeLineAddsToCurrentPoint [
 	| engine capturedX capturedY |
 	engine := self engineOnSmallForm.
 	engine strokeWidth: 2.0 color: Color black do: [
-		engine abs_MoveToX: 10 y: 10.
-		engine rel_LineToX: 20 y: 15.
+		engine abs_MoveTo: 10 @ 10.
+		engine rel_LineTo: 20 @ 15.
 		capturedX := engine instVarNamed: 'pathCurrentX'.
 		capturedY := engine instVarNamed: 'pathCurrentY' ].
 	self assert: capturedX equals: 30.

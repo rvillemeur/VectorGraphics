@@ -34,7 +34,7 @@ TTHmtxTableParser class >> on: anEntry glyphs: glyphsArray numHMetrics: n [
 { #category : 'initialization' }
 TTHmtxTableParser >> initWithEntry: anEntry glyphs: glyphsArray numHMetrics: n [
 
-	super initWithEntry: anEntry.
+	entry := anEntry.
 	glyphs := glyphsArray.
 	numHMetrics := n
 ]

@@ -31,7 +31,7 @@ TTLocaTableParser class >> on: anEntry format: aFormat nGlyphs: n [
 { #category : 'initialization' }
 TTLocaTableParser >> initWithEntry: anEntry format: aFormat nGlyphs: n [
 
-	super initWithEntry: anEntry.
+	entry := anEntry.
 	format := aFormat.
 	nGlyphs := n
 ]

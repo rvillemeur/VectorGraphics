@@ -27,7 +27,7 @@ automatically when rendering glyphs).
 
 Example:
   (VectorCanvas onForm: Display) strokeWidth: 1.0 color: Color black do: [ :c |
-      c abs_MoveToX: 10 y: 10; abs_LineToX: 100 y: 100 ].
+      c abs_MoveTo: 10 @ 10; abs_LineTo: 100 @ 100 ].
   Display forceToScreen
 "
 Class {
@@ -73,23 +73,14 @@ VectorCanvas >> cubicBezier: points [
 	control1 := points second.
 	control2 := points third.
 	end := points fourth.
-	engine abs_MoveToX: start x y: start y.
-	engine
-		abs_CubicBezierToX: end x y: end y
-		control1X: control1 x y: control1 y
-		control2X: control2 x y: control2 y
+	engine abs_MoveTo: start.
+	engine abs_CubicBezierTo: end control1: control1 control2: control2
 ]
 
 { #category : 'paths' }
 VectorCanvas >> curveToX: xTo y: yTo control1X: xC1 y: yC1 control2X: xC2 y: yC2 [
 
-	engine
-		abs_CubicBezierToX: xTo
-		y: yTo
-		control1X: xC1
-		y: yC1
-		control2X: xC2
-		y: yC2
+	engine abs_CubicBezierTo: xTo @ yTo control1: xC1 @ yC1 control2: xC2 @ yC2
 ]
 
 { #category : 'private' }
@@ -211,11 +202,7 @@ VectorCanvas >> drawUtf8: aByteArray at: aPoint font: aTrueTypeFont color: aColo
 { #category : 'paths' }
 VectorCanvas >> ellipseCenterX: mcx y: mcy rx: mrx ry: mry [
 
-	engine
-		abs_EllipseCenterX: mcx
-		y: mcy
-		radiusX: mrx
-		radiusY: mry
+	engine abs_EllipseCenter: mcx @ mcy radiusX: mrx radiusY: mry
 ]
 
 { #category : 'drawing - FormCanvas protocol' }
@@ -294,8 +281,8 @@ VectorCanvas >> fillRectangle: aRectangle color: aColor borderWidth: morphStroke
 	brColor ifNotNil: [ 
 		self strokeWidth: morphStrokeWidth color: brColor do: [ 
 			self moveToX: aRectangle left + d1 y: aRectangle bottom - d2.
-			self lineToX: aRectangle right - d2 y: aRectangle bottom - d2.
-			self lineToX: aRectangle right - d2 y: aRectangle top + d1 ] ]
+			self lineToX: (aRectangle right - d2) y: (aRectangle bottom - d2).
+			self lineToX: (aRectangle right - d2) y: (aRectangle top + d1) ] ]
 ]
 
 { #category : 'drawing - FormCanvas protocol' }
@@ -358,13 +345,13 @@ VectorCanvas >> line: pt1 to: pt2 width: morphStrokeWidth color: aStrokeColor [
 { #category : 'paths' }
 VectorCanvas >> lineToX: xTo y: yTo [
 
-	engine abs_LineToX: xTo y: yTo
+	engine abs_LineTo: xTo @ yTo
 ]
 
 { #category : 'paths' }
 VectorCanvas >> moveToX: x y: y [
 
-	engine abs_MoveToX: x y: y
+	engine abs_MoveTo: x @ y
 ]
 
 { #category : 'paths - sequences' }
@@ -372,25 +359,23 @@ VectorCanvas >> multiArc: coordinatesAreRelative rs: rs xAxisRotations: xAxisRot
 
 	| to r |
 	coordinatesAreRelative
-		ifFalse: [ 
-			1 to: toPoints size do: [ :i | 
+		ifFalse: [
+			1 to: toPoints size do: [ :i |
 				to := toPoints at: i.
 				r := rs at: i.
 				engine
-					abs_ArcToX: to x
-					y: to y
+					abs_ArcTo: to
 					radiusX: r x
 					radiusY: r y
 					angleOfXAxis: (xAxisRotations at: i)
 					largeFlag: (doLargerArcs at: i)
 					sweepFlag: (useIncreasingAngless at: i) ] ]
-		ifTrue: [ 
-			1 to: toPoints size do: [ :i | 
+		ifTrue: [
+			1 to: toPoints size do: [ :i |
 				to := toPoints at: i.
 				r := rs at: i.
 				engine
-					rel_ArcToX: to x
-					y: to y
+					rel_ArcTo: to
 					radiusX: r x
 					radiusY: r y
 					angleOfXAxis: (xAxisRotations at: i)
@@ -403,30 +388,18 @@ VectorCanvas >> multiCurveTo: coordinatesAreRelative toPoints: toPoints control1
 
 	| c1 c2 to |
 	coordinatesAreRelative
-		ifFalse: [ 
-			1 to: toPoints size do: [ :i | 
+		ifFalse: [
+			1 to: toPoints size do: [ :i |
 				to := toPoints at: i.
 				c1 := control1Points at: i.
 				c2 := control2Points at: i.
-				engine
-					abs_CubicBezierToX: to x
-					y: to y
-					control1X: c1 x
-					y: c1 y
-					control2X: c2 x
-					y: c2 y ] ]
-		ifTrue: [ 
-			1 to: toPoints size do: [ :i | 
+				engine abs_CubicBezierTo: to control1: c1 control2: c2 ] ]
+		ifTrue: [
+			1 to: toPoints size do: [ :i |
 				to := toPoints at: i.
 				c1 := control1Points at: i.
 				c2 := control2Points at: i.
-				engine
-					rel_CubicBezierToX: to x
-					y: to y
-					control1X: c1 x
-					y: c1 y
-					control2X: c2 x
-					y: c2 y ] ]
+				engine rel_CubicBezierTo: to control1: c1 control2: c2 ] ]
 ]
 
 { #category : 'paths - sequences' }
@@ -434,24 +407,16 @@ VectorCanvas >> multiCurveToSmooth: coordinatesAreRelative toPoints: toPoints co
 
 	| c2 to |
 	coordinatesAreRelative
-		ifFalse: [ 
-			1 to: toPoints size do: [ :i | 
+		ifFalse: [
+			1 to: toPoints size do: [ :i |
 				to := toPoints at: i.
 				c2 := control2Points at: i.
-				engine
-					abs_CubicBezierSmoothToX: to x
-					y: to y
-					control2X: c2 x
-					y: c2 y ] ]
-		ifTrue: [ 
-			1 to: toPoints size do: [ :i | 
+				engine abs_CubicBezierSmoothTo: to control2: c2 ] ]
+		ifTrue: [
+			1 to: toPoints size do: [ :i |
 				to := toPoints at: i.
 				c2 := control2Points at: i.
-				engine
-					rel_CubicBezierSmoothToX: to x
-					y: to y
-					control2X: c2 x
-					y: c2 y ] ]
+				engine rel_CubicBezierSmoothTo: to control2: c2 ] ]
 ]
 
 { #category : 'paths - sequences' }
@@ -459,14 +424,14 @@ VectorCanvas >> multiLineTo: coordinatesAreRelative points: toPoints [
 
 	| to |
 	coordinatesAreRelative
-		ifFalse: [ 
-			1 to: toPoints size do: [ :i | 
+		ifFalse: [
+			1 to: toPoints size do: [ :i |
 				to := toPoints at: i.
-				engine abs_LineToX: to x y: to y ] ]
-		ifTrue: [ 
-			1 to: toPoints size do: [ :i | 
+				engine abs_LineTo: to ] ]
+		ifTrue: [
+			1 to: toPoints size do: [ :i |
 				to := toPoints at: i.
-				engine rel_LineToX: to x y: to y ] ]
+				engine rel_LineTo: to ] ]
 ]
 
 { #category : 'paths - sequences' }
@@ -474,7 +439,7 @@ VectorCanvas >> multiLineTo: coordinatesAreRelative xs: xs [
 
 	coordinatesAreRelative
 		ifFalse: [ xs do: [ :x | engine abs_LineToX: x ] ]
-		ifTrue: [ xs do: [ :x | engine rel_LineToX: x y: 0 ] ]
+		ifTrue: [ xs do: [ :x | engine rel_LineTo: x @ 0 ] ]
 ]
 
 { #category : 'paths - sequences' }
@@ -482,7 +447,7 @@ VectorCanvas >> multiLineTo: coordinatesAreRelative ys: ys [
 
 	coordinatesAreRelative
 		ifFalse: [ ys do: [ :y | engine abs_LineToY: y ] ]
-		ifTrue: [ ys do: [ :y | engine rel_LineToX: 0 y: y ] ]
+		ifTrue: [ ys do: [ :y | engine rel_LineTo: 0 @ y ] ]
 ]
 
 { #category : 'paths - sequences' }
@@ -491,17 +456,17 @@ VectorCanvas >> multiMoveTo: coordinatesAreRelative points: points [
 	| isFirst |
 	isFirst := true.
 	coordinatesAreRelative
-		ifFalse: [ 
-			points do: [ :p | 
+		ifFalse: [
+			points do: [ :p |
 				isFirst
-					ifTrue: [ engine abs_MoveToX: p x y: p y ]
-					ifFalse: [ engine abs_LineToX: p x y: p y ].
+					ifTrue: [ engine abs_MoveTo: p ]
+					ifFalse: [ engine abs_LineTo: p ].
 				isFirst := false ] ]
-		ifTrue: [ 
-			points do: [ :p | 
+		ifTrue: [
+			points do: [ :p |
 				isFirst
-					ifTrue: [ engine rel_MoveToX: p x y: p y ]
-					ifFalse: [ engine rel_LineToX: p x y: p y ].
+					ifTrue: [ engine rel_MoveTo: p ]
+					ifFalse: [ engine rel_LineTo: p ].
 				isFirst := false ] ]
 ]
 
@@ -510,24 +475,16 @@ VectorCanvas >> multiQuadraticCurveTo: coordinatesAreRelative toPoints: toPoints
 
 	| c to |
 	coordinatesAreRelative
-		ifFalse: [ 
-			1 to: toPoints size do: [ :i | 
+		ifFalse: [
+			1 to: toPoints size do: [ :i |
 				to := toPoints at: i.
 				c := controlPoints at: i.
-				engine
-					abs_QuadraticBezierToX: to x
-					y: to y
-					controlX: c x
-					y: c y ] ]
-		ifTrue: [ 
-			1 to: toPoints size do: [ :i | 
+				engine abs_QuadraticBezierTo: to control: c ] ]
+		ifTrue: [
+			1 to: toPoints size do: [ :i |
 				to := toPoints at: i.
 				c := controlPoints at: i.
-				engine
-					rel_QuadraticBezierToX: to x
-					y: to y
-					controlX: c x
-					y: c y ] ]
+				engine rel_QuadraticBezierTo: to control: c ] ]
 ]
 
 { #category : 'paths - sequences' }
@@ -535,25 +492,21 @@ VectorCanvas >> multiQuadraticCurveToSmooth: coordinatesAreRelative toPoints: to
 
 	| to |
 	coordinatesAreRelative
-		ifFalse: [ 
-			1 to: toPoints size do: [ :i | 
+		ifFalse: [
+			1 to: toPoints size do: [ :i |
 				to := toPoints at: i.
-				engine abs_QuadraticBezierSmoothToX: to x y: to y ] ]
-		ifTrue: [ 
-			1 to: toPoints size do: [ :i | 
+				engine abs_QuadraticBezierSmoothTo: to ] ]
+		ifTrue: [
+			1 to: toPoints size do: [ :i |
 				to := toPoints at: i.
-				engine rel_QuadraticBezierSmoothToX: to x y: to y ] ]
+				engine rel_QuadraticBezierSmoothTo: to ] ]
 ]
 
 { #category : 'paths' }
 VectorCanvas >> polyLine: points [
 
-	| p |
-	p := points first.
-	engine abs_MoveToX: p x y: p y.
-	2 to: points size do: [ :i | 
-		p := points at: i.
-		engine abs_LineToX: p x y: p y ]
+	engine abs_MoveTo: points first.
+	2 to: points size do: [ :i | engine abs_LineTo: (points at: i) ]
 ]
 
 { #category : 'paths' }
@@ -562,26 +515,18 @@ VectorCanvas >> quadraticBezier: points [
 	"points must be of size 3
 	http://en.wikipedia.org/wiki/Bezier_curve"
 
-	| start control end |
-	start := points first.
-	control := points second.
-	end := points third.
-	engine abs_MoveToX: start x y: start y.
-	engine
-		abs_QuadraticBezierToX: end x
-		y: end y
-		controlX: control x
-		y: control y
+	engine abs_MoveTo: points first.
+	engine abs_QuadraticBezierTo: points third control: points second
 ]
 
 { #category : 'paths' }
 VectorCanvas >> rectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax [
 
 	engine
-		abs_MoveToX: xMin y: yMin;
-		abs_LineToX: xMax y: yMin;
-		abs_LineToX: xMax y: yMax;
-		abs_LineToX: xMin y: yMax;
+		abs_MoveTo: xMin @ yMin;
+		abs_LineTo: xMax @ yMin;
+		abs_LineTo: xMax @ yMax;
+		abs_LineTo: xMin @ yMax;
 		do_ClosePath
 ]
 
@@ -614,20 +559,12 @@ VectorCanvas >> roundBottomRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax 
 	useIncreasingAngles := true.
 	"
 	engine
-		abs_MoveToX: corner1 x y: corner1 y;
-		abs_LineToX: corner2 x y: corner2 y;
-		abs_LineToX: p5 x y: p5 y;
-		"		abs_ArcToX: p6 x y: p6 y radiusX: rx radiusY: ry angleOfXAxis: phi largeFlag: doLargerArc sweepFlag: useIncreasingAngles;"
-		abs_QuadraticBezierToX: p6 x
-		y: p6 y
-		controlX: corner3 x
-		y: corner3 y;
-		abs_LineToX: p7 x y: p7 y;
-		"		abs_ArcToX: p8 x y: p8 y radiusX: rx radiusY: ry angleOfXAxis: phi largeFlag: doLargerArc sweepFlag: useIncreasingAngles;"
-		abs_QuadraticBezierToX: p8 x
-		y: p8 y
-		controlX: corner4 x
-		y: corner4 y;
+		abs_MoveTo: corner1;
+		abs_LineTo: corner2;
+		abs_LineTo: p5;
+		abs_QuadraticBezierTo: p6 control: corner3;
+		abs_LineTo: p7;
+		abs_QuadraticBezierTo: p8 control: corner4;
 		do_ClosePath
 ]
 
@@ -680,30 +617,14 @@ VectorCanvas >> roundRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax rx: mr
 	useIncreasingAngles := true.
 	"
 	engine
-		abs_MoveToX: p1 x y: p1 y;
-		"		abs_ArcToX: p2 x y: p2 y radiusX: rx radiusY: ry angleOfXAxis: phi largeFlag: doLargerArc sweepFlag: useIncreasingAngles;"
-		abs_QuadraticBezierToX: p2 x
-		y: p2 y
-		controlX: corner1 x
-		y: corner1 y;
-		abs_LineToX: p3 x y: p3 y;
-		"		abs_ArcToX: p4 x y: p4 y radiusX: rx radiusY: ry angleOfXAxis: phi largeFlag: doLargerArc sweepFlag: useIncreasingAngles;"
-		abs_QuadraticBezierToX: p4 x
-		y: p4 y
-		controlX: corner2 x
-		y: corner2 y;
-		abs_LineToX: p5 x y: p5 y;
-		"		abs_ArcToX: p6 x y: p6 y radiusX: rx radiusY: ry angleOfXAxis: phi largeFlag: doLargerArc sweepFlag: useIncreasingAngles;"
-		abs_QuadraticBezierToX: p6 x
-		y: p6 y
-		controlX: corner3 x
-		y: corner3 y;
-		abs_LineToX: p7 x y: p7 y;
-		"		abs_ArcToX: p8 x y: p8 y radiusX: rx radiusY: ry angleOfXAxis: phi largeFlag: doLargerArc sweepFlag: useIncreasingAngles;"
-		abs_QuadraticBezierToX: p8 x
-		y: p8 y
-		controlX: corner4 x
-		y: corner4 y;
+		abs_MoveTo: p1;
+		abs_QuadraticBezierTo: p2 control: corner1;
+		abs_LineTo: p3;
+		abs_QuadraticBezierTo: p4 control: corner2;
+		abs_LineTo: p5;
+		abs_QuadraticBezierTo: p6 control: corner3;
+		abs_LineTo: p7;
+		abs_QuadraticBezierTo: p8 control: corner4;
 		do_ClosePath
 ]
 
@@ -736,20 +657,12 @@ VectorCanvas >> roundTopRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax rx:
 	useIncreasingAngles := true.
 	"
 	engine
-		abs_MoveToX: p1 x y: p1 y;
-		"		abs_ArcToX: p2 x y: p2 y radiusX: rx radiusY: ry angleOfXAxis: phi largeFlag: doLargerArc sweepFlag: useIncreasingAngles;"
-		abs_QuadraticBezierToX: p2 x
-		y: p2 y
-		controlX: corner1 x
-		y: corner1 y;
-		abs_LineToX: p3 x y: p3 y;
-		"		abs_ArcToX: p4 x y: p4 y radiusX: rx radiusY: ry angleOfXAxis: phi largeFlag: doLargerArc sweepFlag: useIncreasingAngles;"
-		abs_QuadraticBezierToX: p4 x
-		y: p4 y
-		controlX: corner2 x
-		y: corner2 y;
-		abs_LineToX: corner3 x y: corner3 y;
-		abs_LineToX: corner4 x y: corner4 y;
+		abs_MoveTo: p1;
+		abs_QuadraticBezierTo: p2 control: corner1;
+		abs_LineTo: p3;
+		abs_QuadraticBezierTo: p4 control: corner2;
+		abs_LineTo: corner3;
+		abs_LineTo: corner4;
 		do_ClosePath
 ]
 

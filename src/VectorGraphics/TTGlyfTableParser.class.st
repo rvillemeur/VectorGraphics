@@ -38,7 +38,7 @@ TTGlyfTableParser class >> on: anEntry nGlyphs: n offsets: offsetArray [
 { #category : 'initialization' }
 TTGlyfTableParser >> initWithEntry: anEntry nGlyphs: n offsets: offsetArray [
 
-	super initWithEntry: anEntry.
+	entry := anEntry.
 	nGlyphs := n.
 	glyphOffsets := offsetArray
 ]
