@@ -34,19 +34,19 @@ SVGPathParser class >> parse: aString [
 	currentCmd := nil.
 	numStr := ''.
 	aString do: [ :c |
-		c isLetter
-			ifTrue: [
-				currentCmd notNil ifTrue: [
-					commands add: (PathCommand
-						from: currentCmd
-						stream: (SVGNumberStream on: (self parseNumbers: numStr))) ].
-				currentCmd := c.
-				numStr := '' ]
-			ifFalse: [ numStr := numStr , (String with: c) ] ].
-	currentCmd notNil ifTrue: [
-		commands add: (PathCommand
-			from: currentCmd
-			stream: (SVGNumberStream on: (self parseNumbers: numStr))) ].
+			c isLetter
+				ifTrue: [
+						currentCmd ifNotNil: [
+								commands add: (PathCommand
+										 from: currentCmd
+										 stream: (SVGNumberStream on: (self parseNumbers: numStr))) ].
+						currentCmd := c.
+						numStr := '' ]
+				ifFalse: [ numStr := numStr , (String with: c) ] ].
+	currentCmd ifNotNil: [
+			commands add: (PathCommand
+					 from: currentCmd
+					 stream: (SVGNumberStream on: (self parseNumbers: numStr))) ].
 	^ commands
 ]
 

@@ -676,23 +676,16 @@ VectorCanvas >> runPathCommands: aCollection [
 VectorCanvas >> setClipRect: aRectangle [
 
 	"In targetForm coordinates"
-
-	super setClipRect: aRectangle.
 	engine clipRect: aRectangle
 ]
 
 { #category : 'private' }
 VectorCanvas >> setForm: aForm [
 
-	"
-	World extent: World extent
-	"
-
 	aForm depth = 32 ifFalse: [ 
 		self error: 'VectorCanvas can only work on 32 bit destination' ].
 	form := aForm.
 	engine := VectorEngineWholePixel onForm: form.
-	"self newClipRect: nil"
 ]
 
 { #category : 'context and parameters for path' }
