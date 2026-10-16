@@ -57,12 +57,37 @@ Class {
 	#tag : 'TrueType'
 }
 
+{ #category : 'constants' }
+TTFontDescription class >> highestCodePointShownInInspector [
+	"The scan the glyph map view runs goes up to here. The map is four levels deep, which covers
+	 the whole of Unicode, but the Basic Multilingual Plane is what a .ttf of this kind maps."
+
+	^ 16rFFFF
+]
+
 { #category : 'class initialization' }
 TTFontDescription class >> initialize [
 
 	"	TTFontDescription initialize 	"
 
 	Descriptions := nil
+]
+
+{ #category : 'constants' }
+TTFontDescription class >> isSurrogateCodePoint: aCodePoint [
+	"A surrogate carries no character of its own and has no UTF-8 encoding: asking for one raises
+	 ZnInvalidUTF8, so a scan over code points has to step over this block."
+
+	^ aCodePoint between: 16rD800 and: 16rDFFF
+]
+
+{ #category : 'constants' }
+TTFontDescription class >> isUtf8ContinuationByte: aByte [
+	"A continuation byte carries no code point of its own. A walker that lost its place - because
+	 the byte that started the sequence had no entry in the map - has to skip these, or each one
+	 draws a glyph of its own."
+
+	^ (aByte bitAnd: self utf8ContinuationByteMask) = self utf8ContinuationBytePrefix
 ]
 
 { #category : 'instance creation' }
@@ -84,6 +109,29 @@ TTFontDescription class >> read: aDirectoryEntry [
 			readFamilyNames add: ttf familyName ]
 		matches: [ :file | '*.ttf' match: file name ].
 	^ readFamilyNames
+]
+
+{ #category : 'constants' }
+TTFontDescription class >> unknownGlyphContourDataPosition [
+	"Where the unknown glyph's record sits in contourDataForUtf8. Whoever walks
+	 contourDataIndexesByUtf8 and finds no entry for a code point reads this position instead, so
+	 the map needs no slot of its own for a code point the font does not map."
+
+	^ 1
+]
+
+{ #category : 'constants' }
+TTFontDescription class >> utf8ContinuationByteMask [
+	"The bits that tell a UTF-8 continuation byte from the byte that starts a code point."
+
+	^ 2r11000000
+]
+
+{ #category : 'constants' }
+TTFontDescription class >> utf8ContinuationBytePrefix [
+	"What those bits hold in every byte that continues a code point: 10xxxxxx."
+
+	^ 2r10000000
 ]
 
 { #category : 'instance accessing' }
@@ -156,15 +204,14 @@ TTFontDescription >> contourDataIndexesByUtf8 [
 	^ contourDataIndexesByUtf8
 ]
 
-{ #category : 'private' }
+{ #category : 'glyph access' }
 TTFontDescription >> contourDataPositionForByte1: b1 byte2: b2 byte3: b3 byte4: b4 [
-
 	| i |
 	i := contourDataIndexesByUtf8 at: b1 + 1.
 	b2 notNil ifTrue: [ i := contourDataIndexesByUtf8 at: i negated + b2 + 1 ].
 	b3 notNil ifTrue: [ i := contourDataIndexesByUtf8 at: i negated + b3 + 1 ].
 	b4 notNil ifTrue: [ i := contourDataIndexesByUtf8 at: i negated + b4 + 1 ].
-	i = 0 ifTrue: [ i := 1 ].
+	i = 0 ifTrue: [ i := self class unknownGlyphContourDataPosition ].
 	^ i
 ]
 
@@ -326,16 +373,19 @@ TTFontDescription >> fullName [
 	^ fullName
 ]
 
-{ #category : 'private-initialization' }
+{ #category : 'glyph access' }
 TTFontDescription >> glyphsByUtf8Bytes: glyphsByUTF8 unknownGlyph: theUnknownGlyph [
-
 	| mGlyph |
 	mGlyph := glyphsByUTF8 at: $M codePoint + 1.
 	letterMTopSideBearing := (mGlyph ifNil: [ theUnknownGlyph ]) topSideBearing.
-
 	contourDataIndexesByUtf8 := (IntegerArray new: 256) as: OrderedCollection.
 	contourDataForUtf8 := Float32Array streamContents: [ :stream |
-		theUnknownGlyph addContourDataTo: stream tx: nil. "First data is for unknownGlyph"
+		"The unknown glyph needs its whole record, header included: it sits at
+		 unknownGlyphContourDataPosition, and every reader of a position - the engine's draw loop,
+		 widthOfUtf8Byte1:byte2:byte3:byte4: - reads an advance width, four bounds and a contour
+		 count before the contours. addContourDataTo:tx: writes the contours alone, so a code point
+		 that fell back to this position read the first contour's bezier count as an advance width."
+		theUnknownGlyph addContourDataTo: stream.
 		self
 			appendGlyphDataTo: stream
 			glyphsArray: glyphsByUTF8
@@ -352,6 +402,85 @@ TTFontDescription >> includesAscii [
 
 	^ (33 to: 127) allSatisfy: [ :codePoint |
 		  (contourDataIndexesByUtf8 at: codePoint + 1) > 1 ]
+]
+
+{ #category : 'inspector' }
+TTFontDescription >> inspectorGlyphMap [
+	<inspectorPresentationOrder: 30 title: 'Glyph map'>
+	"Every code point this font maps, with the position its record sits at, the advance width read
+	 from that record and the number of contours. A code point absent from the table is answered the
+	 unknown glyph."
+
+	^ SpTablePresenter new
+		  addColumn: ((SpStringTableColumn title: 'Code point' evaluated: [ :each |
+					    '16r' , each key printStringHex ]) width: 90);
+		  addColumn: ((SpStringTableColumn title: 'Character' evaluated: [ :each |
+					    (Character value: each key) asString ]) width: 70);
+		  addColumn: ((SpStringTableColumn title: 'Position' evaluated: [ :each |
+					    each value printString ]) width: 70);
+		  addColumn: (SpStringTableColumn title: 'Advance width' evaluated: [ :each |
+				   (contourDataForUtf8 at: each value) printString ]);
+		  addColumn: (SpStringTableColumn title: 'Contours' evaluated: [ :each |
+				   (contourDataForUtf8 at: each value + 5) asInteger printString ]);
+		  items: self inspectorGlyphMapEntries;
+		  yourself
+]
+
+{ #category : 'inspector' }
+TTFontDescription >> inspectorGlyphMapEntries [
+	"One association per code point the map answers a glyph record for: code point -> position.
+	 The scan asks contourDataPositionForByte1:byte2:byte3:byte4: for every code point, so the view
+	 shows what the map really answers and cannot drift from the walk the engine does."
+
+	| entries |
+	entries := OrderedCollection new.
+	0 to: self class highestCodePointShownInInspector do: [ :codePoint |
+		(self class isSurrogateCodePoint: codePoint) ifFalse: [
+			| bytes position |
+			bytes := (Character value: codePoint) asString utf8Encoded.
+			position := self
+				            contourDataPositionForByte1: (bytes at: 1)
+				            byte2: (bytes size > 1 ifTrue: [ bytes at: 2 ])
+				            byte3: (bytes size > 2 ifTrue: [ bytes at: 3 ])
+				            byte4: (bytes size > 3 ifTrue: [ bytes at: 4 ]).
+			position > self class unknownGlyphContourDataPosition ifTrue: [
+				entries add: codePoint -> position ] ] ].
+	^ entries asArray
+]
+
+{ #category : 'inspector' }
+TTFontDescription >> inspectorMapDensity [
+	<inspectorPresentationOrder: 40 title: 'Map density'>
+	"What the map costs, measured rather than described: the mapped code points against the floats
+	 and index entries they need, and against what one slot per code point of the whole Basic
+	 Multilingual Plane would need. The reader stores a slot only for a code point the font maps,
+	 and this view is where that shows."
+
+	| mapped floats |
+	mapped := self inspectorGlyphMapEntries size.
+	floats := contourDataForUtf8 size.
+	^ SpTextPresenter new
+		  text: (String streamContents: [ :stream |
+					   stream
+						   nextPutAll: 'mapped code points: ';
+						   print: mapped;
+						   cr;
+						   nextPutAll: 'distinct glyph records: ';
+						   print: (self inspectorGlyphMapEntries collect: [ :each | each value ]) asSet size;
+						   cr;
+						   nextPutAll: 'contour data floats: ';
+						   print: floats;
+						   nextPutAll: ' (';
+						   print: floats * 4;
+						   nextPutAll: ' bytes)';
+						   cr;
+						   nextPutAll: 'index entries: ';
+						   print: contourDataIndexesByUtf8 size;
+						   cr;
+						   nextPutAll: 'floats per mapped code point: ';
+						   print: (mapped = 0 ifTrue: [ 0 ] ifFalse: [ (floats / mapped) asFloat roundTo: 0.01 ]) ]);
+		  beNotEditable;
+		  yourself
 ]
 
 { #category : 'testing' }

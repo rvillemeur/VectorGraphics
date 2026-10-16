@@ -58,40 +58,48 @@ TTFontReader >> buildTableDirectory: fontData offset: anOffset [
 ]
 
 { #category : 'private' }
+TTFontReader >> codePointsToMapIn: characterMap [
+	"The code points worth asking a glyph for: the ones with an entry of their own, plus the
+	 substitution sources, which reach a glyph through another code point and so hold zero in
+	 the map. Everything else resolves to the unknown glyph, and storing it would copy that
+	 glyph's contour data once per unmapped code point."
+
+	| codePoints |
+	codePoints := OrderedCollection new.
+	1 to: characterMap size do: [ :index |
+		(characterMap at: index) = 0 ifFalse: [ codePoints add: index - 1 ] ].
+	codePoints addAll: TTFontParser glyphSubstitutions keys.
+	^ codePoints
+]
+
+{ #category : 'private' }
 TTFontReader >> mapAndStoreGlyphsUsing: characterMap glyphs: glyphs [
+	"Build the UTF-8 to glyph map and store it in fontDescription.
+	 Only the code points the font really maps get a slot. Storing the unknown glyph for the
+	 rest would write a copy of its contour data for every code point of the character map:
+	 65536 copies for a font of a hundred glyphs. A code point with no slot is answered the
+	 unknown glyph's position by
+	 TTFontDescription >> contourDataPositionForByte1:byte2:byte3:byte4: instead."
 
-	"Build the UTF-8 → glyph map and store it in fontDescription.
-	https://developer.apple.com/fonts/TrueType-Reference-Manual/RM07/appendixB.html"
-
-	| glyphsByUTF8 unknownGlyph spaceGlyph mapSize |
+	| glyphsByUtf8 unknownGlyph spaceGlyph |
 	unknownGlyph := glyphs first.
-	mapSize := characterMap size.
-	glyphsByUTF8 := Array new: 256.
-	0 to: mapSize - 1 do: [ :codePoint |
-		| g array prevByte |
-		g := TTFontParser
-			     selectGlyphFor: codePoint
-			     from: characterMap
-			     glyphs: glyphs
-			     unknownGlyph: unknownGlyph.
-		array := glyphsByUTF8.
-		prevByte := nil.
-		Character
-			evaluate: [ :byte |
-				prevByte notNil ifTrue: [
-					array := (array at: prevByte + 1) ifNil: [
-						         array at: prevByte + 1 put: (Array new: 256) ] ].
-				prevByte := byte ]
-			withUtf8BytesOf: codePoint.
-		array at: prevByte + 1 put: g.
-		codePoint = 32 ifTrue: [ spaceGlyph := g ] ].
-
-	"Map whitespace separators (tab, newline, etc.) to the space glyph"
-	{ 9. 10. 11. 12. 13 } do: [ :cp |
-		glyphsByUTF8 at: cp + 1 put: spaceGlyph ].
-
+	glyphsByUtf8 := Array new: 256.
+	spaceGlyph := nil.
+	(self codePointsToMapIn: characterMap) do: [ :codePoint |
+		| glyph |
+		glyph := TTFontParser
+			         selectGlyphFor: codePoint
+			         from: characterMap
+			         glyphs: glyphs
+			         unknownGlyph: unknownGlyph.
+		glyph == unknownGlyph ifFalse: [
+			self store: glyph for: codePoint in: glyphsByUtf8.
+			codePoint = Character space codePoint ifTrue: [ spaceGlyph := glyph ] ] ].
+	spaceGlyph ifNotNil: [
+		self whitespaceCodePoints do: [ :codePoint |
+			glyphsByUtf8 at: codePoint + 1 put: spaceGlyph ] ].
 	fontDescription
-		glyphsByUtf8Bytes: glyphsByUTF8
+		glyphsByUtf8Bytes: glyphsByUtf8
 		unknownGlyph: unknownGlyph
 ]
 
@@ -154,4 +162,31 @@ TTFontReader >> readTTFFrom: aByteArray [
 	fontDescription := TTFontDescription new.
 	self readFrom: aByteArray fromOffset: 0.
 	^ fontDescription
+]
+
+{ #category : 'private' }
+TTFontReader >> store: aGlyph for: aCodePoint in: glyphsByUtf8 [
+	"Put aGlyph in the slot of aCodePoint's last UTF-8 byte, building the 256 slot arrays the
+	 earlier bytes are descended through.
+	 https://developer.apple.com/fonts/TrueType-Reference-Manual/RM07/appendixB.html"
+
+	| array prevByte |
+	array := glyphsByUtf8.
+	prevByte := nil.
+	Character
+		evaluate: [ :byte |
+			prevByte notNil ifTrue: [
+				array := (array at: prevByte + 1) ifNil: [
+					         array at: prevByte + 1 put: (Array new: 256) ] ].
+			prevByte := byte ]
+		withUtf8BytesOf: aCodePoint.
+	array at: prevByte + 1 put: aGlyph
+]
+
+{ #category : 'constants' }
+TTFontReader >> whitespaceCodePoints [
+	"The separators that carry no glyph of their own — tab, line feed, vertical tab, form feed
+	 and carriage return — and are drawn as a space so that a line advances across them."
+
+	^ #( 9 10 11 12 13 )
 ]

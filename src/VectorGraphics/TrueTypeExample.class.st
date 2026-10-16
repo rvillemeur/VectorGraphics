@@ -101,6 +101,15 @@ TrueTypeExample class >> exampleGlyphLarge [
 ]
 
 { #category : 'examples' }
+TrueTypeExample class >> exampleGlyphMap [
+	"Inspect the font's UTF-8 to glyph map: the Glyph map tab lists every code point the font
+	maps and the Map density tab says what those code points cost in floats and index entries.
+	TrueTypeExample exampleGlyphMap inspect"
+<sampleInstance>
+	^ self loadFontFrom: self defaultFontPath
+]
+
+{ #category : 'examples' }
 TrueTypeExample class >> exampleGlyphSmall [
 	"Render a glyph at small size (12px).
 	TrueTypeExample exampleGlyphSmall inspect"

@@ -35,24 +35,37 @@ Class {
 	#tag : 'TrueType'
 }
 
+{ #category : 'constants' }
+TTFontParser class >> glyphSubstitutions [
+	"The code points asked for in place of another: a wide minus for an ASCII dash, a centered
+	 asterisk for an ASCII star. A substitution source has no glyph of its own in the
+	 character map, so whoever walks the map has to ask for these keys as well."
+
+	^ Dictionary newFrom: {
+			  ($- codePoint -> 16r2212).
+			  ($* codePoint -> 16r2217) }
+]
+
 { #category : 'instance creation' }
 TTFontParser class >> on: anEntry [
 
 	^ self new initWithEntry: anEntry
 ]
 
-{ #category : 'utility' }
+{ #category : 'glyph selection' }
 TTFontParser class >> selectGlyphFor: codePoint from: characterMap glyphs: glyphs unknownGlyph: unknownGlyph [
-
-	"Select the best glyph for codePoint. Substitutes wide minus and centered asterisk
-	Unicode code points for the ASCII dash and star. Falls back to the original codePoint
-	if the preferred substitute is absent from the font."
+	"Select the best glyph for codePoint. Substitutes the code points glyphSubstitutions
+	 declares — a wide minus for the ASCII dash, a centered asterisk for the ASCII star.
+	 Falls back to the original codePoint if the preferred substitute is absent from the
+	 font."
 
 	| preferredCodePoint g |
-	preferredCodePoint := codePoint.
-	codePoint = $- codePoint ifTrue: [ preferredCodePoint := 16r2212 ].
-	codePoint = $* codePoint ifTrue: [ preferredCodePoint := 16r2217 ].
-	g := glyphs at: (characterMap at: preferredCodePoint + 1) + 1 ifAbsent: [ unknownGlyph ].
+	preferredCodePoint := self glyphSubstitutions
+		                      at: codePoint
+		                      ifAbsent: [ codePoint ].
+	g := glyphs
+		     at: (characterMap at: preferredCodePoint + 1) + 1
+		     ifAbsent: [ unknownGlyph ].
 	g == unknownGlyph ifTrue: [
 		g := glyphs at: (characterMap at: codePoint + 1) + 1 ifAbsent: [ unknownGlyph ] ].
 	^ g
