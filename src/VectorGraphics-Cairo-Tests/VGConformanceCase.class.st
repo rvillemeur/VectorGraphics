@@ -76,11 +76,10 @@ VGConformanceCase >> name [
 
 { #category : 'running' }
 VGConformanceCase >> newTarget [
-	"Unit 1.1 owns #extent:, so until it lands the surface is built reflectively. That keeps the
-	 selector a case reports the one its own drawing asks for, rather than the surface constructor
-	 every case would otherwise stop on."
-
-	^ VGCairoContext newFor: VGCairoImageSurface basicNew
+	"A real ARGB32 surface of my own size, now that unit 1.1 builds one. The context a case draws
+	 on is the one a caller would build, so the selector a case reports is the one its own drawing
+	 asks for."
+	^ (VGCairoImageSurface extent: extent) newContext
 ]
 
 { #category : 'printing' }

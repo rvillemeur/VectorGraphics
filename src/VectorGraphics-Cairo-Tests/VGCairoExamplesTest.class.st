@@ -13,6 +13,7 @@ Class {
 VGCairoExamplesTest >> exampleHolders [
 	^ {
 		  VGCairoContextExamples.
+		  VGCairoImageSurfaceExamples.
 		  VGCairoInventoryExamples.
 		  VGConformanceCorpusExamples }
 ]

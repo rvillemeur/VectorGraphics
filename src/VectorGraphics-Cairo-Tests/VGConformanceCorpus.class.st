@@ -84,9 +84,8 @@ VGConformanceCorpus class >> clipCases [
 
 { #category : 'cases' }
 VGConformanceCorpus class >> groupCases [
-	"Unit 1.7: the group, the mask and the one operator AeCanvas sets. The mask surface is built
-	 reflectively, as the harness target is, so that the case stops on the group selector it is
-	 filed under rather than on the unit 1.1 constructor."
+	"Unit 1.7: the group, the mask and the one operator AeCanvas sets. The mask surface is a real
+	 unit 1.1 surface, so a case stops on the group selector it is filed under."
 
 	^ {
 		  (self case: 'group-painted-with-alpha' unit: '1.7' draw: [ :context |
@@ -97,7 +96,7 @@ VGConformanceCorpus class >> groupCases [
 					    circleCenterX: 40 y: 32 radius: 18;
 					    fill ] alpha: 0.5 ]).
 		  (self case: 'group-masked-by-surface' unit: '1.7' draw: [ :context |
-			    context maskSurface: VGCairoImageSurface basicNew x: 16 y: 16 ]).
+			    context maskSurface: (VGCairoImageSurface extent: self caseExtent) x: 16 y: 16 ]).
 		  (self case: 'group-masked-with-a-block' unit: '1.7' draw: [ :context |
 			    context maskGroupWith: [ :each |
 				    each
@@ -202,12 +201,12 @@ VGConformanceCorpus class >> sourceCases [
 				    paint ]).
 		  (self case: 'source-surface-pattern' unit: '1.5' draw: [ :context |
 			    context
-				    sourcePattern: (VGCairoSurfacePattern surface: VGCairoImageSurface basicNew);
+				    sourcePattern: (VGCairoSurfacePattern surface: (VGCairoImageSurface extent: self caseExtent));
 				    rectangleX: 0 y: 0 width: 64 height: 64;
 				    fill ]).
 		  (self case: 'source-surface-directly' unit: '1.5' draw: [ :context |
 			    context
-				    sourceSurface: VGCairoImageSurface basicNew;
+				    sourceSurface: (VGCairoImageSurface extent: self caseExtent);
 				    rectangleX: 0 y: 0 width: 64 height: 64;
 				    fill ]) }
 ]

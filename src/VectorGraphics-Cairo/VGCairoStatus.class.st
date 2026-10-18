@@ -15,6 +15,20 @@ Class {
 }
 
 { #category : 'instance creation' }
+VGCairoStatus class >> invalidStride [
+	^ self new
+		  setCode: self invalidStrideCode;
+		  yourself
+]
+
+{ #category : 'constants' }
+VGCairoStatus class >> invalidStrideCode [
+	"Cairo's CAIRO_STATUS_INVALID_STRIDE. The number is the enumeration value a caller reading my
+	 code would compare against, so it is named rather than written inline."
+	^ 24
+]
+
+{ #category : 'instance creation' }
 VGCairoStatus class >> success [
 	^ self new
 		  setCode: self successCode;

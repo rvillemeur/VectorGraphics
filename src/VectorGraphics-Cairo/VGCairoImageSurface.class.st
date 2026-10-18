@@ -8,117 +8,364 @@ Unit 1.1 implements me; until then my selectors signal VGNotYetImplemented.
 Class {
 	#name : 'VGCairoImageSurface',
 	#superclass : 'VGCairoObject',
+	#instVars : [
+		'format',
+		'width',
+		'height',
+		'stride',
+		'data',
+		'deviceOffset',
+		'deviceScale',
+		'status',
+		'finished'
+	],
 	#category : 'VectorGraphics-Cairo-Surface',
 	#package : 'VectorGraphics-Cairo',
 	#tag : 'Surface'
 }
 
-{ #category : 'skeleton - unit 1.1' }
-VGCairoImageSurface class >> extent: arg1 [
-	^ self notYetImplementedIn: '1.1' selector: #extent:
+{ #category : 'instance creation' }
+VGCairoImageSurface class >> extent: aPoint [
+	^ self extent: aPoint format: VGCairoSurfaceFormat argb32
 ]
 
-{ #category : 'skeleton - unit 1.1' }
-VGCairoImageSurface class >> extent: arg1 format: arg2 [
-	^ self notYetImplementedIn: '1.1' selector: #extent:format:
+{ #category : 'instance creation' }
+VGCairoImageSurface class >> extent: aPoint format: aFormat [
+	^ self newFormat: aFormat extent: aPoint
 ]
 
-{ #category : 'skeleton - unit 1.1' }
-VGCairoImageSurface class >> extent: arg1 to: arg2 [
-	^ self notYetImplementedIn: '1.1' selector: #extent:to:
+{ #category : 'skeleton - unit 1.9' }
+VGCairoImageSurface class >> extent: aPoint to: aFileReference [
+	^ self notYetImplementedIn: '1.9' selector: #extent:to:
 ]
 
-{ #category : 'skeleton - unit 1.1' }
-VGCairoImageSurface class >> fromForm: arg1 [
-	^ self notYetImplementedIn: '1.1' selector: #fromForm:
+{ #category : 'instance creation' }
+VGCairoImageSurface class >> fromForm: aForm [
+	"A Form holds straight alpha, so every pixel is premultiplied on the way in."
+	| form surface |
+	form := aForm asFormOfDepth: 32.
+	surface := self extent: form extent.
+	0 to: form height - 1 do: [ :y |
+		0 to: form width - 1 do: [ :x |
+			surface
+				pixelAtX: x
+				y: y
+				put: (surface format pixelForColor: (form colorAt: x @ y)) ] ].
+	^ surface
 ]
 
-{ #category : 'skeleton - unit 1.1' }
-VGCairoImageSurface class >> unownedNewForData: arg1 format: arg2 width: arg3 height: arg4 stride: arg5 [
-	^ self notYetImplementedIn: '1.1' selector: #unownedNewForData:format:width:height:stride:
+{ #category : 'instance creation' }
+VGCairoImageSurface class >> newFormat: aFormat extent: aPoint [
+	"I own these pixels: a ByteArray in object memory, zero filled, which is the fully transparent
+	 surface Cairo answers from cairo_image_surface_create."
+	| pixelFormat stride |
+	pixelFormat := VGCairoSurfaceFormat normalize: aFormat.
+	stride := pixelFormat strideForWidth: aPoint x.
+	^ self new
+		  setFormat: pixelFormat
+		  extent: aPoint
+		  stride: stride
+		  data: (ByteArray new: stride * aPoint y)
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'constants' }
+VGCairoImageSurface class >> transparentFormPixel [
+	"White with zero alpha: the word Alexandrie leaves in a Form where the surface is fully
+	 transparent."
+	^ 16r00FFFFFF
+]
+
+{ #category : 'instance creation' }
+VGCairoImageSurface class >> unownedNewForData: aBuffer format: aFormat width: aWidth height: aHeight stride: aStride [
+	"The pixels belong to the caller: a host window hands over a raw address and its own row pitch.
+	 Both a ByteArray and an ExternalAddress answer #uint32AtOffset:put:, so either is accepted and
+	 one code path serves both. A stride too small for one row is reported through my status, as
+	 Cairo does, rather than signalled."
+	| pixelFormat surface |
+	pixelFormat := VGCairoSurfaceFormat normalize: aFormat.
+	surface := self new
+		           setFormat: pixelFormat
+		           extent: aWidth @ aHeight
+		           stride: aStride
+		           data: aBuffer.
+	aStride < (pixelFormat strideForWidth: aWidth) ifTrue: [
+		surface setStatus: VGCairoStatus invalidStride ].
+	^ surface
+]
+
+{ #category : 'converting' }
 VGCairoImageSurface >> asForm [
-	^ self notYetImplementedIn: '1.1' selector: #asForm
+	"A Form holds straight alpha, so the stored premultiplication is divided back out. A fully
+	 transparent pixel answers 16r00FFFFFF, which is what Alexandrie answers, because a Form that
+	 differed there would blit differently."
+	| form bits |
+	form := Form extent: self extent depth: 32.
+	bits := form bits.
+	0 to: height - 1 do: [ :y |
+		0 to: width - 1 do: [ :x |
+			bits
+				at: y * width + x + 1
+				put: (self straightAlphaPixelAtX: x y: y) ] ].
+	^ form
 ]
 
-{ #category : 'skeleton - unit 1.1' }
-VGCairoImageSurface >> colorAt: arg1 [
-	^ self notYetImplementedIn: '1.1' selector: #colorAt:
+{ #category : 'pixels' }
+VGCairoImageSurface >> blendPixel: anInteger [
+	"Every pixel of mine, with that source painted over what is already there. Row by row and only
+	 width pixels wide, like #fillPixel:, because the padding belongs to whoever gave me the
+	 stride."
+	self ensureNotFinished.
+	0 to: height - 1 do: [ :y |
+		0 to: width - 1 do: [ :x |
+			self
+				primitivePixelAtX: x
+				y: y
+				put: (format blendPixel: anInteger over: (self pixelAtX: x y: y)) ] ]
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'accessing' }
+VGCairoImageSurface >> byteSize [
+	^ stride * height
+]
+
+{ #category : 'pixels' }
+VGCairoImageSurface >> colorAt: aPoint [
+	^ self colorAtX: aPoint x y: aPoint y
+]
+
+{ #category : 'pixels' }
+VGCairoImageSurface >> colorAtX: x y: y [
+	^ format colorForPixel: (self pixelAtX: x y: y)
+]
+
+{ #category : 'accessing' }
 VGCairoImageSurface >> data [
-	^ self notYetImplementedIn: '1.1' selector: #data
+	"The buffer my pixels live in: my own ByteArray, or whatever the caller of
+	 #unownedNewForData:format:width:height:stride: gave me."
+	^ data
 ]
 
-{ #category : 'skeleton - unit 1.1' }
-VGCairoImageSurface >> deviceOffset: arg1 [
-	^ self notYetImplementedIn: '1.1' selector: #deviceOffset:
+{ #category : 'device space' }
+VGCairoImageSurface >> deviceOffset [
+	^ deviceOffset
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'device space' }
+VGCairoImageSurface >> deviceOffset: aPoint [
+	"Bloc's host renderer offsets a surface by the negated origin of the damaged rectangle, so the
+	 drawing lands where the window wants it."
+	deviceOffset := aPoint asPoint
+]
+
+{ #category : 'device space' }
 VGCairoImageSurface >> deviceScale [
-	^ self notYetImplementedIn: '1.1' selector: #deviceScale
+	^ deviceScale
 ]
 
-{ #category : 'skeleton - unit 1.1' }
-VGCairoImageSurface >> deviceScale: arg1 [
-	^ self notYetImplementedIn: '1.1' selector: #deviceScale:
+{ #category : 'device space' }
+VGCairoImageSurface >> deviceScale: aPoint [
+	deviceScale := aPoint asPoint
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'skeleton - unit 1.2' }
 VGCairoImageSurface >> deviceScaleMatrix [
-	^ self notYetImplementedIn: '1.1' selector: #deviceScaleMatrix
+	^ self notYetImplementedIn: '1.2' selector: #deviceScaleMatrix
 ]
 
-{ #category : 'skeleton - unit 1.1' }
-VGCairoImageSurface >> deviceScaleX: arg1 y: arg2 [
-	^ self notYetImplementedIn: '1.1' selector: #deviceScaleX:y:
+{ #category : 'device space' }
+VGCairoImageSurface >> deviceScaleX: aNumber y: anotherNumber [
+	self deviceScale: aNumber @ anotherNumber
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'lifecycle' }
+VGCairoImageSurface >> ensureNotFinished [
+	finished ifTrue: [
+		self error: 'Surface is finished: no further drawing is allowed' ]
+]
+
+{ #category : 'accessing' }
 VGCairoImageSurface >> extent [
-	^ self notYetImplementedIn: '1.1' selector: #extent
+	^ width @ height
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'pixels' }
+VGCairoImageSurface >> fillPixel: anInteger [
+	"Row by row and only width pixels wide: the bytes between one row and the next belong to whoever
+	 gave me the stride, and a host window reads them back."
+	self ensureNotFinished.
+	0 to: height - 1 do: [ :y |
+		0 to: width - 1 do: [ :x | self primitivePixelAtX: x y: y put: anInteger ] ]
+]
+
+{ #category : 'lifecycle' }
 VGCairoImageSurface >> finish [
-	^ self notYetImplementedIn: '1.1' selector: #finish
+	"Cairo refuses further drawing on a finished surface but leaves its pixels readable, and
+	 finishing twice is not an error."
+	finished := true.
+	^ self
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'lifecycle' }
 VGCairoImageSurface >> flush [
-	^ self notYetImplementedIn: '1.1' selector: #flush
+	"A software surface has nothing pending. The selector is here because Alexandrie's callers
+	 cascade from it."
+	^ self
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'accessing' }
+VGCairoImageSurface >> format [
+	^ format
+]
+
+{ #category : 'accessing' }
 VGCairoImageSurface >> height [
-	^ self notYetImplementedIn: '1.1' selector: #height
+	^ height
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'inspector' }
+VGCairoImageSurface >> inspectorLayout: aBuilder [
+	<inspectorPresentationOrder: 11 title: 'Layout'>
+	^ aBuilder newTable
+		  items: self layoutDescription;
+		  addColumn: (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Value'
+				   evaluated: [ :each | each value printString ]);
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGCairoImageSurface >> inspectorLayoutContext: aContext [
+	aContext active: data notNil
+]
+
+{ #category : 'inspector' }
+VGCairoImageSurface >> inspectorPicture: aBuilder [
+	<inspectorPresentationOrder: 10 title: 'Picture'>
+	"#asForm answers a fresh Form every call, so showing the surface cannot change it."
+	^ aBuilder newImage
+		  image: self asForm;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGCairoImageSurface >> inspectorPictureContext: aContext [
+	aContext active: data notNil
+]
+
+{ #category : 'lifecycle' }
+VGCairoImageSurface >> isFinished [
+	^ finished
+]
+
+{ #category : 'inspector' }
+VGCairoImageSurface >> layoutDescription [
+	"Read back out of me, so the tab that shows it cannot drift from #strideForWidth: or from the
+	 buffer I was handed."
+	| used |
+	used := width * format bytesPerPixel.
+	^ {
+		  ('format' -> format formatName).
+		  ('extent' -> self extent).
+		  ('stride' -> stride).
+		  ('bytes per row carrying pixels' -> used).
+		  ('padding bytes per row' -> (stride - used)).
+		  ('byte size' -> self byteSize).
+		  ('buffer' -> data class name).
+		  ('device offset' -> deviceOffset).
+		  ('device scale' -> deviceScale).
+		  ('status' -> status).
+		  ('finished' -> finished) }
+]
+
+{ #category : 'instance creation' }
 VGCairoImageSurface >> newContext [
-	^ self notYetImplementedIn: '1.1' selector: #newContext
+	^ VGCairoContext newFor: self
 ]
 
-{ #category : 'skeleton - unit 1.1' }
-VGCairoImageSurface >> newSimilarImageFormat: arg1 width: arg2 height: arg3 [
-	^ self notYetImplementedIn: '1.1' selector: #newSimilarImageFormat:width:height:
+{ #category : 'instance creation' }
+VGCairoImageSurface >> newSimilarImageFormat: aFormat width: aWidth height: aHeight [
+	"AeCanvas builds its shadow mask this way and asks the result for its status."
+	^ self class newFormat: aFormat extent: aWidth @ aHeight
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'pixels' }
+VGCairoImageSurface >> offsetOfX: x y: y [
+	^ y * stride + (x * format bytesPerPixel)
+]
+
+{ #category : 'pixels' }
+VGCairoImageSurface >> pixelAtX: x y: y [
+	"Both a ByteArray and an ExternalAddress answer #uint32AtOffset:, so the same path reads my own
+	 buffer and a host window's memory."
+	| offset |
+	offset := self offsetOfX: x y: y.
+	^ format isA8
+		  ifTrue: [ data uint8AtOffset: offset ]
+		  ifFalse: [ data uint32AtOffset: offset ]
+]
+
+{ #category : 'pixels' }
+VGCairoImageSurface >> pixelAtX: x y: y put: anInteger [
+	self ensureNotFinished.
+	self primitivePixelAtX: x y: y put: anInteger.
+	^ anInteger
+]
+
+{ #category : 'pixels' }
+VGCairoImageSurface >> primitivePixelAtX: x y: y put: anInteger [
+	| offset |
+	offset := self offsetOfX: x y: y.
+	format isA8
+		ifTrue: [ data uint8AtOffset: offset put: anInteger ]
+		ifFalse: [ data uint32AtOffset: offset put: anInteger ]
+]
+
+{ #category : 'initialization' }
+VGCairoImageSurface >> setFormat: aFormat extent: aPoint stride: anInteger data: aBuffer [
+	format := aFormat.
+	width := aPoint x.
+	height := aPoint y.
+	stride := anInteger.
+	data := aBuffer.
+	deviceOffset := 0 @ 0.
+	deviceScale := 1 @ 1.
+	status := VGCairoStatus success.
+	finished := false
+]
+
+{ #category : 'initialization' }
+VGCairoImageSurface >> setStatus: aStatus [
+	status := aStatus
+]
+
+{ #category : 'accessing' }
+VGCairoImageSurface >> status [
+	^ status
+]
+
+{ #category : 'converting' }
+VGCairoImageSurface >> straightAlphaPixelAtX: x y: y [
+	| colour |
+	colour := self colorAtX: x y: y.
+	colour isTransparent ifTrue: [ ^ self class transparentFormPixel ].
+	^ colour pixelWordForDepth: 32
+]
+
+{ #category : 'accessing' }
 VGCairoImageSurface >> stride [
-	^ self notYetImplementedIn: '1.1' selector: #stride
+	^ stride
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'accessing' }
 VGCairoImageSurface >> width [
-	^ self notYetImplementedIn: '1.1' selector: #width
+	^ width
 ]
 
-{ #category : 'skeleton - unit 1.1' }
-VGCairoImageSurface >> writePngTo: arg1 [
-	^ self notYetImplementedIn: '1.1' selector: #writePngTo:
+{ #category : 'converting' }
+VGCairoImageSurface >> writePngTo: aFileReference [
+	"Answers my status, as Alexandrie does, so a caller can cascade #ensureIsSuccess."
+	aFileReference binaryWriteStreamDo: [ :stream |
+		PNGReadWriter putForm: self asForm onStream: stream ].
+	^ status
 ]

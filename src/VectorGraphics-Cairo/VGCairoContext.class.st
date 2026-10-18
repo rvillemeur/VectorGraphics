@@ -64,14 +64,21 @@ VGCairoContext >> circleSectorCenter: arg1 from: arg2 to: arg3 radius: arg4 [
 	^ self notYetImplementedIn: '1.3' selector: #circleSectorCenter:from:to:radius:
 ]
 
-{ #category : 'skeleton - unit 1.1' }
-VGCairoContext >> clearColor: arg1 [
-	^ self notYetImplementedIn: '1.1' selector: #clearColor:
+{ #category : 'painting' }
+VGCairoContext >> clearColor: aColor [
+	"Unit 1.1 paints every pixel of the target, which is what cairo_paint with the source operator
+	 and no clip does. The operator and the clip belong to units 1.6 and 1.7, so they are not
+	 consulted here."
+	surface fillPixel: (surface format pixelForColor: aColor).
+	^ self
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'painting' }
 VGCairoContext >> clearTransparent [
-	^ self notYetImplementedIn: '1.1' selector: #clearTransparent
+	"A zero pixel is transparent in every format I target, so one constant clears both ARGB32 and
+	 A8."
+	surface fillPixel: 0.
+	^ self
 ]
 
 { #category : 'skeleton - unit 1.6' }
@@ -94,9 +101,9 @@ VGCairoContext >> currentPointInUserSpace [
 	^ self notYetImplementedIn: '1.2' selector: #currentPointInUserSpace
 ]
 
-{ #category : 'skeleton - unit 1.1' }
+{ #category : 'painting' }
 VGCairoContext >> currentTarget [
-	^ self notYetImplementedIn: '1.1' selector: #currentTarget
+	^ surface
 ]
 
 { #category : 'skeleton - unit 1.3' }

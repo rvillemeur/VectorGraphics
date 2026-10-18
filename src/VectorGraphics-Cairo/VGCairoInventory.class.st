@@ -174,7 +174,7 @@ VGCairoInventory class >> progressReport [
 			  (selectors count: [ :each | self isSkeletonSelector: each ]) } ]
 ]
 
-{ #category : 'units' }
+{ #category : 'constants' }
 VGCairoInventory class >> selectorUnitTable [
 	"Which unit owes which selector. One entry per unit, in plan order. A selector that several
 	 classes declare - status, autoRelease, matrix: - is owed by the same unit everywhere."
@@ -182,11 +182,11 @@ VGCairoInventory class >> selectorUnitTable [
 	^ {
 		  ('1.0' -> #( #autoRelease #externallyFree #status #new #newFor: )).
 		  ('1.1' -> #( #asForm #clearColor: #clearTransparent #colorAt: #currentTarget #data
-		                #deviceOffset: #deviceScale #deviceScale: #deviceScaleMatrix #deviceScaleX:y:
-		                #extent #extent: #extent:format: #extent:to: #finish #flush #fromForm:
+		                #deviceOffset: #deviceScale #deviceScale: #deviceScaleX:y:
+		                #extent #extent: #extent:format: #finish #flush #fromForm:
 		                #height #newContext #newSimilarImageFormat:width:height: #stride
 		                #unownedNewForData:format:width:height:stride: #width #writePngTo: )).
-		  ('1.2' -> #( #currentPointInUserSpace #matrix #matrix: #restoreStateAfter:
+		  ('1.2' -> #( #currentPointInUserSpace #deviceScaleMatrix #matrix #matrix: #restoreStateAfter:
 		                #rotateByRadians: #rotateByRadians:center: #scaleBy: #setIdentityMatrix
 		                #transformWith: #translateBy: )).
 		  ('1.3' -> #( #annulusSectorCenter:from:to:innerRadius:outerRadius:
@@ -210,7 +210,8 @@ VGCairoInventory class >> selectorUnitTable [
 		  ('1.7' -> #( #maskGroupWith: #maskSurface:x:y: #paintGroupWith: #paintGroupWith:alpha:
 		                #paintWithAlpha: #setOperatorClear )).
 		  ('1.8' -> #( #appendGlyphsPath: #fontExtents #fontSize: #getGlyphExtentsOf:size:into:
-		                #scaledFont: #showGlyphs: )) }
+		                #scaledFont: #showGlyphs: )).
+		  ('1.9' -> #( #extent:to: )) }
 ]
 
 { #category : 'measuring' }
