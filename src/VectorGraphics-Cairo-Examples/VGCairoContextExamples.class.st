@@ -11,12 +11,8 @@ Class {
 { #category : 'examples' }
 VGCairoContextExamples class >> contextOnAnImageSurface [
 	<sampleInstance>
-	"A context over an image surface, the pair every drawing goes through. Unit 1.1 owns
-	 VGCairoImageSurface class >> #extent:, so the surface is built reflectively until then."
-
-	| surface |
-	surface := VGCairoImageSurface basicNew.
-	^ VGCairoContext newFor: surface
+	"A context over an image surface, the pair every drawing goes through."
+	^ (VGCairoImageSurface extent: 64 @ 64) newContext
 ]
 
 { #category : 'examples' }
@@ -26,4 +22,21 @@ VGCairoContextExamples class >> linearGradientPatternClass [
 	 class shows the constructors unit 1.5 owes."
 
 	^ VGCairoLinearGradientPattern
+]
+
+{ #category : 'examples' }
+VGCairoContextExamples class >> transformedContextWithASavedState [
+	<sampleInstance>
+	"A context whose current matrix has been moved, turned and stretched, with one state pushed
+	 underneath it, so the state stack and the current transformation are both visible."
+	| context |
+	context := (VGCairoImageSurface extent: 64 @ 64) newContext.
+	context state fillRule: #evenOdd.
+	context saveState.
+	context
+		translateBy: 32 @ 32;
+		rotateByRadians: Float pi / 6;
+		scaleBy: 1.8 @ 0.6.
+	context state source: Color red.
+	^ context
 ]

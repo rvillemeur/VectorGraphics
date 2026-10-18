@@ -9,7 +9,10 @@ Class {
 	#name : 'VGCairoContext',
 	#superclass : 'VGCairoObject',
 	#instVars : [
-		'surface'
+		'surface',
+		'state',
+		'stateStack',
+		'status'
 	],
 	#category : 'VectorGraphics-Cairo-Context',
 	#package : 'VectorGraphics-Cairo',
@@ -54,6 +57,14 @@ VGCairoContext >> arcCenterX: arg1 centerY: arg2 radius: arg3 startAngle: arg4 e
 	^ self notYetImplementedIn: '1.3' selector: #arcCenterX:centerY:radius:startAngle:endAngle:
 ]
 
+{ #category : 'transformations' }
+VGCairoContext >> changeMatrixBy: aBlock [
+	"Cairo ignores every request once the context is in error, which is how a singular matrix ends
+	 as an empty drawing instead of a signal."
+	self isInError ifTrue: [ ^ self ].
+	aBlock value: state matrix
+]
+
 { #category : 'skeleton - unit 1.3' }
 VGCairoContext >> circleCenterX: arg1 y: arg2 radius: arg3 [
 	^ self notYetImplementedIn: '1.3' selector: #circleCenterX:y:radius:
@@ -66,19 +77,16 @@ VGCairoContext >> circleSectorCenter: arg1 from: arg2 to: arg3 radius: arg4 [
 
 { #category : 'painting' }
 VGCairoContext >> clearColor: aColor [
-	"Unit 1.1 paints every pixel of the target, which is what cairo_paint with the source operator
-	 and no clip does. The operator and the clip belong to units 1.6 and 1.7, so they are not
-	 consulted here."
-	surface fillPixel: (surface format pixelForColor: aColor).
-	^ self
+	"Every pixel of my target in aColor. The operator and the clip arrive in units 1.6 and 1.7, so
+	 this is a plain fill of the whole surface for now."
+	self isInError ifTrue: [ ^ self ].
+	surface fillPixel: (surface format pixelForColor: aColor)
 ]
 
 { #category : 'painting' }
 VGCairoContext >> clearTransparent [
-	"A zero pixel is transparent in every format I target, so one constant clears both ARGB32 and
-	 A8."
-	surface fillPixel: 0.
-	^ self
+	self isInError ifTrue: [ ^ self ].
+	surface fillPixel: 0
 ]
 
 { #category : 'skeleton - unit 1.6' }
@@ -98,7 +106,7 @@ VGCairoContext >> closePath [
 
 { #category : 'skeleton - unit 1.2' }
 VGCairoContext >> currentPointInUserSpace [
-	^ self notYetImplementedIn: '1.2' selector: #currentPointInUserSpace
+	^ self notYetImplementedIn: '1.3' selector: #currentPointInUserSpace
 ]
 
 { #category : 'painting' }
@@ -151,6 +159,49 @@ VGCairoContext >> getGlyphExtentsOf: arg1 size: arg2 into: arg3 [
 	^ self notYetImplementedIn: '1.8' selector: #getGlyphExtentsOf:size:into:
 ]
 
+{ #category : 'initialization' }
+VGCairoContext >> initialize [
+	super initialize.
+	state := VGCairoState new.
+	stateStack := OrderedCollection new.
+	status := VGCairoStatus success
+]
+
+{ #category : 'inspecting' }
+VGCairoContext >> inspectorStateStack: aBuilder [
+	<inspectorPresentationOrder: 12 title: 'State stack'>
+	^ aBuilder newTable
+		  items: self stateStackDescription;
+		  addColumn: (SpStringTableColumn
+				   title: 'Depth'
+				   evaluated: [ :each | each first ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Fill rule'
+				   evaluated: [ :each | each second fillRule printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Source'
+				   evaluated: [ :each | each second source printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Clip'
+				   evaluated: [ :each | each second clip printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Matrix'
+				   evaluated: [ :each | each second matrix printString ]);
+		  yourself
+]
+
+{ #category : 'inspecting' }
+VGCairoContext >> inspectorStateStackContext: aContext [
+	aContext active: state notNil
+]
+
+{ #category : 'accessing' }
+VGCairoContext >> isInError [
+	"Cairo latches a failure on the context and then ignores every request, so the drawing a bad
+	 matrix would have produced is empty rather than signalled."
+	^ status isSuccess not
+]
+
 { #category : 'skeleton - unit 1.3' }
 VGCairoContext >> lineFrom: arg1 to: arg2 [
 	^ self notYetImplementedIn: '1.3' selector: #lineFrom:to:
@@ -176,14 +227,18 @@ VGCairoContext >> maskSurface: arg1 x: arg2 y: arg3 [
 	^ self notYetImplementedIn: '1.7' selector: #maskSurface:x:y:
 ]
 
-{ #category : 'skeleton - unit 1.2' }
+{ #category : 'transformations' }
 VGCairoContext >> matrix [
-	^ self notYetImplementedIn: '1.2' selector: #matrix
+	"A copy, because Alexandrie answers a fresh matrix and a caller may transform what it got."
+	^ state matrix copy
 ]
 
-{ #category : 'skeleton - unit 1.2' }
-VGCairoContext >> matrix: arg1 [
-	^ self notYetImplementedIn: '1.2' selector: #matrix:
+{ #category : 'transformations' }
+VGCairoContext >> matrix: aMatrix [
+	self isInError ifTrue: [ ^ self ].
+	aMatrix isInvertible
+		ifTrue: [ state matrix: aMatrix copy ]
+		ifFalse: [ status := VGCairoStatus invalidMatrix ]
 ]
 
 { #category : 'skeleton - unit 1.3' }
@@ -231,19 +286,28 @@ VGCairoContext >> rectangleX: arg1 y: arg2 width: arg3 height: arg4 [
 	^ self notYetImplementedIn: '1.3' selector: #rectangleX:y:width:height:
 ]
 
-{ #category : 'skeleton - unit 1.2' }
-VGCairoContext >> restoreStateAfter: arg1 [
-	^ self notYetImplementedIn: '1.2' selector: #restoreStateAfter:
+{ #category : 'state' }
+VGCairoContext >> restoreState [
+	stateStack isEmpty ifTrue: [ ^ self ].
+	state := stateStack removeLast
 ]
 
-{ #category : 'skeleton - unit 1.2' }
-VGCairoContext >> rotateByRadians: arg1 [
-	^ self notYetImplementedIn: '1.2' selector: #rotateByRadians:
+{ #category : 'state' }
+VGCairoContext >> restoreStateAfter: aBlock [
+	"The block runs with my state saved, and the state comes back even when the block raises: a
+	 painting that fails must not leave the next frame transformed."
+	self saveState.
+	^ aBlock ensure: [ self restoreState ]
 ]
 
-{ #category : 'skeleton - unit 1.2' }
-VGCairoContext >> rotateByRadians: arg1 center: arg2 [
-	^ self notYetImplementedIn: '1.2' selector: #rotateByRadians:center:
+{ #category : 'transformations' }
+VGCairoContext >> rotateByRadians: anAngle [
+	self changeMatrixBy: [ :each | each rotateByRadians: anAngle ]
+]
+
+{ #category : 'transformations' }
+VGCairoContext >> rotateByRadians: anAngle center: aPoint [
+	self changeMatrixBy: [ :each | each rotateByRadians: anAngle center: aPoint ]
 ]
 
 { #category : 'skeleton - unit 1.3' }
@@ -251,9 +315,19 @@ VGCairoContext >> roundedRectangleLeft: arg1 top: arg2 right: arg3 bottom: arg4 
 	^ self notYetImplementedIn: '1.3' selector: #roundedRectangleLeft:top:right:bottom:tl:tr:br:bl:
 ]
 
-{ #category : 'skeleton - unit 1.2' }
-VGCairoContext >> scaleBy: arg1 [
-	^ self notYetImplementedIn: '1.2' selector: #scaleBy:
+{ #category : 'state' }
+VGCairoContext >> saveState [
+	stateStack addLast: state copy
+]
+
+{ #category : 'transformations' }
+VGCairoContext >> scaleBy: aPoint [
+	self changeMatrixBy: [ :each | each scaleBy: aPoint ]
+]
+
+{ #category : 'transformations' }
+VGCairoContext >> scaleByX: aNumber y: anotherNumber [
+	self changeMatrixBy: [ :each | each scaleByX: aNumber y: anotherNumber ]
 ]
 
 { #category : 'skeleton - unit 1.8' }
@@ -261,9 +335,9 @@ VGCairoContext >> scaledFont: arg1 [
 	^ self notYetImplementedIn: '1.8' selector: #scaledFont:
 ]
 
-{ #category : 'skeleton - unit 1.2' }
+{ #category : 'transformations' }
 VGCairoContext >> setIdentityMatrix [
-	^ self notYetImplementedIn: '1.2' selector: #setIdentityMatrix
+	self changeMatrixBy: [ :each | each beIdentity ]
 ]
 
 { #category : 'skeleton - unit 1.7' }
@@ -311,6 +385,30 @@ VGCairoContext >> sourceSurface: arg1 [
 	^ self notYetImplementedIn: '1.5' selector: #sourceSurface:
 ]
 
+{ #category : 'accessing' }
+VGCairoContext >> state [
+	"My current graphics state: the matrix, the source, the fill rule and the clip that #saveState
+	 pushes and #restoreState brings back together."
+	^ state
+]
+
+{ #category : 'inspecting' }
+VGCairoContext >> stateStackDescription [
+	"One row for my current state and one for each state waiting under it, newest first, read from
+	 the stack itself so the view shows what #restoreState will really bring back."
+	^ ({ state } , stateStack reversed) withIndexCollect: [ :each :index |
+		  {
+			  (index = 1
+				   ifTrue: [ 'current' ]
+				   ifFalse: [ 'saved ' , (index - 1) printString ]).
+			  each } ]
+]
+
+{ #category : 'accessing' }
+VGCairoContext >> status [
+	^ status
+]
+
 { #category : 'skeleton - unit 1.3' }
 VGCairoContext >> stroke [
 	^ self notYetImplementedIn: '1.3' selector: #stroke
@@ -356,14 +454,20 @@ VGCairoContext >> tolerance: arg1 [
 	^ self notYetImplementedIn: '1.4' selector: #tolerance:
 ]
 
-{ #category : 'skeleton - unit 1.2' }
-VGCairoContext >> transformWith: arg1 [
-	^ self notYetImplementedIn: '1.2' selector: #transformWith:
+{ #category : 'transformations' }
+VGCairoContext >> transformWith: aMatrix [
+	"The argument acts first and my own matrix after it, which is cairo_transform."
+	self changeMatrixBy: [ :each | each preMultiply: aMatrix ]
 ]
 
-{ #category : 'skeleton - unit 1.2' }
-VGCairoContext >> translateBy: arg1 [
-	^ self notYetImplementedIn: '1.2' selector: #translateBy:
+{ #category : 'transformations' }
+VGCairoContext >> translateBy: aPoint [
+	self changeMatrixBy: [ :each | each translateBy: aPoint ]
+]
+
+{ #category : 'transformations' }
+VGCairoContext >> translateByX: aNumber y: anotherNumber [
+	self changeMatrixBy: [ :each | each translateByX: aNumber y: anotherNumber ]
 ]
 
 { #category : 'skeleton - unit 1.3' }

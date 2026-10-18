@@ -186,10 +186,11 @@ VGCairoInventory class >> selectorUnitTable [
 		                #extent #extent: #extent:format: #finish #flush #fromForm:
 		                #height #newContext #newSimilarImageFormat:width:height: #stride
 		                #unownedNewForData:format:width:height:stride: #width #writePngTo: )).
-		  ('1.2' -> #( #currentPointInUserSpace #deviceScaleMatrix #matrix #matrix: #restoreStateAfter:
+		  ('1.2' -> #( #deviceScaleMatrix #matrix #matrix: #restoreStateAfter:
 		                #rotateByRadians: #rotateByRadians:center: #scaleBy: #setIdentityMatrix
 		                #transformWith: #translateBy: )).
 		  ('1.3' -> #( #annulusSectorCenter:from:to:innerRadius:outerRadius:
+		                #currentPointInUserSpace
 		                #arcCenter:radius:startAngle:endAngle:cw:
 		                #arcCenter:radius:startAngle:sweep:
 		                #arcCenterX:centerY:radius:startAngle:endAngle: #circleCenterX:y:radius:

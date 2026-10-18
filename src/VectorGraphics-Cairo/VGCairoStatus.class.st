@@ -15,6 +15,17 @@ Class {
 }
 
 { #category : 'instance creation' }
+VGCairoStatus class >> invalidMatrix [
+	^ self new setCode: self invalidMatrixCode
+]
+
+{ #category : 'constants' }
+VGCairoStatus class >> invalidMatrixCode [
+	"CAIRO_STATUS_INVALID_MATRIX: the matrix is not invertible."
+	^ 5
+]
+
+{ #category : 'instance creation' }
 VGCairoStatus class >> invalidStride [
 	^ self new
 		  setCode: self invalidStrideCode;

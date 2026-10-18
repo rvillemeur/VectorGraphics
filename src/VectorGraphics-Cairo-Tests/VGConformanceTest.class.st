@@ -87,7 +87,9 @@ VGConformanceTest >> testEveryUnitThatOwesPaintingSelectorsHasACase [
 
 { #category : 'constants' }
 VGConformanceTest >> unitsWithoutAPicture [
-	"Unit 1.0 builds the harness and unit 1.9 wires the AeCanvas subclass, so neither owes a case."
-
-	^ #( '1.0' '1.9' )
+	"Unit 1.0 builds the harness and unit 1.9 wires the AeCanvas subclass, so neither owes a case.
+	 Unit 1.2 owns the matrix, which changes nothing visible on its own: a transformation shows up
+	 only through a shape, so its three cases are filed under unit 1.3 with the shape verbs they
+	 need."
+	^ #( '1.0' '1.2' '1.9' )
 ]

@@ -167,9 +167,9 @@ VGCairoImageSurface >> deviceScale: aPoint [
 	deviceScale := aPoint asPoint
 ]
 
-{ #category : 'skeleton - unit 1.2' }
+{ #category : 'accessing - device space' }
 VGCairoImageSurface >> deviceScaleMatrix [
-	^ self notYetImplementedIn: '1.2' selector: #deviceScaleMatrix
+	^ VGCairoMatrix newScalingByX: deviceScale x y: deviceScale y
 ]
 
 { #category : 'device space' }

@@ -8,6 +8,9 @@ Unit 1.5 implements me.
 Class {
 	#name : 'VGCairoPattern',
 	#superclass : 'VGCairoObject',
+	#instVars : [
+		'matrix'
+	],
 	#category : 'VectorGraphics-Cairo-Pattern',
 	#package : 'VectorGraphics-Cairo',
 	#tag : 'Pattern'
@@ -18,14 +21,21 @@ VGCairoPattern >> filter: arg1 [
 	^ self notYetImplementedIn: '1.5' selector: #filter:
 ]
 
-{ #category : 'skeleton - unit 1.2' }
-VGCairoPattern >> matrix [
-	^ self notYetImplementedIn: '1.2' selector: #matrix
+{ #category : 'initialization' }
+VGCairoPattern >> initialize [
+	super initialize.
+	matrix := VGCairoMatrix newIdentity
 ]
 
-{ #category : 'skeleton - unit 1.2' }
-VGCairoPattern >> matrix: arg1 [
-	^ self notYetImplementedIn: '1.2' selector: #matrix:
+{ #category : 'accessing' }
+VGCairoPattern >> matrix [
+	"A copy, because Cairo answers the numbers rather than the pattern's own matrix."
+	^ matrix copy
+]
+
+{ #category : 'accessing' }
+VGCairoPattern >> matrix: aMatrix [
+	matrix := aMatrix copy
 ]
 
 { #category : 'skeleton - unit 1.5' }

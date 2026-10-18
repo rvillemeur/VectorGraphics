@@ -285,21 +285,23 @@ VGConformanceCorpus class >> textCases [
 
 { #category : 'cases' }
 VGConformanceCorpus class >> transformCases [
-	"Unit 1.2: the matrix, read through a shape whose position and shape depend on it."
+	"The matrix, read through a shape whose position and shape depend on it. The matrix itself is
+	 unit 1.2, but a case is only drawable once the shape verbs arrive, so these are filed under
+	 unit 1.3."
 
 	^ {
-		  (self case: 'transform-translated-rectangle' unit: '1.2' draw: [ :context |
+		  (self case: 'transform-translated-rectangle' unit: '1.3' draw: [ :context |
 			    context
 				    translateBy: 12 @ 20;
 				    rectangleX: 0 y: 0 width: 24 height: 16;
 				    fill ]).
-		  (self case: 'transform-rotated-rectangle' unit: '1.2' draw: [ :context |
+		  (self case: 'transform-rotated-rectangle' unit: '1.3' draw: [ :context |
 			    context
 				    translateBy: 32 @ 32;
 				    rotateByRadians: Float pi / 6;
 				    rectangleX: -16 y: -10 width: 32 height: 20;
 				    fill ]).
-		  (self case: 'transform-scaled-circle' unit: '1.2' draw: [ :context |
+		  (self case: 'transform-scaled-circle' unit: '1.3' draw: [ :context |
 			    context
 				    translateBy: 32 @ 32;
 				    scaleBy: 1.8 @ 0.6;

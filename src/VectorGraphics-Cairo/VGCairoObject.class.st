@@ -122,8 +122,8 @@ VGCairoObject >> skeletonSelectorsWithUnit [
 
 { #category : 'accessing' }
 VGCairoObject >> status [
-	"Cairo puts a status on every context and surface, and AeCanvas sends ensureIsSuccess to it. A
-	 pure Pharo target has no C error code to report, so the answer is success."
-
+	"Cairo puts a status on every context and surface, and AeCanvas sends ensureIsSuccess to it.
+	 Success is the answer for an object that cannot fail; a context and an image surface hold a
+	 real status and override this."
 	^ VGCairoStatus success
 ]
