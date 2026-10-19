@@ -22,6 +22,28 @@ VGConformanceTest >> coveredUnits [
 ]
 
 { #category : 'tests' }
+VGConformanceTest >> testAPatternOrASurfaceInACaseIsBuiltFromTheFamilyOfTheContextItDrawsOn [
+	"A shared draw block may name no class of either side: handing one of our patterns to
+	 Alexandrie's context reaches a Cairo call with an object that holds no pointer."
+
+	| ourContext cairoContext |
+	ourContext := (VGCairoImageSurface extent: 4 @ 4) newContext.
+	cairoContext := (AeCairoImageSurface extent: 4 @ 4) newContext.
+	self
+		assert: (VGConformanceCorpus classNamed: 'ColorPattern' for: ourContext)
+		equals: VGCairoColorPattern.
+	self
+		assert: (VGConformanceCorpus classNamed: 'ColorPattern' for: cairoContext)
+		equals: AeCairoColorPattern.
+	self
+		assert: (VGConformanceCorpus classNamed: 'ImageSurface' for: ourContext)
+		equals: VGCairoImageSurface.
+	self
+		assert: (VGConformanceCorpus classNamed: 'ImageSurface' for: cairoContext)
+		equals: AeCairoImageSurface
+]
+
+{ #category : 'tests' }
 VGConformanceTest >> testEveryCaseBlocksOnASelectorNoLaterThanItsOwnUnit [
 	"The gate for unit 1.0. A case must stop by raising VGNotYetImplemented, and the unit named by
 	 the selector it stopped on must be the case's own unit or an earlier one; a later unit means the
@@ -131,6 +153,38 @@ VGConformanceTest >> testEveryUnitThatOwesPaintingSelectorsHasACase [
 	self
 		assert: uncovered isEmpty
 		description: 'no conformance case is filed under ' , uncovered printString
+]
+
+{ #category : 'tests' }
+VGConformanceTest >> testTheComparisonPremultipliesTheStoredBytesAndNotAFractionOfThem [
+	"A bug in what the gate reads with. A Form keeps unpremultiplied bytes, so the comparison
+	 premultiplies before it measures; it was handing a byte to a method that takes a fraction of
+	 one, and the product ran into the neighbouring channel. Two pixels a single step of coverage
+	 apart were reported as the whole range apart, which made every tolerance meaningless."
+
+	| ours theirs comparison |
+	ours := Form extent: 1 @ 1 depth: 32.
+	theirs := Form extent: 1 @ 1 depth: 32.
+	"Transparent white is how a Form stores a pixel nothing painted; the reference painted red at
+	 one step of coverage, so the two are one apart and not two hundred and fifty-five apart."
+	ours bits at: 1 put: 16r00FFFFFF.
+	theirs bits at: 1 put: 16r01FF0000.
+	comparison := VGFormComparison between: ours and: theirs.
+	self assert: comparison maximumChannelDistance equals: 1.
+	self assert: comparison differingPixelCount equals: 1.
+	"Our pixel is outside the reference's shape only where the reference painted nothing at all."
+	self assert: comparison extraneousPixelCount equals: 0.
+	ours bits at: 1 put: 16rFFFFFFFF.
+	theirs bits at: 1 put: 16r00FFFFFF.
+	comparison := VGFormComparison between: ours and: theirs.
+	self assert: comparison extraneousPixelCount equals: 1.
+	self assert: comparison maximumChannelDistance equals: 255.
+	"Two opaque pixels are measured as they are stored, so the whole range is still reachable."
+	ours bits at: 1 put: 16rFFFFFFFF.
+	theirs bits at: 1 put: 16rFF000000.
+	self
+		assert: (VGFormComparison between: ours and: theirs) maximumChannelDistance
+		equals: 255
 ]
 
 { #category : 'accessing' }

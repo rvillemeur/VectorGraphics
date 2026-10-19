@@ -79,6 +79,25 @@ VGCairoDrawingTest >> testAFreshContextAnswersTheOriginAsItsCurrentPoint [
 	self deny: context hasCurrentPoint
 ]
 
+{ #category : 'tests - source' }
+VGCairoDrawingTest >> testAStopAddedAfterThePatternIsSetIsStillSeenAtPaintTime [
+	"Measured on a live Cairo context: Cairo keeps a reference to the pattern rather than a copy of
+	 it, so a stop added after the pattern has been set is part of the gradient that is painted. A
+	 gradient of one black stop paints flat black, and the second stop turns it into the ramp."
+
+	| surface context pattern |
+	surface := VGCairoImageSurface extent: 16 @ 4.
+	context := surface newContext.
+	pattern := VGCairoLinearGradientPattern from: 0 @ 0 to: 16 @ 0.
+	pattern addStopAt: 0.0 color: Color black.
+	context sourcePattern: pattern.
+	pattern addStopAt: 1.0 color: Color white.
+	context paint.
+	self assert: (surface pixelAtX: 0 y: 1) equals: 16rFF080808.
+	self assert: (surface pixelAtX: 8 y: 1) equals: 16rFF878787.
+	self assert: (surface pixelAtX: 15 y: 1) equals: 16rFFF7F7F7
+]
+
 { #category : 'tests - stroking' }
 VGCairoDrawingTest >> testAStrokeIsWidenedInUserSpaceAndNotInDeviceSpace [
 	"Cairo widens the path in user space, so a scaled context strokes a thicker line. Stroking in
@@ -109,6 +128,37 @@ VGCairoDrawingTest >> testAStrokedHorizontalLineCoversItsOwnWidth [
 	self assert: (surface pixelAtX: 10 y: 6) equals: 0.
 	self assert: (surface pixelAtX: 10 y: 9) equals: 0.
 	self assert: (surface pixelAtX: 3 y: 8) equals: 0
+]
+
+{ #category : 'tests - source' }
+VGCairoDrawingTest >> testASurfaceSourceWithAnOffsetMovesThePatternAndLeavesWhatItUncoversUntouched [
+	"Measured on a live Cairo context with a four by four source, red over its left half and blue
+	 over its right: an offset of one moves the whole pattern one pixel to the right, and the
+	 column it uncovers is untouched because the default extend mode of a surface pattern is none."
+
+	| source surface context |
+	source := VGCairoImageSurface extent: 4 @ 4.
+	source newContext
+		sourceColor: Color blue;
+		paint;
+		sourceColor: Color red;
+		rectangle: (0 @ 0 corner: 2 @ 4);
+		fill.
+	source flush.
+	surface := VGCairoImageSurface extent: 8 @ 4.
+	context := surface newContext.
+	context sourceSurface: source x: 1 y: 0.
+	context
+		rectangle: (0 @ 0 corner: 8 @ 4);
+		fill.
+	{
+		(0 -> 0).
+		(1 -> 16rFFFF0000).
+		(2 -> 16rFFFF0000).
+		(3 -> 16rFF0000FF).
+		(4 -> 16rFF0000FF).
+		(5 -> 0) } do: [ :each |
+		self assert: (surface pixelAtX: each key y: 0) equals: each value ]
 ]
 
 { #category : 'tests' }
@@ -221,6 +271,35 @@ VGCairoDrawingTest >> testTheEvenOddRuleLeavesTheHeartOfAStarHollowAndTheWinding
 	evenOddContext fill.
 	self assert: (winding pixelAtX: 16 y: 16) equals: self opaqueBlack.
 	self assert: (evenOdd pixelAtX: 16 y: 16) equals: 0
+]
+
+{ #category : 'tests - source' }
+VGCairoDrawingTest >> testTheSourceMatrixIsTheOneInForceWhenTheSourceWasSet [
+	"Measured on a live Cairo context: setting a sixteen-wide ramp as the source and then scaling
+	 the context by two paints exactly what no scaling at all paints, because Cairo captures the
+	 transformation when the source is set and not when it is used."
+
+	| expected |
+	expected := {
+		            (0 -> 16rFF080808).
+		            (4 -> 16rFF484848).
+		            (8 -> 16rFF878787).
+		            (12 -> 16rFFC7C7C7).
+		            (15 -> 16rFFF7F7F7) }.
+	#( false true ) do: [ :scaleAfter |
+		| surface context |
+		surface := VGCairoImageSurface extent: 16 @ 4.
+		context := surface newContext.
+		context sourcePattern: (VGCairoLinearGradientPattern
+				 from: 0 @ 0
+				 to: 16 @ 0
+				 addStopsFrom: {
+						 (0.0 -> Color black).
+						 (1.0 -> Color white) }).
+		scaleAfter ifTrue: [ context scaleBy: 2 @ 2 ].
+		context paint.
+		expected do: [ :each |
+			self assert: (surface pixelAtX: each key y: 1) equals: each value ] ]
 ]
 
 { #category : 'tests - the display list' }

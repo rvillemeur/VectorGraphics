@@ -116,21 +116,13 @@ VGSoftwareBackend >> isEmpty [
 	^ commands isEmpty
 ]
 
-{ #category : 'private' }
-VGSoftwareBackend >> pixelFor: aPaint coverage: aNumber format: aFormat [
-	"The paint at that coverage, as a premultiplied pixel: coverage multiplies the alpha, which on
-	 premultiplied pixels means it multiplies every channel. Unit 1.5 reads the paint ABI here."
-	| colour |
-	colour := aPaint.
-	^ aFormat pixelForColor: (colour alpha: colour alpha * aNumber)
-]
-
-{ #category : 'private' }
+{ #category : 'rasterising' }
 VGSoftwareBackend >> rasterise: aSegments paint: aPaint clip: aRectangle operator: aSymbol into: aTarget [
 	"One recorded fill: the rasteriser says how much of each pixel the edges cover, and the paint
 	 is composited over the target at that coverage. The fill rule and the antialiasing mode both
-	 ride inside the segments, because the three messages of the backend carry neither. Unit 1.5
-	 replaces the colour with the paint ABI and unit 1.7 brings the operators other than over and
+	 ride inside the segments, because the three messages of the backend carry neither. A paint
+	 that lays down nothing at a pixel leaves that pixel alone, which is how an extend mode of
+	 none paints outside its own pattern. Unit 1.7 brings the operators other than over and
 	 source."
 
 	| rasteriser format |
@@ -142,13 +134,20 @@ VGSoftwareBackend >> rasterise: aSegments paint: aPaint clip: aRectangle operato
 		              clip: aRectangle.
 	rasteriser coverageRowsDo: [ :y :coverage :left |
 		1 to: coverage size do: [ :index |
-			| value |
+			| value pixel x |
 			value := coverage at: index.
 			value > 0 ifTrue: [
-				self
-					compose: (self pixelFor: aPaint coverage: value format: format)
-					atX: left + index - 1
-					y: y
-					operator: aSymbol
-					into: aTarget ] ] ]
+				x := left + index - 1.
+				pixel := aPaint
+					         pixelIn: format
+					         atX: x
+					         y: y
+					         coverage: value.
+				pixel ifNotNil: [
+					self
+						compose: pixel
+						atX: x
+						y: y
+						operator: aSymbol
+						into: aTarget ] ] ] ]
 ]

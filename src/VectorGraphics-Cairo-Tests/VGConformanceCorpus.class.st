@@ -87,6 +87,20 @@ VGConformanceCorpus class >> cases [
 	^ self caseMethodSelectors flatCollect: [ :each | self perform: each ]
 ]
 
+{ #category : 'private' }
+VGConformanceCorpus class >> classNamed: aString for: aContext [
+	"The class of that name in the family of the context: ours when the replacement is drawing,
+	 Alexandrie's when the reference is. One draw block runs on both contexts, so a case that
+	 needs a pattern or a second surface has to ask for it this way: Alexandrie's context hands
+	 whatever it is given straight to a Cairo call, which wants a pointer our objects do not have."
+
+	| prefix |
+	prefix := (aContext isKindOf: VGCairoContext)
+		          ifTrue: [ 'VGCairo' ]
+		          ifFalse: [ 'AeCairo' ].
+	^ Smalltalk at: (prefix , aString) asSymbol
+]
+
 { #category : 'cases' }
 VGConformanceCorpus class >> clipCases [
 	"Unit 1.6: the clip, read through a shape that reaches outside it."
@@ -103,6 +117,19 @@ VGConformanceCorpus class >> clipCases [
 				    rectangleX: 8 y: 8 width: 48 height: 48;
 				    clipPreservingPath;
 				    stroke ]) }
+]
+
+{ #category : 'constants' }
+VGConformanceCorpus class >> gradientInterpolationTolerance [
+	"How far a channel of a gradient may sit from Cairo's own. Cairo hands a gradient to pixman,
+	 which walks the ramp in fixed point, and we evaluate it in floating point: on an axis aligned
+	 ramp the two agree byte for byte on all sixty-four pixels, which VGCairoSurfaceTest and
+	 VGPaintTest hold exactly, and they part by one on the pixels where the offset lands on a
+	 boundary of the fixed point step. Measured: sixty-four pixels of a diagonal ramp, all on the
+	 line where the offset is exactly a half, and thirty-two pixels of a radial one, all on one
+	 ring. The exterior is still held exactly, which is what catches a wrong shape."
+
+	^ 1
 ]
 
 { #category : 'cases' }
@@ -157,6 +184,16 @@ VGConformanceCorpus class >> inspectorCasesContext: aContext [
 	aContext active: self superclass = Object
 ]
 
+{ #category : 'private' }
+VGConformanceCorpus class >> interpolatedCase: aString unit: aUnitString draw: aBlock [
+	"A case whose colour comes from a gradient, so a pixel of it may sit one off Cairo's own;
+	 see gradientInterpolationTolerance."
+
+	^ (self case: aString unit: aUnitString draw: aBlock)
+		  tolerance: self gradientInterpolationTolerance;
+		  yourself
+]
+
 { #category : 'cases' }
 VGConformanceCorpus class >> pathCases [
 	"Unit 1.3: a path, a fill rule, and the three painting verbs. The source is left alone, because
@@ -194,7 +231,8 @@ VGConformanceCorpus class >> pathCases [
 { #category : 'cases' }
 VGConformanceCorpus class >> sourceCases [
 	"Unit 1.5: what the painting verbs take their colour from. Each of the four pattern classes
-	 appears here, because a class no case names would never be exercised at all."
+	 appears here, because a class no case names would never be exercised at all. No case names a
+	 class of either side itself; see classNamed:for:."
 
 	^ {
 		  (self case: 'source-flat-colour' unit: '1.5' draw: [ :context |
@@ -204,18 +242,19 @@ VGConformanceCorpus class >> sourceCases [
 				    fill ]).
 		  (self case: 'source-colour-pattern' unit: '1.5' draw: [ :context |
 			    context
-				    sourcePattern: (VGCairoColorPattern r: 0.1 g: 0.7 b: 0.4);
+				    sourcePattern:
+					    ((self classNamed: 'ColorPattern' for: context) r: 0.1 g: 0.7 b: 0.4);
 				    paint ]).
-		  (self case: 'source-linear-gradient' unit: '1.5' draw: [ :context |
+		  (self interpolatedCase: 'source-linear-gradient' unit: '1.5' draw: [ :context |
 			    context
-				    sourcePattern: (VGCairoLinearGradientPattern
+				    sourcePattern: ((self classNamed: 'LinearGradientPattern' for: context)
 						     from: 0 @ 0
 						     to: 64 @ 64
 						     addStopsFrom: self twoStopRamp);
 				    paint ]).
-		  (self case: 'source-radial-gradient' unit: '1.5' draw: [ :context |
+		  (self interpolatedCase: 'source-radial-gradient' unit: '1.5' draw: [ :context |
 			    context
-				    sourcePattern: (VGCairoRadialGradientPattern
+				    sourcePattern: ((self classNamed: 'RadialGradientPattern' for: context)
 						     innerCenter: 32 @ 32
 						     innerRadius: 2
 						     outerCenter: 32 @ 32
@@ -224,12 +263,13 @@ VGConformanceCorpus class >> sourceCases [
 				    paint ]).
 		  (self case: 'source-surface-pattern' unit: '1.5' draw: [ :context |
 			    context
-				    sourcePattern: (VGCairoSurfacePattern surface: (VGCairoImageSurface extent: self caseExtent));
+				    sourcePattern: ((self classNamed: 'SurfacePattern' for: context)
+						     surface: (self tileFor: context));
 				    rectangleX: 0 y: 0 width: 64 height: 64;
 				    fill ]).
 		  (self case: 'source-surface-directly' unit: '1.5' draw: [ :context |
 			    context
-				    sourceSurface: (VGCairoImageSurface extent: self caseExtent);
+				    sourceSurface: (self tileFor: context);
 				    rectangleX: 0 y: 0 width: 64 height: 64;
 				    fill ]) }
 ]
@@ -308,6 +348,27 @@ VGConformanceCorpus class >> textCases [
 				    scaledFont: nil;
 				    appendGlyphsPath: #();
 				    fill ]) }
+]
+
+{ #category : 'private' }
+VGConformanceCorpus class >> tileFor: aContext [
+	"A source surface in the family of the context, of the extent every case draws at, cleared to
+	 a colour with its right half painted over, so a pattern over it shows which half of it a
+	 pixel came from."
+
+	| tile tileContext |
+	tile := (self classNamed: 'ImageSurface' for: aContext) extent: self caseExtent.
+	tileContext := tile newContext.
+	tileContext clearColor: (Color r: 0.1 g: 0.6 b: 0.8).
+	tileContext sourceColor: (Color r: 1.0 g: 0.5 b: 0.0).
+	tileContext
+		rectangleX: self caseExtent x / 2
+		y: 0
+		width: self caseExtent x / 2
+		height: self caseExtent y.
+	tileContext fill.
+	tile flush.
+	^ tile
 ]
 
 { #category : 'cases' }

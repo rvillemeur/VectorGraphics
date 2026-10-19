@@ -69,6 +69,54 @@ VGCairoContextStateTest >> testContextInErrorDrawsNothingJustAsCairoDoes [
 	self assert: (cairoSurface data uint32AtOffset: 0) equals: 0
 ]
 
+{ #category : 'tests - source' }
+VGCairoContextStateTest >> testEverySourceSetterIsIgnoredOnceTheContextIsInError [
+	"A latched context ignores every request, so the source it had when it latched is the source it
+	 still has."
+
+	| context source |
+	context := self newContext.
+	context sourceColor: Color red.
+	source := context source.
+	context matrix: self singularMatrix.
+	self assert: context isInError.
+	context
+		sourceColor: Color blue;
+		sourceColorR: 0 g: 1 b: 0;
+		sourceColorR: 0 g: 1 b: 0 a: 0.5;
+		sourcePattern: (VGCairoColorPattern r: 0 g: 1 b: 0);
+		sourceSurface: (VGCairoImageSurface extent: 4 @ 4);
+		sourceSurface: (VGCairoImageSurface extent: 4 @ 4) x: 1 y: 1.
+	self assert: context source identicalTo: source
+]
+
+{ #category : 'tests - source' }
+VGCairoContextStateTest >> testEverySourceSetterLeavesAPatternOfItsOwnType [
+	"Cairo answers the pattern it was given rather than a copy of it, so a caller that keeps a
+	 pattern and asks the context for its source holds the same thing twice."
+
+	| context pattern |
+	context := self newContext.
+	context sourceColor: Color red.
+	self assert: context source type equals: #solid.
+	context sourceColorR: 0.1 g: 0.2 b: 0.3.
+	self assert: context source type equals: #solid.
+	context sourceColorR: 0.1 g: 0.2 b: 0.3 a: 0.4.
+	self assert: context source type equals: #solid.
+	pattern := VGCairoLinearGradientPattern from: 0 @ 0 to: 8 @ 0.
+	context sourcePattern: pattern.
+	self assert: context source type equals: #linear.
+	self assert: context source identicalTo: pattern.
+	context sourcePattern: (VGCairoRadialGradientPattern
+			 innerCenter: 0 @ 0
+			 innerRadius: 1
+			 outerCenter: 0 @ 0
+			 outerRadius: 8).
+	self assert: context source type equals: #radial.
+	context sourceSurface: (VGCairoImageSurface extent: 4 @ 4).
+	self assert: context source type equals: #surface
+]
+
 { #category : 'tests' }
 VGCairoContextStateTest >> testFreshContextHasTheIdentityMatrix [
 	self assert: self newContext matrix isIdentity
@@ -124,24 +172,26 @@ VGCairoContextStateTest >> testRestoreStateAfterNests [
 
 { #category : 'tests' }
 VGCairoContextStateTest >> testRestoreStateAfterRestoresMatrixSourceFillRuleAndClipTogether [
-	"The gate: the four pieces of state come back together. The source, the fill rule and the clip
-	 are set on the state itself, because the context selectors that set them belong to later
-	 units."
+	"The gate: the four pieces of state come back together. The source is the pattern itself and
+	 not a copy of it, which is what Cairo keeps, so it is compared by identity. The fill rule and
+	 the clip are still set on the state, because the context selectors that set them belong to
+	 later units."
+
 	| context source fillRule clip |
 	context := self newContext.
-	source := Color red.
+	source := VGCairoColorPattern r: 1.0 g: 0.0 b: 0.0.
 	fillRule := #evenOdd.
 	clip := 0 @ 0 corner: 4 @ 4.
-	context state source: source.
+	context sourcePattern: source.
 	context state fillRule: fillRule.
 	context state clip: clip.
 	context restoreStateAfter: [
 		context translateBy: 9 @ 9.
-		context state source: Color blue.
+		context sourceColor: Color blue.
 		context state fillRule: #winding.
 		context state clip: nil ].
 	self assert: context matrix isIdentity.
-	self assert: context state source equals: source.
+	self assert: context source identicalTo: source.
 	self assert: context state fillRule equals: fillRule.
 	self assert: context state clip equals: clip
 ]
@@ -220,6 +270,19 @@ VGCairoContextStateTest >> testSurfaceDeviceScaleMatrixIsAScalingMatrix [
 	surface := VGCairoImageSurface extent: 8 @ 8.
 	surface deviceScaleX: 2 y: 3.
 	self assert: (surface deviceScaleMatrix value: 1 @ 1) equals: 2 @ 3
+]
+
+{ #category : 'tests - source' }
+VGCairoContextStateTest >> testTheDefaultSourceIsAnOpaqueBlackSolidPattern [
+	"Measured: a fresh Cairo context paints opaque black, and the pattern it answers for its source
+	 is a solid one."
+
+	| surface context |
+	surface := VGCairoImageSurface extent: 4 @ 4.
+	context := surface newContext.
+	self assert: context source type equals: #solid.
+	context paint.
+	self assert: (surface pixelAtX: 1 y: 1) equals: 16rFF000000
 ]
 
 { #category : 'tests' }

@@ -12,16 +12,32 @@ Class {
 }
 
 { #category : 'instance creation' }
-VGCairoColorPattern class >> newFrom: arg1 [
-	^ self notYetImplementedIn: '1.5' selector: #newFrom:
+VGCairoColorPattern class >> newFrom: aColor [
+	^ self
+		  r: aColor red
+		  g: aColor green
+		  b: aColor blue
+		  alpha: aColor alpha
 ]
 
-{ #category : 'skeleton - unit 1.5' }
-VGCairoColorPattern class >> r: arg1 g: arg2 b: arg3 [
-	^ self notYetImplementedIn: '1.5' selector: #r:g:b:
+{ #category : 'accessing' }
+VGCairoColorPattern class >> paintClass [
+	^ VGColorPaint
 ]
 
-{ #category : 'skeleton - unit 1.5' }
-VGCairoColorPattern class >> r: arg1 g: arg2 b: arg3 alpha: arg4 [
-	^ self notYetImplementedIn: '1.5' selector: #r:g:b:alpha:
+{ #category : 'instance creation' }
+VGCairoColorPattern class >> r: red g: green b: blue [
+	^ self r: red g: green b: blue alpha: 1.0
+]
+
+{ #category : 'instance creation' }
+VGCairoColorPattern class >> r: red g: green b: blue alpha: alpha [
+	^ (self new)
+		  setRed: red green: green blue: blue alpha: alpha;
+		  yourself
+]
+
+{ #category : 'initialization' }
+VGCairoColorPattern >> setRed: red green: green blue: blue alpha: alpha [
+	paint setRed: red green: green blue: blue alpha: alpha
 ]

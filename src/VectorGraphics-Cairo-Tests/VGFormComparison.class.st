@@ -71,19 +71,24 @@ VGFormComparison class >> premultiplied: aWord [
 	 whole range apart, which would report a difference of 255 where the pictures differ by one
 	 two-hundred-and-fifty-fifth of coverage. Premultiplying first measures what the eye sees."
 
-	| alpha pixelFormat |
-	pixelFormat := VGCairoSurfaceFormat argb32.
-	alpha := (aWord bitShift: -24) bitAnd: 255.
+	| alpha |
+	alpha := self alphaOf: aWord.
 	^ (alpha bitShift: 24)
 	  +
-		  ((pixelFormat
-			    premultiplyChannel: ((aWord bitShift: -16) bitAnd: 255)
-			    byAlpha: alpha) bitShift: 16)
+		  ((self premultipliedByte: ((aWord bitShift: -16) bitAnd: 255) byAlpha: alpha)
+			   bitShift: 16)
 	  +
-		  ((pixelFormat
-			    premultiplyChannel: ((aWord bitShift: -8) bitAnd: 255)
-			    byAlpha: alpha) bitShift: 8)
-	  + (pixelFormat premultiplyChannel: (aWord bitAnd: 255) byAlpha: alpha)
+		  ((self premultipliedByte: ((aWord bitShift: -8) bitAnd: 255) byAlpha: alpha)
+			   bitShift: 8)
+	  + (self premultipliedByte: (aWord bitAnd: 255) byAlpha: alpha)
+]
+
+{ #category : 'comparing' }
+VGFormComparison class >> premultipliedByte: aByte byAlpha: anAlphaByte [
+	"One stored channel multiplied by the alpha it carries, both as bytes, so the result is a byte
+	 as well. Multiplying a byte by a byte would run into the next channel of the word."
+
+	^ (aByte * anAlphaByte / 255) rounded
 ]
 
 { #category : 'initialization' }

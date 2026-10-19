@@ -78,6 +78,72 @@ VGCairoSurfaceTest >> testA8StrideIsAlignedToFourBytes [
 	self assert: surface status isSuccess
 ]
 
+{ #category : 'tests - format' }
+VGCairoSurfaceTest >> testAFormatReadsAndWritesAPixelAsFourUnpremultipliedFloats [
+	"The rasteriser evaluates a paint in floating point, and a Pharo Color keeps only ten bits a
+	 channel, so the format has to take and answer channels as floats or the last bit of a ramp is
+	 lost on the way through. Half-transparent red shows it: through four floats the pixel is
+	 16r80800000, and through a Color it is 16r7F7F0000, because a half rounds down to five hundred
+	 and eleven of the ten bits a Color keeps, and the alpha it rounds to premultiplies the red."
+
+	| argb a8 rgb24 |
+	argb := VGCairoSurfaceFormat argb32.
+	a8 := VGCairoSurfaceFormat a8.
+	rgb24 := VGCairoSurfaceFormat rgb24.
+
+	self assert: (argb pixelForRgba: #( 1.0 0.0 0.0 0.5 )) equals: 16r80800000.
+
+	"Measured in live Cairo: these are the channels a sixty-four wide ramp from transparent blue to
+	 opaque red holds at the centre of pixel 32, and this is the word Cairo writes for them."
+	self
+		assert: (argb pixelForRgba: { 0.5078125. 0.0. 0.4921875. 0.5078125 })
+		equals: 16r81420040.
+	self
+		assert: (argb pixelForColor: (Color r: 1.0 g: 0.0 b: 0.0 alpha: 0.5))
+		equals: 16r7F7F0000.
+	self assert: (argb rgbaForPixel: 16r80800000) equals: { 1.0. 0.0. 0.0. 128 / 255 }.
+
+	self
+		assert: (argb rgbaForPixel: (argb pixelForRgba: #( 1.0 1.0 1.0 1.0 )))
+		equals: #( 1.0 1.0 1.0 1.0 ).
+
+	"A pixel of no alpha premultiplied its channels away, so nothing is left to divide back out."
+	self assert: (argb rgbaForPixel: 0) equals: #( 0.0 0.0 0.0 0.0 ).
+
+	"A8 carries alpha alone, and RGB24 carries no alpha at all and so reads back opaque."
+	self assert: (a8 pixelForRgba: #( 1.0 1.0 1.0 0.5 )) equals: 128.
+	self assert: (a8 rgbaForPixel: 128) equals: { 0.0. 0.0. 0.0. 128 / 255 }.
+	self assert: (rgb24 rgbaForPixel: (rgb24 pixelForRgba: #( 1.0 0.0 0.0 0.5 ))) equals: #( 1.0 0.0 0.0 1.0 )
+]
+
+{ #category : 'tests' }
+VGCairoSurfaceTest >> testASolidColourQuantisesThroughSixteenBitShortsAndAGradientThroughBytes [
+	"Measured against live Cairo on six colours and on nine pixels of a ramp. Cairo keeps a solid
+	 colour as four sixteen-bit shorts, each the truncated product of the channel, the alpha and
+	 sixty-five thousand five hundred and thirty-five, and stores the top byte of each; a gradient
+	 it evaluates into bytes and rounds. The two rules differ by one on most colours, so each
+	 paint has to quantise its own way."
+
+	| format solid |
+	format := VGCairoSurfaceFormat argb32.
+	solid := #( 0.5004887585532747 0.25024437927663734 0.7497556207233627 0.4980392156862745 ).
+	self assert: (format pixelForRgbaThroughShorts: solid) equals: 16r7F3F1F5F.
+	self assert: (format pixelForRgba: solid) equals: 16r7F40205F.
+	self
+		assert: (format pixelForRgbaThroughShorts: #( 0.09970674486803519 0.6999022482893451 0.3998044965786901 1.0 ))
+		equals: 16rFF19B366.
+	self
+		assert: (format pixelForRgbaThroughShorts: #( 1.0 0.0 0.0 0.24705882352941178 ))
+		equals: 16r3F3F0000.
+	"An alpha only surface carries no colour to premultiply and a plain RGB one carries no alpha,
+	 so on both the two rules part by rounding alone."
+	self assert: (VGCairoSurfaceFormat a8 pixelForRgbaThroughShorts: solid) equals: 127.
+	self assert: (VGCairoSurfaceFormat a8 pixelForRgba: solid) equals: 127.
+	self
+		assert: (VGCairoSurfaceFormat rgb24 pixelForRgbaThroughShorts: #( 1.0 0.0 0.5019607843137255 1.0 ))
+		equals: (VGCairoSurfaceFormat rgb24 pixelForRgba: #( 1.0 0.0 0.5019607843137255 1.0 ))
+]
+
 { #category : 'tests - geometry' }
 VGCairoSurfaceTest >> testArgb32StrideIsFourBytesPerPixel [
 	| surface |

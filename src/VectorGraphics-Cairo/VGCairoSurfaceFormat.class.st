@@ -171,6 +171,53 @@ VGCairoSurfaceFormat >> pixelForColor: aColor [
 ]
 
 { #category : 'converting' }
+VGCairoSurfaceFormat >> pixelForRgba: anArray [
+	"The premultiplied pixel word a surface of my format stores for those four unpremultiplied
+	 channels, in the order red, green, blue, alpha. The premultiplication is by the alpha as a
+	 float and is rounded once per channel, which is what live Cairo stores for a gradient: at the
+	 centre of pixel 32 of a sixty-four wide ramp from transparent blue to opaque red it writes
+	 16r81420040, where premultiplying by the rounded alpha byte instead would write a blue of 63.
+	 An RGB24 pixel carries no alpha at all, so its channels are stored unmultiplied."
+
+	| alpha multiplier |
+	self isA8 ifTrue: [ ^ ((anArray at: 4) * 255) rounded ].
+	alpha := self isRgb24
+		         ifTrue: [ 255 ]
+		         ifFalse: [ ((anArray at: 4) * 255) rounded ].
+	multiplier := self isRgb24
+		              ifTrue: [ 1.0 ]
+		              ifFalse: [ anArray at: 4 ].
+	^ (alpha bitShift: 24)
+	  + (((anArray at: 1) * multiplier * 255) rounded bitShift: 16)
+	  + (((anArray at: 2) * multiplier * 255) rounded bitShift: 8)
+	  + ((anArray at: 3) * multiplier * 255) rounded
+]
+
+{ #category : 'converting' }
+VGCairoSurfaceFormat >> pixelForRgbaThroughShorts: anArray [
+	"The premultiplied pixel word Cairo stores for a solid colour of those four unpremultiplied
+	 channels. A solid colour goes through four sixteen-bit shorts: each short is the product of
+	 the channel, the alpha and sixty-five thousand five hundred and thirty-five, truncated, and
+	 the pixel keeps the top byte of each. This is one step away from the rule a gradient follows,
+	 which rounds the product of the channel and two hundred and fifty-five: r 0.5 g 0.25 b 0.75
+	 alpha 0.5 is stored as 16r7F3F1F5F here and as 16r7F40205F there, both measured on a live
+	 Cairo context. An alpha only surface keeps no colour and an RGB one keeps no alpha."
+
+	| alpha multiplier |
+	self isA8 ifTrue: [ ^ self shortByteOf: (anArray at: 4) ].
+	alpha := self isRgb24
+		         ifTrue: [ 255 ]
+		         ifFalse: [ self shortByteOf: (anArray at: 4) ].
+	multiplier := self isRgb24
+		              ifTrue: [ 1.0 ]
+		              ifFalse: [ anArray at: 4 ].
+	^ (alpha bitShift: 24)
+	  + ((self shortByteOf: (anArray at: 1) * multiplier) bitShift: 16)
+	  + ((self shortByteOf: (anArray at: 2) * multiplier) bitShift: 8)
+	  + (self shortByteOf: (anArray at: 3) * multiplier)
+]
+
+{ #category : 'converting' }
 VGCairoSurfaceFormat >> premultiplyChannel: aFraction byAlpha: anAlphaByte [
 	"Premultiplication: a stored channel is already multiplied by the alpha it carries, which is why
 	 half-transparent red is 16r80800000 and not 16r80FF0000."
@@ -186,6 +233,23 @@ VGCairoSurfaceFormat >> printOn: aStream [
 		nextPut: $)
 ]
 
+{ #category : 'converting' }
+VGCairoSurfaceFormat >> rgbaForPixel: anInteger [
+	"The four channels that pixel word holds, as floats in zero to one with the alpha divided back
+	 out. This is colorForPixel: without the detour through a Pharo Color, which keeps ten bits a
+	 channel and so cannot carry every step of a two-hundred-and-fifty-five-step ramp."
+
+	| alpha |
+	alpha := self alphaOfPixel: anInteger.
+	alpha = 0 ifTrue: [ ^ #( 0.0 0.0 0.0 0.0 ) ].
+	self isA8 ifTrue: [ ^ { 0.0. 0.0. 0.0. alpha / 255 } ].
+	^ {
+		  (((anInteger bitShift: -16) bitAnd: 255) / alpha).
+		  (((anInteger bitShift: -8) bitAnd: 255) / alpha).
+		  ((anInteger bitAnd: 255) / alpha).
+		  (alpha / 255) }
+]
+
 { #category : 'blending' }
 VGCairoSurfaceFormat >> scaleByte: aByte by: anAlphaByte [
 	"Divides by 255 with rounding, which is what Cairo's integer blend does, so our pixels and
@@ -198,6 +262,14 @@ VGCairoSurfaceFormat >> setCode: anInteger bitsPerPixel: aBitCount name: aSymbol
 	code := anInteger.
 	bitsPerPixel := aBitCount.
 	formatName := aSymbol
+]
+
+{ #category : 'converting' }
+VGCairoSurfaceFormat >> shortByteOf: aNumber [
+	"The byte Cairo keeps for one channel of a solid colour: the channel as a sixteen-bit short,
+	 truncated and not rounded, of which only the top byte is stored."
+
+	^ ((aNumber * 65535) truncated bitShift: -8) min: 255
 ]
 
 { #category : 'accessing' }

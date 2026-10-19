@@ -11,7 +11,24 @@ Class {
 	#tag : 'Pattern'
 }
 
-{ #category : 'skeleton - unit 1.5' }
-VGCairoSurfacePattern class >> surface: arg1 [
-	^ self notYetImplementedIn: '1.5' selector: #surface:
+{ #category : 'accessing' }
+VGCairoSurfacePattern class >> paintClass [
+	^ VGSurfacePaint
+]
+
+{ #category : 'instance creation' }
+VGCairoSurfacePattern class >> surface: aSurface [
+	^ (self new)
+		  surface: aSurface;
+		  yourself
+]
+
+{ #category : 'accessing' }
+VGCairoSurfacePattern >> surface [
+	^ paint surface
+]
+
+{ #category : 'accessing' }
+VGCairoSurfacePattern >> surface: aSurface [
+	paint surface: aSurface
 ]

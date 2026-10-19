@@ -28,6 +28,20 @@ VGAlexandrieCorpus class >> allExperimentSelectors [
 			   one selector = #sampleInstance ] ]) asSortedCollection asArray
 ]
 
+{ #category : 'constants' }
+VGAlexandrieCorpus class >> antialiasedEdgeTolerance [
+	"How far a channel of an antialiased edge pixel of an experiment may sit from Alexandrie's own.
+	 Our scan converter samples the same grid as Cairo's, so the two agree on every pixel a shape
+	 covers wholly or not at all, and part only on the shades along a curve, a slanted edge or a
+	 half-pixel stroke. How far apart a shade can be follows the contrast across the edge, and these
+	 experiments are drawn in saturated colours: the worst measured is thirty-five of two hundred
+	 and fifty-five, on the rim of a yellow to red sphere over dark blue, where the conformance
+	 corpus of this plan, drawn in quieter colours, stays within twenty-one. The exterior is held
+	 exactly in every case, which is the condition that catches a wrong shape."
+
+	^ 36
+]
+
 { #category : 'substitution' }
 VGAlexandrieCorpus class >> cairoClassNamesUsed [
 	"Every Alexandrie Cairo class the experiments name, read from their literals."
@@ -120,6 +134,18 @@ VGAlexandrieCorpus class >> missingClassUnitTable [
 		  (#AeCairoMeshPattern -> '1.12') }
 ]
 
+{ #category : 'constants' }
+VGAlexandrieCorpus class >> nearestSampleTolerance [
+	"How far a channel of a surface pattern we sample without a filter may sit from Alexandrie's
+	 own. Cairo filters a surface pattern it has to scale; we read the nearest pixel, which is
+	 exact at one to one and coarse under a scale, and the real filters arrive with the surface unit
+	 1.9. One experiment scales a bitmap to a quarter, and its worst pixel is ninety-five of two
+	 hundred and fifty-five; the gate is set just above that so that a wrong shape still fails, and
+	 the exterior of the picture is held exactly as everywhere else."
+
+	^ 96
+]
+
 { #category : 'accessing' }
 VGAlexandrieCorpus class >> nonPictureSelectors [
 	"The experiments that answer something other than a picture, so there is nothing to compare.
@@ -181,12 +207,43 @@ VGAlexandrieCorpus class >> toleranceFor: aSelector [
 		  ifNotNil: [ :each | each value ]
 ]
 
-{ #category : 'accessing' }
+{ #category : 'constants' }
 VGAlexandrieCorpus class >> toleranceTable [
 	"The cases that may not match Cairo exactly, each with how far one channel may differ and why.
 	 It is empty while no case renders; a case added here has to carry its reason, so that a
-	 tolerance is never a quiet way of passing."
-	^ {  }
+	 tolerance is never a quiet way of passing. Two reasons cover every entry: all but one of these
+	 experiments draw a curve, a slanted edge or a half-pixel stroke, so their edge pixels are
+	 shades and ours part from Cairo's by a little, and fillPaint3 also scales a bitmap, which we
+	 still sample without a filter. See antialiasedEdgeTolerance and nearestSampleTolerance."
+
+	| edges |
+	edges := self antialiasedEdgeTolerance.
+	^ {
+		  (#ContextPathWithArcCircle -> edges).
+		  (#ContextPathWithArcCurve -> edges).
+		  (#ContextPathWithArcCurveCW -> edges).
+		  (#ContextPathWithArcCurveExampleDraw -> edges).
+		  (#ContextPathWithArcCurveExampleDrawClockWise -> edges).
+		  (#ContextPathWithArcCurveExampleDrawCounterClockWise -> edges).
+		  (#ContextPathWithArcCurveWithoutSubPath -> edges).
+		  (#ContextPathWithArcSweep -> edges).
+		  (#ContextPathWithCubicBezier -> edges).
+		  (#ContextPathWithCubicBezier2 -> edges).
+		  (#ContextPathWithCubicBezier3 -> edges).
+		  (#ContextPathWithLine -> edges).
+		  (#ContextPathWithQuadraticBezier -> edges).
+		  (#ContextPathWithRoundedRectangle -> edges).
+		  (#fillLinearGradientExperiment -> edges).
+		  (#fillLinearGradientExperimentDiagonal -> edges).
+		  (#fillPaint3 -> self nearestSampleTolerance).
+		  (#lineColor -> edges).
+		  (#lineDash -> edges).
+		  (#linePath -> edges).
+		  (#polygonLinearGradient -> edges).
+		  (#radialGradientPattern1 -> edges).
+		  (#strokeAndFill -> edges).
+		  (#strokeAndFill2 -> edges).
+		  (#transformationShear -> edges) }
 ]
 
 { #category : 'substitution' }

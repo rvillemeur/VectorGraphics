@@ -9,27 +9,66 @@ Class {
 	#name : 'VGCairoPattern',
 	#superclass : 'VGCairoObject',
 	#instVars : [
-		'matrix'
+		'matrix',
+		'paint'
 	],
 	#category : 'VectorGraphics-Cairo-Pattern',
 	#package : 'VectorGraphics-Cairo',
 	#tag : 'Pattern'
 }
 
-{ #category : 'skeleton' }
-VGCairoPattern >> addStopAt: anArgument1 color: anArgument2 [
-	^ self notYetImplementedIn: '1.5' selector: #addStopAt:color:
+{ #category : 'accessing' }
+VGCairoPattern class >> paintClass [
+	"The paint class that holds what a pattern of mine means to the backend."
+
+	^ self subclassResponsibility
 ]
 
-{ #category : 'skeleton - unit 1.5' }
-VGCairoPattern >> filter: arg1 [
-	^ self notYetImplementedIn: '1.5' selector: #filter:
+{ #category : 'accessing' }
+VGCairoPattern >> extend [
+	^ paint extend
+]
+
+{ #category : 'accessing' }
+VGCairoPattern >> extend: anExtendMode [
+	"One of my paint's names, Cairo's integer code or Alexandrie's own value."
+
+	paint extend: anExtendMode
+]
+
+{ #category : 'accessing' }
+VGCairoPattern >> filter [
+	^ paint filter
+]
+
+{ #category : 'accessing' }
+VGCairoPattern >> filter: aFilter [
+	paint filter: aFilter
 ]
 
 { #category : 'initialization' }
 VGCairoPattern >> initialize [
 	super initialize.
-	matrix := VGCairoMatrix newIdentity
+	matrix := VGCairoMatrix newIdentity.
+	paint := self class paintClass new
+]
+
+{ #category : 'inspector' }
+VGCairoPattern >> inspectorPaint: aBuilder [
+
+	<inspectorPresentationOrder: 20 title: 'Paint'>
+	^ aBuilder newTable
+		  items: self paintDescription;
+		  addColumn: (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
+		  addColumn:
+			  (SpStringTableColumn title: 'Value' evaluated: [ :each | each value printString ]);
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGCairoPattern >> inspectorPaintContext: aContext [
+
+	aContext active: paint notNil
 ]
 
 { #category : 'accessing' }
@@ -43,7 +82,47 @@ VGCairoPattern >> matrix: aMatrix [
 	matrix := aMatrix copy
 ]
 
-{ #category : 'skeleton - unit 1.5' }
+{ #category : 'accessing' }
+VGCairoPattern >> paint [
+	"The paint the backend reads. It is mine and not a copy, because Cairo keeps a reference to a
+	 pattern and sees a change made to it after it has been set as a source."
+
+	^ paint
+]
+
+{ #category : 'printing' }
+VGCairoPattern >> paintDescription [
+	"What I am, property by property, read back through the methods a caller uses, so a reader of
+	 the Paint tab sees what the backend will see and not a second statement of it. The last entry
+	 is the paint a fill records when no transformation is in force."
+
+	^ {
+		  ('type' -> self type).
+		  ('tag' -> paint tag).
+		  ('extend' -> self extend).
+		  ('filter' -> self filter).
+		  ('matrix' -> self matrix).
+		  ('paint at an identity device matrix'
+		   -> (self paintForDeviceMatrix: VGCairoMatrix newIdentity)) }
+]
+
+{ #category : 'converting' }
+VGCairoPattern >> paintForDeviceMatrix: aMatrix [
+	"A snapshot of my paint whose matrix maps a device point into paint space. A device point gets
+	 there in two steps: back through the transformation that was in force when I was set as a
+	 source, and then forward through my own matrix. A transformation that cannot be undone maps
+	 nothing, and answers no paint at all."
+
+	aMatrix isInvertible ifFalse: [ ^ nil ].
+	^ paint copy
+		  matrix: (matrix copy preMultiply: aMatrix inverted);
+		  yourself
+]
+
+{ #category : 'accessing' }
 VGCairoPattern >> type [
-	^ self notYetImplementedIn: '1.5' selector: #type
+	"Cairo's own pattern type, by name. Alexandrie answers an AeCairoPatternType; a symbol is the
+	 vocabulary on this side, as it already is for the extend mode and the filter."
+
+	^ VGPaint nameIn: VGPaint typeNames for: paint tag
 ]

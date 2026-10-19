@@ -6,10 +6,11 @@ that implement the source, the fill rule and the clip set my fields; I only hold
 "
 Class {
 	#name : 'VGCairoState',
-	#superclass : 'Object',
+	#superclass : 'VGCairoObject',
 	#instVars : [
 		'matrix',
 		'source',
+		'sourceMatrix',
 		'fillRule',
 		'clip',
 		'strokeStyle',
@@ -87,15 +88,16 @@ VGCairoState >> fillRule: aSymbol [
 
 { #category : 'initialization' }
 VGCairoState >> initialize [
-	"Cairo's own defaults: the identity matrix, opaque black, the winding fill rule, the stroke
-	 style of VGCairoStrokeStyle, a tolerance of a tenth of a pixel and antialiasing left to the
-	 backend. Every one of them is measured against a live Cairo context in a test. The setter
-	 for the source arrives in unit 1.5, so black is what every drawing uses until then."
+	"Cairo's own defaults: the identity matrix, a solid pattern of opaque black whose own
+	 transformation is the identity, the winding fill rule, the stroke style of
+	 VGCairoStrokeStyle, a tolerance of a tenth of a pixel and antialiasing left to the backend.
+	 Every one of them is measured against a live Cairo context in a test."
 
 	super initialize.
 	matrix := VGCairoMatrix newIdentity.
 	fillRule := #winding.
-	source := Color black.
+	source := VGCairoColorPattern r: 0.0 g: 0.0 b: 0.0 alpha: 1.0.
+	sourceMatrix := VGCairoMatrix newIdentity.
 	strokeStyle := VGCairoStrokeStyle new.
 	tolerance := self class defaultTolerance.
 	antialias := self class antialiasNames first
@@ -124,10 +126,13 @@ VGCairoState >> matrix: aMatrix [
 { #category : 'copying' }
 VGCairoState >> postCopy [
 	"My matrix is mutable and a context transforms it in place, and my stroke style is mutable
-	 and a context sets its width and dash in place, so a saved state must hold its own of each."
+	 and a context sets its width and dash in place, so a saved state must hold its own of each.
+	 My source matrix is a capture that no one transforms, but a copy costs nothing and keeps the
+	 rule that a saved state shares no mutable part."
 
 	super postCopy.
 	matrix := matrix copy.
+	sourceMatrix := sourceMatrix copy.
 	strokeStyle := strokeStyle copy
 ]
 
@@ -150,6 +155,20 @@ VGCairoState >> source [
 { #category : 'accessing' }
 VGCairoState >> source: aSource [
 	source := aSource
+]
+
+{ #category : 'accessing' }
+VGCairoState >> sourceMatrix [
+	"The transformation that was in force when the source was set. Measured: Cairo captures it
+	 then and not when the source is used, so a scale applied afterwards does not move the
+	 pattern."
+
+	^ sourceMatrix
+]
+
+{ #category : 'accessing' }
+VGCairoState >> sourceMatrix: aMatrix [
+	sourceMatrix := aMatrix
 ]
 
 { #category : 'accessing' }

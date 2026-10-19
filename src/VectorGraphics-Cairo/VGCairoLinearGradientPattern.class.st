@@ -5,18 +5,32 @@ I answer the frozen paint ABI of rule two of VECTORCANVAS-PLAN.md, and unit 1.5 
 "
 Class {
 	#name : 'VGCairoLinearGradientPattern',
-	#superclass : 'VGCairoPattern',
+	#superclass : 'VGCairoGradientPattern',
 	#category : 'VectorGraphics-Cairo-Pattern',
 	#package : 'VectorGraphics-Cairo',
 	#tag : 'Pattern'
 }
 
-{ #category : 'skeleton - unit 1.5' }
-VGCairoLinearGradientPattern class >> from: arg1 to: arg2 [
-	^ self notYetImplementedIn: '1.5' selector: #from:to:
+{ #category : 'instance creation' }
+VGCairoLinearGradientPattern class >> from: aPoint to: anotherPoint [
+	^ (self new)
+		  from: aPoint to: anotherPoint;
+		  yourself
 ]
 
-{ #category : 'skeleton - unit 1.5' }
-VGCairoLinearGradientPattern class >> from: arg1 to: arg2 addStopsFrom: arg3 [
-	^ self notYetImplementedIn: '1.5' selector: #from:to:addStopsFrom:
+{ #category : 'instance creation' }
+VGCairoLinearGradientPattern class >> from: aPoint to: anotherPoint addStopsFrom: offsetColorAssociations [
+	^ (self from: aPoint to: anotherPoint)
+		  addStopsFrom: offsetColorAssociations;
+		  yourself
+]
+
+{ #category : 'accessing' }
+VGCairoLinearGradientPattern class >> paintClass [
+	^ VGLinearGradientPaint
+]
+
+{ #category : 'initialization' }
+VGCairoLinearGradientPattern >> from: aPoint to: anotherPoint [
+	paint from: aPoint to: anotherPoint
 ]

@@ -629,12 +629,17 @@ VGCairoContext >> raise: anEndAngle above: aStartAngle [
 { #category : 'private' }
 VGCairoContext >> recordFillOf: aSegments [
 	"One entry on the surface's display list. Nothing is rasterised here: the frame appears when
-	 the list is drained, which is the first rule of the plan."
+	 the list is drained, which is the first rule of the plan. The paint is built now, because
+	 Cairo draws when the fill is asked for and so reads the pattern and the captured
+	 transformation of this moment."
 
+	| paint |
 	aSegments isEmpty ifTrue: [ ^ self ].
+	paint := state source paintForDeviceMatrix: state sourceMatrix.
+	paint ifNil: [ ^ self ].
 	surface displayList add: (VGFillEntry
 			 segments: aSegments
-			 paint: state source
+			 paint: paint
 			 clip: self currentClip
 			 operator: self currentOperator)
 ]
@@ -814,39 +819,66 @@ VGCairoContext >> showText: anArgument1 [
 	^ self notYetImplementedIn: '1.8' selector: #showText:
 ]
 
-{ #category : 'skeleton - unit 1.5' }
+{ #category : 'source' }
 VGCairoContext >> source [
-	^ self notYetImplementedIn: '1.5' selector: #source
+	"The pattern the painting verbs take their colour from, and not a copy of it: Cairo answers a
+	 new wrapper over the same pattern, so a caller that changes what it answers changes the
+	 source itself."
+
+	^ state source
 ]
 
-{ #category : 'skeleton - unit 1.5' }
-VGCairoContext >> sourceColor: arg1 [
-	^ self notYetImplementedIn: '1.5' selector: #sourceColor:
+{ #category : 'source' }
+VGCairoContext >> sourceColor: aColor [
+	self isInError ifTrue: [ ^ self ].
+	self sourcePattern: (VGCairoColorPattern newFrom: aColor)
 ]
 
-{ #category : 'skeleton - unit 1.5' }
-VGCairoContext >> sourceColorR: arg1 g: arg2 b: arg3 [
-	^ self notYetImplementedIn: '1.5' selector: #sourceColorR:g:b:
+{ #category : 'source' }
+VGCairoContext >> sourceColorR: red g: green b: blue [
+	"Cairo's rgb setter paints opaque."
+
+	self sourceColorR: red g: green b: blue a: 1.0
 ]
 
-{ #category : 'skeleton - unit 1.5' }
-VGCairoContext >> sourceColorR: arg1 g: arg2 b: arg3 a: arg4 [
-	^ self notYetImplementedIn: '1.5' selector: #sourceColorR:g:b:a:
+{ #category : 'source' }
+VGCairoContext >> sourceColorR: red g: green b: blue a: alpha [
+	self isInError ifTrue: [ ^ self ].
+	self sourcePattern: (VGCairoColorPattern
+			 r: red
+			 g: green
+			 b: blue
+			 alpha: alpha)
 ]
 
-{ #category : 'skeleton - unit 1.5' }
-VGCairoContext >> sourcePattern: arg1 [
-	^ self notYetImplementedIn: '1.5' selector: #sourcePattern:
+{ #category : 'source' }
+VGCairoContext >> sourcePattern: aPattern [
+	"Measured on a live Cairo context: the pattern is referenced and not copied, so a stop added
+	 to it afterwards is painted, while the transformation is captured here and now, so a scale
+	 applied afterwards does not move the pattern."
+
+	self isInError ifTrue: [ ^ self ].
+	state source: aPattern.
+	state sourceMatrix: state matrix copy
 ]
 
-{ #category : 'skeleton - unit 1.5' }
-VGCairoContext >> sourceSurface: arg1 [
-	^ self notYetImplementedIn: '1.5' selector: #sourceSurface:
+{ #category : 'source' }
+VGCairoContext >> sourceSurface: aSurface [
+	self sourceSurface: aSurface x: 0 y: 0
 ]
 
-{ #category : 'skeleton' }
-VGCairoContext >> sourceSurface: anArgument1 x: anArgument2 y: anArgument3 [
-	^ self notYetImplementedIn: '1.5' selector: #sourceSurface:x:y:
+{ #category : 'source' }
+VGCairoContext >> sourceSurface: aSurface x: x y: y [
+	"Cairo builds a surface pattern and moves it by translating the pattern's matrix the other
+	 way, because a pattern matrix maps a user point into the pattern's own space. Measured: an
+	 offset of one moves the picture one pixel to the right and leaves the column it uncovers
+	 untouched, because the default extend mode of a surface pattern is none."
+
+	| pattern |
+	self isInError ifTrue: [ ^ self ].
+	pattern := VGCairoSurfacePattern surface: aSurface.
+	pattern matrix: (VGCairoMatrix newTranslationBy: (x @ y) negated).
+	self sourcePattern: pattern
 ]
 
 { #category : 'accessing' }
