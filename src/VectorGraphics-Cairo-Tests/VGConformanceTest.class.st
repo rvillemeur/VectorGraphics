@@ -83,6 +83,43 @@ VGConformanceTest >> testEveryCaseNamesAUnitThePlanDeclares [
 ]
 
 { #category : 'tests' }
+VGConformanceTest >> testEveryCaseOfAFinishedUnitDraws [
+	"A case whose unit has no skeleton left must draw from end to end. Without this, a case could
+	 stay skipped by the oracle while its unit was called done."
+
+	| blocked |
+	blocked := VGConformanceCorpus cases
+		           select: [ :each |
+			           (self unitsWithNoSkeletonLeft includes: each unit) and: [
+				           each blockingFailure notNil ] ]
+		           thenCollect: [ :each |
+			           each name , ' stops on ' , each blockingFailure selectorName ].
+	self assert: blocked asArray isEmpty description: blocked asArray printString
+]
+
+{ #category : 'tests' }
+VGConformanceTest >> testEveryCaseThatDrawsMatchesCairo [
+	"The gate. Every case the implemented units can draw is rendered twice from one script, once
+	 by the replacement and once by Alexandrie, and the two pictures must agree: no pixel of ours
+	 outside Cairo's shape at all, and no channel further from Cairo's than the case allows. A
+	 case blocked on a later unit is skipped, which is what its blocking failure is for."
+
+	| failures |
+	failures := OrderedCollection new.
+	VGConformanceCorpus cases do: [ :case |
+		case blockingFailure ifNil: [
+			| comparison |
+			comparison := case comparisonWithCairo.
+			comparison isComparable
+				ifFalse: [ failures add: case name , ' differs in extent' ]
+				ifTrue: [
+					(comparison extraneousPixelCount isZero and: [
+						 comparison maximumChannelDistance <= case tolerance ]) ifFalse: [
+						failures add: case name , ' ' , comparison printString ] ] ] ].
+	self assert: failures asArray isEmpty description: failures asArray printString
+]
+
+{ #category : 'tests' }
 VGConformanceTest >> testEveryUnitThatOwesPaintingSelectorsHasACase [
 	"Unit 1.0 owes only lifecycle selectors and unit 1.9 owes none at all, so neither can be drawn.
 	 Every other unit in the table must be visible in at least one picture."
@@ -94,6 +131,22 @@ VGConformanceTest >> testEveryUnitThatOwesPaintingSelectorsHasACase [
 	self
 		assert: uncovered isEmpty
 		description: 'no conformance case is filed under ' , uncovered printString
+]
+
+{ #category : 'accessing' }
+VGConformanceTest >> unitsWithNoSkeletonLeft [
+	"The units whose selectors are all written: no method of the replacement still raises the
+	 not-yet-implemented error naming them. Asked of the code rather than kept as a list, so it
+	 cannot say a unit is done while a selector of it is still a skeleton."
+
+	| pending |
+	pending := ((Smalltalk packageOrganizer packageNamed: 'VectorGraphics-Cairo') methods
+		            select: [ :each |
+		            each messages includes: #notYetImplementedIn:selector: ]
+		            thenCollect: [ :each |
+		            each literals detect: [ :one |
+			            one isString and: [ one first isDigit ] ] ]) asSet.
+	^ VGCairoInventory planUnits reject: [ :each | pending includes: each ]
 ]
 
 { #category : 'support' }

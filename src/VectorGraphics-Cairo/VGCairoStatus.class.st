@@ -40,6 +40,19 @@ VGCairoStatus class >> invalidStrideCode [
 ]
 
 { #category : 'instance creation' }
+VGCairoStatus class >> noCurrentPoint [
+	^ self new setCode: self noCurrentPointCode
+]
+
+{ #category : 'constants' }
+VGCairoStatus class >> noCurrentPointCode [
+	"CAIRO_STATUS_NO_CURRENT_POINT: a relative path verb was sent with no current point. The
+	 number is read from the live enumeration, not guessed."
+
+	^ 4
+]
+
+{ #category : 'instance creation' }
 VGCairoStatus class >> success [
 	^ self new
 		  setCode: self successCode;

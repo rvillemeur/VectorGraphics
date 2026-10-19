@@ -9,15 +9,21 @@ Class {
 	#tag : 'Tests'
 }
 
-{ #category : 'support' }
+{ #category : 'accessing' }
 VGCairoExamplesTest >> exampleHolders [
 	^ {
 		  VGAlexandrieCorpusExamples.
+		  VGBackendExamples.
 		  VGCairoContextExamples.
 		  VGCairoImageSurfaceExamples.
 		  VGCairoInventoryExamples.
 		  VGCairoMatrixExamples.
-		  VGConformanceCorpusExamples }
+		  VGConformanceCorpusExamples.
+		  VGDisplayListExamples.
+		  VGFormComparisonExamples.
+		  VGPathExamples.
+		  VGRasteriserExamples.
+		  VGStrokerExamples }
 ]
 
 { #category : 'accessing' }
@@ -26,6 +32,15 @@ VGCairoExamplesTest >> exampleMethods [
 
 	^ self exampleHolders flatCollect: [ :each |
 		  each class methods select: [ :method | method hasPragmaNamed: #sampleInstance ] ]
+]
+
+{ #category : 'accessing' }
+VGCairoExamplesTest >> exampleSubjects [
+	"Every object the examples build. One click in the browser shows each of them, so these are
+	 the objects whose inspector views have to work."
+
+	^ self exampleMethods collect: [ :each |
+		  each methodClass instanceSide perform: each selector ]
 ]
 
 { #category : 'tests' }
@@ -69,4 +84,63 @@ VGCairoExamplesTest >> testEveryExampleRunsAndAnswersSomething [
 	self
 		assert: broken isEmpty
 		description: 'these examples do not run: ' , broken asArray printString
+]
+
+{ #category : 'tests' }
+VGCairoExamplesTest >> testEveryViewHasAGate [
+	"A view must say when it applies, or it shows a tab full of nils on a half built object. The
+	 gate is the view's own selector with Context: in place of the colon."
+
+	| ungated |
+	ungated := OrderedCollection new.
+	self exampleSubjects do: [ :subject |
+		(self viewMethodsOf: subject) do: [ :each |
+			| gate |
+			gate := ((each value selector allButLast: 1) , 'Context:') asSymbol.
+			(each key class canUnderstand: gate) ifFalse: [
+				ungated add: each value printString ] ] ].
+	self
+		assert: ungated asSet isEmpty
+		description: 'these views have no gate: ' , ungated asSet asSortedCollection asArray printString
+]
+
+{ #category : 'tests' }
+VGCairoExamplesTest >> testEveryViewOfAnExampleBuildsAndFillsItsCells [
+	"A view that raises when the inspector opens it is worse than no view. Every example is asked
+	 for its presenters, and a table is asked for every cell it would show, because a column
+	 block only runs when a row is drawn."
+
+	| broken builder |
+	builder := SpPresenterBuilder newApplication: SpApplication new.
+	broken := OrderedCollection new.
+	self exampleSubjects do: [ :subject |
+		(self viewMethodsOf: subject) do: [ :each |
+			| presenter |
+			presenter := nil.
+			[ presenter := each key perform: each value selector with: builder ]
+				on: Error
+				do: [ :error |
+					broken add: each value printString -> (error class name , ': ' , error messageText printString) ].
+			(presenter isKindOf: SpAbstractListPresenter) ifTrue: [
+				presenter items do: [ :item |
+					presenter columns do: [ :column |
+						[ column evaluation value: item ]
+							on: Error
+							do: [ :error |
+								broken add: each value printString -> (column title , ': ' , error class name) ] ] ] ] ] ].
+	self
+		assert: broken isEmpty
+		description: 'these views do not build: ' , broken asArray printString
+]
+
+{ #category : 'accessing' }
+VGCairoExamplesTest >> viewMethodsOf: anObject [
+	"The inspector views that would show for this object, found by the pragma on both sides, as
+	 receiver to method associations: a class-side view is sent to the class."
+
+	| class |
+	class := anObject class.
+	^ (class methods collect: [ :each | anObject -> each ])
+	  , (class class methods collect: [ :each | class -> each ]) select: [ :each |
+		  each value hasPragmaNamed: #inspectorPresentationOrder:title: ]
 ]

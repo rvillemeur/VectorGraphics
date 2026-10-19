@@ -11,7 +11,8 @@ Class {
 		'matrix',
 		'source',
 		'fillRule',
-		'clip'
+		'clip',
+		'lineWidth'
 	],
 	#category : 'VectorGraphics-Cairo-Context',
 	#package : 'VectorGraphics-Cairo',
@@ -40,9 +41,25 @@ VGCairoState >> fillRule: aSymbol [
 
 { #category : 'initialization' }
 VGCairoState >> initialize [
+	"Cairo's own defaults: the identity matrix, opaque black, the winding fill rule and a line
+	 width of two user-space units. The setters for the source and the line width arrive in units
+	 1.5 and 1.4, so the defaults are what every drawing uses until then."
+
 	super initialize.
 	matrix := VGCairoMatrix newIdentity.
-	fillRule := #winding
+	fillRule := #winding.
+	source := Color black.
+	lineWidth := 2.0
+]
+
+{ #category : 'accessing' }
+VGCairoState >> lineWidth [
+	^ lineWidth
+]
+
+{ #category : 'accessing' }
+VGCairoState >> lineWidth: aNumber [
+	lineWidth := aNumber
 ]
 
 { #category : 'accessing' }

@@ -17,7 +17,9 @@ Class {
 		'deviceOffset',
 		'deviceScale',
 		'status',
-		'finished'
+		'finished',
+		'displayList',
+		'backend'
 	],
 	#category : 'VectorGraphics-Cairo-Surface',
 	#package : 'VectorGraphics-Cairo',
@@ -109,18 +111,38 @@ VGCairoImageSurface >> asForm [
 	^ form
 ]
 
-{ #category : 'pixels' }
+{ #category : 'accessing' }
+VGCairoImageSurface >> backend [
+	"Whichever backend draws my frames. The software one is the default and the failover; phase 2
+	 puts the Vulkan one here."
+	^ backend ifNil: [ backend := VGSoftwareBackend new ]
+]
+
+{ #category : 'accessing' }
+VGCairoImageSurface >> backend: aBackend [
+	self flush.
+	backend := aBackend
+]
+
+{ #category : 'pixel access' }
 VGCairoImageSurface >> blendPixel: anInteger [
 	"Every pixel of mine, with that source painted over what is already there. Row by row and only
 	 width pixels wide, like #fillPixel:, because the padding belongs to whoever gave me the
 	 stride."
 	self ensureNotFinished.
+	self flush.
 	0 to: height - 1 do: [ :y |
 		0 to: width - 1 do: [ :x |
 			self
 				primitivePixelAtX: x
 				y: y
-				put: (format blendPixel: anInteger over: (self pixelAtX: x y: y)) ] ]
+				put: (format blendPixel: anInteger over: (self primitivePixelAtX: x y: y)) ] ]
+]
+
+{ #category : 'accessing' }
+VGCairoImageSurface >> boundsRectangle [
+	"My whole area in device space, which is the clip until unit 1.6 brings the clip stack."
+	^ 0 @ 0 corner: width @ height
 ]
 
 { #category : 'accessing' }
@@ -177,6 +199,13 @@ VGCairoImageSurface >> deviceScaleX: aNumber y: anotherNumber [
 	self deviceScale: aNumber @ anotherNumber
 ]
 
+{ #category : 'accessing' }
+VGCairoImageSurface >> displayList [
+	"The frame being recorded on me. Every context drawing on me records here, so that two contexts
+	 on one surface draw in the order their calls were made."
+	^ displayList ifNil: [ displayList := VGDisplayList new ]
+]
+
 { #category : 'lifecycle' }
 VGCairoImageSurface >> ensureNotFinished [
 	finished ifTrue: [
@@ -188,11 +217,13 @@ VGCairoImageSurface >> extent [
 	^ width @ height
 ]
 
-{ #category : 'pixels' }
+{ #category : 'pixel access' }
 VGCairoImageSurface >> fillPixel: anInteger [
 	"Row by row and only width pixels wide: the bytes between one row and the next belong to whoever
-	 gave me the stride, and a host window reads them back."
+	 gave me the stride, and a host window reads them back. The frame waiting on me is drawn first,
+	 so that a fill really does cover what came before it."
 	self ensureNotFinished.
+	self flush.
 	0 to: height - 1 do: [ :y |
 		0 to: width - 1 do: [ :x | self primitivePixelAtX: x y: y put: anInteger ] ]
 ]
@@ -200,16 +231,22 @@ VGCairoImageSurface >> fillPixel: anInteger [
 { #category : 'lifecycle' }
 VGCairoImageSurface >> finish [
 	"Cairo refuses further drawing on a finished surface but leaves its pixels readable, and
-	 finishing twice is not an error."
+	 finishing twice is not an error. What was recorded and not yet drawn is drawn first, as Cairo
+	 flushes before it finishes."
+	finished ifFalse: [ self flush ].
 	finished := true.
 	^ self
 ]
 
-{ #category : 'lifecycle' }
+{ #category : 'drawing' }
 VGCairoImageSurface >> flush [
-	"A software surface has nothing pending. The selector is here because Alexandrie's callers
-	 cascade from it."
-	^ self
+	"Draw the frame recorded on me and keep nothing. This is Cairo's own synchronisation point:
+	 everything that reads my pixels sends it first, and a caller holding a raw pointer has to send
+	 it itself."
+	self displayList isEmpty ifTrue: [ ^ self ].
+	self displayList replayOn: self backend.
+	self backend drainInto: self.
+	self displayList reset
 ]
 
 { #category : 'accessing' }
@@ -294,15 +331,13 @@ VGCairoImageSurface >> offsetOfX: x y: y [
 	^ y * stride + (x * format bytesPerPixel)
 ]
 
-{ #category : 'pixels' }
+{ #category : 'pixel access' }
 VGCairoImageSurface >> pixelAtX: x y: y [
 	"Both a ByteArray and an ExternalAddress answer #uint32AtOffset:, so the same path reads my own
-	 buffer and a host window's memory."
-	| offset |
-	offset := self offsetOfX: x y: y.
-	^ format isA8
-		  ifTrue: [ data uint8AtOffset: offset ]
-		  ifFalse: [ data uint32AtOffset: offset ]
+	 buffer and a host window's memory. The frame is drained first, because a caller reading a
+	 pixel means to see what it drew."
+	self flush.
+	^ self primitivePixelAtX: x y: y
 ]
 
 { #category : 'pixels' }
@@ -310,6 +345,17 @@ VGCairoImageSurface >> pixelAtX: x y: y put: anInteger [
 	self ensureNotFinished.
 	self primitivePixelAtX: x y: y put: anInteger.
 	^ anInteger
+]
+
+{ #category : 'pixel access' }
+VGCairoImageSurface >> primitivePixelAtX: x y: y [
+	"The stored pixel, read without draining the frame first. The backend reads through me while it
+	 is draining, so the public reader cannot be the one it uses."
+	| offset |
+	offset := self offsetOfX: x y: y.
+	^ format isA8
+		  ifTrue: [ data uint8AtOffset: offset ]
+		  ifFalse: [ data uint32AtOffset: offset ]
 ]
 
 { #category : 'pixels' }

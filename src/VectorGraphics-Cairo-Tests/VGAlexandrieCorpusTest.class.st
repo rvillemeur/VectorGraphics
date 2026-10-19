@@ -35,10 +35,11 @@ VGAlexandrieCorpusTest >> testEveryCaseEitherDrawsOrNamesTheUnitThatUnblocksIt [
 	self assert: unexplained asArray isEmpty description: unexplained asArray printString
 ]
 
-{ #category : 'tests - oracle' }
+{ #category : 'tests' }
 VGAlexandrieCorpusTest >> testEveryCaseThatDrawsMatchesCairo [
 	"The oracle itself. A case that runs end to end on the replacement must produce the same
 	 picture as Alexandrie, within the tolerance the corpus states for it."
+
 	| failures |
 	self skipWithoutTheExperiments ifTrue: [ ^ self skip ].
 	failures := OrderedCollection new.
@@ -46,12 +47,11 @@ VGAlexandrieCorpusTest >> testEveryCaseThatDrawsMatchesCairo [
 		(case isPortable and: [ case blockingFailure isNil ]) ifTrue: [
 			| comparison |
 			comparison := case comparisonWithCairo.
-			comparison
-				ifNil: [ failures add: case name , ' differs in extent' ]
-				ifNotNil: [
-					comparison second > case tolerance ifTrue: [
-						failures add: case name , ' differs in ' , comparison first printString
-							, ' pixels, up to ' , comparison second printString , ' per channel' ] ] ] ].
+			comparison isComparable
+				ifFalse: [ failures add: case name , ' differs in extent' ]
+				ifTrue: [
+					comparison maximumChannelDistance > case tolerance ifTrue: [
+						failures add: case name , ' ' , comparison printString ] ] ] ].
 	self assert: failures asArray isEmpty description: failures asArray printString
 ]
 

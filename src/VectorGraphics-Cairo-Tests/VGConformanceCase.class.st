@@ -41,6 +41,25 @@ VGConformanceCase >> blockingFailure [
 ]
 
 { #category : 'drawing' }
+VGConformanceCase >> cairoForm [
+	"The reference, drawn by Alexandrie from my own script. The script is not translated: the
+	 replacement answers the selectors Alexandrie answers, so one block runs on either context,
+	 and a case that drifts from that calling API cannot be rendered here at all. This is also
+	 why the reference is rendered rather than committed as a PNG, as unit 1.1 already does."
+
+	| surface |
+	surface := AeCairoImageSurface extent: extent.
+	self drawOn: surface newContext.
+	surface flush.
+	^ surface asForm
+]
+
+{ #category : 'comparing' }
+VGConformanceCase >> comparisonWithCairo [
+	^ VGFormComparison between: self ourForm and: self cairoForm
+]
+
+{ #category : 'drawing' }
 VGConformanceCase >> drawOn: aContext [
 	drawBlock value: aContext
 ]
@@ -69,6 +88,23 @@ VGConformanceCase >> inspectorBlockingFailure: aContext [
 		  yourself
 ]
 
+{ #category : 'inspector' }
+VGConformanceCase >> inspectorBlockingFailureContext: aContext [
+	aContext active: drawBlock notNil
+]
+
+{ #category : 'comparing' }
+VGConformanceCase >> matchesCairo [
+	"Two conditions, and the first is the strict one: we paint no pixel Cairo leaves untouched, and
+	 no channel anywhere is further from Cairo than my tolerance allows."
+
+	| comparison |
+	comparison := self comparisonWithCairo.
+	^ comparison isComparable and: [
+		  comparison extraneousPixelCount isZero and: [
+			  comparison maximumChannelDistance <= self tolerance ] ]
+]
+
 { #category : 'accessing' }
 VGConformanceCase >> name [
 	^ name
@@ -82,6 +118,17 @@ VGConformanceCase >> newTarget [
 	^ (VGCairoImageSurface extent: extent) newContext
 ]
 
+{ #category : 'drawing' }
+VGConformanceCase >> ourForm [
+	"My picture, drawn by the replacement."
+
+	| surface |
+	surface := VGCairoImageSurface extent: extent.
+	self drawOn: surface newContext.
+	surface flush.
+	^ surface asForm
+]
+
 { #category : 'printing' }
 VGConformanceCase >> printOn: aStream [
 	super printOn: aStream.
@@ -91,13 +138,6 @@ VGConformanceCase >> printOn: aStream [
 		nextPutAll: ' (unit ';
 		nextPutAll: unit;
 		nextPut: $)
-]
-
-{ #category : 'accessing' }
-VGConformanceCase >> referenceFileName [
-	"The reference render lives next to the corpus, one PNG per case, named after the case."
-
-	^ name , '.png'
 ]
 
 { #category : 'private' }

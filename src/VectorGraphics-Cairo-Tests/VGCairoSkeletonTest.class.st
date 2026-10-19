@@ -12,6 +12,15 @@ Class {
 }
 
 { #category : 'accessing' }
+VGCairoSkeletonTest >> packagesUnderTest [
+	"The three packages this project owns."
+
+	^ #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Tests'
+	     'VectorGraphics-Cairo-Examples' ) collect: [ :each |
+		  Smalltalk packageOrganizer packageNamed: each ]
+]
+
+{ #category : 'accessing' }
 VGCairoSkeletonTest >> skeletonMethods [
 	"Every method of the Cairo replacement that is still a skeleton, found by its send rather than
 	 by its protocol name, so that renaming a protocol cannot hide one."
@@ -68,6 +77,28 @@ VGCairoSkeletonTest >> testEverySkeletonSignalsAndTheErrorNamesItsUnit [
 					failures add: method methodClass name , ' >> ' , method selector , ' named unit '
 						, error unit printString ] ] ].
 	self assert: failures asArray isEmpty description: failures asArray printString
+]
+
+{ #category : 'tests' }
+VGCairoSkeletonTest >> testNoMethodReferencesAnUndeclaredVariable [
+	"A method left behind by a slot that was removed still compiles: the slot name becomes an
+	 undeclared global, and reading it answers nil instead of failing. Nothing in these packages
+	 may hold such a reference."
+
+	| offenders |
+	offenders := OrderedCollection new.
+	self packagesUnderTest do: [ :package |
+		package methods do: [ :method |
+			(method literals select: [ :each |
+				 each isVariableBinding and: [ each key notNil and: [
+					 (Smalltalk includesKey: each key asSymbol) not ] ] ]) do: [ :each |
+				offenders add:
+					method methodClass name asString , '>>' , method selector , ' -> '
+					, each key asString ] ] ].
+	self
+		assert: offenders isEmpty
+		description: 'these methods read an undeclared variable: '
+			, offenders asArray printString
 ]
 
 { #category : 'tests - meta' }

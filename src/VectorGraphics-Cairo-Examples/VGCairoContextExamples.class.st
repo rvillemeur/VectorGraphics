@@ -17,6 +17,27 @@ VGCairoContextExamples class >> contextOnAnImageSurface [
 ]
 
 { #category : 'examples' }
+VGCairoContextExamples class >> contextWithAStarPathPending [
+	<sampleInstance>
+	"A context holding a built but unpainted path, so the Path tab shows the runs and the current
+	 point a fill would consume. The path is already in device space, which is why a later
+	 transformation cannot move it."
+
+	| context |
+	context := (VGCairoImageSurface extent: 64 @ 64) newContext.
+	context useFillRuleEvenOdd.
+	0 to: 4 do: [ :index |
+		| angle point |
+		angle := index * 4 * Float pi / 5 - (Float pi / 2).
+		point := 32 @ 32 + (angle cos * 26 @ (angle sin * 26)).
+		index isZero
+			ifTrue: [ context moveTo: point ]
+			ifFalse: [ context lineTo: point ] ].
+	context closePath.
+	^ context
+]
+
+{ #category : 'examples' }
 VGCairoContextExamples class >> linearGradientPatternClass [
 	<sampleInstance>
 	"The pattern classes are the third of the three Cairo objects AeCanvas drives. Inspecting the

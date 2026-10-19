@@ -76,13 +76,6 @@ VGAlexandrieCase >> cairoForm [
 	^ VGAlexandrieCorpus experimentClass perform: experimentSelector
 ]
 
-{ #category : 'comparing' }
-VGAlexandrieCase >> channelDistanceBetween: aWord and: anotherWord [
-	^ ((0 to: 24 by: 8) collect: [ :shift |
-		   (((aWord bitShift: shift negated) bitAnd: 255)
-		    - ((anotherWord bitShift: shift negated) bitAnd: 255)) abs ]) max
-]
-
 { #category : 'inspecting' }
 VGAlexandrieCase >> classDescription [
 	"One row for every Alexandrie class my experiment names: the name it uses, the counterpart the
@@ -97,25 +90,10 @@ VGAlexandrieCase >> classDescription [
 
 { #category : 'comparing' }
 VGAlexandrieCase >> comparisonWithCairo [
-	"How far my picture is from Alexandrie's: the number of pixels that differ and the largest
-	 difference in any single channel. Both pictures are drawn afresh, so asking changes nothing.
-	 Two pictures of different sizes are not comparable at all, and answer nil."
-	| ours theirs differing maximum |
-	ours := self ourForm asFormOfDepth: 32.
-	theirs := self cairoForm asFormOfDepth: 32.
-	ours extent = theirs extent ifFalse: [ ^ nil ].
-	differing := 0.
-	maximum := 0.
-	1 to: ours bits size do: [ :index |
-		| ourWord theirWord |
-		ourWord := ours bits at: index.
-		theirWord := theirs bits at: index.
-		ourWord = theirWord ifFalse: [
-			differing := differing + 1.
-			maximum := maximum max: (self channelDistanceBetween: ourWord and: theirWord) ] ].
-	^ {
-		  differing.
-		  maximum }
+	"How far my picture is from Alexandrie's. Both pictures are drawn afresh, so asking changes
+	 nothing."
+
+	^ VGFormComparison between: self ourForm and: self cairoForm
 ]
 
 { #category : 'generating' }
@@ -183,9 +161,14 @@ VGAlexandrieCase >> isPortable [
 
 { #category : 'comparing' }
 VGAlexandrieCase >> matchesCairo [
+	"Two conditions, and the first is the strict one: we paint no pixel Alexandrie leaves
+	 untouched, and no channel anywhere is further from it than my tolerance allows."
+
 	| comparison |
 	comparison := self comparisonWithCairo.
-	^ comparison notNil and: [ comparison second <= self tolerance ]
+	^ comparison isComparable and: [
+		  comparison extraneousPixelCount isZero and: [
+			  comparison maximumChannelDistance <= self tolerance ] ]
 ]
 
 { #category : 'accessing' }
