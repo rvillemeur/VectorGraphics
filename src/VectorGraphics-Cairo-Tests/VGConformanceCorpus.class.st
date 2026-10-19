@@ -236,40 +236,44 @@ VGConformanceCorpus class >> sourceCases [
 
 { #category : 'cases' }
 VGConformanceCorpus class >> strokeCases [
-	"Unit 1.4: the stroke parameters. The cap, the join and the fill rule are named by symbol here,
-	 so that the corpus runs in an image that has no Cairo at all; unit 1.4 decides whether the
-	 setters also accept Alexandrie's own enumeration objects, which AeCanvas passes them."
+	"Unit 1.4: the stroke parameters. A case that must draw the same picture on our context and on
+	 a live Cairo one names a cap and a join through the six use verbs, which both contexts answer
+	 and neither reads from an enumeration object. The antialiasing mode is the one stroke
+	 parameter Alexandrie offers no verb for, so that case names its enumeration object, which the
+	 test package is allowed to do; it fills a polygon rather than a circle, because a flattened
+	 curve lands its vertices in a phase of its own and an aliased pixel is wholly on or wholly
+	 off, which turns a sliver of a difference into a whole pixel."
 
 	^ {
-		  (self case: 'stroke-caps' unit: '1.4' draw: [ :context |
-			    #( #butt #round #square ) doWithIndex: [ :each :index |
-				    context
-					    strokeCap: each;
-					    strokeSize: 9;
-					    lineFrom: 14 @ (index * 16) to: 50 @ (index * 16);
-					    stroke ] ]).
-		  (self case: 'stroke-joins' unit: '1.4' draw: [ :context |
-			    #( #miter #round #bevel ) doWithIndex: [ :each :index |
-				    context
-					    strokeJoin: each;
-					    strokeJoinMiterLimit: 10;
-					    strokeSize: 7;
-					    moveTo: 10 @ (index * 20);
-					    lineTo: 32 @ (index * 20 - 12);
-					    lineTo: 54 @ (index * 20);
-					    stroke ] ]).
+		  (self antialiasedCase: 'stroke-caps' unit: '1.4' draw: [ :context |
+			   #( #useStrokeCapButt #useStrokeCapRound #useStrokeCapSquare )
+				   doWithIndex: [ :each :index |
+					   context
+						   perform: each;
+						   strokeSize: 9;
+						   lineFrom: 14 @ (index * 16) to: 50 @ (index * 16);
+						   stroke ] ]).
+		  (self antialiasedCase: 'stroke-joins' unit: '1.4' draw: [ :context |
+			   #( #useStrokeJoinMiter #useStrokeJoinRound #useStrokeJoinBevel )
+				   doWithIndex: [ :each :index |
+					   context
+						   perform: each;
+						   strokeJoinMiterLimit: 10;
+						   strokeSize: 7;
+						   moveTo: 10 @ (index * 20);
+						   lineTo: 32 @ (index * 20 - 12);
+						   lineTo: 54 @ (index * 20);
+						   stroke ] ]).
 		  (self case: 'stroke-dashes' unit: '1.4' draw: [ :context |
-			    context
-				    strokeSize: 5;
-				    strokeDashPattern: #( 9 4 ) offset: 2;
-				    lineFrom: 6 @ 32 to: 58 @ 32;
-				    stroke ]).
+			   context
+				   strokeSize: 6;
+				   strokeDashPattern: #( 9 4 ) offset: 2;
+				   lineFrom: 6 @ 32 to: 58 @ 32;
+				   stroke ]).
 		  (self case: 'stroke-antialias-none' unit: '1.4' draw: [ :context |
-			    context
-				    antialias: #none;
-				    tolerance: 0.1;
-				    circleCenterX: 32 y: 32 radius: 20;
-				    fill ]) }
+			   context antialias: AeCairoAntialias none.
+			   self appendFivePointedStarTo: context.
+			   context fill ]) }
 ]
 
 { #category : 'cases' }

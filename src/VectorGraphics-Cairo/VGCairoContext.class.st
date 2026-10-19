@@ -55,9 +55,15 @@ VGCairoContext >> annulusSectorCenter: aPoint from: startRadians to: stopRadians
 		closePath
 ]
 
-{ #category : 'skeleton - unit 1.4' }
-VGCairoContext >> antialias: arg1 [
-	^ self notYetImplementedIn: '1.4' selector: #antialias:
+{ #category : 'stroke style' }
+VGCairoContext >> antialias: anObject [
+	"How a fill is sampled: #default, #none, #gray, #subpixel, #fast, #good or #best, or
+	 Alexandrie's own AeCairoAntialias, or Cairo's integer. Only #none changes what we draw,
+	 because it takes one sample at the centre of each pixel and every other mode keeps the
+	 sub-row sampling Cairo itself uses."
+
+	self isInError ifTrue: [ ^ self ].
+	state antialias: anObject
 ]
 
 { #category : 'private' }
@@ -471,6 +477,16 @@ VGCairoContext >> isInError [
 	^ status isSuccess not
 ]
 
+{ #category : 'private' }
+VGCairoContext >> isValidDashPattern: aCollection [
+	"Cairo's two rules, measured against a live context: no length may be negative, and a
+	 pattern that holds lengths at all must hold one that is not zero. An empty pattern is
+	 valid and turns dashing off."
+
+	(aCollection anySatisfy: [ :each | each < 0 ]) ifTrue: [ ^ false ].
+	^ aCollection isEmpty or: [ aCollection anySatisfy: [ :each | each > 0 ] ]
+]
+
 { #category : 'path' }
 VGCairoContext >> lineFrom: aPoint to: anotherPoint [
 	self
@@ -579,9 +595,13 @@ VGCairoContext >> paintWithAlpha: arg1 [
 { #category : 'accessing' }
 VGCairoContext >> pathBuilder [
 	"The path I am building, in device space. Cairo transforms a point as the path verb is sent,
-	 not as the paint is drawn, so a path survives a later change of matrix unmoved."
+	 not as the paint is drawn, so a path survives a later change of matrix unmoved. The builder
+	 flattens a curve to the tolerance the state carries."
 
-	^ pathBuilder ifNil: [ pathBuilder := VGPathBuilder new ]
+	^ pathBuilder ifNil: [
+		  pathBuilder := VGPathBuilder new
+			                 flatteningTolerance: state tolerance;
+			                 yourself ]
 ]
 
 { #category : 'path' }
@@ -621,20 +641,21 @@ VGCairoContext >> recordFillOf: aSegments [
 
 { #category : 'private' }
 VGCairoContext >> recordFillOfPath [
-	"The fill rule travels inside the segment array, because the backend's three messages are
-	 frozen and none of them carries one."
+	"The fill rule and the antialiasing mode both travel inside the segment array, because the
+	 backend's three messages are frozen and none of them carries either one."
 
-	self recordFillOf: (self pathBuilder path segmentsWithFillRule: state fillRule)
+	self recordFillOf: (self pathBuilder path
+			 segmentsWithFillRule: state fillRule
+			 antialias: state antialias)
 ]
 
 { #category : 'private' }
 VGCairoContext >> recordStrokeOfPath [
-	"A stroke is a fill of the widened path: the backend fills segments and knows nothing else."
+	"A stroke is a fill of the widened path: the backend fills segments and knows nothing else.
+	 The whole stroke style travels in the state, because the caps, joins, dashes and miter
+	 limit all shape the outline."
 
-	self recordFillOf: (VGStroker
-			 path: self pathBuilder path
-			 matrix: state matrix
-			 lineWidth: state lineWidth) segments
+	self recordFillOf: (VGStroker path: self pathBuilder path state: state) segments
 ]
 
 { #category : 'path' }
@@ -859,29 +880,54 @@ VGCairoContext >> stroke [
 	self newPath
 ]
 
-{ #category : 'skeleton - unit 1.4' }
-VGCairoContext >> strokeCap: arg1 [
-	^ self notYetImplementedIn: '1.4' selector: #strokeCap:
+{ #category : 'stroke style' }
+VGCairoContext >> strokeCap: anObject [
+	"The cap drawn past each end of an open run: #butt, #round or #square. Alexandrie passes an
+	 AeCairoStrokeCap and Cairo's own integer names the same three, so all three are accepted."
+
+	self isInError ifTrue: [ ^ self ].
+	state strokeStyle lineCap: (VGCairoStrokeStyle capFor: anObject)
 ]
 
-{ #category : 'skeleton - unit 1.4' }
-VGCairoContext >> strokeDashPattern: arg1 offset: arg2 [
-	^ self notYetImplementedIn: '1.4' selector: #strokeDashPattern:offset:
+{ #category : 'stroke style' }
+VGCairoContext >> strokeDashPattern: aCollection offset: aNumber [
+	"The on and off lengths along the path, and how far into the cycle the first run starts. An
+	 empty pattern turns dashing off. Cairo refuses a negative length, and a pattern whose
+	 lengths are all zero, with CAIRO_STATUS_INVALID_DASH; a refused pattern leaves the style as
+	 it was."
+
+	self isInError ifTrue: [ ^ self ].
+	(self isValidDashPattern: aCollection)
+		ifTrue: [ state strokeStyle dashPattern: aCollection offset: aNumber ]
+		ifFalse: [ status := VGCairoStatus invalidDash ]
 ]
 
-{ #category : 'skeleton' }
-VGCairoContext >> strokeDashPattern: anArgument1 size: anArgument2 offset: anArgument3 [
-	^ self notYetImplementedIn: '1.4' selector: #strokeDashPattern:size:offset:
+{ #category : 'stroke style' }
+VGCairoContext >> strokeDashPattern: aCollection size: anInteger offset: aNumber [
+	"AeCanvas hands over an array and the count of entries to read separately, so the count
+	 rules and the tail of the array is no part of the pattern."
+
+	self
+		strokeDashPattern: (aCollection first: anInteger)
+		offset: aNumber
 ]
 
-{ #category : 'skeleton - unit 1.4' }
-VGCairoContext >> strokeJoin: arg1 [
-	^ self notYetImplementedIn: '1.4' selector: #strokeJoin:
+{ #category : 'stroke style' }
+VGCairoContext >> strokeJoin: anObject [
+	"The wedge drawn where two segments meet: #miter, #round or #bevel. Alexandrie passes an
+	 AeCairoStrokeJoin and Cairo's own integer names the same three, so all three are accepted."
+
+	self isInError ifTrue: [ ^ self ].
+	state strokeStyle lineJoin: (VGCairoStrokeStyle joinFor: anObject)
 ]
 
-{ #category : 'skeleton - unit 1.4' }
-VGCairoContext >> strokeJoinMiterLimit: arg1 [
-	^ self notYetImplementedIn: '1.4' selector: #strokeJoinMiterLimit:
+{ #category : 'stroke style' }
+VGCairoContext >> strokeJoinMiterLimit: aNumber [
+	"How far a miter join may run out from the vertex, as a multiple of half the line width.
+	 Cairo draws the bevel instead once the tip would pass it."
+
+	self isInError ifTrue: [ ^ self ].
+	state strokeStyle miterLimit: aNumber asFloat
 ]
 
 { #category : 'painting' }
@@ -890,9 +936,13 @@ VGCairoContext >> strokePreservingPath [
 	self recordStrokeOfPath
 ]
 
-{ #category : 'skeleton - unit 1.4' }
-VGCairoContext >> strokeSize: arg1 [
-	^ self notYetImplementedIn: '1.4' selector: #strokeSize:
+{ #category : 'stroke style' }
+VGCairoContext >> strokeSize: aNumber [
+	"The line width, in user space. Cairo's own name for it is the line width; Alexandrie calls
+	 it the stroke size and that is the name the inventory holds."
+
+	self isInError ifTrue: [ ^ self ].
+	state lineWidth: aNumber
 ]
 
 { #category : 'accessing' }
@@ -900,9 +950,15 @@ VGCairoContext >> surface [
 	^ surface
 ]
 
-{ #category : 'skeleton - unit 1.4' }
-VGCairoContext >> tolerance: arg1 [
-	^ self notYetImplementedIn: '1.4' selector: #tolerance:
+{ #category : 'stroke style' }
+VGCairoContext >> tolerance: aNumber [
+	"How far a flattened curve, and the polygon a round cap is drawn with, may stand from the
+	 real shape, in device space. Measured, Cairo answers a tolerance of zero or less back as
+	 its own minimum and keeps its status clean."
+
+	self isInError ifTrue: [ ^ self ].
+	state tolerance: aNumber.
+	pathBuilder ifNotNil: [ pathBuilder flatteningTolerance: state tolerance ]
 ]
 
 { #category : 'transformations' }
@@ -931,34 +987,46 @@ VGCairoContext >> useFillRuleWinding [
 	self fillRule: #winding
 ]
 
-{ #category : 'skeleton' }
+{ #category : 'stroke style' }
 VGCairoContext >> useStrokeCapButt [
-	^ self notYetImplementedIn: '1.4' selector: #useStrokeCapButt
+	"Alexandrie's verb for the cap that stops at the end point."
+
+	self strokeCap: #butt
 ]
 
-{ #category : 'skeleton' }
+{ #category : 'stroke style' }
 VGCairoContext >> useStrokeCapRound [
-	^ self notYetImplementedIn: '1.4' selector: #useStrokeCapRound
+	"Alexandrie's verb for the cap that is a half disc past the end point."
+
+	self strokeCap: #round
 ]
 
-{ #category : 'skeleton' }
+{ #category : 'stroke style' }
 VGCairoContext >> useStrokeCapSquare [
-	^ self notYetImplementedIn: '1.4' selector: #useStrokeCapSquare
+	"Alexandrie's verb for the cap that runs half the line width past the end point."
+
+	self strokeCap: #square
 ]
 
-{ #category : 'skeleton' }
+{ #category : 'stroke style' }
 VGCairoContext >> useStrokeJoinBevel [
-	^ self notYetImplementedIn: '1.4' selector: #useStrokeJoinBevel
+	"Alexandrie's verb for the join that closes the turn with one straight edge."
+
+	self strokeJoin: #bevel
 ]
 
-{ #category : 'skeleton' }
+{ #category : 'stroke style' }
 VGCairoContext >> useStrokeJoinMiter [
-	^ self notYetImplementedIn: '1.4' selector: #useStrokeJoinMiter
+	"Alexandrie's verb for the join that runs out to the tip, within the miter limit."
+
+	self strokeJoin: #miter
 ]
 
-{ #category : 'skeleton' }
+{ #category : 'stroke style' }
 VGCairoContext >> useStrokeJoinRound [
-	^ self notYetImplementedIn: '1.4' selector: #useStrokeJoinRound
+	"Alexandrie's verb for the join that fills the turn with a disc."
+
+	self strokeJoin: #round
 ]
 
 { #category : 'private' }

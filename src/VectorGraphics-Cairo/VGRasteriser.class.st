@@ -19,7 +19,8 @@ Class {
 	#instVars : [
 		'segments',
 		'fillRule',
-		'clip'
+		'clip',
+		'antialias'
 	],
 	#category : 'VectorGraphics-Cairo-Rasterising',
 	#package : 'VectorGraphics-Cairo',
@@ -34,8 +35,21 @@ VGRasteriser class >> samplesPerPixelRow [
 ]
 
 { #category : 'instance creation' }
+VGRasteriser class >> segments: anArray fillRule: aSymbol antialias: anotherSymbol clip: aRectangle [
+	^ self new
+		  setSegments: anArray
+		  fillRule: aSymbol
+		  antialias: anotherSymbol
+		  clip: aRectangle
+]
+
+{ #category : 'instance creation' }
 VGRasteriser class >> segments: anArray fillRule: aSymbol clip: aRectangle [
-	^ self new setSegments: anArray fillRule: aSymbol clip: aRectangle
+	^ self
+		  segments: anArray
+		  fillRule: aSymbol
+		  antialias: VGCairoState antialiasNames first
+		  clip: aRectangle
 ]
 
 { #category : 'private' }
@@ -52,6 +66,11 @@ VGRasteriser >> addOverlapFrom: aNumber to: anotherNumber into: aFloatArray star
 		overlap > 0 ifTrue: [
 			index := pixel - anInteger + 1.
 			aFloatArray at: index put: (aFloatArray at: index) + overlap ] ]
+]
+
+{ #category : 'accessing' }
+VGRasteriser >> antialias [
+	^ antialias
 ]
 
 { #category : 'accessing' }
@@ -85,26 +104,23 @@ VGRasteriser >> coverageRamp [
 	^ ' .:-=+*#%@'
 ]
 
-{ #category : 'enumerating' }
+{ #category : 'accessing' }
 VGRasteriser >> coverageRowsDo: aBlock [
 	"The coverage of every row the clip and the edges share: the row, a Float64Array of coverage
 	 from zero to one, and the device x its first entry stands for. A row no edge reaches is not
 	 visited at all."
-	| left width coverage samples |
+
+	| left width coverage |
 	segments isEmpty ifTrue: [ ^ self ].
 	left := clip left floor.
 	width := clip right ceiling - left.
 	width <= 0 ifTrue: [ ^ self ].
-	samples := self class samplesPerPixelRow.
 	coverage := Float64Array new: width.
 	self rowRange do: [ :y |
 		coverage atAllPut: 0.0.
-		0 to: samples - 1 do: [ :sample |
-			self
-				spansAt: y + ((sample + 0.5) / samples)
-				do: [ :from :to | self addOverlapFrom: from to: to into: coverage startingAt: left ] ].
-		1 to: width do: [ :index |
-			coverage at: index put: ((coverage at: index) / samples min: 1.0) ].
+		self isAliased
+			ifTrue: [ self fillAliasedCoverage: coverage startingAt: left atRow: y ]
+			ifFalse: [ self fillSampledCoverage: coverage startingAt: left atRow: y ].
 		aBlock value: y value: coverage value: left ]
 ]
 
@@ -130,9 +146,42 @@ VGRasteriser >> crossingsAt: aNumber [
 	^ crossings asArray sort: [ :a :b | a key <= b key ]
 ]
 
+{ #category : 'private' }
+VGRasteriser >> fillAliasedCoverage: aFloatArray startingAt: anInteger atRow: aRow [
+	"Antialiasing off: one sample at the centre of the pixel, so every pixel is painted whole or
+	 left alone and no edge carries a shade."
+
+	self spansAt: aRow + 0.5 do: [ :from :to |
+		1 to: aFloatArray size do: [ :index |
+			| centre |
+			centre := anInteger + index - 0.5.
+			(centre >= from and: [ centre < to ]) ifTrue: [
+				aFloatArray at: index put: 1.0 ] ] ]
+]
+
 { #category : 'accessing' }
 VGRasteriser >> fillRule [
 	^ fillRule
+]
+
+{ #category : 'private' }
+VGRasteriser >> fillSampledCoverage: aFloatArray startingAt: anInteger atRow: aRow [
+	"The part of each pixel of the row the shape covers, sampled on the sub-row grid and exact
+	 across the pixel."
+
+	| samples |
+	samples := self class samplesPerPixelRow.
+	0 to: samples - 1 do: [ :sample |
+		self
+			spansAt: aRow + ((sample + 0.5) / samples)
+			do: [ :from :to |
+			self
+				addOverlapFrom: from
+				to: to
+				into: aFloatArray
+				startingAt: anInteger ] ].
+	1 to: aFloatArray size do: [ :index |
+		aFloatArray at: index put: ((aFloatArray at: index) / samples min: 1.0) ]
 ]
 
 { #category : 'inspector' }
@@ -149,6 +198,11 @@ VGRasteriser >> inspectorCoverage: aBuilder [
 { #category : 'inspector' }
 VGRasteriser >> inspectorCoverageContext: aContext [
 	aContext active: (segments notNil and: [ clip notNil ])
+]
+
+{ #category : 'testing' }
+VGRasteriser >> isAliased [
+	^ antialias == #none
 ]
 
 { #category : 'private' }
@@ -190,10 +244,11 @@ VGRasteriser >> segments [
 	^ segments
 ]
 
-{ #category : 'initialization' }
-VGRasteriser >> setSegments: anArray fillRule: aSymbol clip: aRectangle [
+{ #category : 'private' }
+VGRasteriser >> setSegments: anArray fillRule: aSymbol antialias: anotherSymbol clip: aRectangle [
 	segments := anArray.
 	fillRule := aSymbol.
+	antialias := anotherSymbol.
 	clip := aRectangle
 ]
 

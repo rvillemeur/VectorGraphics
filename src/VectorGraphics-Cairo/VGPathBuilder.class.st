@@ -48,9 +48,12 @@ VGPathBuilder >> beginSubPath [
 
 { #category : 'building' }
 VGPathBuilder >> closePath [
-	"A closed run bounds its own area and the current point goes back to where the run started, so
-	 that drawing on begins a new run from there, which is what Cairo does."
-	points size < 2 ifTrue: [ ^ self ].
+	"A closed run bounds its own area and the current point goes back to where the run started,
+	 so that drawing on begins a new run from there, which is what Cairo does. A run of one
+	 point closes too: Cairo paints the round cap of a closed degenerate run, and nothing at all
+	 for a move that closes nothing."
+
+	points ifEmpty: [ ^ self ].
 	subPaths add: (VGSubPath points: points asArray closed: true).
 	points := OrderedCollection with: startPoint.
 	currentPoint := startPoint

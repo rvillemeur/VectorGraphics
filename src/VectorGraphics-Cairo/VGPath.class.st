@@ -142,6 +142,14 @@ VGPath >> segmentsWithFillRule: aSymbol [
 	^ VGSegments coordinates: self edgeCoordinates fillRule: aSymbol
 ]
 
+{ #category : 'converting' }
+VGPath >> segmentsWithFillRule: aSymbol antialias: anotherSymbol [
+	^ VGSegments
+		  coordinates: self edgeCoordinates
+		  fillRule: aSymbol
+		  antialias: anotherSymbol
+]
+
 { #category : 'initialization' }
 VGPath >> setSubPaths: anArray [
 	subPaths := anArray

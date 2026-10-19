@@ -13,7 +13,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'coordinates',
-		'fillRule'
+		'fillRule',
+		'antialias'
 	],
 	#category : 'VectorGraphics-Cairo-Path',
 	#package : 'VectorGraphics-Cairo',
@@ -22,7 +23,18 @@ Class {
 
 { #category : 'instance creation' }
 VGSegments class >> coordinates: anArray fillRule: aSymbol [
-	^ self new setCoordinates: anArray fillRule: aSymbol
+	^ self
+		  coordinates: anArray
+		  fillRule: aSymbol
+		  antialias: VGCairoState antialiasNames first
+]
+
+{ #category : 'instance creation' }
+VGSegments class >> coordinates: anArray fillRule: aSymbol antialias: anotherSymbol [
+	^ self new
+		  setCoordinates: anArray
+		  fillRule: aSymbol
+		  antialias: anotherSymbol
 ]
 
 { #category : 'instance creation' }
@@ -47,6 +59,14 @@ VGSegments class >> rectangle: aRectangle [
 				  right. bottom. left. bottom.
 				  left. bottom. left. top }
 		  fillRule: #winding
+]
+
+{ #category : 'accessing' }
+VGSegments >> antialias [
+	"The antialiasing mode the fill I describe is sampled with. The backend answers three frozen
+	 messages and none of them carries a mode, so the mode rides here, as the fill rule does."
+
+	^ antialias
 ]
 
 { #category : 'geometry' }
@@ -118,6 +138,14 @@ VGSegments >> inspectorEdgesContext: aContext [
 	aContext active: coordinates notNil
 ]
 
+{ #category : 'testing' }
+VGSegments >> isAliased [
+	"Only Cairo's #none mode changes what the rasteriser does; the other six ask for antialiasing
+	 of one quality or another and we sample them all the same way."
+
+	^ antialias == #none
+]
+
 { #category : 'accessing' }
 VGSegments >> isEmpty [
 	^ coordinates isEmpty
@@ -139,10 +167,11 @@ VGSegments >> printOn: aStream [
 		nextPut: $)
 ]
 
-{ #category : 'initialization' }
-VGSegments >> setCoordinates: anArray fillRule: aSymbol [
+{ #category : 'private' }
+VGSegments >> setCoordinates: anArray fillRule: aSymbol antialias: anotherSymbol [
 	coordinates := anArray.
-	fillRule := aSymbol
+	fillRule := aSymbol.
+	antialias := anotherSymbol
 ]
 
 { #category : 'accessing' }

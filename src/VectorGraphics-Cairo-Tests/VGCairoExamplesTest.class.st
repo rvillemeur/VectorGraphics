@@ -18,6 +18,7 @@ VGCairoExamplesTest >> exampleHolders [
 		  VGCairoImageSurfaceExamples.
 		  VGCairoInventoryExamples.
 		  VGCairoMatrixExamples.
+		  VGCairoStrokeStyleExamples.
 		  VGConformanceCorpusExamples.
 		  VGDisplayListExamples.
 		  VGFormComparisonExamples.

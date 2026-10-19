@@ -128,13 +128,17 @@ VGSoftwareBackend >> pixelFor: aPaint coverage: aNumber format: aFormat [
 { #category : 'private' }
 VGSoftwareBackend >> rasterise: aSegments paint: aPaint clip: aRectangle operator: aSymbol into: aTarget [
 	"One recorded fill: the rasteriser says how much of each pixel the edges cover, and the paint
-	 is composited over the target at that coverage. Unit 1.5 replaces the colour with the paint
-	 ABI and unit 1.7 brings the operators other than over and source."
+	 is composited over the target at that coverage. The fill rule and the antialiasing mode both
+	 ride inside the segments, because the three messages of the backend carry neither. Unit 1.5
+	 replaces the colour with the paint ABI and unit 1.7 brings the operators other than over and
+	 source."
+
 	| rasteriser format |
 	format := aTarget format.
 	rasteriser := VGRasteriser
 		              segments: aSegments coordinates
 		              fillRule: aSegments fillRule
+		              antialias: aSegments antialias
 		              clip: aRectangle.
 	rasteriser coverageRowsDo: [ :y :coverage :left |
 		1 to: coverage size do: [ :index |

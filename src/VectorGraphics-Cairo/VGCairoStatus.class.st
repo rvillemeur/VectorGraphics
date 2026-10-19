@@ -15,6 +15,21 @@ Class {
 }
 
 { #category : 'instance creation' }
+VGCairoStatus class >> invalidDash [
+	^ self new
+		  setCode: self invalidDashCode;
+		  yourself
+]
+
+{ #category : 'accessing' }
+VGCairoStatus class >> invalidDashCode [
+	"CAIRO_STATUS_INVALID_DASH: a dash pattern holds a negative length, or every one of its
+	 lengths is zero. The number is read from a live Cairo context, not guessed."
+
+	^ 19
+]
+
+{ #category : 'instance creation' }
 VGCairoStatus class >> invalidMatrix [
 	^ self new setCode: self invalidMatrixCode
 ]
