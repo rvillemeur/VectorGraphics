@@ -9,9 +9,10 @@ Class {
 	#tag : 'Tests'
 }
 
-{ #category : 'constants' }
+{ #category : 'support' }
 VGCairoExamplesTest >> exampleHolders [
 	^ {
+		  VGAlexandrieCorpusExamples.
 		  VGCairoContextExamples.
 		  VGCairoImageSurfaceExamples.
 		  VGCairoInventoryExamples.

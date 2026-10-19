@@ -16,6 +16,11 @@ Class {
 	#tag : 'Pattern'
 }
 
+{ #category : 'skeleton' }
+VGCairoPattern >> addStopAt: anArgument1 color: anArgument2 [
+	^ self notYetImplementedIn: '1.5' selector: #addStopAt:color:
+]
+
 { #category : 'skeleton - unit 1.5' }
 VGCairoPattern >> filter: arg1 [
 	^ self notYetImplementedIn: '1.5' selector: #filter:

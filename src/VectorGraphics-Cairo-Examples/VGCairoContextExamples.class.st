@@ -4,8 +4,9 @@ I hold the one-click examples for the VectorGraphics Cairo-compatible context. M
 Class {
 	#name : 'VGCairoContextExamples',
 	#superclass : 'Object',
-	#category : 'VectorGraphics-Cairo-Examples',
-	#package : 'VectorGraphics-Cairo-Examples'
+	#category : 'VectorGraphics-Cairo-Examples-Examples',
+	#package : 'VectorGraphics-Cairo-Examples',
+	#tag : 'Examples'
 }
 
 { #category : 'examples' }

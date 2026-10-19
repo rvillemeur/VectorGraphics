@@ -77,6 +77,52 @@ VGCairoInventory class >> excludedPatternClassNames [
 	^ #( #AeCairoMeshPattern )
 ]
 
+{ #category : 'inventory' }
+VGCairoInventory class >> extendedSelectorUnitTable [
+	"Cairo selectors that Alexandrie offers and the Bloc code never sends, so they are outside the
+	 measured inventory, but that the AlexandrieCairoExperiment drawings do send. One entry per
+	 selector: the unit that owes it, the class that holds it, and the selector. These are aliases
+	 and spellings of what the units already own, which is why no entry adds a unit of its own."
+	^ {
+		  { '1.2'. #VGCairoContext. #translateByX:y: }.
+		  { '1.2'. #VGCairoContext. #scaleByX:y: }.
+		  { '1.3'. #VGCairoContext. #relativeLineTo: }.
+		  { '1.3'. #VGCairoContext. #moveToX:y: }.
+		  { '1.3'. #VGCairoContext. #beginSubPath }.
+		  { '1.3'. #VGCairoContext. #arcCenter:radius:startAngle:endAngle: }.
+		  { '1.3'. #VGCairoContext. #circleCenter:radius: }.
+		  { '1.3'. #VGCairoContext. #circleRadius: }.
+		  { '1.3'. #VGCairoContext. #cubicCurveFrom:controlPoint1:controlPoint2:to: }.
+		  { '1.3'. #VGCairoContext. #fillPreserve }.
+		  { '1.4'. #VGCairoContext. #useStrokeCapButt }.
+		  { '1.4'. #VGCairoContext. #useStrokeCapRound }.
+		  { '1.4'. #VGCairoContext. #useStrokeCapSquare }.
+		  { '1.4'. #VGCairoContext. #useStrokeJoinBevel }.
+		  { '1.4'. #VGCairoContext. #useStrokeJoinMiter }.
+		  { '1.4'. #VGCairoContext. #useStrokeJoinRound }.
+		  { '1.4'. #VGCairoContext. #strokeDashPattern:size:offset: }.
+		  { '1.5'. #VGCairoContext. #sourceSurface:x:y: }.
+		  { '1.5'. #VGCairoPattern. #addStopAt:color: }.
+		  { '1.5'. #'VGCairoRadialGradientPattern class'.
+		  #innerCenter:innerRadius:outerCenter:outerRadius: }.
+		  { '1.7'. #VGCairoContext. #operator: }.
+		  { '1.7'. #VGCairoContext. #mask: }.
+		  { '1.8'. #VGCairoContext. #showText: } }
+]
+
+{ #category : 'inventory' }
+VGCairoInventory class >> extendedSelectors [
+	^ (self extendedSelectorUnitTable collect: [ :each | each third ]) asSet asSortedCollection
+		  asArray
+]
+
+{ #category : 'inventory' }
+VGCairoInventory class >> extendedSelectorsForUnit: aUnitString [
+	^ (self extendedSelectorUnitTable
+		   select: [ :each | each first = aUnitString ]
+		   thenCollect: [ :each | each third ]) asSortedCollection asArray
+]
+
 { #category : 'inspecting' }
 VGCairoInventory class >> inspectorUnitProgress: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Units'>
@@ -151,23 +197,23 @@ VGCairoInventory class >> patternSelectors [
 	^ #( #autoRelease #externallyFree #filter: #matrix #matrix: #status #type )
 ]
 
-{ #category : 'units' }
+{ #category : 'inventory' }
 VGCairoInventory class >> planUnits [
 	"The units of phase 1 that VECTORCANVAS-PLAN.md declares. A skeleton may only name one of
-	 these, which is what keeps the code and the plan from drifting apart."
-
-	^ #( '1.0' '1.1' '1.2' '1.3' '1.4' '1.5' '1.6' '1.7' '1.8' '1.9' )
+	 these, which is what keeps the code and the plan from drifting apart. Units 1.10 to 1.12 own
+	 no selector of the Bloc union: 1.10 wires the renderer, 1.11 profiles, and 1.12 holds the mesh
+	 patterns that only the Alexandrie experiments ask for."
+	^ #( '1.0' '1.1' '1.2' '1.3' '1.4' '1.5' '1.6' '1.7' '1.8' '1.9' '1.10' '1.11' '1.12' )
 ]
 
-{ #category : 'querying' }
+{ #category : 'inventory' }
 VGCairoInventory class >> progressReport [
-	"One row per unit: the unit, how many selectors it owes, and how many of those are still
-	 skeletons. Every number is read from the compiled methods, so the report cannot drift from the
-	 code."
-
+	"One row per unit: the unit, how many selectors it owes over both tables, and how many of those
+	 are still skeletons. Every number is read from the compiled methods, so the report cannot
+	 drift from the code."
 	^ self planUnits collect: [ :unit |
 		  | selectors |
-		  selectors := self selectorsForUnit: unit.
+		  selectors := ((self selectorsForUnit: unit) , (self extendedSelectorsForUnit: unit)) asSet.
 		  {
 			  unit.
 			  selectors size.
@@ -277,12 +323,14 @@ VGCairoInventory class >> surfaceSelectors [
 	     #newContext #newSimilarImageFormat:width:height: #status #stride #width #writePngTo: )
 ]
 
-{ #category : 'units' }
+{ #category : 'inventory' }
 VGCairoInventory class >> unitForSelector: aSelector [
-	"Answer the unit that owes aSelector, or nil when the table does not name it. A nil is a fault,
-	 and VGCairoSkeletonTest reports it."
-
+	"Answer the unit that owes aSelector, or nil when neither table names it. A nil is a fault,
+	 and VGCairoSkeletonTest reports it. Both tables are read, because a skeleton may come from
+	 the measured Bloc union or from the wider Cairo surface the experiments exercise."
 	self selectorUnitTable do: [ :each |
 		(each value includes: aSelector) ifTrue: [ ^ each key ] ].
+	self extendedSelectorUnitTable do: [ :each |
+		each third = aSelector ifTrue: [ ^ each first ] ].
 	^ nil
 ]

@@ -11,6 +11,11 @@ Class {
 	#tag : 'Pattern'
 }
 
+{ #category : 'skeleton' }
+VGCairoRadialGradientPattern class >> innerCenter: anArgument1 innerRadius: anArgument2 outerCenter: anArgument3 outerRadius: anArgument4 [
+	^ self notYetImplementedIn: '1.5' selector: #innerCenter:innerRadius:outerCenter:outerRadius:
+]
+
 { #category : 'skeleton - unit 1.5' }
 VGCairoRadialGradientPattern class >> innerCenter: arg1 innerRadius: arg2 outerCenter: arg3 outerRadius: arg4 addStopsFrom: arg5 [
 	^ self notYetImplementedIn: '1.5' selector: #innerCenter:innerRadius:outerCenter:outerRadius:addStopsFrom:

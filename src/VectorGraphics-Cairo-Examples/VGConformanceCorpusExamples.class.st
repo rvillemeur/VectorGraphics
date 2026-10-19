@@ -4,8 +4,9 @@ I hold the one-click examples for the conformance harness. My examples answer a 
 Class {
 	#name : 'VGConformanceCorpusExamples',
 	#superclass : 'Object',
-	#category : 'VectorGraphics-Cairo-Examples',
-	#package : 'VectorGraphics-Cairo-Examples'
+	#category : 'VectorGraphics-Cairo-Examples-Examples',
+	#package : 'VectorGraphics-Cairo-Examples',
+	#tag : 'Examples'
 }
 
 { #category : 'examples' }

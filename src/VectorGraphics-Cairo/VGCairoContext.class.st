@@ -42,6 +42,11 @@ VGCairoContext >> appendGlyphsPath: arg1 [
 	^ self notYetImplementedIn: '1.8' selector: #appendGlyphsPath:
 ]
 
+{ #category : 'skeleton' }
+VGCairoContext >> arcCenter: anArgument1 radius: anArgument2 startAngle: anArgument3 endAngle: anArgument4 [
+	^ self notYetImplementedIn: '1.3' selector: #arcCenter:radius:startAngle:endAngle:
+]
+
 { #category : 'skeleton - unit 1.3' }
 VGCairoContext >> arcCenter: arg1 radius: arg2 startAngle: arg3 endAngle: arg4 cw: arg5 [
 	^ self notYetImplementedIn: '1.3' selector: #arcCenter:radius:startAngle:endAngle:cw:
@@ -57,6 +62,11 @@ VGCairoContext >> arcCenterX: arg1 centerY: arg2 radius: arg3 startAngle: arg4 e
 	^ self notYetImplementedIn: '1.3' selector: #arcCenterX:centerY:radius:startAngle:endAngle:
 ]
 
+{ #category : 'skeleton' }
+VGCairoContext >> beginSubPath [
+	^ self notYetImplementedIn: '1.3' selector: #beginSubPath
+]
+
 { #category : 'transformations' }
 VGCairoContext >> changeMatrixBy: aBlock [
 	"Cairo ignores every request once the context is in error, which is how a singular matrix ends
@@ -65,9 +75,19 @@ VGCairoContext >> changeMatrixBy: aBlock [
 	aBlock value: state matrix
 ]
 
+{ #category : 'skeleton' }
+VGCairoContext >> circleCenter: anArgument1 radius: anArgument2 [
+	^ self notYetImplementedIn: '1.3' selector: #circleCenter:radius:
+]
+
 { #category : 'skeleton - unit 1.3' }
 VGCairoContext >> circleCenterX: arg1 y: arg2 radius: arg3 [
 	^ self notYetImplementedIn: '1.3' selector: #circleCenterX:y:radius:
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> circleRadius: anArgument1 [
+	^ self notYetImplementedIn: '1.3' selector: #circleRadius:
 ]
 
 { #category : 'skeleton - unit 1.3' }
@@ -104,6 +124,11 @@ VGCairoContext >> closePath [
 	^ self notYetImplementedIn: '1.3' selector: #closePath
 ]
 
+{ #category : 'skeleton' }
+VGCairoContext >> cubicCurveFrom: anArgument1 controlPoint1: anArgument2 controlPoint2: anArgument3 to: anArgument4 [
+	^ self notYetImplementedIn: '1.3' selector: #cubicCurveFrom:controlPoint1:controlPoint2:to:
+]
+
 { #category : 'skeleton - unit 1.2' }
 VGCairoContext >> currentPointInUserSpace [
 	^ self notYetImplementedIn: '1.3' selector: #currentPointInUserSpace
@@ -132,6 +157,11 @@ VGCairoContext >> ellipseWidth: arg1 height: arg2 [
 { #category : 'skeleton - unit 1.3' }
 VGCairoContext >> fill [
 	^ self notYetImplementedIn: '1.3' selector: #fill
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> fillPreserve [
+	^ self notYetImplementedIn: '1.3' selector: #fillPreserve
 ]
 
 { #category : 'skeleton - unit 1.3' }
@@ -217,6 +247,11 @@ VGCairoContext >> lineToX: arg1 y: arg2 [
 	^ self notYetImplementedIn: '1.3' selector: #lineToX:y:
 ]
 
+{ #category : 'skeleton' }
+VGCairoContext >> mask: anArgument1 [
+	^ self notYetImplementedIn: '1.7' selector: #mask:
+]
+
 { #category : 'skeleton - unit 1.7' }
 VGCairoContext >> maskGroupWith: arg1 [
 	^ self notYetImplementedIn: '1.7' selector: #maskGroupWith:
@@ -244,6 +279,16 @@ VGCairoContext >> matrix: aMatrix [
 { #category : 'skeleton - unit 1.3' }
 VGCairoContext >> moveTo: arg1 [
 	^ self notYetImplementedIn: '1.3' selector: #moveTo:
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> moveToX: anArgument1 y: anArgument2 [
+	^ self notYetImplementedIn: '1.3' selector: #moveToX:y:
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> operator: anArgument1 [
+	^ self notYetImplementedIn: '1.7' selector: #operator:
 ]
 
 { #category : 'skeleton - unit 1.3' }
@@ -284,6 +329,11 @@ VGCairoContext >> rectangleTo: arg1 [
 { #category : 'skeleton - unit 1.3' }
 VGCairoContext >> rectangleX: arg1 y: arg2 width: arg3 height: arg4 [
 	^ self notYetImplementedIn: '1.3' selector: #rectangleX:y:width:height:
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> relativeLineTo: anArgument1 [
+	^ self notYetImplementedIn: '1.3' selector: #relativeLineTo:
 ]
 
 { #category : 'state' }
@@ -355,6 +405,11 @@ VGCairoContext >> showGlyphs: arg1 [
 	^ self notYetImplementedIn: '1.8' selector: #showGlyphs:
 ]
 
+{ #category : 'skeleton' }
+VGCairoContext >> showText: anArgument1 [
+	^ self notYetImplementedIn: '1.8' selector: #showText:
+]
+
 { #category : 'skeleton - unit 1.5' }
 VGCairoContext >> source [
 	^ self notYetImplementedIn: '1.5' selector: #source
@@ -383,6 +438,11 @@ VGCairoContext >> sourcePattern: arg1 [
 { #category : 'skeleton - unit 1.5' }
 VGCairoContext >> sourceSurface: arg1 [
 	^ self notYetImplementedIn: '1.5' selector: #sourceSurface:
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> sourceSurface: anArgument1 x: anArgument2 y: anArgument3 [
+	^ self notYetImplementedIn: '1.5' selector: #sourceSurface:x:y:
 ]
 
 { #category : 'accessing' }
@@ -422,6 +482,11 @@ VGCairoContext >> strokeCap: arg1 [
 { #category : 'skeleton - unit 1.4' }
 VGCairoContext >> strokeDashPattern: arg1 offset: arg2 [
 	^ self notYetImplementedIn: '1.4' selector: #strokeDashPattern:offset:
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> strokeDashPattern: anArgument1 size: anArgument2 offset: anArgument3 [
+	^ self notYetImplementedIn: '1.4' selector: #strokeDashPattern:size:offset:
 ]
 
 { #category : 'skeleton - unit 1.4' }
@@ -478,4 +543,34 @@ VGCairoContext >> useFillRuleEvenOdd [
 { #category : 'skeleton - unit 1.3' }
 VGCairoContext >> useFillRuleWinding [
 	^ self notYetImplementedIn: '1.3' selector: #useFillRuleWinding
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> useStrokeCapButt [
+	^ self notYetImplementedIn: '1.4' selector: #useStrokeCapButt
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> useStrokeCapRound [
+	^ self notYetImplementedIn: '1.4' selector: #useStrokeCapRound
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> useStrokeCapSquare [
+	^ self notYetImplementedIn: '1.4' selector: #useStrokeCapSquare
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> useStrokeJoinBevel [
+	^ self notYetImplementedIn: '1.4' selector: #useStrokeJoinBevel
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> useStrokeJoinMiter [
+	^ self notYetImplementedIn: '1.4' selector: #useStrokeJoinMiter
+]
+
+{ #category : 'skeleton' }
+VGCairoContext >> useStrokeJoinRound [
+	^ self notYetImplementedIn: '1.4' selector: #useStrokeJoinRound
 ]

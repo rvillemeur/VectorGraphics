@@ -9,6 +9,18 @@ Class {
 	#tag : 'Conformance'
 }
 
+{ #category : 'support' }
+VGConformanceTest >> coveredUnits [
+	"The units a case is filed under, from both corpora: the cases written here and the cases
+	 derived from the Alexandrie experiments, which are the only ones covering the mesh patterns."
+	| covered |
+	covered := (VGConformanceCorpus cases collect: [ :each | each unit ]) asSet.
+	VGAlexandrieCorpus isAvailable ifTrue: [
+		VGAlexandrieCorpus cases do: [ :each |
+			each blockingUnit ifNotNil: [ :unit | covered add: unit ] ] ].
+	^ covered
+]
+
 { #category : 'tests' }
 VGConformanceTest >> testEveryCaseBlocksOnASelectorNoLaterThanItsOwnUnit [
 	"The gate for unit 1.0. A case must stop by raising VGNotYetImplemented, and the unit named by
@@ -74,9 +86,8 @@ VGConformanceTest >> testEveryCaseNamesAUnitThePlanDeclares [
 VGConformanceTest >> testEveryUnitThatOwesPaintingSelectorsHasACase [
 	"Unit 1.0 owes only lifecycle selectors and unit 1.9 owes none at all, so neither can be drawn.
 	 Every other unit in the table must be visible in at least one picture."
-
 	| covered uncovered |
-	covered := (VGConformanceCorpus cases collect: [ :each | each unit ]) asSet.
+	covered := self coveredUnits.
 	uncovered := (VGCairoInventory planUnits
 		              reject: [ :each | (self unitsWithoutAPicture includes: each) or: [ covered includes: each ] ])
 		             asSortedCollection asArray.
@@ -85,11 +96,13 @@ VGConformanceTest >> testEveryUnitThatOwesPaintingSelectorsHasACase [
 		description: 'no conformance case is filed under ' , uncovered printString
 ]
 
-{ #category : 'constants' }
+{ #category : 'support' }
 VGConformanceTest >> unitsWithoutAPicture [
 	"Unit 1.0 builds the harness and unit 1.9 wires the AeCanvas subclass, so neither owes a case.
 	 Unit 1.2 owns the matrix, which changes nothing visible on its own: a transformation shows up
 	 only through a shape, so its three cases are filed under unit 1.3 with the shape verbs they
-	 need."
-	^ #( '1.0' '1.2' '1.9' )
+	 need.
+	 Unit 1.10 wires the renderer and unit 1.11 profiles it, and neither adds a drawing verb, so
+	 what they change is measured by the cases the earlier units already own."
+	^ #( '1.0' '1.2' '1.9' '1.10' '1.11' )
 ]

@@ -6,8 +6,9 @@ got without disturbing anything else.
 Class {
 	#name : 'VGCairoMatrixExamples',
 	#superclass : 'Object',
-	#category : 'VectorGraphics-Cairo-Examples',
-	#package : 'VectorGraphics-Cairo-Examples'
+	#category : 'VectorGraphics-Cairo-Examples-Examples',
+	#package : 'VectorGraphics-Cairo-Examples',
+	#tag : 'Examples'
 }
 
 { #category : 'examples' }

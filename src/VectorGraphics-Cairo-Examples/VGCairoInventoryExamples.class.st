@@ -4,8 +4,9 @@ I hold the one-click examples for VGCairoInventory, the frozen list of the Cairo
 Class {
 	#name : 'VGCairoInventoryExamples',
 	#superclass : 'Object',
-	#category : 'VectorGraphics-Cairo-Examples',
-	#package : 'VectorGraphics-Cairo-Examples'
+	#category : 'VectorGraphics-Cairo-Examples-Examples',
+	#package : 'VectorGraphics-Cairo-Examples',
+	#tag : 'Examples'
 }
 
 { #category : 'examples' }

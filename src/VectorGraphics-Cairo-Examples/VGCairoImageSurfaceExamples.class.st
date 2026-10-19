@@ -6,8 +6,9 @@ the browser opens an inspector whose Picture and Layout tabs show what the unit 
 Class {
 	#name : 'VGCairoImageSurfaceExamples',
 	#superclass : 'Object',
-	#category : 'VectorGraphics-Cairo-Examples',
-	#package : 'VectorGraphics-Cairo-Examples'
+	#category : 'VectorGraphics-Cairo-Examples-Examples',
+	#package : 'VectorGraphics-Cairo-Examples',
+	#tag : 'Examples'
 }
 
 { #category : 'examples' }
