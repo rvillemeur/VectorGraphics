@@ -20,6 +20,14 @@ Class {
 	#tag : 'Tests'
 }
 
+{ #category : 'accessing' }
+VGAlexandrieCorpusTest >> defaultTimeLimit [
+	"Eighty-two experiments, each rendered twice, take minutes rather than the ten seconds SUnit
+	 allows a test by default. Without this the oracle ended a package run as an error instead of
+	 as a verdict."
+	^ 10 minutes
+]
+
 { #category : 'support' }
 VGAlexandrieCorpusTest >> skipWithoutTheExperiments [
 	^ VGAlexandrieCorpus isAvailable not
@@ -38,8 +46,8 @@ VGAlexandrieCorpusTest >> testEveryCaseEitherDrawsOrNamesTheUnitThatUnblocksIt [
 { #category : 'tests' }
 VGAlexandrieCorpusTest >> testEveryCaseThatDrawsMatchesCairo [
 	"The oracle itself. A case that runs end to end on the replacement must produce the same
-	 picture as Alexandrie, within the tolerance the corpus states for it."
-
+	 picture as Alexandrie, within the tolerance the corpus states for it, and with nothing of
+	 ours outside Cairo's shape beyond the residue a rounded edge leaves."
 	| failures |
 	self skipWithoutTheExperiments ifTrue: [ ^ self skip ].
 	failures := OrderedCollection new.
@@ -50,7 +58,8 @@ VGAlexandrieCorpusTest >> testEveryCaseThatDrawsMatchesCairo [
 			comparison isComparable
 				ifFalse: [ failures add: case name , ' differs in extent' ]
 				ifTrue: [
-					comparison maximumChannelDistance > case tolerance ifTrue: [
+					(comparison maximumStrayAlpha <= VGConformanceCorpus strayAlphaAllowance
+						 and: [ comparison maximumChannelDistance <= case tolerance ]) ifFalse: [
 						failures add: case name , ' ' , comparison printString ] ] ] ].
 	self assert: failures asArray isEmpty description: failures asArray printString
 ]

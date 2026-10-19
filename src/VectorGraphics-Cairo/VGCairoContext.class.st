@@ -252,14 +252,28 @@ VGCairoContext >> clearTransparent [
 	surface fillPixel: 0
 ]
 
-{ #category : 'skeleton - unit 1.6' }
+{ #category : 'clipping' }
 VGCairoContext >> clip [
-	^ self notYetImplementedIn: '1.6' selector: #clip
+	"Narrow the clip by the current path and forget the path, which is what Cairo's cairo_clip
+	 does."
+
+	self isInError ifTrue: [ ^ self ].
+	self clipPreservingPath.
+	self newPath
 ]
 
-{ #category : 'skeleton - unit 1.6' }
+{ #category : 'clipping' }
 VGCairoContext >> clipPreservingPath [
-	^ self notYetImplementedIn: '1.6' selector: #clipPreservingPath
+	"Narrow the clip by the current path and keep the path. The path is already in device space,
+	 so the clip is fixed there: a transformation sent afterwards does not move it. The fill rule
+	 and the antialiasing mode in force now belong to that clip for the rest of its life, which is
+	 why they travel into it. Measured: clipping with no path is not an error and clips everything
+	 away."
+
+	self isInError ifTrue: [ ^ self ].
+	state clip: (self currentClipShape clippedBy: (self pathBuilder path
+			  segmentsWithFillRule: state fillRule
+			  antialias: state antialias))
 ]
 
 { #category : 'path' }
@@ -275,15 +289,22 @@ VGCairoContext >> cubicCurveFrom: aStartPoint controlPoint1: aFirstControlPoint 
 		curveVia: aFirstControlPoint via: aSecondControlPoint to: anEndPoint
 ]
 
-{ #category : 'private' }
+{ #category : 'clipping' }
 VGCairoContext >> currentClip [
-	"The area a fill may touch. The clip verbs arrive in unit 1.6; until then the state holds no
-	 clip and the whole surface is the limit. The surface bounds are always one of the terms, so
-	 the rasteriser is never asked for a pixel the target does not have."
+	"The clip extents: the area a fill may touch, rounded out to whole pixels, which is what
+	 cairo_clip_extents reports. A paint fills exactly this and lets the clip trim it, so a
+	 fractional clip edge still pays for part of its pixel."
 
-	^ state clip
-		  ifNil: [ surface boundsRectangle ]
-		  ifNotNil: [ :rectangle | rectangle intersect: surface boundsRectangle ]
+	^ self currentClipShape extents
+]
+
+{ #category : 'clipping' }
+VGCairoContext >> currentClipShape [
+	"The clip a fill of mine is held to. The surface bounds are always one of its terms, so the
+	 rasteriser is never asked for a pixel the target does not have, and a state that has not been
+	 clipped yet answers that whole area."
+
+	^ state clip ifNil: [ VGClip bounds: surface boundsRectangle ]
 ]
 
 { #category : 'private' }
@@ -626,12 +647,13 @@ VGCairoContext >> raise: anEndAngle above: aStartAngle [
 	^ angle
 ]
 
-{ #category : 'private' }
+{ #category : 'display list' }
 VGCairoContext >> recordFillOf: aSegments [
 	"One entry on the surface's display list. Nothing is rasterised here: the frame appears when
 	 the list is drained, which is the first rule of the plan. The paint is built now, because
 	 Cairo draws when the fill is asked for and so reads the pattern and the captured
-	 transformation of this moment."
+	 transformation of this moment, and so is the clip, which is the one in force now and not the
+	 one in force at the drain."
 
 	| paint |
 	aSegments isEmpty ifTrue: [ ^ self ].
@@ -640,7 +662,7 @@ VGCairoContext >> recordFillOf: aSegments [
 	surface displayList add: (VGFillEntry
 			 segments: aSegments
 			 paint: paint
-			 clip: self currentClip
+			 clip: self currentClipShape
 			 operator: self currentOperator)
 ]
 

@@ -26,10 +26,11 @@ VGFillEntry class >> segments: aSegments paint: aPaint clip: aRectangle operator
 
 { #category : 'draining' }
 VGFillEntry >> boundingBox [
-	"What I can touch: where my edges are, cut down to my clip."
+	"What I can touch: where my edges are, cut down to my clip. The clip answers the narrowed
+	 rectangle itself, because a clip that does not meet the edges has to read as plainly empty."
 	| box |
 	box := segments boundingBox.
-	^ box ifNotNil: [ box intersect: clip ]
+	^ box ifNotNil: [ clip boundsNarrowedTo: box ]
 ]
 
 { #category : 'accessing' }

@@ -68,6 +68,10 @@ VGCairoState >> antialias: anAntialiasObject [
 
 { #category : 'accessing' }
 VGCairoState >> clip [
+	"The clip a fill is held to, or nil while the whole surface is the limit. A VGClip is
+	 immutable - clipping one answers another - so a saved state and the state it was saved from
+	 can share one and #postCopy has nothing to do for it."
+
 	^ clip
 ]
 

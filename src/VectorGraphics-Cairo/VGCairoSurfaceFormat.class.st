@@ -93,6 +93,21 @@ VGCairoSurfaceFormat >> bitsPerPixel [
 ]
 
 { #category : 'blending' }
+VGCairoSurfaceFormat >> blendPixel: aSourcePixel maskedBy: aMaskByte over: aDestinationPixel [
+	"Source-over at a coverage: the source is scaled by the mask and composited. A plain RGB pixel
+	 has no alpha byte to carry the mask, so there the two are mixed by the mask directly, which
+	 is the same arithmetic: opaque black at half coverage over white is the grey 16r7F7F7F on a
+	 live Cairo RGB24 surface."
+
+	aMaskByte = 255 ifTrue: [ ^ self blendPixel: aSourcePixel over: aDestinationPixel ].
+	self isRgb24 ifTrue: [
+		^ self lerpPixel: aSourcePixel over: aDestinationPixel by: aMaskByte ].
+	^ self
+		  blendPixel: (self pixel: aSourcePixel scaledBy: aMaskByte)
+		  over: aDestinationPixel
+]
+
+{ #category : 'blending' }
 VGCairoSurfaceFormat >> blendPixel: aSourcePixel over: aDestinationPixel [
 	"Source-over on premultiplied pixels: source plus destination scaled by one minus the source
 	 alpha. Premultiplication is what makes that one multiply per channel instead of three."
@@ -153,6 +168,52 @@ VGCairoSurfaceFormat >> isArgb32 [
 { #category : 'testing' }
 VGCairoSurfaceFormat >> isRgb24 [
 	^ formatName = #rgb24
+]
+
+{ #category : 'blending' }
+VGCairoSurfaceFormat >> lerpPixel: aSourcePixel over: aDestinationPixel by: aMaskByte [
+	"The two pixels mixed channel by channel, the source weighted by the mask and the destination
+	 by what is left of it. On a plain RGB surface this is source-over itself: the source there is
+	 always opaque and carries no alpha byte for the mask to ride in, so the mask is the only
+	 weight there is."
+
+	| inverse |
+	inverse := 255 - aMaskByte.
+	^ (0 to: 24 by: 8) inject: 0 into: [ :pixel :shift |
+		  | source destination |
+		  source := (aSourcePixel bitShift: shift negated) bitAnd: 255.
+		  destination := (aDestinationPixel bitShift: shift negated) bitAnd: 255.
+		  pixel + (((self scaleByte: source by: aMaskByte)
+			    + (self scaleByte: destination by: inverse) min: 255) bitShift: shift) ]
+]
+
+{ #category : 'blending' }
+VGCairoSurfaceFormat >> maskByteForCoverage: aNumber [
+	"The eight-bit mask Cairo scales a pixel by for that coverage: the coverage times two hundred
+	 and fifty-six, rounded, capped at two hundred and fifty-five. Measured over a sweep of
+	 clip edges a two hundred and fifty-sixth apart: a coverage of two hundred and fifty over two
+	 hundred and fifty-six stores an alpha of two hundred and fifty exactly, where a mask of the
+	 coverage times two hundred and fifty-five would store two hundred and forty-nine."
+
+	^ (aNumber * 256) rounded min: 255
+]
+
+{ #category : 'blending' }
+VGCairoSurfaceFormat >> pixel: aPixel scaledBy: aMaskByte [
+	"A premultiplied pixel with every channel scaled by an eight-bit mask, the alpha along with
+	 the colours, which keeps it premultiplied. This is how Cairo pays for a partly covered
+	 pixel: the paint is quantised once and the mask is applied to the result, so a solid
+	 16r7F3F1F5F at half coverage is 16r40201030 and never 16r3F1F0F2F. One measured difference
+	 remains, at the very bottom of the range: a mask of one over an opaque grey of 16r80 writes
+	 a colour byte of zero on a live context where the rule here writes one."
+
+	aMaskByte = 255 ifTrue: [ ^ aPixel ].
+	self isA8 ifTrue: [ ^ self scaleByte: (aPixel bitAnd: 255) by: aMaskByte ].
+	^ (0 to: 24 by: 8) inject: 0 into: [ :pixel :shift |
+		  pixel
+		  + ((self
+				    scaleByte: ((aPixel bitShift: shift negated) bitAnd: 255)
+				    by: aMaskByte) bitShift: shift) ]
 ]
 
 { #category : 'converting' }
@@ -267,9 +328,11 @@ VGCairoSurfaceFormat >> setCode: anInteger bitsPerPixel: aBitCount name: aSymbol
 { #category : 'converting' }
 VGCairoSurfaceFormat >> shortByteOf: aNumber [
 	"The byte Cairo keeps for one channel of a solid colour: the channel as a sixteen-bit short,
-	 truncated and not rounded, of which only the top byte is stored."
+	 rounded, of which only the top byte is stored. Measured with exact doubles on a live
+	 context: a half of sixty-five thousand five hundred and thirty-five is 32767.5 and is kept
+	 as 16r80, so the short rounds and does not truncate."
 
-	^ ((aNumber * 65535) truncated bitShift: -8) min: 255
+	^ ((aNumber * 65535) rounded bitShift: -8) min: 255
 ]
 
 { #category : 'accessing' }

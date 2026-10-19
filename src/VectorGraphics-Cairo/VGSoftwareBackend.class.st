@@ -32,19 +32,32 @@ VGSoftwareBackend >> commands [
 ]
 
 { #category : 'private' }
-VGSoftwareBackend >> compose: aPixel atX: x y: y operator: aSymbol into: aTarget [
+VGSoftwareBackend >> compose: aPixel mask: aMaskByte atX: x y: y operator: aSymbol into: aTarget [
 	"The read is the primitive one: I am called from inside the surface's own flush, and the
-	 public reader flushes before it answers, so reading through it here would recurse."
+	 public reader flushes before it answers, so reading through it here would recurse. The mask
+	 is the coverage of the pixel, which source-over carries in the scaled source and the source
+	 operator carries as the weight of a mix."
 
-	aSymbol == #source
-		ifTrue: [ aTarget primitivePixelAtX: x y: y put: aPixel ]
-		ifFalse: [
-			aTarget
-				primitivePixelAtX: x
-				y: y
-				put: (aTarget format
-						 blendPixel: aPixel
-						 over: (aTarget primitivePixelAtX: x y: y)) ]
+	| format |
+	format := aTarget format.
+	aSymbol == #source ifTrue: [
+		^ aTarget
+			  primitivePixelAtX: x
+			  y: y
+			  put: (aMaskByte = 255
+					   ifTrue: [ aPixel ]
+					   ifFalse: [
+						   format
+							   lerpPixel: aPixel
+							   over: (aTarget primitivePixelAtX: x y: y)
+							   by: aMaskByte ]) ].
+	aTarget
+		primitivePixelAtX: x
+		y: y
+		put: (format
+				 blendPixel: aPixel
+				 maskedBy: aMaskByte
+				 over: (aTarget primitivePixelAtX: x y: y))
 ]
 
 { #category : 'draining' }
@@ -117,13 +130,13 @@ VGSoftwareBackend >> isEmpty [
 ]
 
 { #category : 'rasterising' }
-VGSoftwareBackend >> rasterise: aSegments paint: aPaint clip: aRectangle operator: aSymbol into: aTarget [
-	"One recorded fill: the rasteriser says how much of each pixel the edges cover, and the paint
-	 is composited over the target at that coverage. The fill rule and the antialiasing mode both
-	 ride inside the segments, because the three messages of the backend carry neither. A paint
-	 that lays down nothing at a pixel leaves that pixel alone, which is how an extend mode of
-	 none paints outside its own pattern. Unit 1.7 brings the operators other than over and
-	 source."
+VGSoftwareBackend >> rasterise: aSegments paint: aPaint clip: aClip operator: aSymbol into: aTarget [
+	"One recorded fill: the rasteriser says how much of each pixel the edges cover inside the
+	 clip, and the paint is composited over the target at that coverage. The fill rule and the
+	 antialiasing mode both ride inside the segments, because the three messages of the backend
+	 carry neither, and the clip carries its own. A paint that lays down nothing at a pixel leaves
+	 that pixel alone, which is how an extend mode of none paints outside its own pattern. Unit
+	 1.7 brings the operators other than over and source."
 
 	| rasteriser format |
 	format := aTarget format.
@@ -131,21 +144,18 @@ VGSoftwareBackend >> rasterise: aSegments paint: aPaint clip: aRectangle operato
 		              segments: aSegments coordinates
 		              fillRule: aSegments fillRule
 		              antialias: aSegments antialias
-		              clip: aRectangle.
+		              clip: aClip.
 	rasteriser coverageRowsDo: [ :y :coverage :left |
 		1 to: coverage size do: [ :index |
-			| value pixel x |
-			value := coverage at: index.
-			value > 0 ifTrue: [
+			| mask pixel x |
+			mask := format maskByteForCoverage: (coverage at: index).
+			mask > 0 ifTrue: [
 				x := left + index - 1.
-				pixel := aPaint
-					         pixelIn: format
-					         atX: x
-					         y: y
-					         coverage: value.
+				pixel := aPaint pixelIn: format atX: x y: y.
 				pixel ifNotNil: [
 					self
 						compose: pixel
+						mask: mask
 						atX: x
 						y: y
 						operator: aSymbol

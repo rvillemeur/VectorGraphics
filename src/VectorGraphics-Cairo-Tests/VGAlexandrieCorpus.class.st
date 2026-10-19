@@ -207,15 +207,15 @@ VGAlexandrieCorpus class >> toleranceFor: aSelector [
 		  ifNotNil: [ :each | each value ]
 ]
 
-{ #category : 'constants' }
+{ #category : 'tolerances' }
 VGAlexandrieCorpus class >> toleranceTable [
 	"The cases that may not match Cairo exactly, each with how far one channel may differ and why.
 	 It is empty while no case renders; a case added here has to carry its reason, so that a
 	 tolerance is never a quiet way of passing. Two reasons cover every entry: all but one of these
 	 experiments draw a curve, a slanted edge or a half-pixel stroke, so their edge pixels are
-	 shades and ours part from Cairo's by a little, and fillPaint3 also scales a bitmap, which we
-	 still sample without a filter. See antialiasedEdgeTolerance and nearestSampleTolerance."
-
+	 shades and ours part from Cairo by a little, and fillPaint3 also scales a bitmap, which we
+	 still sample without a filter. A clip of a circle is an edge of that kind too: the shade is
+	 the one the clip itself carries. See antialiasedEdgeTolerance and nearestSampleTolerance."
 	| edges |
 	edges := self antialiasedEdgeTolerance.
 	^ {
@@ -233,6 +233,8 @@ VGAlexandrieCorpus class >> toleranceTable [
 		  (#ContextPathWithLine -> edges).
 		  (#ContextPathWithQuadraticBezier -> edges).
 		  (#ContextPathWithRoundedRectangle -> edges).
+		  (#clip1 -> edges).
+		  (#clip2 -> edges).
 		  (#fillLinearGradientExperiment -> edges).
 		  (#fillLinearGradientExperimentDiagonal -> edges).
 		  (#fillPaint3 -> self nearestSampleTolerance).

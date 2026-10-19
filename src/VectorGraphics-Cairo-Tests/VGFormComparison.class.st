@@ -12,7 +12,8 @@ Class {
 		'isComparable',
 		'differingPixelCount',
 		'maximumChannelDistance',
-		'extraneousPixelCount'
+		'extraneousPixelCount',
+		'maximumStrayAlpha'
 	],
 	#category : 'VectorGraphics-Cairo-Tests-Conformance',
 	#package : 'VectorGraphics-Cairo-Tests',
@@ -26,35 +27,19 @@ VGFormComparison class >> alphaOf: aWord [
 
 { #category : 'instance creation' }
 VGFormComparison class >> between: aForm and: aReferenceForm [
-	"How far our picture is from the reference: how many pixels differ at all, the largest
-	 difference in any single channel, and how many pixels we paint that the reference leaves
-	 untouched. The last number is the one that must be zero: a disagreement on an antialiased
-	 edge is a shade, while a pixel outside the reference's shape is a wrong shape. Two pictures
-	 of different sizes are not comparable, and answer an instance that says so rather than a
-	 number a caller could read as agreement."
-
-	| ours theirs differing maximum extraneous |
+	"How far our picture is from the reference. Two pictures of different sizes are not
+	 comparable, and answer an instance that says so rather than a number a caller could read as
+	 agreement."
+	| ours theirs comparison |
 	ours := aForm asFormOfDepth: 32.
 	theirs := aReferenceForm asFormOfDepth: 32.
 	ours extent = theirs extent ifFalse: [ ^ self new beIncomparable ].
-	differing := 0.
-	maximum := 0.
-	extraneous := 0.
+	comparison := self new beEmptyTally.
 	1 to: ours bits size do: [ :index |
-		| ourWord theirWord |
-		ourWord := self premultiplied: (ours bits at: index).
-		theirWord := self premultiplied: (theirs bits at: index).
-		(self alphaOf: theirWord) isZero ifTrue: [
-			(self alphaOf: ourWord) isZero ifFalse: [
-				extraneous := extraneous + 1 ] ].
-		ourWord = theirWord ifFalse: [
-			differing := differing + 1.
-			maximum := maximum
-				           max: (self channelDistanceBetween: ourWord and: theirWord) ] ].
-	^ self new
-		  setDifferingPixelCount: differing
-		  maximumChannelDistance: maximum
-		  extraneousPixelCount: extraneous
+		comparison
+			addOurPixel: (ours bits at: index)
+			againstReference: (theirs bits at: index) ].
+	^ comparison
 ]
 
 { #category : 'private' }
@@ -91,12 +76,47 @@ VGFormComparison class >> premultipliedByte: aByte byAlpha: anAlphaByte [
 	^ (aByte * anAlphaByte / 255) rounded
 ]
 
+{ #category : 'measuring' }
+VGFormComparison >> addOurPixel: aStoredWord againstReference: anotherStoredWord [
+	"One pixel of each picture, as a Form stores it. A Form keeps unpremultiplied bytes, so both
+	 are premultiplied before anything is measured. A pixel we paint where the reference is
+	 untouched is counted and weighed: an alpha of one is the residue of the grid Cairo rounds a
+	 polygon edge to, while a heavier one is a shape we got wrong."
+	| ourWord theirWord ourAlpha |
+	ourWord := self class premultiplied: aStoredWord.
+	theirWord := self class premultiplied: anotherStoredWord.
+	(self class alphaOf: theirWord) isZero ifTrue: [
+		ourAlpha := self class alphaOf: ourWord.
+		ourAlpha isZero ifFalse: [
+			extraneousPixelCount := extraneousPixelCount + 1.
+			maximumStrayAlpha := maximumStrayAlpha max: ourAlpha ] ].
+	ourWord = theirWord ifTrue: [ ^ self ].
+	differingPixelCount := differingPixelCount + 1.
+	maximumChannelDistance := maximumChannelDistance
+		                          max:
+		                          (self class
+			                           channelDistanceBetween: ourWord
+			                           and: theirWord)
+]
+
+{ #category : 'initialization' }
+VGFormComparison >> beEmptyTally [
+	"A comparison of nothing yet: comparable, with every count at zero, ready to be told one
+	 pixel at a time."
+	isComparable := true.
+	differingPixelCount := 0.
+	maximumChannelDistance := 0.
+	extraneousPixelCount := 0.
+	maximumStrayAlpha := 0
+]
+
 { #category : 'initialization' }
 VGFormComparison >> beIncomparable [
 	isComparable := false.
 	differingPixelCount := 0.
 	maximumChannelDistance := 0.
-	extraneousPixelCount := 0
+	extraneousPixelCount := 0.
+	maximumStrayAlpha := 0
 ]
 
 { #category : 'accessing' }
@@ -111,18 +131,19 @@ VGFormComparison >> extraneousPixelCount [
 	^ extraneousPixelCount
 ]
 
-{ #category : 'inspector' }
+{ #category : 'inspecting' }
 VGFormComparison >> inspectorVerdict: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Verdict'>
 	"What the comparison found. An extraneous pixel is one we paint where the reference is
-	 untouched, and it is the number a case holds to zero whatever its tolerance."
-
+	 untouched, and the gate holds the heaviest of them to the residue a rounded edge leaves,
+	 whatever the case tolerance allows a shade to differ by."
 	^ aBuilder newTable
 		  items: {
 				  ('Comparable' -> self isComparable).
 				  ('Differing pixels' -> self differingPixelCount).
 				  ('Worst channel distance' -> self maximumChannelDistance).
-				  ('Extraneous pixels' -> self extraneousPixelCount) };
+				  ('Extraneous pixels' -> self extraneousPixelCount).
+				  ('Heaviest stray alpha' -> self maximumStrayAlpha) };
 		  addColumn: (SpStringTableColumn
 				   title: 'Property'
 				   evaluated: [ :each | each key ]);
@@ -147,6 +168,14 @@ VGFormComparison >> maximumChannelDistance [
 	^ maximumChannelDistance
 ]
 
+{ #category : 'accessing' }
+VGFormComparison >> maximumStrayAlpha [
+	"The largest alpha among the pixels we paint that the reference leaves untouched, or zero
+	 when there are none. An alpha of one is the residue of a grid Cairo rounds its polygon
+	 edges to; anything larger is a wrong shape."
+	^ maximumStrayAlpha
+]
+
 { #category : 'printing' }
 VGFormComparison >> printOn: aStream [
 	super printOn: aStream.
@@ -158,7 +187,9 @@ VGFormComparison >> printOn: aStream [
 		print: maximumChannelDistance;
 		nextPutAll: ' per channel, ';
 		print: extraneousPixelCount;
-		nextPutAll: ' outside the reference)'
+		nextPutAll: ' outside the reference at up to an alpha of ';
+		print: maximumStrayAlpha;
+		nextPut: $)
 ]
 
 { #category : 'initialization' }
@@ -167,4 +198,13 @@ VGFormComparison >> setDifferingPixelCount: anInteger maximumChannelDistance: an
 	differingPixelCount := anInteger.
 	maximumChannelDistance := anotherInteger.
 	extraneousPixelCount := aThirdInteger
+]
+
+{ #category : 'initialization' }
+VGFormComparison >> setDifferingPixelCount: anInteger maximumChannelDistance: anotherInteger extraneousPixelCount: aThirdInteger maximumStrayAlpha: aFourthInteger [
+	isComparable := true.
+	differingPixelCount := anInteger.
+	maximumChannelDistance := anotherInteger.
+	extraneousPixelCount := aThirdInteger.
+	maximumStrayAlpha := aFourthInteger
 ]

@@ -274,21 +274,31 @@ VGPaint >> matrix: aMatrix [
 			put: (aMatrix perform: (self class matrixFieldOrder at: index)) asFloat ]
 ]
 
-{ #category : 'evaluating' }
-VGPaint >> pixelIn: aFormat atX: x y: y coverage: aNumber [
-	"The premultiplied pixel a surface of that format stores for me at that pixel and that
+{ #category : 'painting' }
+VGPaint >> pixelIn: aFormat atX: x y: y [
+	"The premultiplied pixel a surface of that format stores for me at that pixel, at full
 	 coverage, or nil where I lay nothing down at all. I am evaluated at the centre of the pixel,
-	 which is where live Cairo samples a gradient, and the coverage multiplies my alpha before the
-	 quantisation. The quantisation itself is mine to choose, because Cairo keeps a solid colour in
-	 sixteen-bit shorts and a gradient in bytes."
+	 which is where live Cairo samples a gradient. The quantisation is mine to choose, because
+	 Cairo keeps a solid colour in sixteen-bit shorts and a gradient in bytes."
 
 	| channels |
 	channels := self rgbaAtX: x + 0.5 y: y + 0.5.
 	channels ifNil: [ ^ nil ].
-	^ self
-		  quantise:
-			  ((channels copyFrom: 1 to: 3) copyWith: (channels at: 4) * aNumber)
-		  in: aFormat
+	^ self quantise: channels in: aFormat
+]
+
+{ #category : 'painting' }
+VGPaint >> pixelIn: aFormat atX: x y: y coverage: aNumber [
+	"The source pixel source-over wants at that coverage: the pixel I store at full coverage,
+	 with every channel scaled by the coverage as an eight-bit mask. Cairo quantises the paint
+	 once and masks the result, so the coverage is not a factor of my alpha. A plain RGB target
+	 cannot be served this way, because its pixel has no alpha byte to carry the mask; there the
+	 format mixes source and destination by the mask itself."
+
+	| pixel |
+	pixel := self pixelIn: aFormat atX: x y: y.
+	pixel ifNil: [ ^ nil ].
+	^ aFormat pixel: pixel scaledBy: (aFormat maskByteForCoverage: aNumber)
 ]
 
 { #category : 'evaluating' }

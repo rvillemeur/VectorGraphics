@@ -21,6 +21,14 @@ VGConformanceTest >> coveredUnits [
 	^ covered
 ]
 
+{ #category : 'accessing' }
+VGConformanceTest >> defaultTimeLimit [
+	"The gate renders every case twice, once through us and once through live Cairo, which takes
+	 minutes rather than the ten seconds SUnit allows a test by default. Without this the gate
+	 ended a package run as an error instead of as a verdict, and said nothing about the pictures."
+	^ 10 minutes
+]
+
 { #category : 'tests' }
 VGConformanceTest >> testAPatternOrASurfaceInACaseIsBuiltFromTheFamilyOfTheContextItDrawsOn [
 	"A shared draw block may name no class of either side: handing one of our patterns to
@@ -41,6 +49,32 @@ VGConformanceTest >> testAPatternOrASurfaceInACaseIsBuiltFromTheFamilyOfTheConte
 	self
 		assert: (VGConformanceCorpus classNamed: 'ImageSurface' for: cairoContext)
 		equals: AeCairoImageSurface
+]
+
+{ #category : 'tests' }
+VGConformanceTest >> testAPixelOutsideTheReferenceIsMeasuredByItsAlphaAndNotOnlyCounted [
+	"A stray pixel is counted and also weighed. Cairo steps a polygon edge on a grid of five
+	 hundred and twelfths of a pixel with integer arithmetic, while our scan converter is exact
+	 across the pixel, so a near tangential edge can leave us a coverage of a fraction of one
+	 step where Cairo rounds to none. The gate has to tell that residue, which is an alpha of
+	 one, from a wrongly shaped region, which is an alpha of many."
+	| ours theirs comparison |
+	ours := Form extent: 2 @ 1 depth: 32.
+	theirs := Form extent: 2 @ 1 depth: 32.
+	ours bits at: 1 put: 16r01FFFFFF.
+	ours bits at: 2 put: 16r28FFFFFF.
+	theirs bits at: 1 put: 16r00FFFFFF.
+	theirs bits at: 2 put: 16r00FFFFFF.
+	comparison := VGFormComparison between: ours and: theirs.
+	self assert: comparison extraneousPixelCount equals: 2.
+	self assert: comparison maximumStrayAlpha equals: 16r28.
+	"A picture that paints nothing the reference leaves untouched has no stray alpha at all."
+	ours bits at: 1 put: 16r00FFFFFF.
+	ours bits at: 2 put: 16r00FFFFFF.
+	comparison := VGFormComparison between: ours and: theirs.
+	self assert: comparison extraneousPixelCount equals: 0.
+	self assert: comparison maximumStrayAlpha equals: 0.
+	self assert: (VGFormComparison new beIncomparable) maximumStrayAlpha equals: 0
 ]
 
 { #category : 'tests' }
@@ -122,10 +156,10 @@ VGConformanceTest >> testEveryCaseOfAFinishedUnitDraws [
 { #category : 'tests' }
 VGConformanceTest >> testEveryCaseThatDrawsMatchesCairo [
 	"The gate. Every case the implemented units can draw is rendered twice from one script, once
-	 by the replacement and once by Alexandrie, and the two pictures must agree: no pixel of ours
-	 outside Cairo's shape at all, and no channel further from Cairo's than the case allows. A
-	 case blocked on a later unit is skipped, which is what its blocking failure is for."
-
+	 by the replacement and once by Alexandrie, and the two pictures must agree: nothing of ours
+	 outside Cairo's shape beyond the residue a rounded edge leaves, and no channel further from
+	 Cairo's than the case allows. A case blocked on a later unit is skipped, which is what its
+	 blocking failure is for."
 	| failures |
 	failures := OrderedCollection new.
 	VGConformanceCorpus cases do: [ :case |
@@ -135,8 +169,8 @@ VGConformanceTest >> testEveryCaseThatDrawsMatchesCairo [
 			comparison isComparable
 				ifFalse: [ failures add: case name , ' differs in extent' ]
 				ifTrue: [
-					(comparison extraneousPixelCount isZero and: [
-						 comparison maximumChannelDistance <= case tolerance ]) ifFalse: [
+					(comparison maximumStrayAlpha <= VGConformanceCorpus strayAlphaAllowance
+						 and: [ comparison maximumChannelDistance <= case tolerance ]) ifFalse: [
 						failures add: case name , ' ' , comparison printString ] ] ] ].
 	self assert: failures asArray isEmpty description: failures asArray printString
 ]

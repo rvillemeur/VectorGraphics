@@ -144,6 +144,23 @@ VGCairoSurfaceTest >> testASolidColourQuantisesThroughSixteenBitShortsAndAGradie
 		equals: (VGCairoSurfaceFormat rgb24 pixelForRgba: #( 1.0 0.0 0.5019607843137255 1.0 ))
 ]
 
+{ #category : 'tests' }
+VGCairoSurfaceTest >> testASolidColourRoundsItsShortsRatherThanTruncatingThem [
+	"Measured on a live Cairo context with exact doubles, which is the only way to see the rule:
+	 an opaque red one, green a half, blue a quarter is stored as 16rFFFF8040, and an opaque
+	 quarter, three quarters, an eighth as 16rFF40BF20. A half of sixty-five thousand five
+	 hundred and thirty-five is 32767.5, a quarter is 16383.75 and an eighth is 8191.875, so
+	 truncating the short would store one step less on each of those three channels. The six
+	 colours of #testASolidColourQuantisesThroughSixteenBitShortsAndAGradientThroughBytes come
+	 through a Pharo Color, whose channels are ten bit, and none of them lands on a tie."
+
+	| format |
+	format := VGCairoSurfaceFormat argb32.
+	self assert: (format pixelForRgbaThroughShorts: #( 1.0 0.5 0.25 1.0 )) equals: 16rFFFF8040.
+	self assert: (format pixelForRgbaThroughShorts: #( 0.25 0.75 0.125 1.0 )) equals: 16rFF40BF20.
+	self assert: (format pixelForRgbaThroughShorts: #( 0.5 0.5 0.5 1.0 )) equals: 16rFF808080
+]
+
 { #category : 'tests - geometry' }
 VGCairoSurfaceTest >> testArgb32StrideIsFourBytesPerPixel [
 	| surface |
@@ -214,6 +231,44 @@ VGCairoSurfaceTest >> testClearTransparentEmptiesTheSurface [
 	context clearTransparent.
 	self assert: (surface colorAt: 0 @ 0) equals: Color transparent.
 	self assert: (surface pixelAtX: 1 y: 0) equals: 0
+]
+
+{ #category : 'tests' }
+VGCairoSurfaceTest >> testCoverageIsAnEightBitMaskOnTheQuantisedPixelAndNotAFactorOfTheAlpha [
+	"Measured against a live Cairo context through a clip whose edge falls in the middle of a
+	 pixel, which is the only way to ask for a known coverage and read the answer. Cairo
+	 quantises the paint once and then scales every channel of that pixel, alpha included, by an
+	 eight-bit mask: the solid 16r7F3F1F5F is stored as 16r40201030 at half coverage and the
+	 gradient pixel 16r81420040 as 16r41210020, both exact. Folding the coverage into the alpha
+	 before the quantisation writes 16r3F1F0F2F for the first of those instead.
+
+	 The mask is the coverage times two hundred and fifty-six, rounded and capped at two hundred
+	 and fifty-five, which is what a sweep of two hundred and fifty-six clip edges answers: a
+	 coverage of two hundred and fifty over two hundred and fifty-six stores an alpha of two
+	 hundred and fifty exactly, where a mask of the coverage times two hundred and fifty-five
+	 would store two hundred and forty-nine."
+
+	| format |
+	format := VGCairoSurfaceFormat argb32.
+	self assert: (format maskByteForCoverage: 1.0) equals: 255.
+	self assert: (format maskByteForCoverage: 0.5) equals: 128.
+	self assert: (format maskByteForCoverage: 250 / 256) equals: 250.
+	self assert: (format maskByteForCoverage: 0.0) equals: 0.
+	self assert: (format pixel: 16r7F3F1F5F scaledBy: 128) equals: 16r40201030.
+	self assert: (format pixel: 16r81420040 scaledBy: 128) equals: 16r41210020.
+	self assert: (format pixel: 16r7F3F1F5F scaledBy: 255) equals: 16r7F3F1F5F.
+	"A plain RGB pixel has no alpha byte to carry the mask, so a masked source is composited as
+	 the interpolation source-over already is: opaque black at half coverage over white is the
+	 grey 16r7F7F7F, measured on a live Cairo RGB24 surface."
+	self
+		assert: (VGCairoSurfaceFormat rgb24
+				 blendPixel: 16rFF000000
+				 maskedBy: 128
+				 over: 16rFFFFFFFF)
+		equals: 16rFF7F7F7F.
+	self
+		assert: (format blendPixel: 16rFF000000 maskedBy: 128 over: 16rFFFFFFFF)
+		equals: 16rFF7F7F7F
 ]
 
 { #category : 'tests - pixels' }

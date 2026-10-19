@@ -31,14 +31,14 @@ VGRasteriserTest >> coverageOf: aPointArray rule: aSymbol [
 	^ self coverageOfAll: { aPointArray } rule: aSymbol
 ]
 
-{ #category : 'support' }
+{ #category : 'helpers' }
 VGRasteriserTest >> coverageOfAll: aCollectionOfPointArrays rule: aSymbol [
 	| grid rasteriser |
 	grid := Dictionary new.
 	rasteriser := VGRasteriser
 		              segments: (self segmentsOfAll: aCollectionOfPointArrays)
 		              fillRule: aSymbol
-		              clip: (0 @ 0 corner: 64 @ 64).
+		              clip: (VGClip bounds: (0 @ 0 corner: 64 @ 64)).
 	rasteriser coverageRowsDo: [ :y :coverage :left |
 		1 to: coverage size do: [ :index |
 			| value |
@@ -118,13 +118,13 @@ VGRasteriserTest >> testAnAlignedRectangleCoversWholePixelsAndNothingOutside [
 	self assert: grid size equals: 8 * 5
 ]
 
-{ #category : 'tests - coverage' }
+{ #category : 'tests' }
 VGRasteriserTest >> testNothingOutsideTheClipIsEverVisited [
 	| rasteriser rows |
 	rasteriser := VGRasteriser
 		              segments: (self segmentsOfAll: { { 0 @ 0. 64 @ 0. 64 @ 64. 0 @ 64 } })
 		              fillRule: #winding
-		              clip: (10 @ 20 corner: 14 @ 23).
+		              clip: (VGClip bounds: (10 @ 20 corner: 14 @ 23)).
 	rows := OrderedCollection new.
 	rasteriser coverageRowsDo: [ :y :coverage :left |
 		rows add: y.

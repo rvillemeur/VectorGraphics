@@ -27,7 +27,7 @@ VGRasteriserExamples class >> rasteriserOnACircle [
 	^ VGRasteriser
 		  segments: builder path edgeCoordinates
 		  fillRule: #winding
-		  clip: (0 @ 0 corner: 64 @ 64)
+		  clip: (VGClip bounds: (0 @ 0 corner: 64 @ 64))
 ]
 
 { #category : 'examples' }
@@ -39,5 +39,5 @@ VGRasteriserExamples class >> rasteriserOnAStarUnderTheEvenOddRule [
 	^ VGRasteriser
 		  segments: VGPathExamples starPath edgeCoordinates
 		  fillRule: #evenOdd
-		  clip: (0 @ 0 corner: 64 @ 64)
+		  clip: (VGClip bounds: (0 @ 0 corner: 64 @ 64))
 ]

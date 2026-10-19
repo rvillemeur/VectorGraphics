@@ -27,12 +27,11 @@ VGDisplayListExamples class >> backendHoldingAFrame [
 VGDisplayListExamples class >> fillEntryOfAStar [
 	<sampleInstance>
 	"One entry of a frame on its own: the edges, the paint, the clip and the operator the backend
-	 will be handed."
-
+	 will be handed. The clip of a whole surface is a rectangle of a clip, which keeps no shape."
 	^ VGFillEntry
 		  segments: (VGPathExamples starPath segmentsWithFillRule: #winding)
 		  paint: Color black
-		  clip: (0 @ 0 corner: 64 @ 64)
+		  clip: (VGClip bounds: (0 @ 0 corner: 64 @ 64))
 		  operator: #over
 ]
 

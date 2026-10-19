@@ -119,6 +119,24 @@ VGCairoPathTest >> testAPathIsImmutableOnceBuilt [
 	self assert: path subPaths first points size equals: 2
 ]
 
+{ #category : 'tests' }
+VGCairoPathTest >> testAPointIsSnappedToTheFixedPointGridCairoStoresPathsOn [
+	"Cairo keeps every path coordinate as a cairo_fixed_t, which holds twenty-four bits of whole
+	 number and eight of fraction, so a device coordinate lands on a two hundred and fifty-sixth
+	 of a pixel. Its conversion rounds a half to the even neighbour, which is why a rectangle one
+	 five hundred and twelfth of a pixel wide paints nothing at all on a live context."
+	| builder points |
+	builder := VGPathBuilder new.
+	builder
+		moveTo: 1 / 512 @ (1 / 256);
+		lineTo: 2 + (1 / 400) @ (3 / 512);
+		lineTo: 4.2 @ 5.7.
+	points := builder path subPaths first points.
+	self assert: points first equals: 0.0 @ 0.00390625.
+	self assert: points second equals: 2.00390625 @ 0.0078125.
+	self assert: points third equals: 4.19921875 @ 5.69921875
+]
+
 { #category : 'tests - flattening' }
 VGCairoPathTest >> testAQuadraticCurveFlattensThroughItsCubicForm [
 	"Cairo has no quadratic primitive: it raises the quadratic to a cubic, and so do we."

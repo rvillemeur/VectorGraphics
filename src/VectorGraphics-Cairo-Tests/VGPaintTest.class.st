@@ -295,19 +295,19 @@ VGPaintTest >> testEachPaintQuantisesItsOwnWayAndAnswersNoPixelWhereItPaintsNoth
 	| format solid ramp |
 	format := VGCairoSurfaceFormat argb32.
 	solid := VGColorPaint color: (Color r: 0.5 g: 0.25 b: 0.75 alpha: 0.5).
-	self assert: (solid pixelIn: format atX: 0 y: 0 coverage: 1.0) equals: 16r7F3F1F5F.
+	self assert: (solid pixelIn: format atX: 0 y: 0) equals: 16r7F3F1F5F.
 	ramp := (VGLinearGradientPaint from: 0 @ 0 to: 64 @ 0)
 		        extend: #pad;
 		        addStopAt: 0.0 color: (Color r: 0.0 g: 0.0 b: 1.0 alpha: 0.0);
 		        addStopAt: 1.0 color: (Color r: 1.0 g: 0.0 b: 0.0 alpha: 1.0);
 		        yourself.
-	self assert: (ramp pixelIn: format atX: 16 y: 0 coverage: 1.0) equals: 16r42110031.
-	self assert: (ramp pixelIn: format atX: 32 y: 0 coverage: 1.0) equals: 16r81420040.
-	"Coverage multiplies the alpha before the quantisation, which is how an edge pixel is paid
-	 for."
-	self
-		assert: (solid pixelIn: format atX: 0 y: 0 coverage: 0.5)
-		equals: (format pixelForRgbaThroughShorts: #( 0.5004887585532747 0.25024437927663734 0.7497556207233627 0.24901960784313726 )).
+	self assert: (ramp pixelIn: format atX: 16 y: 0) equals: 16r42110031.
+	self assert: (ramp pixelIn: format atX: 32 y: 0) equals: 16r81420040.
+	"Coverage is a mask on the pixel the paint has already quantised, and it scales the alpha
+	 along with the colours: a clip edge through the middle of the pixel stores 16r40201030 for
+	 that solid and 16r41210020 for pixel thirty-two of that ramp, both measured."
+	self assert: (solid pixelIn: format atX: 0 y: 0 coverage: 0.5) equals: 16r40201030.
+	self assert: (ramp pixelIn: format atX: 32 y: 0 coverage: 0.5) equals: 16r41210020.
 	"A paint that lays nothing down at a pixel answers no pixel at all, and the one underneath
 	 stays as it was."
 	self

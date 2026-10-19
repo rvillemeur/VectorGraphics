@@ -10,6 +10,14 @@ Class {
 }
 
 { #category : 'accessing' }
+VGCairoExamplesTest >> defaultTimeLimit [
+	"Every example of every family is rebuilt and every view of each is built and filled, which
+	 takes minutes rather than the ten seconds SUnit allows a test by default. Without this a
+	 package run reported a timeout where it should report which view does not build."
+	^ 10 minutes
+]
+
+{ #category : 'accessing' }
 VGCairoExamplesTest >> exampleHolders [
 	^ {
 		  VGAlexandrieCorpusExamples.
@@ -19,12 +27,14 @@ VGCairoExamplesTest >> exampleHolders [
 		  VGCairoInventoryExamples.
 		  VGCairoMatrixExamples.
 		  VGCairoStrokeStyleExamples.
+		  VGClipExamples.
 		  VGConformanceCorpusExamples.
 		  VGDisplayListExamples.
 		  VGFormComparisonExamples.
 		  VGPaintExamples.
 		  VGPathExamples.
 		  VGRasteriserExamples.
+		  VGSpanScannerExamples.
 		  VGStrokerExamples }
 ]
 

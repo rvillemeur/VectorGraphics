@@ -66,15 +66,21 @@ VGPathBuilder >> currentPoint [
 
 { #category : 'building' }
 VGPathBuilder >> curveVia: aControlPoint via: anotherControlPoint to: aPoint [
+	"The control points reach the grid before the curve is flattened, because Cairo subdivides a
+	 spline that is already on the grid."
+	| firstControl secondControl end |
 	self hasCurrentPoint ifFalse: [ self moveTo: aControlPoint ].
+	firstControl := self snapped: aControlPoint.
+	secondControl := self snapped: anotherControlPoint.
+	end := self snapped: aPoint.
 	self
 		flattenCubicFrom: currentPoint
-		via: aControlPoint
-		via: anotherControlPoint
-		to: aPoint
+		via: firstControl
+		via: secondControl
+		to: end
 		depth: 0.
-	points add: aPoint.
-	currentPoint := aPoint
+	points add: end.
+	currentPoint := end
 ]
 
 { #category : 'private' }
@@ -88,10 +94,26 @@ VGPathBuilder >> distanceFrom: aPoint toLineFrom: aStartPoint to: anEndPoint [
 ]
 
 { #category : 'private' }
+VGPathBuilder >> fixedOf: aNumber [
+	"A coordinate on the grid Cairo stores a path on. A cairo_fixed_t is twenty-four bits of
+	 whole number and eight of fraction, so a device coordinate lands on a two hundred and fifty
+	 sixth of a pixel, and the conversion rounds a half to the even neighbour. Both halves of the
+	 rule are measured: a rectangle one five hundred and twelfth of a pixel wide paints nothing
+	 on a live context, where a half rounded away from zero would make it paint an alpha of one."
+	| scaled floor |
+	scaled := aNumber * 256.
+	floor := scaled floor.
+	^ (scaled - floor = (1 / 2)
+		   ifTrue: [ floor even ifTrue: [ floor ] ifFalse: [ floor + 1 ] ]
+		   ifFalse: [ scaled rounded ]) / 256.0
+]
+
+{ #category : 'private' }
 VGPathBuilder >> flattenCubicFrom: aPoint via: aControlPoint via: anotherControlPoint to: anEndPoint depth: anInteger [
 	"Recursive subdivision: a curve flat enough to be its own chord is emitted as that chord, and
 	 any other is halved. The end point is added by the caller, so each call adds only what lies
-	 strictly inside its own span."
+	 strictly inside its own span. Each emitted point is snapped, because a flattened point is a
+	 path point like any other and Cairo holds it on the same grid."
 	| middle leftControl leftAnother rightControl rightAnother leftEnd |
 	(anInteger >= self class maximumSubdivisionDepth or: [
 		 self isFlatFrom: aPoint via: aControlPoint via: anotherControlPoint to: anEndPoint ])
@@ -101,7 +123,7 @@ VGPathBuilder >> flattenCubicFrom: aPoint via: aControlPoint via: anotherControl
 	rightAnother := (anotherControlPoint + anEndPoint) / 2.
 	leftAnother := (leftControl + middle) / 2.
 	rightControl := (middle + rightAnother) / 2.
-	leftEnd := (leftAnother + rightControl) / 2.
+	leftEnd := self snapped: (leftAnother + rightControl) / 2.
 	self
 		flattenCubicFrom: aPoint
 		via: leftControl
@@ -198,17 +220,21 @@ VGPathBuilder >> isFlatFrom: aPoint via: aControlPoint via: anotherControlPoint 
 { #category : 'building' }
 VGPathBuilder >> lineTo: aPoint [
 	"Cairo treats a line to with no current point as a move to rather than as an error."
+	| point |
 	self hasCurrentPoint ifFalse: [ ^ self moveTo: aPoint ].
-	points add: aPoint.
-	currentPoint := aPoint
+	point := self snapped: aPoint.
+	points add: point.
+	currentPoint := point
 ]
 
 { #category : 'building' }
 VGPathBuilder >> moveTo: aPoint [
+	| point |
+	point := self snapped: aPoint.
 	self flushRun.
-	points := OrderedCollection with: aPoint.
-	startPoint := aPoint.
-	currentPoint := aPoint
+	points := OrderedCollection with: point.
+	startPoint := point.
+	currentPoint := point
 ]
 
 { #category : 'converting' }
@@ -242,4 +268,12 @@ VGPathBuilder >> quadraticVia: aControlPoint to: aPoint [
 		curveVia: from + ((aControlPoint - from) * (2 / 3))
 		via: aPoint + ((aControlPoint - aPoint) * (2 / 3))
 		to: aPoint
+]
+
+{ #category : 'private' }
+VGPathBuilder >> snapped: aPoint [
+	"The point Cairo would store for this one. Snapping here, where device coordinates arrive,
+	 is what keeps our coverage and Cairo's from drifting apart on a shape thinner than a step
+	 of the grid."
+	^ (self fixedOf: aPoint x) @ (self fixedOf: aPoint y)
 ]

@@ -79,6 +79,25 @@ VGCairoDrawingTest >> testAFreshContextAnswersTheOriginAsItsCurrentPoint [
 	self deny: context hasCurrentPoint
 ]
 
+{ #category : 'tests' }
+VGCairoDrawingTest >> testASliverThinnerThanHalfAFixedPointStepPaintsNothing [
+	"Measured on a live context: a rectangle one four hundredth of a pixel wide stores an alpha
+	 of one, and a wider one of three five hundred and twelfths stores two, but one of exactly
+	 one five hundred and twelfth stores nothing, because its width collapses to zero when the
+	 coordinates reach the fixed point grid. Our coverage must collapse with it, or we paint a
+	 pixel Cairo leaves untouched."
+	| surface context |
+	surface := self newSurface.
+	context := surface newContext.
+	{ 1 / 512. 1 / 400. 3 / 512 } doWithIndex: [ :width :index |
+		context
+			rectangleX: 2 y: 2 * (index - 1) width: width height: 1;
+			fill ].
+	self assert: ((surface pixelAtX: 2 y: 0) bitShift: -24) equals: 0.
+	self assert: ((surface pixelAtX: 2 y: 2) bitShift: -24) equals: 1.
+	self assert: ((surface pixelAtX: 2 y: 4) bitShift: -24) equals: 2
+]
+
 { #category : 'tests - source' }
 VGCairoDrawingTest >> testAStopAddedAfterThePatternIsSetIsStillSeenAtPaintTime [
 	"Measured on a live Cairo context: Cairo keeps a reference to the pattern rather than a copy of

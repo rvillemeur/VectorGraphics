@@ -104,19 +104,18 @@ VGConformanceCorpus class >> classNamed: aString for: aContext [
 { #category : 'cases' }
 VGConformanceCorpus class >> clipCases [
 	"Unit 1.6: the clip, read through a shape that reaches outside it."
-
 	^ {
-		  (self case: 'clip-circle' unit: '1.6' draw: [ :context |
-			    context
-				    circleCenterX: 32 y: 32 radius: 18;
-				    clip;
-				    rectangleX: 0 y: 0 width: 64 height: 40;
-				    fill ]).
+		  (self antialiasedCase: 'clip-circle' unit: '1.6' draw: [ :context |
+			   context
+				   circleCenterX: 32 y: 32 radius: 18;
+				   clip;
+				   rectangleX: 0 y: 0 width: 64 height: 40;
+				   fill ]).
 		  (self case: 'clip-preserving-path' unit: '1.6' draw: [ :context |
-			    context
-				    rectangleX: 8 y: 8 width: 48 height: 48;
-				    clipPreservingPath;
-				    stroke ]) }
+			   context
+				   rectangleX: 8 y: 8 width: 48 height: 48;
+				   clipPreservingPath;
+				   stroke ]) }
 ]
 
 { #category : 'constants' }
@@ -272,6 +271,17 @@ VGConformanceCorpus class >> sourceCases [
 				    sourceSurface: (self tileFor: context);
 				    rectangleX: 0 y: 0 width: 64 height: 64;
 				    fill ]) }
+]
+
+{ #category : 'constants' }
+VGConformanceCorpus class >> strayAlphaAllowance [
+	"How heavy a pixel we paint outside Cairo shape may be. Cairo steps a polygon edge across a
+	 grid of five hundred and twelfths of a pixel with integer arithmetic, while our scan
+	 converter is exact across the pixel, so a near tangential edge, such as the tip of a star,
+	 can leave us a coverage of a fraction of one step of alpha where Cairo rounds to none. One
+	 step is the smallest alpha a pixel can carry and is invisible; anything heavier is a shape
+	 we got wrong, which is what the gate is for."
+	^ 1
 ]
 
 { #category : 'cases' }

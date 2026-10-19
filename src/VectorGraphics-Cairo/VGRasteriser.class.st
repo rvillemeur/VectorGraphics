@@ -17,10 +17,8 @@ Class {
 	#name : 'VGRasteriser',
 	#superclass : 'Object',
 	#instVars : [
-		'segments',
-		'fillRule',
-		'clip',
-		'antialias'
+		'scanner',
+		'clip'
 	],
 	#category : 'VectorGraphics-Cairo-Rasterising',
 	#package : 'VectorGraphics-Cairo',
@@ -35,21 +33,22 @@ VGRasteriser class >> samplesPerPixelRow [
 ]
 
 { #category : 'instance creation' }
-VGRasteriser class >> segments: anArray fillRule: aSymbol antialias: anotherSymbol clip: aRectangle [
+VGRasteriser class >> segments: anArray fillRule: aSymbol antialias: anotherSymbol clip: aClip [
 	^ self new
-		  setSegments: anArray
-		  fillRule: aSymbol
-		  antialias: anotherSymbol
-		  clip: aRectangle
+		  setScanner: (VGSpanScanner
+				   segments: anArray
+				   fillRule: aSymbol
+				   antialias: anotherSymbol)
+		  clip: aClip
 ]
 
 { #category : 'instance creation' }
-VGRasteriser class >> segments: anArray fillRule: aSymbol clip: aRectangle [
+VGRasteriser class >> segments: anArray fillRule: aSymbol clip: aClip [
 	^ self
 		  segments: anArray
 		  fillRule: aSymbol
 		  antialias: VGCairoState antialiasNames first
-		  clip: aRectangle
+		  clip: aClip
 ]
 
 { #category : 'private' }
@@ -70,7 +69,7 @@ VGRasteriser >> addOverlapFrom: aNumber to: anotherNumber into: aFloatArray star
 
 { #category : 'accessing' }
 VGRasteriser >> antialias [
-	^ antialias
+	^ scanner antialias
 ]
 
 { #category : 'accessing' }
@@ -108,80 +107,47 @@ VGRasteriser >> coverageRamp [
 VGRasteriser >> coverageRowsDo: aBlock [
 	"The coverage of every row the clip and the edges share: the row, a Float64Array of coverage
 	 from zero to one, and the device x its first entry stands for. A row no edge reaches is not
-	 visited at all."
+	 visited at all, and a clip that allows nothing is not visited either."
 
 	| left width coverage |
-	segments isEmpty ifTrue: [ ^ self ].
-	left := clip left floor.
-	width := clip right ceiling - left.
+	scanner isEmpty ifTrue: [ ^ self ].
+	clip isEmpty ifTrue: [ ^ self ].
+	left := clip bounds left floor.
+	width := clip bounds right ceiling - left.
 	width <= 0 ifTrue: [ ^ self ].
 	coverage := Float64Array new: width.
 	self rowRange do: [ :y |
 		coverage atAllPut: 0.0.
-		self isAliased
-			ifTrue: [ self fillAliasedCoverage: coverage startingAt: left atRow: y ]
-			ifFalse: [ self fillSampledCoverage: coverage startingAt: left atRow: y ].
+		self fillCoverage: coverage startingAt: left atRow: y.
 		aBlock value: y value: coverage value: left ]
 ]
 
 { #category : 'private' }
-VGRasteriser >> crossingsAt: aNumber [
-	"Every edge the line crosses, as an x to direction association sorted by x. An edge is taken
-	 half open, from its upper end inclusive to its lower end exclusive, so a vertex shared by two
-	 edges is counted once rather than twice."
-	| crossings |
-	crossings := OrderedCollection new.
-	1 to: segments size by: 4 do: [ :index |
-		| y0 y1 |
-		y0 := segments at: index + 1.
-		y1 := segments at: index + 3.
-		y0 = y1 ifFalse: [
-			(aNumber >= (y0 min: y1) and: [ aNumber < (y0 max: y1) ]) ifTrue: [
-				| x0 x1 |
-				x0 := segments at: index.
-				x1 := segments at: index + 2.
-				crossings add:
-					x0 + ((x1 - x0) * (aNumber - y0) / (y1 - y0))
-					-> (y1 > y0 ifTrue: [ 1 ] ifFalse: [ -1 ]) ] ] ].
-	^ crossings asArray sort: [ :a :b | a key <= b key ]
-]
-
-{ #category : 'private' }
-VGRasteriser >> fillAliasedCoverage: aFloatArray startingAt: anInteger atRow: aRow [
-	"Antialiasing off: one sample at the centre of the pixel, so every pixel is painted whole or
-	 left alone and no edge carries a shade."
-
-	self spansAt: aRow + 0.5 do: [ :from :to |
-		1 to: aFloatArray size do: [ :index |
-			| centre |
-			centre := anInteger + index - 0.5.
-			(centre >= from and: [ centre < to ]) ifTrue: [
-				aFloatArray at: index put: 1.0 ] ] ]
+VGRasteriser >> fillCoverage: aFloatArray startingAt: anInteger atRow: aRow [
+	"The part of each pixel of the row the shape covers inside the clip, sampled on the sub-row
+	 grid and exact across the pixel. Every sub-row span of the shape is trimmed to the spans the
+	 clip allows on that same sub-row, which is the geometric intersection Cairo performs. An
+	 aliased shape or clip answers the same whole pixels on every sub-row of the row, so this one
+	 loop serves both modes."
+	| samples |
+	samples := self class samplesPerPixelRow.
+	0 to: samples - 1 do: [ :sample |
+		| subRow |
+		subRow := aRow + ((sample + 0.5) / samples).
+		scanner spansOfPixelRowAt: subRow do: [ :from :to |
+			clip spanFrom: from to: to at: subRow do: [ :start :end |
+				self
+					addOverlapFrom: start
+					to: end
+					into: aFloatArray
+					startingAt: anInteger ] ] ].
+	1 to: aFloatArray size do: [ :index |
+		aFloatArray at: index put: ((aFloatArray at: index) / samples min: 1.0) ]
 ]
 
 { #category : 'accessing' }
 VGRasteriser >> fillRule [
-	^ fillRule
-]
-
-{ #category : 'private' }
-VGRasteriser >> fillSampledCoverage: aFloatArray startingAt: anInteger atRow: aRow [
-	"The part of each pixel of the row the shape covers, sampled on the sub-row grid and exact
-	 across the pixel."
-
-	| samples |
-	samples := self class samplesPerPixelRow.
-	0 to: samples - 1 do: [ :sample |
-		self
-			spansAt: aRow + ((sample + 0.5) / samples)
-			do: [ :from :to |
-			self
-				addOverlapFrom: from
-				to: to
-				into: aFloatArray
-				startingAt: anInteger ] ].
-	1 to: aFloatArray size do: [ :index |
-		aFloatArray at: index put: ((aFloatArray at: index) / samples min: 1.0) ]
+	^ scanner fillRule
 ]
 
 { #category : 'inspector' }
@@ -197,29 +163,22 @@ VGRasteriser >> inspectorCoverage: aBuilder [
 
 { #category : 'inspector' }
 VGRasteriser >> inspectorCoverageContext: aContext [
-	aContext active: (segments notNil and: [ clip notNil ])
+	aContext active: (scanner notNil and: [ clip notNil ])
 ]
 
 { #category : 'testing' }
 VGRasteriser >> isAliased [
-	^ antialias == #none
-]
-
-{ #category : 'private' }
-VGRasteriser >> isInside: anInteger [
-	^ fillRule == #evenOdd
-		  ifTrue: [ anInteger odd ]
-		  ifFalse: [ anInteger ~= 0 ]
+	^ scanner isAliased
 ]
 
 { #category : 'printing' }
 VGRasteriser >> printOn: aStream [
 	aStream
 		nextPutAll: self class name;
-		nextPutAll: '(';
-		print: segments size // 4;
+		nextPut: $(;
+		print: scanner size;
 		nextPutAll: ' edges, ';
-		nextPutAll: fillRule;
+		nextPutAll: scanner fillRule;
 		nextPutAll: ', clip ';
 		print: clip;
 		nextPut: $)
@@ -228,7 +187,9 @@ VGRasteriser >> printOn: aStream [
 { #category : 'private' }
 VGRasteriser >> rowRange [
 	"The rows the clip and the edges share. A shape well above or below the clip costs nothing."
-	| top bottom |
+
+	| top bottom segments |
+	segments := scanner segments.
 	top := Float infinity.
 	bottom := Float infinity negated.
 	2 to: segments size by: 2 do: [ :index |
@@ -236,38 +197,24 @@ VGRasteriser >> rowRange [
 		y := segments at: index.
 		top := top min: y.
 		bottom := bottom max: y ].
-	^ (top floor max: clip top floor) to: (bottom ceiling min: clip bottom ceiling) - 1
+	^ (top floor max: clip bounds top floor)
+	  to: (bottom ceiling min: clip bounds bottom ceiling) - 1
+]
+
+{ #category : 'accessing' }
+VGRasteriser >> scanner [
+	"The scan conversion of my shape, which the clip performs on its own shapes too."
+
+	^ scanner
 ]
 
 { #category : 'accessing' }
 VGRasteriser >> segments [
-	^ segments
+	^ scanner segments
 ]
 
 { #category : 'private' }
-VGRasteriser >> setSegments: anArray fillRule: aSymbol antialias: anotherSymbol clip: aRectangle [
-	segments := anArray.
-	fillRule := aSymbol.
-	antialias := anotherSymbol.
-	clip := aRectangle
-]
-
-{ #category : 'enumerating' }
-VGRasteriser >> spansAt: aNumber do: aBlock [
-	"The spans of that horizontal line the fill rule calls inside. A crossing carries the direction
-	 the edge runs in, because the winding rule counts those directions and the even-odd rule only
-	 counts crossings."
-	| crossings winding startX |
-	crossings := self crossingsAt: aNumber.
-	winding := 0.
-	startX := nil.
-	crossings do: [ :crossing |
-		| wasInside |
-		wasInside := self isInside: winding.
-		winding := fillRule == #evenOdd
-			           ifTrue: [ winding + 1 ]
-			           ifFalse: [ winding + crossing value ].
-		(self isInside: winding)
-			ifTrue: [ wasInside ifFalse: [ startX := crossing key ] ]
-			ifFalse: [ wasInside ifTrue: [ aBlock value: startX value: crossing key ] ] ]
+VGRasteriser >> setScanner: aScanner clip: aClip [
+	scanner := aScanner.
+	clip := aClip
 ]

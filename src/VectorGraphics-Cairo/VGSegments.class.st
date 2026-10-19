@@ -69,9 +69,47 @@ VGSegments >> antialias [
 	^ antialias
 ]
 
-{ #category : 'geometry' }
+{ #category : 'testing' }
+VGSegments >> asDeviceRectangle [
+	"The device-space rectangle my edges are, or nil when they are anything else. Four edges, each
+	 one horizontal or vertical, whose corners are the four corners of my bounding box: that is
+	 the clip a Bloc element with a rectangular geometry builds, and a clip of one needs no scan
+	 conversion at all."
+
+	| box corners |
+	self size = 4 ifFalse: [ ^ nil ].
+	box := self exactBoundingBox.
+	corners := box corners asSet.
+	1 to: coordinates size by: 4 do: [ :index |
+		| from to |
+		from := (coordinates at: index) @ (coordinates at: index + 1).
+		to := (coordinates at: index + 2) @ (coordinates at: index + 3).
+		(from x = to x or: [ from y = to y ]) ifFalse: [ ^ nil ].
+		((corners includes: from) and: [ corners includes: to ]) ifFalse: [ ^ nil ] ].
+	^ box
+]
+
+{ #category : 'accessing' }
 VGSegments >> boundingBox [
 	"The whole-pixel device rectangle my edges live in, or nil when I hold none."
+
+	| exact |
+	exact := self exactBoundingBox.
+	exact ifNil: [ ^ nil ].
+	^ exact left floor @ exact top floor
+	  corner: exact right ceiling @ exact bottom ceiling
+]
+
+{ #category : 'accessing' }
+VGSegments >> coordinates [
+	^ coordinates
+]
+
+{ #category : 'accessing' }
+VGSegments >> exactBoundingBox [
+	"The device rectangle my edges live in, fractions kept, or nil when I hold none. A clip needs
+	 the fraction: it is what pays for half of the pixel its edge runs through."
+
 	| left top right bottom |
 	self isEmpty ifTrue: [ ^ nil ].
 	left := Float infinity.
@@ -86,12 +124,7 @@ VGSegments >> boundingBox [
 		right := right max: x.
 		top := top min: y.
 		bottom := bottom max: y ].
-	^ left floor @ top floor corner: right ceiling @ bottom ceiling
-]
-
-{ #category : 'accessing' }
-VGSegments >> coordinates [
-	^ coordinates
+	^ left @ top corner: right @ bottom
 ]
 
 { #category : 'accessing' }
