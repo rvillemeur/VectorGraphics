@@ -6,7 +6,7 @@ that implement the source, the fill rule and the clip set my fields; I only hold
 "
 Class {
 	#name : 'VGCairoState',
-	#superclass : 'VGCairoObject',
+	#superclass : 'Object',
 	#instVars : [
 		'matrix',
 		'source',
@@ -16,7 +16,8 @@ Class {
 		'strokeStyle',
 		'tolerance',
 		'antialias',
-		'operator'
+		'operator',
+		'scaledFont'
 	],
 	#category : 'VectorGraphics-Cairo-Context',
 	#package : 'VectorGraphics-Cairo',
@@ -162,6 +163,23 @@ VGCairoState >> printOn: aStream [
 		nextPutAll: ' matrix: ';
 		print: matrix;
 		nextPut: $)
+]
+
+{ #category : 'accessing' }
+VGCairoState >> scaledFont [
+	"The font every text verb draws through, or nil when none was selected. Cairo's own default
+	 is a toy face at size ten; we have no font discovery before unit 1.10, so a context starts
+	 with no font and a text verb says so."
+
+	^ scaledFont
+]
+
+{ #category : 'accessing' }
+VGCairoState >> scaledFont: aScaledFont [
+	"A scaled font is immutable and shared, so a saved state needs no copy of it: that is what
+	 lets its glyph atlas outlive a save and a restore."
+
+	scaledFont := aScaledFont
 ]
 
 { #category : 'accessing' }

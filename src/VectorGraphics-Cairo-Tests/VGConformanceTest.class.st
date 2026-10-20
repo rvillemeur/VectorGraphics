@@ -159,7 +159,8 @@ VGConformanceTest >> testEveryCaseThatDrawsMatchesCairo [
 	 by the replacement and once by Alexandrie, and the two pictures must agree: nothing of ours
 	 outside Cairo's shape beyond the residue a rounded edge leaves, and no channel further from
 	 Cairo's than the case allows. A case blocked on a later unit is skipped, which is what its
-	 blocking failure is for."
+	 blocking failure is for. The allowance for a pixel outside the reference is the case's own,
+	 because a reference FreeType rasterised does not have the exterior a scan converter has."
 	| failures |
 	failures := OrderedCollection new.
 	VGConformanceCorpus cases do: [ :case |
@@ -169,7 +170,7 @@ VGConformanceTest >> testEveryCaseThatDrawsMatchesCairo [
 			comparison isComparable
 				ifFalse: [ failures add: case name , ' differs in extent' ]
 				ifTrue: [
-					(comparison maximumStrayAlpha <= VGConformanceCorpus strayAlphaAllowance
+					(comparison maximumStrayAlpha <= case strayAlphaAllowance
 						 and: [ comparison maximumChannelDistance <= case tolerance ]) ifFalse: [
 						failures add: case name , ' ' , comparison printString ] ] ] ].
 	self assert: failures asArray isEmpty description: failures asArray printString

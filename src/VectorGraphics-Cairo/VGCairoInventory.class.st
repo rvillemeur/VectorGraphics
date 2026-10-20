@@ -107,7 +107,8 @@ VGCairoInventory class >> extendedSelectorUnitTable [
 		  #innerCenter:innerRadius:outerCenter:outerRadius: }.
 		  { '1.7'. #VGCairoContext. #operator: }.
 		  { '1.7'. #VGCairoContext. #mask: }.
-		  { '1.8'. #VGCairoContext. #showText: } }
+		  { '1.8'. #VGCairoContext. #showText: }.
+		  { '1.10'. #VGCairoContext. #defaultScaledFont } }
 ]
 
 { #category : 'inventory' }

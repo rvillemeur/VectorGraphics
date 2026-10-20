@@ -302,6 +302,34 @@ VGConformanceCorpus class >> pathCases [
 		  (self case: 'path-painted-whole-target' unit: '1.3' draw: [ :context | context paint ]) }
 ]
 
+{ #category : 'cases - text' }
+VGConformanceCorpus class >> scaledFontFor: aContext size: aNumber [
+	"A scaled font in the family of the context, over the same bytes at the same size with the
+	 metrics unhinted, so both families lay the run out from the same numbers. The hint style is
+	 named on both sides because Alexandrie's default would let FreeType move the outlines."
+
+	(aContext isKindOf: VGCairoContext) ifTrue: [
+		^ VGScaledFont
+			  fontFace: (VGFontFace newForBytes: self textCaseFontBytes)
+			  fontMatrix: (VGCairoMatrix newScalingBy: aNumber asPoint)
+			  userToDeviceMatrix: VGCairoMatrix newIdentity
+			  options: (VGFontOptions new
+					   hintStyle: #none;
+					   hintMetrics: #off;
+					   yourself) ].
+	^ AeCairoScaledFont
+		  fontFace: (AeCairoFreetypeFontFace newForFace:
+				   (AeFTLibrary newInitialized
+					    newFaceFromBytes: self textCaseFontBytes
+					    index: 0))
+		  fontMatrix: (AeCairoMatrix newScalingBy: aNumber asPoint)
+		  userToDeviceMatrix: AeCairoMatrix newIdentity
+		  options: (AeCairoFontOptions new
+				   hintStyle: AeCairoHintStyle none;
+				   hintMetrics: AeCairoHintMetrics off;
+				   yourself)
+]
+
 { #category : 'cases' }
 VGConformanceCorpus class >> sourceCases [
 	"Unit 1.5: what the painting verbs take their colour from. Each of the four pattern classes
@@ -416,23 +444,117 @@ VGConformanceCorpus class >> targetCases [
 			   draw: [ :context | context clearColor: (Color r: 0.2 g: 0.4 b: 0.9) ]) }
 ]
 
+{ #category : 'cases - text' }
+VGConformanceCorpus class >> textAtlasStrayAlphaAllowance [
+	"How heavy a pixel the atlas route may paint outside Cairo's own glyph. FreeType rounds a
+	 faint edge coverage to nothing where our converter keeps it, so a glyph of ours is a hair
+	 wider than the reference. Measured over the run case: five pixels, the heaviest at an alpha
+	 of thirteen of two hundred and fifty-five, which is a shade no eye reads; the gate is set a
+	 little above that."
+
+	^ 16
+]
+
+{ #category : 'cases - text' }
+VGConformanceCorpus class >> textAtlasTolerance [
+	"How far a channel of a glyph drawn through the atlas may sit from Cairo's. Cairo rasterises
+	 a glyph with FreeType, which walks the outline on its own grid and drops a coverage of its
+	 own, while we rasterise the same outline with the scan converter every other case uses, so
+	 the shades along a stem differ by more than an edge of a path does. Measured over the run
+	 case: thirty-three of two hundred and fifty-five at worst, and the gate is set a little
+	 above that."
+
+	^ 36
+]
+
+{ #category : 'cases - text' }
+VGConformanceCorpus class >> textCaseFontBytes [
+	"The font every text case draws with, read from Alexandrie's embedded copy. A font file is
+	 named here rather than in the corpus's drawing scripts because both families read the same
+	 bytes: ours through its own TrueType tables, Alexandrie's through FreeType."
+
+	^ AeSourceSansPro_Regular fontContentsData
+]
+
+{ #category : 'cases - text' }
+VGConformanceCorpus class >> textCaseFontSize [
+	"Large enough that a glyph has shades on its curve, small enough that a whole word fits the
+	 case extent."
+
+	^ 20
+]
+
+{ #category : 'cases - text' }
+VGConformanceCorpus class >> textCaseOrigin [
+	"Where the baseline of a text case starts: a whole pixel, so the two families place the run
+	 identically and the comparison is about the glyphs rather than about rounding."
+
+	^ 4 @ 44
+]
+
+{ #category : 'cases - text' }
+VGConformanceCorpus class >> textCaseRun [
+	"A capital, a descender, a composite glyph and a round one, which is as much of a font as a
+	 run of this width can exercise."
+
+	^ 'Agio'
+]
+
 { #category : 'cases' }
 VGConformanceCorpus class >> textCases [
-	"Unit 1.8: glyphs. The scaled font is nil until unit 1.8 names the class that holds one, which is
-	 enough for the unit 1.0 gate, because the case must stop on #scaledFont: anyway."
+	"Unit 1.8: the same run drawn both ways. The path case appends the glyph outlines and fills
+	 them, which Cairo rasterises with the same scan converter as any other path, so it is held to
+	 the antialiasing tolerance of every other antialiased case. The run case goes through the
+	 glyph atlas, which Cairo rasterises with FreeType instead, so it carries a tolerance and an
+	 exterior allowance of its own; that the two routes of ours agree byte for byte is held by
+	 VGCairoTextTest, which is what makes the path case a check on both."
 
 	^ {
-		  (self case: 'text-glyph-run' unit: '1.8' draw: [ :context |
-			    context
-				    scaledFont: nil;
-				    fontSize: 16;
-				    moveTo: 6 @ 40;
-				    showGlyphs: #() ]).
-		  (self case: 'text-glyph-path' unit: '1.8' draw: [ :context |
-			    context
-				    scaledFont: nil;
-				    appendGlyphsPath: #();
-				    fill ]) }
+		  ((self
+			    case: 'text-glyph-run'
+			    unit: '1.8'
+			    draw: [ :context |
+				    context
+					    scaledFont:
+						    (self scaledFontFor: context size: self textCaseFontSize);
+					    sourceColor: Color black;
+					    moveTo: self textCaseOrigin;
+					    showText: self textCaseRun ])
+			   tolerance: self textAtlasTolerance;
+			   strayAlphaAllowance: self textAtlasStrayAlphaAllowance;
+			   yourself).
+		  (self
+			   antialiasedCase: 'text-glyph-path'
+			   unit: '1.8'
+			   draw: [ :context |
+				   | font |
+				   font := self scaledFontFor: context size: self textCaseFontSize.
+				   context
+					   scaledFont: font;
+					   sourceColor: Color black;
+					   appendGlyphsPath:
+						   (self textGlyphsOf: font at: self textCaseOrigin);
+					   fill ]) }
+]
+
+{ #category : 'cases - text' }
+VGConformanceCorpus class >> textGlyphsOf: aScaledFont at: aPoint [
+	"The run laid out by that font and moved to aPoint, in whatever form the font's own family
+	 wants. Alexandrie answers an opaque array over external memory, so its glyphs are moved in
+	 place through the structure that array points at."
+
+	| glyphs |
+	glyphs := aScaledFont glyphArrayForString: self textCaseRun.
+	(glyphs isKindOf: Array) ifTrue: [
+		^ glyphs collect: [ :each |
+			  VGGlyph index: each index x: each x + aPoint x y: each y + aPoint y ] ].
+	1 to: glyphs size do: [ :index |
+		| glyph |
+		glyph := glyphs asExternalStructure at: index.
+		glyph
+			x: glyph x + aPoint x;
+			y: glyph y + aPoint y ].
+	^ glyphs
 ]
 
 { #category : 'private' }

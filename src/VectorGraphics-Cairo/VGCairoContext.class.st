@@ -89,9 +89,40 @@ VGCairoContext >> appendArcCenter: aCenter radius: aRadius from: startRadians to
 		firstSegment: wasAtRunStart
 ]
 
-{ #category : 'skeleton - unit 1.8' }
-VGCairoContext >> appendGlyphsPath: arg1 [
-	^ self notYetImplementedIn: '1.8' selector: #appendGlyphsPath:
+{ #category : 'private' }
+VGCairoContext >> appendDeviceContour: aContour into: aPathBuilder [
+	"One contour, already in device space: the start point, then a control point and an end point
+	 for every quadratic. A glyph contour is always closed."
+
+	aPathBuilder moveTo: aContour first.
+	2 to: aContour size by: 2 do: [ :index |
+		aPathBuilder
+			quadraticVia: (aContour at: index)
+			to: (aContour at: index + 1) ].
+	aPathBuilder closePath
+]
+
+{ #category : 'text' }
+VGCairoContext >> appendGlyphsPath: aGlyphArray [
+	"Cairo's cairo_glyph_path: closed subpaths for the glyphs added to the path being built,
+	 drawing nothing."
+
+	self isInError ifTrue: [ ^ self ].
+	self appendGlyphsPath: aGlyphArray length: aGlyphArray size
+]
+
+{ #category : 'text' }
+VGCairoContext >> appendGlyphsPath: aGlyphArray length: aNumberOfGlyphs [
+	"The path route of text: every contour of every glyph as a subpath of the current path. Fill
+	 it and the pixels are the ones #showGlyphs: lays down through the atlas; a test holds the
+	 two routes to each other."
+
+	self isInError ifTrue: [ ^ self ].
+	(self glyphsOf: aGlyphArray size: aNumberOfGlyphs) do: [ :glyph |
+		(self
+			 deviceContoursOfGlyph: glyph index
+			 at: (self snappedDevicePointFor: glyph position)) do: [ :contour |
+			self appendDeviceContour: contour into: self pathBuilder ] ]
 ]
 
 { #category : 'path' }
@@ -363,6 +394,14 @@ VGCairoContext >> currentPointInUserSpace [
 	^ self userPointFor: self pathBuilder currentPoint
 ]
 
+{ #category : 'text' }
+VGCairoContext >> currentScaledFont [
+	"The font every text verb works through: the one the caller selected, or Cairo's toy default
+	 face when it selected none."
+
+	^ state scaledFont ifNil: [ self defaultScaledFont ]
+]
+
 { #category : 'painting' }
 VGCairoContext >> currentTarget [
 	^ surface
@@ -380,6 +419,30 @@ VGCairoContext >> curveVia: aFirstControlPoint via: aSecondControlPoint to: anEn
 { #category : 'path' }
 VGCairoContext >> curveViaX: x1 y: y1 viaX: x2 y: y2 toX: x3 y: y3 [
 	self curveVia: x1 @ y1 via: x2 @ y2 to: x3 @ y3
+]
+
+{ #category : 'text' }
+VGCairoContext >> defaultScaledFont [
+	"Cairo's toy default face at Cairo's default size, which a text verb uses when the caller
+	 selected no font. Naming a family and finding a file for it needs the font manager, so it
+	 waits for unit 1.10; until then a text verb with no font says which unit owes it."
+
+	^ self notYetImplementedIn: '1.10' selector: #defaultScaledFont
+]
+
+{ #category : 'private' }
+VGCairoContext >> deviceContoursOfGlyph: aGlyphIndex at: aDevicePoint [
+	"The contours of one glyph in device space, placed at a device point. The contour points go
+	 through the matrix without its translation, because the translation is in the device point
+	 already, and the device point is the same number in both routes, so the rasteriser sees the
+	 same coordinates whether the glyph is filled as a path or rasterised into a mask."
+
+	| linear |
+	linear := self linearMatrix.
+	^ (self currentScaledFont userSpaceContoursOfGlyphAt: aGlyphIndex) collect: [
+		  :contour |
+		  contour collect: [ :point |
+			  (linear valueX: point x y: point y) + aDevicePoint ] ]
 ]
 
 { #category : 'private' }
@@ -440,19 +503,61 @@ VGCairoContext >> fillRule: aSymbol [
 	state fillRule: aSymbol
 ]
 
-{ #category : 'skeleton - unit 1.8' }
+{ #category : 'text' }
 VGCairoContext >> fontExtents [
-	^ self notYetImplementedIn: '1.8' selector: #fontExtents
+	"Cairo's cairo_font_extents: the vertical geometry of the font in force, in user space."
+
+	^ self currentScaledFont fontExtents
 ]
 
-{ #category : 'skeleton - unit 1.8' }
-VGCairoContext >> fontSize: arg1 [
-	^ self notYetImplementedIn: '1.8' selector: #fontSize:
+{ #category : 'text' }
+VGCairoContext >> fontSize: aNumber [
+	"Cairo's cairo_set_font_size: the font matrix becomes a scale by aNumber, so the em square of
+	 the face is aNumber by aNumber in user space. The face and the options are kept, which is
+	 why this builds a new scaled font rather than changing the one in force: a scaled font is
+	 immutable, and its glyph atlas belongs to the size it was built for."
+
+	| font |
+	self isInError ifTrue: [ ^ self ].
+	font := self currentScaledFont.
+	state scaledFont: (VGScaledFont
+			 fontFace: font fontFace
+			 fontMatrix: (VGCairoMatrix newScalingBy: aNumber asPoint)
+			 userToDeviceMatrix: state matrix copy
+			 options: font options)
 ]
 
-{ #category : 'skeleton - unit 1.8' }
-VGCairoContext >> getGlyphExtentsOf: arg1 size: arg2 into: arg3 [
-	^ self notYetImplementedIn: '1.8' selector: #getGlyphExtentsOf:size:into:
+{ #category : 'text' }
+VGCairoContext >> getGlyphExtentsOf: aGlyphArray size: aNumberOfGlyphs into: aTextExtentsRecord [
+	"Cairo's cairo_glyph_extents, which writes into a record the caller owns and answers nothing.
+	 AeCanvas keeps one record and reads it afterwards, so the record is filled through its own
+	 setters and may be anything that answers them."
+
+	| extents |
+	self isInError ifTrue: [ ^ self ].
+	extents := self currentScaledFont glyphExtentsOf:
+		           (self glyphsOf: aGlyphArray size: aNumberOfGlyphs).
+	aTextExtentsRecord
+		bearingX: extents bearingX;
+		bearingY: extents bearingY;
+		width: extents width;
+		height: extents height;
+		advanceX: extents advanceX;
+		advanceY: extents advanceY
+]
+
+{ #category : 'private' }
+VGCairoContext >> glyphsOf: aGlyphArray size: aNumberOfGlyphs [
+	"The first aNumberOfGlyphs glyphs of an array, as a collection I can walk. Alexandrie hands
+	 over an opaque external array that answers its size and nothing else; the indexable
+	 structure behind it comes from #asExternalStructure, and asking for that selector rather
+	 than for a class name is what keeps this package free of Alexandrie's names."
+
+	| indexable |
+	indexable := (aGlyphArray respondsTo: #asExternalStructure)
+		             ifTrue: [ aGlyphArray asExternalStructure ]
+		             ifFalse: [ aGlyphArray ].
+	^ (1 to: aNumberOfGlyphs) collect: [ :index | indexable at: index ]
 ]
 
 { #category : 'testing' }
@@ -565,6 +670,18 @@ VGCairoContext >> lineTo: aPoint [
 { #category : 'path' }
 VGCairoContext >> lineToX: x y: y [
 	self lineTo: x @ y
+]
+
+{ #category : 'private' }
+VGCairoContext >> linearMatrix [
+	"My matrix without its translation: the part a glyph outline goes through. The translation is
+	 carried by the glyph's own device origin instead, so two runs of the same text a whole pixel
+	 apart share one mask, and the atlas keys on this and not on where the text sits."
+
+	^ state matrix copy
+		  x: 0;
+		  y: 0;
+		  yourself
 ]
 
 { #category : 'private' }
@@ -904,6 +1021,37 @@ VGCairoContext >> relativeLineTo: aDeltaPoint [
 ]
 
 { #category : 'private' }
+VGCairoContext >> renderedGlyphMaskFor: aGlyphIndex atPhase: aPhasePoint [
+	"One glyph rasterised into a surface of its own, with its origin at the sub-pixel phase the
+	 atlas keyed on. The box is whole pixels, so blitting the mask at a whole pixel offset keeps
+	 that phase.
+
+	 The mask is filled with opaque white, so its alpha is the coverage and nothing else, and it
+	 is filled with the winding rule whatever rule the context carries, because that is the rule
+	 a glyph outline is drawn with. The antialiasing mode is the context's, so a context that
+	 asks for hard edges gets them here too."
+
+	| contours box maskSurface maskContext |
+	contours := self deviceContoursOfGlyph: aGlyphIndex at: aPhasePoint.
+	contours ifEmpty: [ ^ nil ].
+	box := self wholePixelBoxOfContours: contours.
+	maskSurface := VGCairoImageSurface
+		               newFormat: VGCairoSurfaceFormat argb32
+		               extent: box extent.
+	maskSurface backend: surface backend.
+	maskContext := maskSurface newContext.
+	maskContext
+		antialias: state antialias;
+		useFillRuleWinding;
+		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
+	(self deviceContoursOfGlyph: aGlyphIndex at: aPhasePoint - box origin) do: [
+		:contour | self appendDeviceContour: contour into: maskContext pathBuilder ].
+	maskContext fill.
+	maskSurface flush.
+	^ VGGlyphMask surface: maskSurface offset: box origin
+]
+
+{ #category : 'private' }
 VGCairoContext >> renderedMaskFor: aPattern [
 	"aPattern painted over the whole of an intermediate the size of the target, under the
 	 transformation in force, so that its alpha can be read pixel by pixel in device space. The
@@ -1006,9 +1154,20 @@ VGCairoContext >> scaleByX: aNumber y: anotherNumber [
 	self changeMatrixBy: [ :each | each scaleByX: aNumber y: anotherNumber ]
 ]
 
-{ #category : 'skeleton - unit 1.8' }
-VGCairoContext >> scaledFont: arg1 [
-	^ self notYetImplementedIn: '1.8' selector: #scaledFont:
+{ #category : 'text' }
+VGCairoContext >> scaledFont [
+	"Cairo's cairo_get_scaled_font. Nil until a font is selected."
+
+	^ state scaledFont
+]
+
+{ #category : 'text' }
+VGCairoContext >> scaledFont: aScaledFont [
+	"Cairo's cairo_set_scaled_font: the face, the font matrix and the font options of the context
+	 all come from the scaled font at once. It is the verb AeCanvas sends before it draws glyphs."
+
+	self isInError ifTrue: [ ^ self ].
+	state scaledFont: aScaledFont
 ]
 
 { #category : 'transformations' }
@@ -1040,14 +1199,71 @@ VGCairoContext >> setSurface: aSurface [
 	surface := aSurface
 ]
 
-{ #category : 'skeleton - unit 1.8' }
-VGCairoContext >> showGlyphs: arg1 [
-	^ self notYetImplementedIn: '1.8' selector: #showGlyphs:
+{ #category : 'text' }
+VGCairoContext >> showGlyphs: aGlyphArray [
+	"Cairo's cairo_show_glyphs: the glyphs drawn with the source in force. Every glyph goes
+	 through the atlas of its scaled font, so a page of text costs one rasterisation per distinct
+	 glyph, matrix and sub-pixel phase, and the rest is blits."
+
+	self isInError ifTrue: [ ^ self ].
+	self showGlyphs: aGlyphArray size: aGlyphArray size
 ]
 
-{ #category : 'skeleton' }
-VGCairoContext >> showText: anArgument1 [
-	^ self notYetImplementedIn: '1.8' selector: #showText:
+{ #category : 'text' }
+VGCairoContext >> showGlyphs: aGlyphArray size: aNumberOfGlyphs [
+	"The first aNumberOfGlyphs glyphs of the array drawn, which is how Alexandrie passes a run
+	 whose array is longer than the run."
+
+	self isInError ifTrue: [ ^ self ].
+	(self glyphsOf: aGlyphArray size: aNumberOfGlyphs) do: [ :glyph |
+		self showOneGlyph: glyph ]
+]
+
+{ #category : 'private' }
+VGCairoContext >> showOneGlyph: aGlyph [
+	"One glyph blitted through its mask. The origin is snapped first, then split into the whole
+	 pixels the blit carries and the phase the mask is rendered at, so that the mask of a letter
+	 is shared by every place that letter sits on a whole pixel."
+
+	| device whole phase mask |
+	device := self snappedDevicePointFor: aGlyph position.
+	whole := device floor.
+	phase := device - whole.
+	mask := self currentScaledFont atlas
+		        maskForGlyph: aGlyph index
+		        phase: phase
+		        matrix: self linearMatrix
+		        ifAbsentPut: [
+		        self renderedGlyphMaskFor: aGlyph index atPhase: phase ].
+	mask ifNil: [ ^ self ].
+	self recordBlitOf: mask surface at: whole + mask offset
+]
+
+{ #category : 'text' }
+VGCairoContext >> showText: aString [
+	"cairo_show_text: the string laid out with no shaping, drawn from the current point, and the
+	 current point left where the next glyph would start. It is Cairo's toy API over
+	 cairo_show_glyphs, so it draws through #showGlyphs: rather than beside it. Cairo reads the
+	 origin as 0 @ 0 when there is no current point, which is what #currentPointInUserSpace
+	 already answers."
+
+	| font origin |
+	self isInError ifTrue: [ ^ self ].
+	font := self currentScaledFont.
+	origin := self currentPointInUserSpace.
+	self showGlyphs: ((font glyphArrayForString: aString) collect: [ :glyph |
+			 VGGlyph index: glyph index x: glyph x + origin x y: glyph y + origin y ]).
+	self moveTo: origin + (font textExtentsOf: aString) advance
+]
+
+{ #category : 'private' }
+VGCairoContext >> snappedDevicePointFor: aPoint [
+	"A device point already on Cairo's grid of two hundred and fifty sixths of a pixel. A glyph
+	 is placed on that grid before anything else happens to it, so that the whole pixel part and
+	 the sub-pixel phase of its origin are exact: the atlas keys on the phase, and a mask
+	 rendered at that phase then covers its pixels exactly as the filled path would."
+
+	^ self pathBuilder snapped: (self devicePointFor: aPoint)
 ]
 
 { #category : 'source' }
@@ -1295,4 +1511,19 @@ VGCairoContext >> useStrokeJoinRound [
 { #category : 'private' }
 VGCairoContext >> userPointFor: aPoint [
 	^ state matrix inverted value: aPoint
+]
+
+{ #category : 'private' }
+VGCairoContext >> wholePixelBoxOfContours: aContourCollection [
+	"The whole pixel box that holds a set of device space contours, with a pixel of margin on
+	 every side. A control point lies outside the curve it bends, so a box over every point of a
+	 contour holds the curve too; the margin keeps an edge pixel the rasteriser shades from
+	 falling outside the mask."
+
+	| points xs ys |
+	points := aContourCollection flatCollect: [ :each | each ].
+	xs := points collect: [ :each | each x ].
+	ys := points collect: [ :each | each y ].
+	^ xs min floor - 1 @ (ys min floor - 1)
+	  corner: xs max ceiling + 1 @ (ys max ceiling + 1)
 ]

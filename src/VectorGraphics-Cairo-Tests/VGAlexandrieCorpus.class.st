@@ -121,15 +121,19 @@ VGAlexandrieCorpus class >> isAvailable [
 VGAlexandrieCorpus class >> missingClassUnitTable [
 	"The Alexandrie Cairo classes the experiments name that the replacement has no counterpart for,
 	 each against the unit of VECTORCANVAS-PLAN.md that owes it. The corpus reads this to say why a
-	 case cannot run yet, so a class missing from the table is a gap the test reports."
+	 case cannot run yet, so a class missing from the table is a gap the test reports.
+	 The font classes name unit 1.10 rather than 1.8: unit 1.8 built the font face, the scaled
+	 font, the metrics and the glyph atlas, but a case that draws text picks its font by family
+	 name through AeFontManager and shapes it with HarfBuzz, and the bridge to those is what 1.10
+	 brings."
 	^ {
 		  (#AeCairoAntialias -> '1.4').
-		  (#AeCairoFontOptions -> '1.8').
-		  (#AeCairoFreetypeFontFace -> '1.8').
-		  (#AeCairoHintMetrics -> '1.8').
-		  (#AeCairoHintStyle -> '1.8').
-		  (#AeCairoScaledFont -> '1.8').
-		  (#AeCairoSubpixelOrder -> '1.8').
+		  (#AeCairoFontOptions -> '1.10').
+		  (#AeCairoFreetypeFontFace -> '1.10').
+		  (#AeCairoHintMetrics -> '1.10').
+		  (#AeCairoHintStyle -> '1.10').
+		  (#AeCairoScaledFont -> '1.10').
+		  (#AeCairoSubpixelOrder -> '1.10').
 		  (#AeCairoMeshPattern -> '1.12') }
 ]
 

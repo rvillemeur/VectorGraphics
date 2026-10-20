@@ -34,6 +34,7 @@ VGCairoExamplesTest >> exampleHolders [
 		  VGPaintExamples.
 		  VGPathExamples.
 		  VGRasteriserExamples.
+		  VGScaledFontExamples.
 		  VGSpanScannerExamples.
 		  VGStrokerExamples }
 ]

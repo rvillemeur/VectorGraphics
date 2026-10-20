@@ -13,7 +13,8 @@ Class {
 		'unit',
 		'extent',
 		'drawBlock',
-		'tolerance'
+		'tolerance',
+		'strayAlphaAllowance'
 	],
 	#category : 'VectorGraphics-Cairo-Tests-Conformance',
 	#package : 'VectorGraphics-Cairo-Tests',
@@ -146,6 +147,21 @@ VGConformanceCase >> setName: aString unit: aUnitString extent: aPoint draw: aBl
 	unit := aUnitString.
 	extent := aPoint.
 	drawBlock := aBlock
+]
+
+{ #category : 'accessing' }
+VGConformanceCase >> strayAlphaAllowance [
+	"How heavy a pixel I may paint outside Cairo's shape. The corpus's own allowance of one step
+	 is the default, because painting outside the reference is how a wrong shape shows up; a case
+	 whose reference was rasterised by FreeType rather than by a scan converter needs more, and
+	 says so where it is built."
+
+	^ strayAlphaAllowance ifNil: [ VGConformanceCorpus strayAlphaAllowance ]
+]
+
+{ #category : 'accessing' }
+VGConformanceCase >> strayAlphaAllowance: aNumber [
+	strayAlphaAllowance := aNumber
 ]
 
 { #category : 'accessing' }
