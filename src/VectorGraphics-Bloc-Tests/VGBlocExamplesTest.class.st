@@ -19,5 +19,6 @@ Class {
 VGBlocExamplesTest >> exampleHolders [
 	^ {
 		  VGCanvasExamples.
+		  VGFrameProfileExamples.
 		  VGRendererExamples }
 ]
