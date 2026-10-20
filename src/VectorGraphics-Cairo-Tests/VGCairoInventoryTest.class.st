@@ -107,6 +107,14 @@ VGCairoInventoryTest >> testPatternAnswersEverySelectorItsCallersSend [
 
 { #category : 'tests' }
 VGCairoInventoryTest >> testSurfaceAnswersEverySelectorItsCallersSend [
+	"A constructor belongs to the class it builds, the way AeCairoExportSurface owns extent:to:,
+	 so the class side of the inventory is satisfied by the surface family rather than by one
+	 class. This is what the pattern family already does, for the same reason."
+
 	self assert: VGCairoImageSurface answers: VGCairoInventory surfaceSelectors.
-	self assert: VGCairoImageSurface class answers: VGCairoInventory surfaceClassSelectors
+	VGCairoInventory surfaceClassSelectors do: [ :each |
+		self
+			assert: (VGCairoImageSurface withAllSubclasses anySatisfy: [ :one |
+					 one class canUnderstand: each ])
+			description: 'no surface class answers ' , each ]
 ]

@@ -36,11 +36,6 @@ VGCairoImageSurface class >> extent: aPoint format: aFormat [
 	^ self newFormat: aFormat extent: aPoint
 ]
 
-{ #category : 'skeleton - unit 1.9' }
-VGCairoImageSurface class >> extent: aPoint to: aFileReference [
-	^ self notYetImplementedIn: '1.9' selector: #extent:to:
-]
-
 { #category : 'instance creation' }
 VGCairoImageSurface class >> fromForm: aForm [
 	"A Form holds straight alpha, so every pixel is premultiplied on the way in."

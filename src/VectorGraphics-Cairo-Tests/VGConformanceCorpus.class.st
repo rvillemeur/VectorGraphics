@@ -55,6 +55,18 @@ VGConformanceCorpus class >> appendFivePointedStarTo: aContext [
 	aContext closePath
 ]
 
+{ #category : 'cases - shadow' }
+VGConformanceCorpus class >> blurFilterFor: aContext [
+	"The Gaussian blur filter in the family of the context. This one cannot be reached by
+	 substituting a prefix the way classNamed:for: does: Alexandrie calls it
+	 AeCairoA8FastGaussianBlurFilter although it touches no Cairo call and has a slower sibling it
+	 shares every method with, and ours is named for what it is."
+
+	^ ((aContext isKindOf: VGCairoContext)
+		   ifTrue: [ Smalltalk at: #VGA8GaussianBlurFilter ]
+		   ifFalse: [ Smalltalk at: #AeCairoA8FastGaussianBlurFilter ]) new
+]
+
 { #category : 'private' }
 VGConformanceCorpus class >> case: aString unit: aUnitString draw: aBlock [
 	^ VGConformanceCase
@@ -77,8 +89,9 @@ VGConformanceCorpus class >> caseMethodSelectors [
 	"The one list the corpus grows by. A new group means a new entry here and a new method, and the
 	 conformance test reads this list rather than the protocol, so a method that nobody named cannot
 	 hide in the corpus."
+
 	^ #( #targetCases #transformCases #pathCases #strokeCases #sourceCases #clipCases #groupCases
-	     #figureCases #textCases )
+	     #figureCases #textCases #shadowCases )
 ]
 
 { #category : 'cases' }
@@ -328,6 +341,117 @@ VGConformanceCorpus class >> scaledFontFor: aContext size: aNumber [
 				   hintStyle: AeCairoHintStyle none;
 				   hintMetrics: AeCairoHintMetrics off;
 				   yourself)
+]
+
+{ #category : 'constants' }
+VGConformanceCorpus class >> shadowBlurTolerance [
+	"A shadow is an alpha surface blurred, so the only difference between the two sides is the
+	 difference between the two rasterisations of the geometry underneath, and three box passes
+	 average that difference down rather than up: measured, the curved shadow cases differ by 2 of
+	 255 at worst where the unblurred circle of unit 1.3 differs by 21, and no pixel of ours falls
+	 outside the reference at all. The two axis-aligned shadow cases are exact and are held exact."
+
+	^ 4
+]
+
+{ #category : 'cases - shadow' }
+VGConformanceCorpus class >> shadowCaseBlurRadii [
+	"The widths the shadow cases blur by, in the order of the cases that use them. A radius of zero
+	 is kept because it is the degenerate state: the filter must leave the alpha surface alone and
+	 the picture must be the geometry itself, masked."
+
+	^ #( 10 16 4 0 )
+]
+
+{ #category : 'cases - shadow' }
+VGConformanceCorpus class >> shadowCaseColor [
+	^ Color r: 0.1 g: 0.1 b: 0.4
+]
+
+{ #category : 'cases - shadow' }
+VGConformanceCorpus class >> shadowCaseNamed: aName geometry: aBlock blurRadius: aNumber [
+	"One shadow case: the geometry drawn opaque into an alpha surface, blurred by the radius, then
+	 masked onto the target at the shadow offset in the shadow colour, which is the path
+	 BlGaussianShadowEffect takes through AeCanvas."
+
+	^ self case: aName unit: '1.9' draw: [ :context |
+		  context
+			  sourceColor: self shadowCaseColor;
+			  maskSurface: (self
+					   shadowMaskFor: context
+					   geometry: aBlock
+					   blurRadius: aNumber)
+			  x: self shadowCaseOffset x
+			  y: self shadowCaseOffset y ]
+]
+
+{ #category : 'cases - shadow' }
+VGConformanceCorpus class >> shadowCaseOffset [
+	"Where the blurred mask is laid down. A Bloc shadow is offset from the element it belongs to,
+	 so the cases mask at an offset rather than at the origin."
+
+	^ 4 @ 4
+]
+
+{ #category : 'cases' }
+VGConformanceCorpus class >> shadowCases [
+	"Unit 1.9: a Bloc shadow, which is the one thing the blur filter exists for. The two curved
+	 cases carry the blur tolerance; the sharp one and the one that blurs by nothing are held
+	 exact, because an axis-aligned edge is the same byte on both sides before the blur and the
+	 blur of it stays the same byte after."
+
+	| radii |
+	radii := self shadowCaseBlurRadii.
+	^ {
+		  ((self
+			    shadowCaseNamed: 'shadow-rounded-rectangle'
+			    geometry: [ :maskContext |
+				    maskContext
+					    roundedRectangleLeft: 14
+					    top: 14
+					    right: 50
+					    bottom: 50
+					    tl: 8
+					    tr: 8
+					    br: 8
+					    bl: 8 ]
+			    blurRadius: (radii at: 1))
+			   tolerance: self shadowBlurTolerance;
+			   yourself).
+		  ((self
+			    shadowCaseNamed: 'shadow-circle'
+			    geometry: [ :maskContext | maskContext circleCenterX: 32 y: 32 radius: 16 ]
+			    blurRadius: (radii at: 2))
+			   tolerance: self shadowBlurTolerance;
+			   yourself).
+		  (self
+			   shadowCaseNamed: 'shadow-sharp-rectangle'
+			   geometry: [ :maskContext | maskContext rectangleX: 16 y: 20 width: 32 height: 24 ]
+			   blurRadius: (radii at: 3)).
+		  (self
+			   shadowCaseNamed: 'shadow-blurred-by-nothing'
+			   geometry: [ :maskContext | maskContext rectangleX: 16 y: 20 width: 32 height: 24 ]
+			   blurRadius: (radii at: 4)) }
+]
+
+{ #category : 'cases - shadow' }
+VGConformanceCorpus class >> shadowMaskFor: aContext geometry: aBlock blurRadius: aRadius [
+	"The alpha surface a shadow is masked through: an alpha-only surface of the case size with the
+	 geometry drawn on it and then blurred, which is what AeCanvas builds for a Bloc shadow. The
+	 geometry is drawn opaque, because only the alpha of this surface is ever read."
+
+	| surface surfaceContext |
+	surface := (self classNamed: 'ImageSurface' for: aContext)
+		           extent: self caseExtent
+		           format: (self classNamed: 'SurfaceFormat' for: aContext) a8.
+	surfaceContext := surface newContext.
+	surfaceContext sourceColorR: 0.0 g: 0.0 b: 0.0 a: 1.0.
+	aBlock value: surfaceContext.
+	surfaceContext fill.
+	(self blurFilterFor: aContext)
+		surface: surface;
+		applyRadius: aRadius.
+	^ surface
 ]
 
 { #category : 'cases' }

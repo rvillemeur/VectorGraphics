@@ -20,9 +20,11 @@ VGCairoExamplesTest >> defaultTimeLimit [
 { #category : 'accessing' }
 VGCairoExamplesTest >> exampleHolders [
 	^ {
+		  VGA8GaussianBlurFilterExamples.
 		  VGAlexandrieCorpusExamples.
 		  VGBackendExamples.
 		  VGCairoContextExamples.
+		  VGCairoExportSurfaceExamples.
 		  VGCairoImageSurfaceExamples.
 		  VGCairoInventoryExamples.
 		  VGCairoMatrixExamples.
