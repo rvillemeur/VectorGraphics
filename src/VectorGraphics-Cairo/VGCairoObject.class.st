@@ -96,6 +96,14 @@ VGCairoObject >> inspectorSkeletonsContext: aContext [
 	aContext active: self skeletonSelectorsWithUnit notEmpty
 ]
 
+{ #category : 'testing' }
+VGCairoObject >> isNull [
+	"A Cairo object answers whether its handle is a NULL pointer, and `AeCanvas >> isValid` asks it
+	 of the context. Mine are Pharo objects, so there is no handle and nothing is ever NULL."
+
+	^ false
+]
+
 { #category : 'skeleton' }
 VGCairoObject >> notYetImplementedIn: aUnitString selector: aSymbol [
 	"A skeleton: the selector is here so that the calling surface is complete and so that a

@@ -21,6 +21,14 @@ Class {
 	#tag : 'Context'
 }
 
+{ #category : 'constants - text' }
+VGCairoContext class >> defaultFontSize [
+	"cairo_set_font_size's own default: the font matrix of a context that was given no font is a
+	 scale by ten, so the em square of the default face is ten by ten user units."
+
+	^ 10
+]
+
 { #category : 'instance creation' }
 VGCairoContext class >> newFor: aSurface [
 	| context |
@@ -424,10 +432,16 @@ VGCairoContext >> curveViaX: x1 y: y1 viaX: x2 y: y2 toX: x3 y: y3 [
 { #category : 'text' }
 VGCairoContext >> defaultScaledFont [
 	"Cairo's toy default face at Cairo's default size, which a text verb uses when the caller
-	 selected no font. Naming a family and finding a file for it needs the font manager, so it
-	 waits for unit 1.10; until then a text verb with no font says which unit owes it."
+	 selected no font. Cairo picks that face through fontconfig and this replacement does not
+	 bind fontconfig, so the face is the one Pharo embeds; the size, the matrix and the options
+	 are Cairo's own defaults, and the user to device matrix is the one in force, as it is for
+	 every other scaled font this context builds."
 
-	^ self notYetImplementedIn: '1.10' selector: #defaultScaledFont
+	^ VGScaledFont
+		  fontFace: VGFontFace default
+		  fontMatrix: (VGCairoMatrix newScalingBy: self class defaultFontSize asPoint)
+		  userToDeviceMatrix: state matrix copy
+		  options: VGFontOptions new
 ]
 
 { #category : 'private' }

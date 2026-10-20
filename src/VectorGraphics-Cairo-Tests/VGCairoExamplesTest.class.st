@@ -28,6 +28,7 @@ VGCairoExamplesTest >> exampleHolders [
 		  VGCairoImageSurfaceExamples.
 		  VGCairoInventoryExamples.
 		  VGCairoMatrixExamples.
+		  VGCairoReferenceScannerExamples.
 		  VGCairoStrokeStyleExamples.
 		  VGClipExamples.
 		  VGConformanceCorpusExamples.
@@ -56,6 +57,19 @@ VGCairoExamplesTest >> exampleSubjects [
 
 	^ self exampleMethods collect: [ :each |
 		  each methodClass instanceSide perform: each selector ]
+]
+
+{ #category : 'private' }
+VGCairoExamplesTest >> projectDefines: aCompiledMethod [
+	"Whether this project wrote the method. An example answers an ordinary Pharo object as often
+	 as one of ours — a `Form`, a `ByteArray` — and Pharo's own inspector views on those objects
+	 are not ours to gate or to hold to this project's rules. The names are compared as symbols
+	 because that is what the organiser answers, and `#'a' = 'a'` is false."
+
+	| package |
+	package := aCompiledMethod package.
+	^ package notNil and: [
+		  VGCairoReferenceScanner projectPackageNames includes: package name asSymbol ]
 ]
 
 { #category : 'tests' }
@@ -148,14 +162,16 @@ VGCairoExamplesTest >> testEveryViewOfAnExampleBuildsAndFillsItsCells [
 		description: 'these views do not build: ' , broken asArray printString
 ]
 
-{ #category : 'accessing' }
+{ #category : 'private' }
 VGCairoExamplesTest >> viewMethodsOf: anObject [
-	"The inspector views that would show for this object, found by the pragma on both sides, as
-	 receiver to method associations: a class-side view is sent to the class."
+	"The inspector views of this project that would show for this object, found by the pragma on
+	 both sides, as receiver to method associations: a class-side view is sent to the class.
+	 Pharo's own views on an object an example answers are left out; see `projectDefines:`."
 
 	| class |
 	class := anObject class.
 	^ (class methods collect: [ :each | anObject -> each ])
 	  , (class class methods collect: [ :each | class -> each ]) select: [ :each |
-		  each value hasPragmaNamed: #inspectorPresentationOrder:title: ]
+		  (each value hasPragmaNamed: #inspectorPresentationOrder:title:) and: [
+			  self projectDefines: each value ] ]
 ]

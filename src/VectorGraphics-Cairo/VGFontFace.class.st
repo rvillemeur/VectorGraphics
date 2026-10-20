@@ -23,6 +23,9 @@ Class {
 		'glyfStart',
 		'glyphDataOffsets'
 	],
+	#classInstVars : [
+		'defaultFace'
+	],
 	#category : 'VectorGraphics-Cairo-Text',
 	#package : 'VectorGraphics-Cairo',
 	#tag : 'Text'
@@ -65,6 +68,54 @@ VGFontFace class >> compositeBoundsAndCountLength [
 	^ 10
 ]
 
+{ #category : 'default face' }
+VGFontFace class >> default [
+	"The default face, read once and kept, so that a text verb with no font parses the tables of
+	 the bundled font once in the life of the image and every default scaled font shares one
+	 glyph cache."
+
+	^ defaultFace ifNil: [ defaultFace := self newForBytes: self defaultBytes ]
+]
+
+{ #category : 'default face' }
+VGFontFace class >> defaultBytes [
+	"The bytes of the default family, read from the font Pharo embeds. A family that is not
+	 embedded would have to be read from a path the provider does not keep, so a provider without
+	 the embedded family is an error that names what is missing rather than a silent fallback to
+	 some other font."
+
+	| family member info |
+	family := FreeTypeFontProvider current families
+		          detect: [ :each | each familyName = self defaultFamilyName ]
+		          ifNone: [ nil ].
+	family ifNil: [ ^ self error: 'no font family named ' , self defaultFamilyName ].
+	member := family memberWithStyleName: self defaultStyleName.
+	member ifNil: [
+		^ self error: self defaultFamilyName , ' has no ' , self defaultStyleName , ' style' ].
+	info := member fileInfo.
+	info isEmbedded ifFalse: [
+		^ self error: self defaultFamilyName , ' is not embedded in this image' ].
+	^ info fileContents
+]
+
+{ #category : 'default face' }
+VGFontFace class >> defaultFamilyName [
+	"The family of the face a text verb falls back to. Cairo resolves its toy default face
+	 through fontconfig, which this replacement does not bind, so the fallback is a family Pharo
+	 itself embeds and which is therefore in every image: the bytes are read from Pharo's font
+	 provider, no FreeType call is made on them, and the outlines are parsed here as any other
+	 face is."
+
+	^ 'Source Sans Pro'
+]
+
+{ #category : 'default face' }
+VGFontFace class >> defaultStyleName [
+	"The style of the default family. Cairo's toy default face is upright and of normal weight."
+
+	^ 'Regular'
+]
+
 { #category : 'constants' }
 VGFontFace class >> moreComponentsFlag [
 	^ 32
@@ -92,6 +143,14 @@ VGFontFace class >> requiredTableTags [
 	 is refused in #readBytes:."
 
 	^ #( 'head' 'maxp' 'hhea' 'hmtx' 'loca' 'cmap' 'glyf' )
+]
+
+{ #category : 'default face' }
+VGFontFace class >> resetDefault [
+	"Forget the kept default face, so a test can hold that it is read once and an image that
+	 gained a font can be told to look again."
+
+	defaultFace := nil
 ]
 
 { #category : 'constants' }

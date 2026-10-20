@@ -54,15 +54,19 @@ VGCairoImageSurface class >> fromForm: aForm [
 { #category : 'instance creation' }
 VGCairoImageSurface class >> newFormat: aFormat extent: aPoint [
 	"I own these pixels: a ByteArray in object memory, zero filled, which is the fully transparent
-	 surface Cairo answers from cairo_image_surface_create."
-	| pixelFormat stride |
+	 surface Cairo answers from cairo_image_surface_create. The extent is truncated here as well as
+	 in `setFormat:extent:stride:data:`, because the stride and the size of the buffer are computed
+	 from it and Bloc asks for fractional extents."
+
+	| pixelFormat stride extent |
 	pixelFormat := VGCairoSurfaceFormat normalize: aFormat.
-	stride := pixelFormat strideForWidth: aPoint x.
+	extent := aPoint x truncated @ aPoint y truncated.
+	stride := pixelFormat strideForWidth: extent x.
 	^ self new
 		  setFormat: pixelFormat
-		  extent: aPoint
+		  extent: extent
 		  stride: stride
-		  data: (ByteArray new: stride * aPoint y)
+		  data: (ByteArray new: stride * extent y)
 ]
 
 { #category : 'constants' }
@@ -77,15 +81,18 @@ VGCairoImageSurface class >> unownedNewForData: aBuffer format: aFormat width: a
 	"The pixels belong to the caller: a host window hands over a raw address and its own row pitch.
 	 Both a ByteArray and an ExternalAddress answer #uint32AtOffset:put:, so either is accepted and
 	 one code path serves both. A stride too small for one row is reported through my status, as
-	 Cairo does, rather than signalled."
-	| pixelFormat surface |
+	 Cairo does, rather than signalled, and the row is measured on the truncated width, because
+	 that is the width Cairo is given."
+
+	| pixelFormat surface extent |
 	pixelFormat := VGCairoSurfaceFormat normalize: aFormat.
+	extent := aWidth truncated @ aHeight truncated.
 	surface := self new
 		           setFormat: pixelFormat
-		           extent: aWidth @ aHeight
+		           extent: extent
 		           stride: aStride
 		           data: aBuffer.
-	aStride < (pixelFormat strideForWidth: aWidth) ifTrue: [
+	aStride < (pixelFormat strideForWidth: extent x) ifTrue: [
 		surface setStatus: VGCairoStatus invalidStride ].
 	^ surface
 ]
@@ -364,9 +371,13 @@ VGCairoImageSurface >> primitivePixelAtX: x y: y put: anInteger [
 
 { #category : 'initialization' }
 VGCairoImageSurface >> setFormat: aFormat extent: aPoint stride: anInteger data: aBuffer [
+	"The extent is truncated, because Cairo takes two integers and uFFI truncates a float on the
+	 way in, and Bloc measures its elements in floats. Measured on live Cairo: a surface asked for
+	 20.9 pixels is twenty pixels wide."
+
 	format := aFormat.
-	width := aPoint x.
-	height := aPoint y.
+	width := aPoint x truncated.
+	height := aPoint y truncated.
 	stride := anInteger.
 	data := aBuffer.
 	deviceOffset := 0 @ 0.

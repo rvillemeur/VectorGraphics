@@ -254,24 +254,28 @@ VGCairoTextTest >> testAStringBecomesGlyphsLaidOutAtTheirOwnAdvances [
 		do: [ :measured :expected | self assert: measured closeTo: expected ]
 ]
 
-{ #category : 'tests' }
-VGCairoTextTest >> testATextVerbWithNoFontNamesTheUnitThatOwesTheDefaultFace [
-	"Cairo draws with a toy default face when the caller selected none, and finding a font by
-	 family name needs the font manager of unit 1.10. A text verb with no font must say that,
-	 with the error the corpus reads, rather than with a plain error that reaches a case as a
-	 defect."
+{ #category : 'tests - default face' }
+VGCairoTextTest >> testATextVerbWithNoFontDrawsThroughTheDefaultFace [
+	"A text verb with no font selected draws, and draws exactly what selecting the default face
+	 by hand draws. Ink is asserted too, so that a default face which resolved to nothing could
+	 not pass the comparison by leaving both surfaces blank."
 
-	| context error |
-	context := self newSurface newContext.
-	error := [
-	         context
-		         moveTo: 2 @ 20;
-		         showText: 'x'.
-	         nil ]
-		         on: VGNotYetImplemented
-		         do: [ :each | each return: each ].
-	self assert: error notNil.
-	self assert: error unit equals: '1.10'
+	| withNoFont withTheDefault |
+	withNoFont := self newTextSurface.
+	withNoFont newContext
+		sourceColorR: 0.1 g: 0.1 b: 0.1;
+		moveTo: 2 @ 20;
+		showText: 'Hi'.
+	withNoFont flush.
+	withTheDefault := self newTextSurface.
+	withTheDefault newContext
+		scaledFont: withTheDefault newContext defaultScaledFont;
+		sourceColorR: 0.1 g: 0.1 b: 0.1;
+		moveTo: 2 @ 20;
+		showText: 'Hi'.
+	withTheDefault flush.
+	self deny: (withNoFont data asArray allSatisfy: [ :each | each = 0 ]).
+	self assert: withNoFont data asArray equals: withTheDefault data asArray
 ]
 
 { #category : 'tests' }
@@ -460,6 +464,39 @@ VGCairoTextTest >> testTheContextFillsTheTextExtentsRecordItIsGiven [
 	self assert: record bearingY closeTo: -19.68.
 	self assert: record advanceX closeTo: 16.32.
 	self assert: record advanceY closeTo: 0
+]
+
+{ #category : 'tests - default face' }
+VGCairoTextTest >> testTheDefaultFaceIsReadOnceAndKept [
+	"The bundled font is nearly three hundred kilobytes of tables, and a text verb with no font
+	 is the slowest path there is if every send parses them again. The face is therefore read
+	 once and kept, which also means two default scaled fonts share one glyph cache."
+
+	| first second |
+	VGFontFace resetDefault.
+	first := VGFontFace default.
+	second := VGFontFace default.
+	self assert: first identicalTo: second.
+	VGFontFace resetDefault.
+	self deny: VGFontFace default identicalTo: first.
+	self assert: VGFontFace default bytes equals: first bytes
+]
+
+{ #category : 'tests - default face' }
+VGCairoTextTest >> testTheDefaultScaledFontIsPharosOwnBundledFaceAtCairosDefaultSize [
+	"Cairo draws with a toy default face when the caller selected none, and resolves that face
+	 through fontconfig, which this replacement does not have. The face has to come from
+	 somewhere that is always there, so it is the sans family Pharo itself embeds, at Cairo's own
+	 default font size, with the font options a context starts with."
+
+	| context font |
+	context := self newSurface newContext.
+	font := context defaultScaledFont.
+	self assert: font fontFace bytes equals: VGFontFace defaultBytes.
+	self
+		assert: font fontMatrix
+		equals: (VGCairoMatrix newScalingBy: VGCairoContext defaultFontSize asPoint).
+	self assert: font options equals: VGFontOptions new
 ]
 
 { #category : 'tests' }

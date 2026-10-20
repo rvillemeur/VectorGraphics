@@ -57,6 +57,18 @@ VGAlexandrieCorpus class >> cases [
 	^ self experimentSelectors collect: [ :each | VGAlexandrieCase for: each ]
 ]
 
+{ #category : 'accessing' }
+VGAlexandrieCorpus class >> casesWithCairosToyDefaultFont [
+	"The cases whose drawing sends a text verb without selecting a font, so Cairo draws them in the
+	 toy default face it picks through fontconfig. This replacement binds no fontconfig and uses
+	 the face Pharo bundles, so the glyphs are a different typeface and no tolerance on a channel
+	 could honestly cover the difference; the shapes around the label are compared by the cases
+	 that do select a font. `testEveryCaseWithNoSelectedFontIsFiled` holds this list against the
+	 real rule, so a case added later is filed or fails."
+
+	^ #( #lineCap #linejoin #linejoin2 )
+]
+
 { #category : 'substitution' }
 VGAlexandrieCorpus class >> classNameMap [
 	"Alexandrie class name to ours, for the classes the experiments name and we have a counterpart

@@ -116,6 +116,19 @@ VGCairoSurfaceTest >> testAFormatReadsAndWritesAPixelAsFourUnpremultipliedFloats
 	self assert: (rgb24 rgbaForPixel: (rgb24 pixelForRgba: #( 1.0 0.0 0.0 0.5 ))) equals: #( 1.0 0.0 0.0 1.0 )
 ]
 
+{ #category : 'tests - creation' }
+VGCairoSurfaceTest >> testAFractionalExtentIsTruncatedAsCairoTruncatesIt [
+	"Bloc measures an element in floats and hands the canvas a fractional extent, and Cairo takes
+	 two integers, so uFFI truncates on the way in: a surface asked for 20.9 by 20.9 is twenty by
+	 twenty, and its stride is the stride of twenty. Measured against live Cairo."
+
+	| surface |
+	surface := VGCairoImageSurface extent: 20.9 @ 10.9.
+	self assert: surface extent equals: 20 @ 10.
+	self assert: surface stride equals: (VGCairoSurfaceFormat argb32 strideForWidth: 20).
+	self assert: surface data size equals: surface stride * 10
+]
+
 { #category : 'tests' }
 VGCairoSurfaceTest >> testASolidColourQuantisesThroughSixteenBitShortsAndAGradientThroughBytes [
 	"Measured against live Cairo on six colours and on nine pixels of a ramp. Cairo keeps a solid
@@ -399,6 +412,25 @@ VGCairoSurfaceTest >> testFromFormPremultipliesThePixels [
 	surface := VGCairoImageSurface fromForm: form.
 	self assert: surface extent equals: 2 @ 2.
 	self assert: (((surface pixelAtX: 0 y: 0) bitShift: -16) bitAnd: 255) equals: 128
+]
+
+{ #category : 'tests - creation' }
+VGCairoSurfaceTest >> testLentPixelsWithAFractionalWidthAreMeasuredOnTheTruncatedWidth [
+	"A surface over pixels the caller lends takes the same truncation as any other: Cairo receives
+	 two integers. The stride that fits the truncated width is therefore a valid stride, and the
+	 surface has to report success, not an invalid stride, or a renderer handed a fractional
+	 damaged rectangle would refuse to draw the frame."
+
+	| stride surface |
+	stride := VGCairoSurfaceFormat argb32 strideForWidth: 20.
+	surface := VGCairoImageSurface
+		           unownedNewForData: (ByteArray new: stride * 10)
+		           format: VGCairoSurfaceFormat argb32
+		           width: 20.9
+		           height: 10.9
+		           stride: stride.
+	self assert: surface extent equals: 20 @ 10.
+	self assert: surface status isSuccess
 ]
 
 { #category : 'tests - lifecycle' }

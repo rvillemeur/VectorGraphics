@@ -47,12 +47,16 @@ VGAlexandrieCorpusTest >> testEveryCaseEitherDrawsOrNamesTheUnitThatUnblocksIt [
 VGAlexandrieCorpusTest >> testEveryCaseThatDrawsMatchesCairo [
 	"The oracle itself. A case that runs end to end on the replacement must produce the same
 	 picture as Alexandrie, within the tolerance the corpus states for it, and with nothing of
-	 ours outside Cairo's shape beyond the residue a rounded edge leaves."
+	 ours outside Cairo's shape beyond the residue a rounded edge leaves. A case drawn in Cairo's
+	 toy default face is left out, with its reason, by `casesWithCairosToyDefaultFont`."
+
 	| failures |
 	self skipWithoutTheExperiments ifTrue: [ ^ self skip ].
 	failures := OrderedCollection new.
 	VGAlexandrieCorpus cases do: [ :case |
-		(case isPortable and: [ case blockingFailure isNil ]) ifTrue: [
+		((case isPortable and: [ case blockingFailure isNil ]) and: [
+			 (VGAlexandrieCorpus casesWithCairosToyDefaultFont includes:
+				  case name asSymbol) not ]) ifTrue: [
 			| comparison |
 			comparison := case comparisonWithCairo.
 			comparison isComparable
@@ -62,6 +66,26 @@ VGAlexandrieCorpusTest >> testEveryCaseThatDrawsMatchesCairo [
 						 and: [ comparison maximumChannelDistance <= case tolerance ]) ifFalse: [
 						failures add: case name , ' ' , comparison printString ] ] ] ].
 	self assert: failures asArray isEmpty description: failures asArray printString
+]
+
+{ #category : 'tests' }
+VGAlexandrieCorpusTest >> testEveryCaseWithNoSelectedFontIsFiled [
+	"A case that draws text without selecting a font is drawn by Cairo in the toy default face it
+	 takes from fontconfig, which this replacement does not bind, so it is filed as unmatchable
+	 rather than carried by a tolerance. The rule is asked of the ported source, so a case that
+	 starts or stops selecting a font fails here instead of failing the oracle."
+
+	| withNoFont |
+	self skipWithoutTheExperiments ifTrue: [ ^ self skip ].
+	withNoFont := VGAlexandrieCorpus cases
+		              select: [ :case |
+			              (case isPortable and: [ case blockingFailure isNil ]) and: [
+				              (case portedSource includesSubstring: 'showText:') and: [
+					              (case portedSource includesSubstring: 'scaledFont') not ] ] ]
+		              thenCollect: [ :case | case name asSymbol ].
+	self
+		assertCollection: withNoFont asSet
+		hasSameElements: VGAlexandrieCorpus casesWithCairosToyDefaultFont asSet
 ]
 
 { #category : 'tests - copies' }
