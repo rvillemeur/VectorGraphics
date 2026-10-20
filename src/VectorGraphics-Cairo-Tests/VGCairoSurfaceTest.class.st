@@ -322,10 +322,12 @@ VGCairoSurfaceTest >> testExternalSurfaceLeavesThePaddingBytesAlone [
 			description: 'byte ' , each printString , ' of the host buffer was overwritten' ]
 ]
 
-{ #category : 'tests - host memory' }
+{ #category : 'tests' }
 VGCairoSurfaceTest >> testExternalSurfaceWritesEveryPixelAtTheGivenStride [
-	"The unit 1.1 gate: a stride larger than four bytes per pixel must land in the right bytes."
-
+	"The unit 1.1 gate: a stride larger than four bytes per pixel must land in the right bytes.
+	 The flush is the caller's job here, because a clear is a recorded paint since unit 1.7 and
+	 this test reads the host buffer behind the surface's back, which is exactly the case the
+	 surface's own comment says has to flush."
 	| data surface offsetOfSecondRow |
 	data := self newHostBuffer.
 	surface := VGCairoImageSurface
@@ -336,6 +338,7 @@ VGCairoSurfaceTest >> testExternalSurfaceWritesEveryPixelAtTheGivenStride [
 		           stride: self hostBufferStride.
 	self assert: surface status isSuccess.
 	surface newContext clearColor: (Color r: 1.0 g: 1.0 b: 1.0).
+	surface flush.
 	offsetOfSecondRow := self hostBufferStride.
 	self assert: (data uint32AtOffset: 0) equals: 16rFFFFFFFF.
 	self assert: (data uint32AtOffset: offsetOfSecondRow) equals: 16rFFFFFFFF.
@@ -449,6 +452,32 @@ VGCairoSurfaceTest >> testStrideSmallerThanOneRowIsRefusedByStatus [
 		           stride: 8.
 	self deny: surface status isSuccess.
 	self should: [ surface status ensureIsSuccess ] raise: Error
+]
+
+{ #category : 'tests' }
+VGCairoSurfaceTest >> testTheFormDividesThePremultiplicationOutExactlyAsAlexandrieDoes [
+	"The corpus compares our Form against Alexandrie's, pixel word for pixel word, so the two have
+	 to divide the stored premultiplication out the same way. A source of 0.7 red at an alpha of
+	 0.8 is stored as 16rCC8F0000 by both, and 16r8F against an alpha of 16rCC unpremultiplies to
+	 178.75: Alexandrie truncates that to 178, and going through a Pharo Color on the way answers
+	 179, because a Color keeps ten bits a channel."
+
+	| ours theirs |
+	ours := VGCairoImageSurface extent: 1 @ 1.
+	ours newContext
+		sourceColorR: 0.7 g: 0 b: 0 a: 0.8;
+		paint.
+	ours flush.
+	theirs := AeCairoImageSurface extent: 1 @ 1.
+	theirs newContext
+		sourceColorR: 0.7 g: 0 b: 0 a: 0.8;
+		paint.
+	theirs flush.
+	self assert: (ours pixelAtX: 0 y: 0) equals: 16rCC8F0000.
+	self assert: (ours asForm pixelValueAt: 0 @ 0) equals: 16rCCB20000.
+	self
+		assert: (ours asForm pixelValueAt: 0 @ 0)
+		equals: (theirs asForm pixelValueAt: 0 @ 0)
 ]
 
 { #category : 'tests' }

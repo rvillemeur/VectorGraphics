@@ -12,7 +12,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'tag',
-		'coefficients'
+		'coefficients',
+		'matrix'
 	],
 	#category : 'VectorGraphics-Cairo-Paint',
 	#package : 'VectorGraphics-Cairo',
@@ -244,21 +245,35 @@ VGPaint >> inspectorBlockContext: aContext [
 	aContext active: coefficients notNil
 ]
 
+{ #category : 'testing' }
+VGPaint >> isSolid [
+	"Whether this paint is one colour everywhere. Cairo asks the same question before it folds a
+	 constant alpha into the paint instead of carrying it as a mask."
+	^ false
+]
+
 { #category : 'accessing' }
 VGPaint >> matrix [
-	| named |
-	named := Dictionary new.
-	self class matrixFieldIndices doWithIndex: [ :field :index |
-		named
-			at: (self class matrixFieldOrder at: index)
-			put: (coefficients at: field) ].
-	^ VGCairoMatrix
-		  newX: (named at: #x)
-		  y: (named at: #y)
-		  sx: (named at: #sx)
-		  sy: (named at: #sy)
-		  shx: (named at: #shx)
-		  shy: (named at: #shy)
+	"The matrix that maps a device point into my own space, decoded from my block once and kept.
+	 Every pixel of every fill asks for it, and building the decode afresh each time was the whole
+	 cost of a frame. My block stays the truth: matrix: writes it and drops the decode, and no one
+	 else writes the six fields. The matrix I answer is mine, so a caller that wants to change one
+	 copies it first."
+
+	^ matrix ifNil: [
+		  | named |
+		  named := Dictionary new.
+		  self class matrixFieldIndices doWithIndex: [ :field :index |
+			  named
+				  at: (self class matrixFieldOrder at: index)
+				  put: (coefficients at: field) ].
+		  matrix := VGCairoMatrix
+			            newX: (named at: #x)
+			            y: (named at: #y)
+			            sx: (named at: #sx)
+			            sy: (named at: #sy)
+			            shx: (named at: #shx)
+			            shy: (named at: #shy) ]
 ]
 
 { #category : 'accessing' }
@@ -266,8 +281,10 @@ VGPaint >> matrix: aMatrix [
 	"The matrix that maps a device point into my own space. It is the pattern's own matrix
 	 composed with the inverse of the transformation in force when I was made the source, because
 	 that is the moment Cairo captures: a later translateBy: does not move a source already set,
-	 which is measured."
+	 which is measured. The decoded matrix beside the block goes, so that the block is read again
+	 and the argument is never aliased."
 
+	matrix := nil.
 	self class matrixFieldIndices doWithIndex: [ :field :index |
 		coefficients
 			at: field
@@ -309,10 +326,12 @@ VGPaint >> pointInPaintSpaceX: x y: y [
 { #category : 'copying' }
 VGPaint >> postCopy [
 	"The block is mutable and a pattern keeps its paint while a display list entry keeps a copy of
-	 it, so the two must not share the one block."
+	 it, so the two must not share the one block. The decoded matrix goes with it, so that the copy
+	 never answers a matrix another paint could be holding."
 
 	super postCopy.
-	coefficients := coefficients copy
+	coefficients := coefficients copy.
+	matrix := nil
 ]
 
 { #category : 'evaluating' }
@@ -322,6 +341,15 @@ VGPaint >> quantise: anArray in: aFormat [
 	 pixel by pixel, which is every paint but a solid colour."
 
 	^ aFormat pixelForRgba: anArray
+]
+
+{ #category : 'evaluating' }
+VGPaint >> quantiseWide: anArray in: aFormat [
+	"The wide pixel those four unpremultiplied channels of mine become. Cairo evaluates me pixel
+	 by pixel and keeps bytes while it does, so widening the pixel word I quantise to is all the
+	 precision there is of me: a solid colour, which Cairo converts once into shorts, is the one
+	 paint that answers more."
+	^ aFormat widenPixel: (self quantise: anArray in: aFormat)
 ]
 
 { #category : 'evaluating' }
@@ -342,4 +370,15 @@ VGPaint >> rgbaInPaintSpace: aPoint [
 { #category : 'accessing' }
 VGPaint >> tag [
 	^ tag
+]
+
+{ #category : 'painting' }
+VGPaint >> widePixelIn: aFormat atX: x y: y [
+	"The same source pixelIn:atX:y: answers, at the precision an operator that composites in
+	 floating point reads it at: four sixteen-bit shorts rather than four bytes. Nil where I lay
+	 nothing down at all, as there too."
+	| channels |
+	channels := self rgbaAtX: x + 0.5 y: y + 0.5.
+	channels ifNil: [ ^ nil ].
+	^ self quantiseWide: channels in: aFormat
 ]

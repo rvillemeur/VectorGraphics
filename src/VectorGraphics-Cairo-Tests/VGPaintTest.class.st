@@ -193,6 +193,21 @@ VGPaintTest >> testALinearGradientRampsAlongItsLineExactlyAsLiveCairoDoes [
 ]
 
 { #category : 'tests' }
+VGPaintTest >> testAPaintDecodesItsMatrixOnceAndSettingItDecodesItAgain [
+	"The matrix is asked for at every pixel of every fill, so decoding the six fields of the block
+	 into a VGCairoMatrix on each call dominated a frame: rendering the twenty-nine operator cases
+	 of the Alexandrie corpus spent its time in a dictionary built once per pixel. The block stays
+	 the truth and the decoded matrix is kept beside it, so a later matrix: has to be seen."
+
+	| paint |
+	paint := self blackToWhiteFrom: 0 @ 0 to: 64 @ 0.
+	self assert: paint matrix == paint matrix.
+	paint matrix: (VGCairoMatrix newScalingBy: 2 @ 2).
+	self assert: paint matrix sx equals: 2.
+	self assert: paint matrix == paint matrix
+]
+
+{ #category : 'tests' }
 VGPaintTest >> testAPatternDescribesItselfByAskingItsOwnPaint [
 	| pattern description bare |
 	pattern := VGPaintExamples linearGradientPattern.
@@ -359,6 +374,24 @@ VGPaintTest >> testEveryPaintCarriesABlockOfTheSameSizeAndATagOfItsOwn [
 	self
 		assert: (paints collect: [ :each | each tag ]) asSet size
 		equals: paints size
+]
+
+{ #category : 'tests' }
+VGPaintTest >> testOnlyAColourIsSolidAndFadingItMultipliesItsAlpha [
+	"Cairo folds an alpha into the paint's colour only when the paint is solid, so the paint
+	 itself has to say whether it is one. Fading answers a copy: the paint of a recorded entry
+	 must not change under it."
+	| paint faded |
+	paint := VGColorPaint r: 1.0 g: 0.5 b: 0.0 alpha: 0.5.
+	self assert: paint isSolid.
+	self deny: VGLinearGradientPaint new isSolid.
+	faded := paint fadedBy: 0.5.
+	self
+		assert: (faded rgbaInPaintSpace: 0 @ 0)
+		equals: { 1.0. 0.5. 0.0. 0.25 }.
+	self
+		assert: (paint rgbaInPaintSpace: 0 @ 0)
+		equals: { 1.0. 0.5. 0.0. 0.5 }
 ]
 
 { #category : 'tests - abi' }

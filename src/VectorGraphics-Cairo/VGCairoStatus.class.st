@@ -41,6 +41,20 @@ VGCairoStatus class >> invalidMatrixCode [
 ]
 
 { #category : 'instance creation' }
+VGCairoStatus class >> invalidPopGroup [
+	^ self new
+		  setCode: self invalidPopGroupCode;
+		  yourself
+]
+
+{ #category : 'constants' }
+VGCairoStatus class >> invalidPopGroupCode [
+	"CAIRO_STATUS_INVALID_POP_GROUP: a group was popped that was never pushed. The number is
+	 read from the live enumeration, not guessed."
+	^ 3
+]
+
+{ #category : 'instance creation' }
 VGCairoStatus class >> invalidStride [
 	^ self new
 		  setCode: self invalidStrideCode;

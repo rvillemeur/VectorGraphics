@@ -37,6 +37,28 @@ VGColorPaint >> color: aColor [
 		alpha: aColor alpha
 ]
 
+{ #category : 'copying' }
+VGColorPaint >> fadedBy: aNumber [
+	"A copy of this colour with its alpha multiplied by aNumber. This is how Cairo carries a
+	 constant alpha under the twenty-three operators that fold it into a solid paint: the
+	 multiplication happens on the doubles, before the colour is quantised, so one composite
+	 runs where the mask route would quantise twice."
+	| faded rgba |
+	rgba := self rgbaInPaintSpace: 0 @ 0.
+	faded := self copy.
+	faded
+		setRed: (rgba at: 1)
+		green: (rgba at: 2)
+		blue: (rgba at: 3)
+		alpha: (rgba at: 4) * aNumber.
+	^ faded
+]
+
+{ #category : 'testing' }
+VGColorPaint >> isSolid [
+	^ true
+]
+
 { #category : 'evaluating' }
 VGColorPaint >> quantise: anArray in: aFormat [
 	"A solid colour is the one paint Cairo converts once, into four sixteen-bit shorts, rather than
@@ -44,6 +66,14 @@ VGColorPaint >> quantise: anArray in: aFormat [
 	 16r7F3F1F5F for r 0.5 g 0.25 b 0.75 alpha 0.5, one short of what rounding writes."
 
 	^ aFormat pixelForRgbaThroughShorts: anArray
+]
+
+{ #category : 'evaluating' }
+VGColorPaint >> quantiseWide: anArray in: aFormat [
+	"I am the one paint Cairo converts once, into four sixteen-bit shorts, and pixman hands those
+	 to its floating point combiner whole. The eight operators that composite in floating point
+	 land a step out of live Cairo if they read the top byte of each instead."
+	^ aFormat widePixelForRgba: anArray
 ]
 
 { #category : 'evaluating' }

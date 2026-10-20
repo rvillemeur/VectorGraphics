@@ -21,9 +21,17 @@ Class {
 }
 
 { #category : 'drawing' }
-VGSoftwareBackend >> blitSurface: aSurface at: aPoint paint: aPaint [
-	"Unit 1.5 brings the surface paint, which is what a blit draws with."
-	^ VGNotYetImplemented signalForSelector: #blitSurface:at:paint: unit: '1.5'
+VGSoftwareBackend >> blitSurface: aSurface at: aPoint paint: aPaint clip: aClip operator: anOperator [
+	"Recorded, not drawn, like a fill. The surface is the mask: its alpha channel says how much
+	 of the paint reaches each pixel and its colours are never read, which is Cairo's
+	 cairo_mask_surface. Every other mask pattern is rendered into a surface by the context
+	 before it arrives here, so this one message covers them all and a Vulkan backend has a
+	 texture to bind."
+	commands add: {
+			(VGCairoSurfaceMask surface: aSurface at: aPoint).
+			aPaint.
+			aClip.
+			anOperator }
 ]
 
 { #category : 'accessing' }
@@ -31,40 +39,32 @@ VGSoftwareBackend >> commands [
 	^ commands asArray
 ]
 
-{ #category : 'private' }
-VGSoftwareBackend >> compose: aPixel mask: aMaskByte atX: x y: y operator: aSymbol into: aTarget [
+{ #category : 'compositing' }
+VGSoftwareBackend >> compose: aPixel mask: aMaskByte atX: x y: y operator: anOperator into: aTarget [
 	"The read is the primitive one: I am called from inside the surface's own flush, and the
 	 public reader flushes before it answers, so reading through it here would recurse. The mask
-	 is the coverage of the pixel, which source-over carries in the scaled source and the source
-	 operator carries as the weight of a mix."
+	 is the coverage of the pixel, and the operator decides what the coverage means: most of them
+	 read it as a scaling of the source, while clear and source mix with the destination."
 
 	| format |
 	format := aTarget format.
-	aSymbol == #source ifTrue: [
-		^ aTarget
-			  primitivePixelAtX: x
-			  y: y
-			  put: (aMaskByte = 255
-					   ifTrue: [ aPixel ]
-					   ifFalse: [
-						   format
-							   lerpPixel: aPixel
-							   over: (aTarget primitivePixelAtX: x y: y)
-							   by: aMaskByte ]) ].
 	aTarget
 		primitivePixelAtX: x
 		y: y
-		put: (format
-				 blendPixel: aPixel
-				 maskedBy: aMaskByte
-				 over: (aTarget primitivePixelAtX: x y: y))
+		put: (anOperator
+				 composeSource: aPixel
+				 mask: aMaskByte
+				 over: (aTarget primitivePixelAtX: x y: y)
+				 in: format)
 ]
 
-{ #category : 'draining' }
+{ #category : 'drawing' }
 VGSoftwareBackend >> drainInto: aTarget [
+	"Each command says itself whether it is a fill or a mask, because the first slot holds the
+	 shape and the shape knows."
 	commands do: [ :each |
-		self
-			rasterise: (each at: 1)
+		(each at: 1)
+			drawOn: self
 			paint: (each at: 2)
 			clip: (each at: 3)
 			operator: (each at: 4)
@@ -129,17 +129,60 @@ VGSoftwareBackend >> isEmpty [
 	^ commands isEmpty
 ]
 
-{ #category : 'rasterising' }
-VGSoftwareBackend >> rasterise: aSegments paint: aPaint clip: aClip operator: aSymbol into: aTarget [
-	"One recorded fill: the rasteriser says how much of each pixel the edges cover inside the
-	 clip, and the paint is composited over the target at that coverage. The fill rule and the
-	 antialiasing mode both ride inside the segments, because the three messages of the backend
-	 carry neither, and the clip carries its own. A paint that lays down nothing at a pixel leaves
-	 that pixel alone, which is how an extend mode of none paints outside its own pattern. Unit
-	 1.7 brings the operators other than over and source."
+{ #category : 'drawing' }
+VGSoftwareBackend >> maskWith: aMask paint: aPaint clip: aClip operator: anOperator into: aTarget [
+	"One recorded mask: the mask's alpha stands where a fill's coverage stands, scaled by the
+	 coverage of the clip. A mask carries no spans, so a clip cannot meet it the way it meets a
+	 fill; Cairo multiplies the coverage of the clip into the mask instead, which keeps the rim of
+	 the clip shaded. The whole clip is visited and not only the mask's own rectangle, because an
+	 unbounded operator writes where the mask covers nothing; under a bounded one a mask byte of
+	 zero leaves the destination exactly as it was, so visiting those pixels changes nothing. A
+	 pixel the clip allows nothing of is left alone under every operator."
 
-	| rasteriser format |
+	| format unbounded |
 	format := aTarget format.
+	unbounded := anOperator isUnbounded.
+	aClip coverageRowsDo: [ :y :coverage :left |
+		1 to: coverage size do: [ :index |
+			| mask source x allowed |
+			allowed := coverage at: index.
+			x := left + index - 1.
+			allowed > 0 ifTrue: [
+				mask := format
+					        scaleByte: (aMask alphaAtX: x y: y)
+					        by: (format maskByteForCoverage: allowed).
+				source := mask > 0
+					          ifTrue: [
+					          anOperator sourceFromPaint: aPaint in: format atX: x y: y ]
+					          ifFalse: [ nil ].
+				source ifNil: [ mask := 0 ].
+				(source notNil or: [ unbounded ]) ifTrue: [
+					self
+						compose: (source ifNil: [ 0 ])
+						mask: mask
+						atX: x
+						y: y
+						operator: anOperator
+						into: aTarget ] ] ] ]
+]
+
+{ #category : 'private' }
+VGSoftwareBackend >> rasterise: aSegments paint: aPaint clip: aClip operator: anOperator into: aTarget [
+	"One recorded fill: the rasteriser says how much of each pixel the edges cover inside the
+	 clip, and the paint is composited there with the operator in force. The fill rule, the
+	 antialiasing mode and the constant alpha all ride inside the segments, because the three
+	 messages of the backend carry none of them, and the clip carries its own. The operator
+	 reads the paint rather than the paint being read for it, because eight of the operators
+	 composite in floating point and want the source at the paint's own precision. A paint that
+	 lays down nothing at a pixel leaves that pixel alone, which is how an extend mode of none
+	 paints outside its own pattern, unless the operator is unbounded: those write where no
+	 source covers, so they run over the whole clip and the pixels the shape misses are swept
+	 afterwards."
+	| rasteriser format unbounded written alphaByte |
+	format := aTarget format.
+	unbounded := anOperator isUnbounded.
+	written := unbounded ifTrue: [ Set new ] ifFalse: [ nil ].
+	alphaByte := format shortByteOf: aSegments alpha.
 	rasteriser := VGRasteriser
 		              segments: aSegments coordinates
 		              fillRule: aSegments fillRule
@@ -147,17 +190,53 @@ VGSoftwareBackend >> rasterise: aSegments paint: aPaint clip: aClip operator: aS
 		              clip: aClip.
 	rasteriser coverageRowsDo: [ :y :coverage :left |
 		1 to: coverage size do: [ :index |
-			| mask pixel x |
-			mask := format maskByteForCoverage: (coverage at: index).
-			mask > 0 ifTrue: [
-				x := left + index - 1.
-				pixel := aPaint pixelIn: format atX: x y: y.
-				pixel ifNotNil: [
+			| mask source x |
+			mask := format
+				        scaleByte: (format maskByteForCoverage: (coverage at: index))
+				        by: alphaByte.
+			x := left + index - 1.
+			source := mask > 0
+				          ifTrue: [ anOperator sourceFromPaint: aPaint in: format atX: x y: y ]
+				          ifFalse: [ nil ].
+			source ifNil: [ mask := 0 ].
+			(source notNil or: [ unbounded ]) ifTrue: [
+				unbounded ifTrue: [ written add: x @ y ].
+				self
+					compose: (source ifNil: [ 0 ])
+					mask: mask
+					atX: x
+					y: y
+					operator: anOperator
+					into: aTarget ] ] ].
+	unbounded ifFalse: [ ^ self ].
+	self
+		sweep: aClip
+		withoutSourceUnder: anOperator
+		skipping: written
+		into: aTarget
+]
+
+{ #category : 'compositing' }
+VGSoftwareBackend >> sweep: aClip withoutSourceUnder: anOperator skipping: aSetOfPoints into: aTarget [
+	"An unbounded operator writes something where the source covers nothing, so Cairo runs it
+	 over the whole clip and not only over the shape. Measured on a live Cairo context: the
+	 pixels of the clip the shape misses come out as a source of nothing leaves them, and
+	 nothing outside the clip is touched at all."
+
+	| extents |
+	extents := aClip extents.
+	extents top to: extents bottom - 1 do: [ :y |
+		aClip
+			pixelsInRowAt: y
+			from: extents left
+			to: extents right
+			do: [ :x |
+				(aSetOfPoints includes: x @ y) ifFalse: [
 					self
-						compose: pixel
-						mask: mask
+						compose: 0
+						mask: 0
 						atX: x
 						y: y
-						operator: aSymbol
-						into: aTarget ] ] ] ]
+						operator: anOperator
+						into: aTarget ] ] ]
 ]

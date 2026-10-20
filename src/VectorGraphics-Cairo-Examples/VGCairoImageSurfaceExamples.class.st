@@ -43,6 +43,36 @@ VGCairoImageSurfaceExamples class >> hostSurfaceWithAPaddedStride [
 ]
 
 { #category : 'examples' }
+VGCairoImageSurfaceExamples class >> surfaceMaskedThroughACircleClip [
+	<sampleInstance>
+	"A mask painted through a clip that is a circle. The mask is opaque on its left half and half
+	 translucent on its right half, and the rim of the circle is shaded, because a mask carries no
+	 spans for the clip to meet and is scaled by the coverage of the clip instead."
+
+	| surface context mask maskContext |
+	mask := VGCairoImageSurface extent: 32 @ 32.
+	maskContext := mask newContext.
+	maskContext sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
+	maskContext
+		rectangleX: 0 y: 0 width: 16 height: 32;
+		fill.
+	maskContext sourceColorR: 1.0 g: 1.0 b: 1.0 a: 0.5.
+	maskContext
+		rectangleX: 16 y: 0 width: 16 height: 32;
+		fill.
+	mask flush.
+	surface := VGCairoImageSurface extent: 32 @ 32.
+	context := surface newContext.
+	context
+		circleCenterX: 16 y: 16 radius: 10;
+		clip.
+	context sourceColorR: 0.0 g: 0.0 b: 1.0 a: 1.0.
+	context maskSurface: mask x: 0 y: 0.
+	surface flush.
+	^ surface
+]
+
+{ #category : 'examples' }
 VGCairoImageSurfaceExamples class >> translucentArgb32Surface [
 	<sampleInstance>
 	| surface |

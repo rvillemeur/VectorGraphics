@@ -13,7 +13,8 @@ Class {
 		'state',
 		'stateStack',
 		'status',
-		'pathBuilder'
+		'pathBuilder',
+		'groupStack'
 	],
 	#category : 'VectorGraphics-Cairo-Context',
 	#package : 'VectorGraphics-Cairo',
@@ -70,15 +71,22 @@ VGCairoContext >> antialias: anObject [
 VGCairoContext >> appendArcCenter: aCenter radius: aRadius from: startRadians to: endRadians [
 	"The arc as a polyline fine enough that it stays within the flattening tolerance of the true
 	 arc in device space. Every point is a lineTo, which Cairo turns into a move when the path has
-	 no current point, so the arc joins what is already there exactly as Cairo's does."
-
-	| sweep count |
+	 no current point, so the arc joins what is already there exactly as Cairo's does. The arc's
+	 own tangents go to the builder afterwards, because the first and the last chord each lean half
+	 a step away from them, and a stroke of a full circle needs the true ones to see that the run
+	 passes smoothly through the point it began at."
+	| sweep count wasAtRunStart |
 	sweep := endRadians - startRadians.
 	count := self arcPointCountForRadius: aRadius sweep: sweep abs.
+	wasAtRunStart := self pathBuilder isAtRunStart.
 	0 to: count do: [ :index |
 		| angle |
 		angle := startRadians + (sweep * index / count).
-		self lineTo: aCenter + (aRadius * angle cos @ (aRadius * angle sin)) ]
+		self lineTo: aCenter + (aRadius * angle cos @ (aRadius * angle sin)) ].
+	self pathBuilder
+		noteTangentsFrom: (self arcTangentAtAngle: startRadians sweep: sweep)
+		to: (self arcTangentAtAngle: endRadians sweep: sweep)
+		firstSegment: wasAtRunStart
 ]
 
 { #category : 'skeleton - unit 1.8' }
@@ -178,6 +186,18 @@ VGCairoContext >> arcPointCountForRadius: aRadius sweep: aSweep [
 	^ (aSweep / step) ceiling max: 1
 ]
 
+{ #category : 'private' }
+VGCairoContext >> arcTangentAtAngle: aNumber sweep: anotherNumber [
+	"The direction the arc travels in at that angle: the derivative of the circle, turned around
+	 when the arc runs towards decreasing angles. The radius is left out because a direction has
+	 no length of its own."
+	| direction |
+	direction := aNumber sin negated @ aNumber cos.
+	^ anotherNumber < 0
+		  ifTrue: [ direction negated ]
+		  ifFalse: [ direction ]
+]
+
 { #category : 'path' }
 VGCairoContext >> beginSubPath [
 	"The path keeps everything it holds and loses its current point, so the next arc needs no
@@ -238,18 +258,39 @@ VGCairoContext >> circleSectorCenter: aPoint from: startRadians to: stopRadians 
 		closePath
 ]
 
-{ #category : 'painting' }
+{ #category : 'drawing' }
 VGCairoContext >> clearColor: aColor [
-	"Every pixel of my target in aColor. The operator and the clip arrive in units 1.6 and 1.7, so
-	 this is a plain fill of the whole surface for now."
-	self isInError ifTrue: [ ^ self ].
-	surface fillPixel: (surface format pixelForColor: aColor)
+	"Every pixel the clip allows in aColor, replacing what was there."
+	self
+		clearR: aColor red
+		g: aColor green
+		b: aColor blue
+		a: aColor alpha
 ]
 
-{ #category : 'painting' }
+{ #category : 'drawing' }
+VGCairoContext >> clearR: r g: g b: b a: a [
+	"A paint of that colour under the source operator, which replaces whatever the destination
+	 held instead of compositing over it. Cairo has no clear-to-a-colour primitive either."
+	self
+		saveState;
+		setOperatorSource;
+		sourceColorR: r g: g b: b a: a;
+		paint;
+		restoreState
+]
+
+{ #category : 'drawing' }
 VGCairoContext >> clearTransparent [
-	self isInError ifTrue: [ ^ self ].
-	surface fillPixel: 0
+	"Cairo has no clear primitive: this is a paint under the clear operator, which is what the
+	 Cairo FAQ tells a caller to write and what Alexandrie does. It therefore obeys the clip and
+	 takes its turn in the recorded frame, rather than wiping the pixels behind the frame's
+	 back."
+	self
+		saveState;
+		setOperatorClear;
+		paint;
+		restoreState
 ]
 
 { #category : 'clipping' }
@@ -307,12 +348,9 @@ VGCairoContext >> currentClipShape [
 	^ state clip ifNil: [ VGClip bounds: surface boundsRectangle ]
 ]
 
-{ #category : 'private' }
+{ #category : 'state' }
 VGCairoContext >> currentOperator [
-	"Unit 1.7 brings the operator to the state. Until then every fill composites source over
-	 destination, which is Cairo's own default operator."
-
-	^ #over
+	^ state operator
 ]
 
 { #category : 'accessing' }
@@ -427,6 +465,7 @@ VGCairoContext >> initialize [
 	super initialize.
 	state := VGCairoState new.
 	stateStack := OrderedCollection new.
+	groupStack := OrderedCollection new.
 	status := VGCairoStatus success
 ]
 
@@ -536,19 +575,50 @@ VGCairoContext >> lower: anEndAngle below: aStartAngle [
 	^ angle
 ]
 
-{ #category : 'skeleton' }
-VGCairoContext >> mask: anArgument1 [
-	^ self notYetImplementedIn: '1.7' selector: #mask:
+{ #category : 'drawing' }
+VGCairoContext >> mask: aPattern [
+	"Cairo's cairo_mask: the source painted through the alpha channel of aPattern, everywhere the
+	 clip allows. A mask of one flat colour is Cairo's paint_with_alpha, fold route and all,
+	 which is measured: a clear through a solid mask of four tenths leaves the pixel a paint
+	 through four tenths leaves. Every other mask is rendered into an intermediate of the
+	 target's size first, so that the backend is handed a mask in device space and one blit
+	 message covers a gradient, a transformed surface and a popped group alike."
+	self isInError ifTrue: [ ^ self ].
+	aPattern isSolid ifTrue: [ ^ self paintWithAlpha: aPattern alpha ].
+	self recordBlitOf: (self renderedMaskFor: aPattern) at: 0 @ 0
 ]
 
-{ #category : 'skeleton - unit 1.7' }
-VGCairoContext >> maskGroupWith: arg1 [
-	^ self notYetImplementedIn: '1.7' selector: #maskGroupWith:
+{ #category : 'groups' }
+VGCairoContext >> maskGroupWith: aBlock [
+	"Alexandrie's convenience: whatever aBlock draws is the mask the source arrives through. The
+	 block takes no argument, because the caller already holds the context it draws on."
+	self pushGroup.
+	aBlock value.
+	self mask: self popGroupAsSurfacePattern
 ]
 
-{ #category : 'skeleton - unit 1.7' }
-VGCairoContext >> maskSurface: arg1 x: arg2 y: arg3 [
-	^ self notYetImplementedIn: '1.7' selector: #maskSurface:x:y:
+{ #category : 'drawing' }
+VGCairoContext >> maskSurface: aSurface [
+	"Alexandrie's convenience: the mask at the origin."
+	self maskSurface: aSurface x: 0.0 y: 0.0
+]
+
+{ #category : 'drawing' }
+VGCairoContext >> maskSurface: aSurface at: aPoint [
+	"Alexandrie's convenience: the mask with its top left corner at aPoint."
+	self maskSurface: aSurface x: aPoint x y: aPoint y
+]
+
+{ #category : 'drawing' }
+VGCairoContext >> maskSurface: aSurface x: x y: y [
+	"Cairo's cairo_mask_surface: aSurface is the mask, with its top left corner at x, y in user
+	 space. Cairo builds the surface pattern itself and moves it by translating the pattern's
+	 matrix the other way, which is what sourceSurface:x:y: does for a source."
+	| pattern |
+	self isInError ifTrue: [ ^ self ].
+	pattern := VGCairoSurfacePattern surface: aSurface.
+	pattern matrix: (VGCairoMatrix newTranslationBy: (x @ y) negated).
+	self mask: pattern
 ]
 
 { #category : 'transformations' }
@@ -584,9 +654,14 @@ VGCairoContext >> newPath [
 	pathBuilder := nil
 ]
 
-{ #category : 'skeleton' }
-VGCairoContext >> operator: anArgument1 [
-	^ self notYetImplementedIn: '1.7' selector: #operator:
+{ #category : 'state' }
+VGCairoContext >> operator: anOperator [
+	"The operator every later fill, stroke, mask and paint composites with, until the state is
+	 restored. An Alexandrie enumeration value, one of my own operators, a name or a code are all
+	 accepted, because a caller ported from Alexandrie passes the enumeration."
+
+	state operator: (VGCairoOperator normalise: anOperator).
+	^ self
 ]
 
 { #category : 'painting' }
@@ -598,19 +673,37 @@ VGCairoContext >> paint [
 	self recordFillOf: (VGSegments rectangle: self currentClip)
 ]
 
-{ #category : 'skeleton - unit 1.7' }
-VGCairoContext >> paintGroupWith: arg1 [
-	^ self notYetImplementedIn: '1.7' selector: #paintGroupWith:
+{ #category : 'groups' }
+VGCairoContext >> paintGroupWith: aBlock [
+	"Alexandrie's convenience: whatever aBlock draws, painted as one picture. The block takes no
+	 argument, because the caller already holds the context it draws on."
+	self pushGroup.
+	aBlock value.
+	self
+		popGroupToSource;
+		paint
 ]
 
-{ #category : 'skeleton - unit 1.7' }
-VGCairoContext >> paintGroupWith: arg1 alpha: arg2 [
-	^ self notYetImplementedIn: '1.7' selector: #paintGroupWith:alpha:
+{ #category : 'groups' }
+VGCairoContext >> paintGroupWith: aBlock alpha: aNumber [
+	"Whatever aBlock draws, painted as one picture through a constant alpha. The alpha applies to
+	 the finished group and not to each shape in it, which is why the overlaps inside a group do
+	 not darken."
+	self pushGroup.
+	aBlock value.
+	self
+		popGroupToSource;
+		paintWithAlpha: aNumber
 ]
 
-{ #category : 'skeleton - unit 1.7' }
-VGCairoContext >> paintWithAlpha: arg1 [
-	^ self notYetImplementedIn: '1.7' selector: #paintWithAlpha:
+{ #category : 'drawing' }
+VGCairoContext >> paintWithAlpha: aNumber [
+	"Cairo's cairo_paint_with_alpha: the source everywhere the clip allows, faded by a constant
+	 alpha. The path is not touched."
+	self isInError ifTrue: [ ^ self ].
+	self
+		recordFillOf: (VGSegments rectangle: self currentClip)
+		throughAlpha: aNumber
 ]
 
 { #category : 'accessing' }
@@ -623,6 +716,53 @@ VGCairoContext >> pathBuilder [
 		  pathBuilder := VGPathBuilder new
 			                 flatteningTolerance: state tolerance;
 			                 yourself ]
+]
+
+{ #category : 'groups' }
+VGCairoContext >> popGroupAsSurfacePattern [
+	"Cairo's pop_group: the group's own frame is drawn now, because what comes back is read as
+	 pixels, and the state push_group saved is restored before the pattern is built. The
+	 pattern carries the restored transformation, which is what Cairo gives it: the matrix of a
+	 pattern maps a user point into the pattern's space, so naming the transformation in force
+	 cancels it again and leaves the group where it was drawn. An unbalanced pop latches
+	 CAIRO_STATUS_INVALID_POP_GROUP."
+	| group pattern |
+	self isInError ifTrue: [ ^ nil ].
+	groupStack isEmpty ifTrue: [
+		status := VGCairoStatus invalidPopGroup.
+		^ nil ].
+	group := surface.
+	group flush.
+	surface := groupStack removeLast.
+	self restoreState.
+	pattern := VGCairoSurfacePattern surface: group.
+	pattern matrix: state matrix copy.
+	^ pattern
+]
+
+{ #category : 'groups' }
+VGCairoContext >> popGroupToSource [
+	"Cairo's pop_group_to_source, which is pop_group followed by set_source."
+	| pattern |
+	pattern := self popGroupAsSurfacePattern.
+	pattern ifNil: [ ^ self ].
+	self sourcePattern: pattern
+]
+
+{ #category : 'groups' }
+VGCairoContext >> pushGroup [
+	"Cairo's push_group: everything drawn from here goes to an intermediate surface of the
+	 target's own format, until one of the two pops. Cairo's push_group also saves the state, so
+	 the pop restores whatever the group changed. The intermediate covers the whole target
+	 rather than the clip extents: Cairo shrinks it to the extents and carries a device offset
+	 to put it back, and a group the size of the target needs no offset at all, so the group's
+	 pixels sit at the device coordinates they were drawn at. It shares the target's backend,
+	 because a group of a Vulkan target must be drawn by the same device."
+	self isInError ifTrue: [ ^ self ].
+	self saveState.
+	groupStack addLast: surface.
+	surface := VGCairoImageSurface newFormat: surface format extent: surface extent.
+	surface backend: (groupStack last backend)
 ]
 
 { #category : 'path' }
@@ -647,20 +787,55 @@ VGCairoContext >> raise: anEndAngle above: aStartAngle [
 	^ angle
 ]
 
-{ #category : 'display list' }
+{ #category : 'private' }
+VGCairoContext >> recordBlitOf: aSurface at: aPoint [
+	"One mask entry on the surface's display list. The paint and the clip are the ones in force
+	 now, for the reason the fill entries are recorded that way, and a finished surface refuses
+	 the entry here for the reason a fill is refused here."
+	| paint |
+	surface ensureNotFinished.
+	paint := state source paintForDeviceMatrix: state sourceMatrix.
+	paint ifNil: [ ^ self ].
+	surface displayList add: (VGBlitEntry
+			 surface: aSurface
+			 at: aPoint
+			 paint: paint
+			 clip: self currentClipShape
+			 operator: self currentOperator)
+]
+
+{ #category : 'private' }
 VGCairoContext >> recordFillOf: aSegments [
 	"One entry on the surface's display list. Nothing is rasterised here: the frame appears when
 	 the list is drained, which is the first rule of the plan. The paint is built now, because
 	 Cairo draws when the fill is asked for and so reads the pattern and the captured
 	 transformation of this moment, and so is the clip, which is the one in force now and not the
 	 one in force at the drain."
+	^ self recordFillOf: aSegments throughAlpha: 1.0
+]
 
-	| paint |
+{ #category : 'private' }
+VGCairoContext >> recordFillOf: aSegments throughAlpha: aNumber [
+	"One entry on the surface's display list, drawn through a constant alpha. Cairo builds a
+	 solid mask of that alpha and then takes one of two routes: it folds the alpha into the
+	 paint's colour when the paint is solid and the operator allows it, and otherwise keeps the
+	 mask. The two routes quantise differently, so the choice shows in the pixels, and
+	 VGCairoOperator names the operators that refuse the fold. The mask rides inside the
+	 segments, because the display list entry carries the segments, the paint, the clip and the
+	 operator and nothing else. A finished surface refuses the entry here, where the drawing is
+	 asked for, because by the drain there is no caller left to tell."
+	| paint segments |
 	aSegments isEmpty ifTrue: [ ^ self ].
+	surface ensureNotFinished.
 	paint := state source paintForDeviceMatrix: state sourceMatrix.
 	paint ifNil: [ ^ self ].
+	segments := aSegments.
+	aNumber = 1 ifFalse: [
+		(paint isSolid and: [ self currentOperator foldsAnAlphaIntoThePaint ])
+			ifTrue: [ paint := paint fadedBy: aNumber ]
+			ifFalse: [ segments := aSegments withAlpha: aNumber ] ].
 	surface displayList add: (VGFillEntry
-			 segments: aSegments
+			 segments: segments
 			 paint: paint
 			 clip: self currentClipShape
 			 operator: self currentOperator)
@@ -726,6 +901,26 @@ VGCairoContext >> relativeLineTo: aDeltaPoint [
 	self isInError ifTrue: [ ^ self ].
 	self hasCurrentPoint ifFalse: [ ^ status := VGCairoStatus noCurrentPoint ].
 	self lineTo: self currentPointInUserSpace + aDeltaPoint
+]
+
+{ #category : 'private' }
+VGCairoContext >> renderedMaskFor: aPattern [
+	"aPattern painted over the whole of an intermediate the size of the target, under the
+	 transformation in force, so that its alpha can be read pixel by pixel in device space. The
+	 intermediate carries an alpha channel whatever the target's format is, because the alpha is
+	 the only thing a mask is read for. The clip is left out on purpose: the blit applies it,
+	 and nothing else reads this surface."
+	| mask context |
+	mask := VGCairoImageSurface
+		        newFormat: VGCairoSurfaceFormat argb32
+		        extent: surface extent.
+	mask backend: surface backend.
+	context := mask newContext.
+	context matrix: state matrix copy.
+	context sourcePattern: aPattern.
+	context paint.
+	mask flush.
+	^ mask
 ]
 
 { #category : 'state' }
@@ -821,9 +1016,23 @@ VGCairoContext >> setIdentityMatrix [
 	self changeMatrixBy: [ :each | each beIdentity ]
 ]
 
-{ #category : 'skeleton - unit 1.7' }
+{ #category : 'state' }
 VGCairoContext >> setOperatorClear [
-	^ self notYetImplementedIn: '1.7' selector: #setOperatorClear
+	"The convenience Alexandrie offers for the one operator a caller reaches for by name."
+
+	^ self operator: VGCairoOperator clear
+]
+
+{ #category : 'operators' }
+VGCairoContext >> setOperatorOver [
+	"The convenience Alexandrie offers for the operator a context starts with."
+	^ self operator: VGCairoOperator over
+]
+
+{ #category : 'operators' }
+VGCairoContext >> setOperatorSource [
+	"The convenience Alexandrie offers for the operator that replaces the destination."
+	^ self operator: VGCairoOperator source
 ]
 
 { #category : 'private' }

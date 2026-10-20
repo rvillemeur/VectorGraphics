@@ -17,6 +17,34 @@ Class {
 }
 
 { #category : 'helpers' }
+VGCairoClipTest >> maskThroughACircleClipOn: aSurfaceClass [
+	"The same script on either family: a mask that is opaque on its left half and half
+	 translucent on its right half, painted through an antialiased circular clip."
+
+	| surface context mask maskContext |
+	mask := aSurfaceClass extent: 32 @ 32.
+	maskContext := mask newContext.
+	maskContext sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
+	maskContext
+		rectangleX: 0 y: 0 width: 16 height: 32;
+		fill.
+	maskContext sourceColorR: 1.0 g: 1.0 b: 1.0 a: 0.5.
+	maskContext
+		rectangleX: 16 y: 0 width: 16 height: 32;
+		fill.
+	mask flush.
+	surface := aSurfaceClass extent: 32 @ 32.
+	context := surface newContext.
+	context
+		circleCenterX: 16 y: 16 radius: 10;
+		clip.
+	context sourceColorR: 0.0 g: 0.0 b: 1.0 a: 1.0.
+	context maskSurface: mask x: 0 y: 0.
+	surface flush.
+	^ surface asForm
+]
+
+{ #category : 'helpers' }
 VGCairoClipTest >> newSurface [
 	^ VGCairoImageSurface extent: 32 @ 32
 ]
@@ -171,6 +199,25 @@ VGCairoClipTest >> testAFractionalClipEdgeCarriesFractionalCoverage [
 		paint.
 	self assert: (colour pixelAtX: 20 y: 5) equals: 16r40201030.
 	self assert: (colour pixelAtX: 21 y: 5) equals: 16r7F3F1F5F
+]
+
+{ #category : 'tests' }
+VGCairoClipTest >> testAMaskThroughAnAntialiasedClipCarriesTheClipsOwnCoverage [
+	"A mask surface is not geometry, so a clip cannot meet it span by span the way it meets a
+	 fill. Cairo scales the mask by the coverage of the clip instead, which leaves the rim of the
+	 clip shaded in the result rather than hard. Measured against a live Cairo surface."
+
+	| comparison |
+	comparison := VGFormComparison
+		              between: (self maskThroughACircleClipOn: VGCairoImageSurface)
+		              and: (self maskThroughACircleClipOn: AeCairoImageSurface).
+	self assert: comparison isComparable.
+	self assert: comparison extraneousPixelCount equals: 0.
+	self
+		assert: comparison maximumChannelDistance
+				<= VGConformanceCorpus antialiasingTolerance
+		description: 'the rim of the clip differs from Cairo by '
+			, comparison maximumChannelDistance printString
 ]
 
 { #category : 'tests' }

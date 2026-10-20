@@ -87,6 +87,32 @@ VGClip >> clippedBy: aSegments [
 ]
 
 { #category : 'accessing' }
+VGClip >> coverageRasteriser [
+	"The real rasteriser, set to fill the whole of my extents through me, so its coverage is the
+	 part of each pixel I allow. A fill needs none of this, because it meets me span by span
+	 inside the rasteriser; a mask carries no spans to meet, so it is scaled by this coverage
+	 instead, and the inspector draws it."
+
+	| segments |
+	segments := VGSegments rectangle: self extents.
+	^ VGRasteriser
+		  segments: segments coordinates
+		  fillRule: segments fillRule
+		  antialias: segments antialias
+		  clip: self
+]
+
+{ #category : 'accessing' }
+VGClip >> coverageRowsDo: aBlock [
+	"The part of each pixel of every row I touch that I allow: the row, a Float64Array of
+	 coverage from zero to one, and the device x its first entry stands for. The rim of a clip is
+	 measured here exactly as the rim of a fill is, because the same rasteriser answers both. A
+	 row I allow nothing of is not visited at all, and a clip of no area is not visited either."
+
+	^ self coverageRasteriser coverageRowsDo: aBlock
+]
+
+{ #category : 'accessing' }
 VGClip >> extents [
 	"What cairo_clip_extents reports: my bounds rounded out to whole pixels, or the origin alone
 	 when I allow nothing. Measured on a live Cairo context: a clip whose right edge falls at 20.5
@@ -97,17 +123,15 @@ VGClip >> extents [
 	  corner: bounds right ceiling @ bounds bottom ceiling
 ]
 
-{ #category : 'inspecting' }
+{ #category : 'inspector' }
 VGClip >> inspectorPassed: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Passed'>
 	"What a fill of my own extents keeps, one character a pixel, drawn by the real rasteriser
 	 with me as its clip. Nothing is restated here: the picture is the coverage a fill through me
-	 would paint, so it cannot drift from the rule."
+	 would paint, and a mask through me is scaled by it, so it cannot drift from the rule."
+
 	^ aBuilder newText
-		  text: (VGRasteriser
-				   segments: (VGSegments rectangle: self extents) coordinates
-				   fillRule: #winding
-				   clip: self) coverageDrawing;
+		  text: self coverageRasteriser coverageDrawing;
 		  beNotEditable;
 		  yourself
 ]
@@ -129,6 +153,20 @@ VGClip >> isRectangular [
 	 scan conversion is needed to trim a fill to me."
 
 	^ shapes isEmpty
+]
+
+{ #category : 'enumerating' }
+VGClip >> pixelsInRowAt: aRow from: aLeft to: aRight do: aBlock [
+	"The whole pixels of that row I allow, sampled at the centre of the pixel, which is how an
+	 unbounded operator sweeps me: it writes where no source covers, and it writes whole pixels."
+
+	self
+		spanFrom: aLeft
+		to: aRight
+		at: aRow + (1 / 2)
+		do: [ :from :to |
+			(from - (1 / 2)) ceiling to: (to - (1 / 2)) ceiling - 1 do: [ :x |
+				aBlock value: x ] ]
 ]
 
 { #category : 'printing' }

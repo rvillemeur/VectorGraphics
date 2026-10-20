@@ -75,11 +75,32 @@ VGCairoSurfaceFormat >> = anObject [
 ]
 
 { #category : 'blending' }
+VGCairoSurfaceFormat >> alphaComposing: aSourceAlphaByte over: aDestinationAlphaByte [
+	"The alpha pixman writes for every blend mode on its integer path: three parts, each rounded
+	 on its own, rather than one rounded sum. Measured over a hundred pairs of alphas: a
+	 destination of 1 under a source of 128 writes 128, where rounding the sum once writes 129.
+	 No pair of bytes can carry it over two hundred and fifty-five, which was checked over all
+	 sixty-five thousand five hundred and thirty-six of them, so it needs no cap."
+	^ (self scaleByte: aDestinationAlphaByte by: 255 - aSourceAlphaByte)
+	  + (self scaleByte: aSourceAlphaByte by: 255 - aDestinationAlphaByte)
+	  + (self dividedByte: aSourceAlphaByte * aDestinationAlphaByte)
+]
+
+{ #category : 'blending' }
 VGCairoSurfaceFormat >> alphaOfPixel: anInteger [
 	"An A8 pixel is alpha alone, an RGB24 pixel has no alpha byte and is always opaque."
 	self isA8 ifTrue: [ ^ anInteger bitAnd: 255 ].
 	self isRgb24 ifTrue: [ ^ 255 ].
 	^ (anInteger bitShift: -24) bitAnd: 255
+]
+
+{ #category : 'blending' }
+VGCairoSurfaceFormat >> alphaOfWidePixel: anInteger [
+	"An A8 wide pixel is one short of alpha alone, and an RGB24 one carries no alpha and is
+	 always opaque."
+	self isA8 ifTrue: [ ^ anInteger bitAnd: 65535 ].
+	self isRgb24 ifTrue: [ ^ 65535 ].
+	^ (anInteger bitShift: -48) bitAnd: 65535
 ]
 
 { #category : 'accessing' }
@@ -124,9 +145,38 @@ VGCairoSurfaceFormat >> blendPixel: aSourcePixel over: aDestinationPixel [
 		  pixel + (((source + (self scaleByte: destination by: inverse)) min: 255) bitShift: shift) ]
 ]
 
+{ #category : 'blending' }
+VGCairoSurfaceFormat >> byteForFloat: aNumber [
+	"The byte pixman stores for a channel it composited in floating point: multiply by two
+	 hundred and fifty-six, truncate, then take the overflow bit back off, so a full channel
+	 lands on two hundred and fifty-five and everything under it floors. Measured: 0.2490 of a
+	 channel writes 63 where a rounding division by two hundred and fifty-five writes 64."
+	| scaled |
+	scaled := ((aNumber * self byteScale) truncated max: 0) min: self byteScale.
+	^ scaled - (scaled // self byteScale)
+]
+
+{ #category : 'constants' }
+VGCairoSurfaceFormat >> byteScale [
+	"The power of two pixman's floating point store multiplies a channel by before it truncates,
+	 and the divisor its own rounding division by two hundred and fifty-five shifts by."
+	^ 256
+]
+
 { #category : 'accessing' }
 VGCairoSurfaceFormat >> bytesPerPixel [
 	^ bitsPerPixel // 8 max: 1
+]
+
+{ #category : 'arithmetic' }
+VGCairoSurfaceFormat >> channelShifts [
+	"Where my channels sit in a pixel word, lowest first. An A8 pixel is alpha alone and an RGB24
+	 pixel has no alpha channel to weigh, which is why the operators have to ask rather than
+	 assume four."
+
+	self isA8 ifTrue: [ ^ #( 0 ) ].
+	self isRgb24 ifTrue: [ ^ #( 0 8 16 ) ].
+	^ #( 0 8 16 24 )
 ]
 
 { #category : 'converting' }
@@ -143,6 +193,17 @@ VGCairoSurfaceFormat >> colorForPixel: anInteger [
 		  g: ((anInteger bitShift: -8) bitAnd: 255) / alpha
 		  b: (anInteger bitAnd: 255) / alpha
 		  alpha: alpha / 255
+]
+
+{ #category : 'blending' }
+VGCairoSurfaceFormat >> dividedByte: aNumerator [
+	"Pixman's own division of a channel numerator by two hundred and fifty-five, written as it
+	 writes it: add half a byte, shift down a byte, add that back, shift down a byte again. It is
+	 not (aNumerator + 128) // 255 — the two differ at 127 and at every two hundred and fifty-five
+	 steps above it, which is a whole step of a channel."
+	| offset |
+	offset := aNumerator + (self byteScale // 2).
+	^ ((offset // self byteScale) + offset) // self byteScale
 ]
 
 { #category : 'accessing' }
@@ -198,6 +259,26 @@ VGCairoSurfaceFormat >> maskByteForCoverage: aNumber [
 	^ (aNumber * 256) rounded min: 255
 ]
 
+{ #category : 'arithmetic' }
+VGCairoSurfaceFormat >> mixPixel: aPixel weightedBy: aByte withPixel: anotherPixel weightedBy: anotherByte [
+	"Two premultiplied pixels, each scaled by a weight of its own and added, channel by channel.
+	 The sum is capped because the add operator weighs both of them fully, and an RGB24 word
+	 keeps the opaque alpha byte it is stored with, since the channels themselves carry no
+	 alpha."
+
+	| mixed |
+	mixed := self channelShifts inject: 0 into: [ :pixel :shift |
+		         | one another |
+		         one := (aPixel bitShift: shift negated) bitAnd: 255.
+		         another := (anotherPixel bitShift: shift negated) bitAnd: 255.
+		         pixel + (((self scaleByte: one by: aByte)
+			            + (self scaleByte: another by: anotherByte) min: 255)
+			           bitShift: shift) ].
+	^ self isRgb24
+		  ifTrue: [ mixed + (255 bitShift: 24) ]
+		  ifFalse: [ mixed ]
+]
+
 { #category : 'blending' }
 VGCairoSurfaceFormat >> pixel: aPixel scaledBy: aMaskByte [
 	"A premultiplied pixel with every channel scaled by an eight-bit mask, the alpha along with
@@ -214,6 +295,20 @@ VGCairoSurfaceFormat >> pixel: aPixel scaledBy: aMaskByte [
 		  + ((self
 				    scaleByte: ((aPixel bitShift: shift negated) bitAnd: 255)
 				    by: aMaskByte) bitShift: shift) ]
+]
+
+{ #category : 'arithmetic' }
+VGCairoSurfaceFormat >> pixelForAlpha: anAlphaByte channels: anArray [
+	"The pixel word for an alpha byte and three premultiplied channel bytes, in the order red,
+	 green, blue. An RGB24 pixel carries no alpha, so the byte in that position is the full byte."
+
+	self isA8 ifTrue: [ ^ anAlphaByte ].
+	^ ((self isRgb24
+		    ifTrue: [ 255 ]
+		    ifFalse: [ anAlphaByte ]) bitShift: 24)
+	  + ((anArray at: 1) bitShift: 16)
+	  + ((anArray at: 2) bitShift: 8)
+	  + (anArray at: 3)
 ]
 
 { #category : 'converting' }
@@ -278,6 +373,29 @@ VGCairoSurfaceFormat >> pixelForRgbaThroughShorts: anArray [
 	  + (self shortByteOf: (anArray at: 3) * multiplier)
 ]
 
+{ #category : 'arithmetic' }
+VGCairoSurfaceFormat >> premultipliedChannelsOfPixel: anInteger [
+	"The red, green and blue bytes the pixel word stores, still multiplied by its alpha. An A8
+	 pixel stores no colour, so it answers three zeroes and the caller keeps its alpha."
+
+	self isA8 ifTrue: [ ^ #( 0 0 0 ) ].
+	^ {
+		  ((anInteger bitShift: -16) bitAnd: 255).
+		  ((anInteger bitShift: -8) bitAnd: 255).
+		  (anInteger bitAnd: 255) }
+]
+
+{ #category : 'blending' }
+VGCairoSurfaceFormat >> premultipliedChannelsOfWidePixel: anInteger [
+	"The red, green and blue shorts the wide pixel stores, still multiplied by its alpha. An A8
+	 pixel stores no colour, so it answers three zeroes and the caller keeps its alpha."
+	self isA8 ifTrue: [ ^ #( 0 0 0 ) ].
+	^ {
+		  ((anInteger bitShift: -32) bitAnd: 65535).
+		  ((anInteger bitShift: -16) bitAnd: 65535).
+		  (anInteger bitAnd: 65535) }
+]
+
 { #category : 'converting' }
 VGCairoSurfaceFormat >> premultiplyChannel: aFraction byAlpha: anAlphaByte [
 	"Premultiplication: a stored channel is already multiplied by the alpha it carries, which is why
@@ -328,11 +446,24 @@ VGCairoSurfaceFormat >> setCode: anInteger bitsPerPixel: aBitCount name: aSymbol
 { #category : 'converting' }
 VGCairoSurfaceFormat >> shortByteOf: aNumber [
 	"The byte Cairo keeps for one channel of a solid colour: the channel as a sixteen-bit short,
-	 rounded, of which only the top byte is stored. Measured with exact doubles on a live
-	 context: a half of sixty-five thousand five hundred and thirty-five is 32767.5 and is kept
-	 as 16r80, so the short rounds and does not truncate."
+	 of which only the top byte is stored."
+	^ (self shortOf: aNumber) bitShift: -8
+]
 
-	^ ((aNumber * 65535) rounded bitShift: -8) min: 255
+{ #category : 'converting' }
+VGCairoSurfaceFormat >> shortOf: aNumber [
+	"The sixteen-bit short Cairo converts one channel of a solid colour into, rounded. Measured
+	 with exact doubles on a live context: a half of sixty-five thousand five hundred and
+	 thirty-five is 32767.5 and is kept as 32768, so the short rounds and does not truncate."
+	^ ((aNumber * 65535) rounded min: 65535) max: 0
+]
+
+{ #category : 'constants' }
+VGCairoSurfaceFormat >> shortsPerByte [
+	"What one byte of a channel is worth in sixteen-bit shorts. Stretching a byte by this is
+	 exact: two hundred and fifty-five times it is sixty-five thousand five hundred and
+	 thirty-five, so a byte over 255 and the stretched short over 65535 are the same number."
+	^ 65535 / 255
 ]
 
 { #category : 'accessing' }
@@ -340,4 +471,41 @@ VGCairoSurfaceFormat >> strideForWidth: aWidth [
 	"What cairo_format_stride_for_width answers: the row span rounded up to a four-byte boundary."
 
 	^ (aWidth * bitsPerPixel + 31) // 32 * 4
+]
+
+{ #category : 'converting' }
+VGCairoSurfaceFormat >> widePixelForRgba: anArray [
+	"The source word pixman composites a solid colour from when it works in floating point: the
+	 four sixteen-bit shorts of which pixelForRgbaThroughShorts: keeps only the top byte each,
+	 packed alpha, red, green, blue, sixteen bits apiece. The eight operators Cairo composites in
+	 floating point read the colour at this precision, and land a step out of live Cairo when
+	 they are given the bytes instead. An alpha only surface keeps no colour and an RGB one is
+	 always opaque."
+	| alpha multiplier |
+	self isA8 ifTrue: [ ^ self shortOf: (anArray at: 4) ].
+	alpha := self isRgb24
+		         ifTrue: [ 65535 ]
+		         ifFalse: [ self shortOf: (anArray at: 4) ].
+	multiplier := self isRgb24
+		              ifTrue: [ 1.0 ]
+		              ifFalse: [ anArray at: 4 ].
+	^ (alpha bitShift: 48)
+	  + ((self shortOf: (anArray at: 1) * multiplier) bitShift: 32)
+	  + ((self shortOf: (anArray at: 2) * multiplier) bitShift: 16)
+	  + (self shortOf: (anArray at: 3) * multiplier)
+]
+
+{ #category : 'converting' }
+VGCairoSurfaceFormat >> widenPixel: anInteger [
+	"The same pixel with every byte stretched into a sixteen-bit short, which loses nothing and
+	 adds nothing. This is how a paint Cairo evaluates in bytes, a gradient or a surface, reaches
+	 an operator that composites in floating point: the unpremultiplied colour it answers is the
+	 same either way, and only a solid colour carries more precision than this."
+	| channels |
+	self isA8 ifTrue: [ ^ (anInteger bitAnd: 255) * self shortsPerByte ].
+	channels := self premultipliedChannelsOfPixel: anInteger.
+	^ ((self alphaOfPixel: anInteger) * self shortsPerByte bitShift: 48)
+	  + ((channels first) * self shortsPerByte bitShift: 32)
+	  + ((channels second) * self shortsPerByte bitShift: 16)
+	  + (channels third * self shortsPerByte)
 ]

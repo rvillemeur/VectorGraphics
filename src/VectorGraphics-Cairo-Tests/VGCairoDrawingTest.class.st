@@ -80,6 +80,78 @@ VGCairoDrawingTest >> testAFreshContextAnswersTheOriginAsItsCurrentPoint [
 ]
 
 { #category : 'tests' }
+VGCairoDrawingTest >> testAGroupKeepsItsDrawingOffTheTargetUntilItIsPopped [
+	"Cairo's push_group redirects the drawing to an intermediate surface, so a flush of the
+	 target in the middle of a group shows the target as it was. Popping the group to the source
+	 and painting it through half an alpha then lays the group down in one composite, which is
+	 what makes a group different from drawing the same shapes twice: half of an opaque white
+	 over an opaque black reads as one hundred and twenty-eight in each channel on a live Cairo
+	 surface."
+	| surface context |
+	surface := self newSurface.
+	context := surface newContext.
+	context
+		sourceColorR: 0.0 g: 0.0 b: 0.0 a: 1.0;
+		paint.
+	context pushGroup.
+	context
+		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0;
+		paint.
+	surface flush.
+	self assert: (surface pixelAtX: 0 y: 0) equals: self opaqueBlack.
+	context popGroupToSource.
+	context paintWithAlpha: 0.5.
+	self assert: (surface pixelAtX: 0 y: 0) equals: 16rFF808080.
+	self assert: (surface pixelAtX: 31 y: 31) equals: 16rFF808080
+]
+
+{ #category : 'tests' }
+VGCairoDrawingTest >> testAMaskSurfacePaintsTheSourceThroughItsAlphaChannel [
+	"Cairo's mask_surface paints the source wherever the mask surface has alpha, at the offset
+	 given, and leaves everything the mask does not reach alone. The mask's colours are not read
+	 at all: only its alpha. The values are read off a live Cairo surface."
+	| target context mask maskContext |
+	mask := VGCairoImageSurface extent: 16 @ 16.
+	maskContext := mask newContext.
+	maskContext sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
+	maskContext
+		rectangleX: 0 y: 0 width: 8 height: 16;
+		fill.
+	maskContext sourceColorR: 1.0 g: 1.0 b: 1.0 a: 0.5.
+	maskContext
+		rectangleX: 8 y: 0 width: 8 height: 16;
+		fill.
+	mask flush.
+	target := self newSurface.
+	context := target newContext.
+	context sourceColorR: 1.0 g: 0.0 b: 0.0 a: 1.0.
+	context maskSurface: mask x: 8 y: 8.
+	self assert: (target pixelAtX: 10 y: 10) equals: 16rFFFF0000.
+	self assert: (target pixelAtX: 20 y: 10) equals: 16r80800000.
+	self assert: (target pixelAtX: 2 y: 2) equals: 0.
+	self assert: (target pixelAtX: 25 y: 25) equals: 0
+]
+
+{ #category : 'tests' }
+VGCairoDrawingTest >> testAPaintCarriedThroughAnAlphaFadesEveryPixelOfTheClip [
+	"Painting black at four tenths of an alpha over white leaves a grey of one hundred and
+	 fifty-three in every channel, read off a live Cairo surface. One hundred and fifty-three is
+	 what folding the alpha into the paint's colour gives: Cairo quantises four tenths to an
+	 alpha of one hundred and two and composites once, where carrying the alpha as a mask would
+	 scale an already quantised black and land a step away."
+	| surface context |
+	surface := self newSurface.
+	context := surface newContext.
+	context
+		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0;
+		paint.
+	context sourceColorR: 0.0 g: 0.0 b: 0.0 a: 1.0.
+	context paintWithAlpha: 0.4.
+	self assert: (surface pixelAtX: 0 y: 0) equals: 16rFF999999.
+	self assert: (surface pixelAtX: 31 y: 31) equals: 16rFF999999
+]
+
+{ #category : 'tests' }
 VGCairoDrawingTest >> testASliverThinnerThanHalfAFixedPointStepPaintsNothing [
 	"Measured on a live context: a rectangle one four hundredth of a pixel wide stores an alpha
 	 of one, and a wider one of three five hundred and twelfths stores two, but one of exactly
@@ -96,6 +168,24 @@ VGCairoDrawingTest >> testASliverThinnerThanHalfAFixedPointStepPaintsNothing [
 	self assert: ((surface pixelAtX: 2 y: 0) bitShift: -24) equals: 0.
 	self assert: ((surface pixelAtX: 2 y: 2) bitShift: -24) equals: 1.
 	self assert: ((surface pixelAtX: 2 y: 4) bitShift: -24) equals: 2
+]
+
+{ #category : 'tests' }
+VGCairoDrawingTest >> testASolidMaskIsCairosPaintThroughAnAlpha [
+	"Cairo's mask takes the same route as paint_with_alpha when the mask pattern is one colour:
+	 the mask's alpha is the alpha, and under clear it is carried as a mask rather than folded
+	 into the paint. The pixel is the one paint_with_alpha leaves, read off a live Cairo
+	 surface."
+	| target context |
+	target := self newSurface.
+	context := target newContext.
+	context
+		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0;
+		paint.
+	context setOperatorClear.
+	context mask: (VGCairoColorPattern r: 0.0 g: 0.0 b: 0.0 alpha: 0.4).
+	self assert: (target pixelAtX: 0 y: 0) equals: 16r99999999.
+	self assert: (target pixelAtX: 31 y: 31) equals: 16r99999999
 ]
 
 { #category : 'tests - source' }
@@ -181,6 +271,48 @@ VGCairoDrawingTest >> testASurfaceSourceWithAnOffsetMovesThePatternAndLeavesWhat
 ]
 
 { #category : 'tests' }
+VGCairoDrawingTest >> testAnAlphaUnderAnOperatorThatRefusesToFoldItThinsTheDestination [
+	"Clear is one of the six operators under which Cairo carries a paint's alpha as a mask
+	 rather than folding it into the paint's colour, and it is one of the four where the choice
+	 shows: a clear through four tenths of an alpha leaves six tenths of an opaque white behind,
+	 read off a live Cairo surface, where folding would have cleared the pixel outright."
+	| surface context |
+	surface := self newSurface.
+	context := surface newContext.
+	context
+		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0;
+		paint.
+	context setOperatorClear.
+	context paintWithAlpha: 0.4.
+	self assert: (surface pixelAtX: 0 y: 0) equals: 16r99999999.
+	self assert: (surface pixelAtX: 31 y: 31) equals: 16r99999999
+]
+
+{ #category : 'tests' }
+VGCairoDrawingTest >> testClearingObeysTheClipAndTheOrderItWasAskedIn [
+	"Cairo has no clear primitive: clearTransparent is a paint under the clear operator and
+	 clearColor: is a paint under the source operator, so both obey the clip and both take their
+	 turn in the frame. Measured on a live Cairo surface: a red paint followed by a clear inside
+	 a half-width clip leaves the clipped half transparent and the other half red, and a clear
+	 to blue then fills the same half."
+	| surface context |
+	surface := self newSurface.
+	context := surface newContext.
+	context
+		sourceColorR: 1.0 g: 0.0 b: 0.0 a: 1.0;
+		paint.
+	context
+		rectangleX: 0 y: 0 width: 16 height: 32;
+		clip.
+	context clearTransparent.
+	self assert: (surface pixelAtX: 4 y: 4) equals: 0.
+	self assert: (surface pixelAtX: 20 y: 4) equals: 16rFFFF0000.
+	context clearR: 0.0 g: 0.0 b: 1.0 a: 1.0.
+	self assert: (surface pixelAtX: 4 y: 4) equals: 16rFF0000FF.
+	self assert: (surface pixelAtX: 20 y: 4) equals: 16rFFFF0000
+]
+
+{ #category : 'tests' }
 VGCairoDrawingTest >> testFillConsumesThePathAndFillPreservingPathKeepsIt [
 	| first second |
 	first := self newSurface.
@@ -200,6 +332,30 @@ VGCairoDrawingTest >> testFillConsumesThePathAndFillPreservingPathKeepsIt [
 		assert: (second pixelAtX: 13 y: 5) = 0
 		description: 'a preserved path is already in device space, so a later transformation cannot move it'.
 	self assert: (first pixelAtX: 13 y: 5) equals: 0
+]
+
+{ #category : 'tests' }
+VGCairoDrawingTest >> testMaskingWithAGroupPaintsTheSourceWhereTheGroupDrew [
+	"Alexandrie's maskGroupWith: draws the block into a group and uses the group as the mask, so
+	 the source arrives through whatever alpha the group laid down and nowhere else. Measured on
+	 a live Cairo surface: an opaque part of the group gives the source whole, a quarter-opaque
+	 part gives a quarter of it, and the rest is untouched."
+	| target context |
+	target := self newSurface.
+	context := target newContext.
+	context sourceColorR: 0.0 g: 0.0 b: 1.0 a: 1.0.
+	context maskGroupWith: [
+		context sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
+		context
+			rectangleX: 4 y: 4 width: 12 height: 12;
+			fill.
+		context sourceColorR: 1.0 g: 1.0 b: 1.0 a: 0.25.
+		context
+			rectangleX: 16 y: 4 width: 12 height: 12;
+			fill ].
+	self assert: (target pixelAtX: 8 y: 8) equals: 16rFF0000FF.
+	self assert: (target pixelAtX: 20 y: 8) equals: 16r40000040.
+	self assert: (target pixelAtX: 8 y: 20) equals: 0
 ]
 
 { #category : 'tests - the display list' }
@@ -228,6 +384,33 @@ VGCairoDrawingTest >> testPaintCoversEveryPixelOfTheSurface [
 	surface newContext paint.
 	self assert: (surface pixelAtX: 0 y: 0) equals: self opaqueBlack.
 	self assert: (surface pixelAtX: 31 y: 31) equals: self opaqueBlack
+]
+
+{ #category : 'tests' }
+VGCairoDrawingTest >> testPaintingAGroupCompositesItOnceSoOverlapsDoNotDouble [
+	"The point of a group: two opaque rectangles that overlap are laid down as one picture, so
+	 the overlap is no more opaque than the rest. Drawing the same two rectangles at half an
+	 alpha without a group would make the overlap three quarters opaque. The values are read off
+	 a live Cairo surface, where every covered pixel is one hundred and twenty-eight in all four
+	 channels and the rest is untouched."
+	| surface context |
+	surface := self newSurface.
+	context := surface newContext.
+	context
+		paintGroupWith: [
+			context sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
+			context
+				rectangleX: 0 y: 0 width: 20 height: 20;
+				fill.
+			context
+				rectangleX: 10 y: 10 width: 20 height: 20;
+				fill ]
+		alpha: 0.5.
+	#( #( 5 5 ) #( 15 15 ) #( 25 25 ) ) do: [ :each |
+		self
+			assert: (surface pixelAtX: each first y: each second)
+			equals: 16r80808080 ].
+	self assert: (surface pixelAtX: 31 y: 5) equals: 0
 ]
 
 { #category : 'tests - the display list' }

@@ -314,6 +314,31 @@ VGCairoStrokeTest >> testAFreshContextCarriesTheStrokeDefaultsLiveCairoReports [
 ]
 
 { #category : 'tests - joins' }
+VGCairoStrokeTest >> testAFullCircleLeavesNoWedgeWhereItsTwoEndsMeet [
+	"A full circle is one run that arrives where it began and arrives there in the direction it
+	 left, because cairo_arc ends with the tangent it started with. Cairo strokes the spline
+	 itself, so its stroke is the whole annulus with no seam in it; ours flattens the spline, so
+	 the two end chords meet at a small angle and the wedge between them has to be filled, or the
+	 stroke shows a notch Cairo has not got."
+	| script comparison |
+	script := [ :context |
+		          context
+			          strokeSize: 8;
+			          circleCenterX: 32 y: 32 radius: 20;
+			          stroke ].
+	comparison := VGFormComparison
+		              between: (self formOf: script)
+		              and: (self cairoFormOf: script).
+	self assert: comparison isComparable.
+	self assert: comparison extraneousPixelCount equals: 0.
+	self
+		assert: comparison maximumChannelDistance
+				<= VGConformanceCorpus antialiasingTolerance
+		description: 'the seam of the circle differs from Cairo by '
+			, comparison maximumChannelDistance printString
+]
+
+{ #category : 'tests - joins' }
 VGCairoStrokeTest >> testAMiterJoinBecomesABevelOnceItPassesTheMiterLimit [
 	"Cairo compares one over the sine of half the turn with the limit, so a right angle needs a
 	 limit of the square root of two. Measured live: the far corner pixel of a right-angled
@@ -370,6 +395,33 @@ VGCairoStrokeTest >> testAPatternOfOneLengthAlternatesOnAndOffWithThatLength [
 	self
 		assert: (self paintedPixelCountIn: (self formOf: (script value: 0)))
 		equals: (self paintedPixelCountIn: (self cairoFormOf: (script value: 0)))
+]
+
+{ #category : 'tests - joins' }
+VGCairoStrokeTest >> testARunOfLinesThatComesBackToItsStartIsStillCappedThere [
+	"Coming back to the first point is not a close: Cairo caps both ends of such a run and leaves
+	 the outer corner between them unpainted. Measured on a live Cairo surface, which is what
+	 keeps a seam join from being drawn where Cairo draws none."
+	| script comparison |
+	script := [ :context |
+		          context
+			          strokeSize: 8;
+			          strokeJoin: AeCairoStrokeJoin miter;
+			          moveTo: 16 @ 16;
+			          lineTo: 48 @ 16;
+			          lineTo: 48 @ 48;
+			          lineTo: 16 @ 48;
+			          lineTo: 16 @ 16;
+			          stroke ].
+	self
+		deny: (self isPaintedIn: (self formOf: script) at: 13 @ 13)
+		description: 'the corner between the two caps is painted as though the seam were joined'.
+	comparison := VGFormComparison
+		              between: (self formOf: script)
+		              and: (self cairoFormOf: script).
+	self assert: comparison isComparable.
+	self assert: comparison extraneousPixelCount equals: 0.
+	self assert: comparison maximumChannelDistance equals: 0
 ]
 
 { #category : 'tests - naming' }

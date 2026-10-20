@@ -71,6 +71,13 @@ VGCairoPattern >> inspectorPaintContext: aContext [
 	aContext active: paint notNil
 ]
 
+{ #category : 'testing' }
+VGCairoPattern >> isSolid [
+	"Whether I am one flat colour everywhere. Cairo asks this of a mask before it decides
+	 whether to carry the mask's alpha on the paint instead of reading pixels."
+	^ paint isSolid
+]
+
 { #category : 'accessing' }
 VGCairoPattern >> matrix [
 	"A copy, because Cairo answers the numbers rather than the pattern's own matrix."

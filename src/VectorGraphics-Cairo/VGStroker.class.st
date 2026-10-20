@@ -219,11 +219,10 @@ VGStroker >> discPointCount [
 		  max: self class minimumDiscPointCount
 ]
 
-{ #category : 'converting' }
+{ #category : 'private' }
 VGStroker >> edgeCoordinates [
 	"The edges of the outline, four floats to an edge. A line width of nothing has no outline at
 	 all: Cairo draws no hairline, and half of nothing is nothing on each side of the path."
-
 	| stream inverse |
 	self lineWidth <= 0 ifTrue: [ ^ #(  ) ].
 	inverse := self matrix inverted.
@@ -232,6 +231,7 @@ VGStroker >> edgeCoordinates [
 		self
 			strokeRun: (subPath points collect: [ :each | inverse value: each ])
 			closed: subPath isClosed
+			smoothSeam: subPath comesBackToItsStartSmoothly
 			into: stream ].
 	^ stream contents
 ]
@@ -455,6 +455,22 @@ VGStroker >> radius [
 	^ self lineWidth / 2.0
 ]
 
+{ #category : 'private' }
+VGStroker >> seamJoinOf: vertices into: aStream [
+	"The wedge between the last chord of a run and its first, filled for a run that comes back to
+	 its own start in the direction it left in. Cairo strokes such a run as one smooth curve, so
+	 its stroke has nothing missing there; ours strokes the chords, and the two end chords meet at
+	 the angle the flattening left between them. The caps stay where they are: Cairo caps both
+	 ends of the run as well, and a round or a square cap paints past the seam as it does at the
+	 end of any other run."
+	vertices size > 2 ifFalse: [ ^ self ].
+	self
+		joinAt: vertices first
+		from: (vertices at: vertices size - 1)
+		to: (vertices at: 2)
+		into: aStream
+]
+
 { #category : 'accessing' }
 VGStroker >> segments [
 	"My path widened into an area to fill. The width is a user-space length, so the outline is
@@ -547,15 +563,19 @@ VGStroker >> strokeDashedRun: vertices closed: aBoolean into: aStream [
 ]
 
 { #category : 'private' }
-VGStroker >> strokeRun: userPoints closed: aBoolean into: aStream [
-	"One run of the path, dashed or whole."
-
+VGStroker >> strokeRun: userPoints closed: aBoolean smoothSeam: anotherBoolean into: aStream [
+	"One run of the path, dashed or whole. A smooth seam is the join that stands for a curve
+	 passing through its own first point; a dashed run is cut into runs of its own, and whether a
+	 dash covers the seam at all is a question this does not ask, so the seam of a dashed run is
+	 left to the dashes."
 	| vertices |
 	vertices := self verticesOf: userPoints closed: aBoolean.
 	vertices isEmpty ifTrue: [ ^ self ].
-	self style hasDashPattern
-		ifTrue: [ self strokeDashedRun: vertices closed: aBoolean into: aStream ]
-		ifFalse: [ self strokeWholeRun: vertices closed: aBoolean into: aStream ]
+	self style hasDashPattern ifTrue: [
+		^ self strokeDashedRun: vertices closed: aBoolean into: aStream ].
+	self strokeWholeRun: vertices closed: aBoolean into: aStream.
+	(anotherBoolean and: [ aBoolean not ]) ifTrue: [
+		self seamJoinOf: vertices into: aStream ]
 ]
 
 { #category : 'private' }

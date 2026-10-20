@@ -37,6 +37,12 @@ VGCairoColorPattern class >> r: red g: green b: blue alpha: alpha [
 		  yourself
 ]
 
+{ #category : 'accessing' }
+VGCairoColorPattern >> alpha [
+	"My one colour's alpha, which is the whole of me when I am used as a mask."
+	^ (paint rgbaInPaintSpace: 0 @ 0) fourth
+]
+
 { #category : 'initialization' }
 VGCairoColorPattern >> setRed: red green: green blue: blue alpha: alpha [
 	paint setRed: red green: green blue: blue alpha: alpha

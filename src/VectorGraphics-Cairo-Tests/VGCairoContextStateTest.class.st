@@ -160,6 +160,44 @@ VGCairoContextStateTest >> testPatternMatrixDefaultsToIdentityAndRoundTrips [
 ]
 
 { #category : 'tests' }
+VGCairoContextStateTest >> testPoppingAGroupThatWasNeverPushedLatchesAnInvalidPopGroup [
+	"Cairo reports a pop with no push as CAIRO_STATUS_INVALID_POP_GROUP, and a latched context
+	 then draws nothing. The code is read from a live Cairo context here rather than written
+	 from memory."
+	| reference context |
+	reference := (AeCairoImageSurface extent: 32 @ 32) newContext.
+	reference popGroupToSource.
+	self assert: reference status asInteger equals: VGCairoStatus invalidPopGroupCode.
+	context := self newContext.
+	context popGroupToSource.
+	self assert: context status code equals: VGCairoStatus invalidPopGroupCode.
+	self assert: context isInError.
+	context
+		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0;
+		paint.
+	self assert: context currentTarget displayList isEmpty
+]
+
+{ #category : 'tests' }
+VGCairoContextStateTest >> testPushingAGroupRedirectsTheTargetAndSavesTheState [
+	"Cairo's push_group saves the state as well as redirecting the target, and both pops restore
+	 it, so an operator set inside a group does not survive the pop."
+	| context target group pattern |
+	context := self newContext.
+	target := context currentTarget.
+	context pushGroup.
+	group := context currentTarget.
+	self deny: group == target.
+	self assert: group extent equals: target extent.
+	context setOperatorClear.
+	self assert: context currentOperator equals: VGCairoOperator clear.
+	pattern := context popGroupAsSurfacePattern.
+	self assert: context currentTarget == target.
+	self assert: context currentOperator equals: VGCairoOperator over.
+	self assert: pattern surface == group
+]
+
+{ #category : 'tests' }
 VGCairoContextStateTest >> testRestoreStateAfterNests [
 	| context |
 	context := self newContext.

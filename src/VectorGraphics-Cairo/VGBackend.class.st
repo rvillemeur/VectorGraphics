@@ -2,8 +2,11 @@
 I am the boundary between the recorded frame and whatever draws it.
 
 Rule three of the plan freezes my interface at three messages: fillSegments:paint:clip:operator:,
-blitSurface:at:paint: and drainInto:. Nothing above me knows whether a paint is evaluated by a Pharo
-method or by a SPIR-V function, and nothing below me knows what a BlPaint or an AeCairoPattern is.
+blitSurface:at:paint:clip:operator: and drainInto:. The blit one grew its clip and its operator in
+unit 1.7, where a mask became drawable: the surface it names is the mask, its alpha channel says how
+much of the paint reaches each pixel, and its colours are never read. Nothing above me knows whether
+a paint is evaluated by a Pharo method or by a SPIR-V function, and nothing below me knows what a
+BlPaint or an AeCairoPattern is.
 A backend below me that raises VGBackendFailure is answered by replaying the same display list on
 the software backend, which is why the failover costs nothing to arrange.
 My subclasses are VGSoftwareBackend here and the Vulkan backend in phase 2.
@@ -48,7 +51,7 @@ VGBackend class >> inspectorBoundaryContext: aContext [
 ]
 
 { #category : 'drawing' }
-VGBackend >> blitSurface: aSurface at: aPoint paint: aPaint [
+VGBackend >> blitSurface: aSurface at: aPoint paint: aPaint clip: aClip operator: anOperator [
 	self subclassResponsibility
 ]
 

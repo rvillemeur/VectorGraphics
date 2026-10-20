@@ -117,14 +117,13 @@ VGAlexandrieCorpus class >> isAvailable [
 	^ self experimentClass notNil and: [ VGCairoInventory isLiveCairoAvailable ]
 ]
 
-{ #category : 'substitution' }
+{ #category : 'constants' }
 VGAlexandrieCorpus class >> missingClassUnitTable [
 	"The Alexandrie Cairo classes the experiments name that the replacement has no counterpart for,
 	 each against the unit of VECTORCANVAS-PLAN.md that owes it. The corpus reads this to say why a
 	 case cannot run yet, so a class missing from the table is a gap the test reports."
 	^ {
 		  (#AeCairoAntialias -> '1.4').
-		  (#AeCairoOperator -> '1.7').
 		  (#AeCairoFontOptions -> '1.8').
 		  (#AeCairoFreetypeFontFace -> '1.8').
 		  (#AeCairoHintMetrics -> '1.8').
@@ -207,7 +206,7 @@ VGAlexandrieCorpus class >> toleranceFor: aSelector [
 		  ifNotNil: [ :each | each value ]
 ]
 
-{ #category : 'tolerances' }
+{ #category : 'constants' }
 VGAlexandrieCorpus class >> toleranceTable [
 	"The cases that may not match Cairo exactly, each with how far one channel may differ and why.
 	 It is empty while no case renders; a case added here has to carry its reason, so that a
@@ -215,7 +214,10 @@ VGAlexandrieCorpus class >> toleranceTable [
 	 experiments draw a curve, a slanted edge or a half-pixel stroke, so their edge pixels are
 	 shades and ours part from Cairo by a little, and fillPaint3 also scales a bitmap, which we
 	 still sample without a filter. A clip of a circle is an edge of that kind too: the shade is
-	 the one the clip itself carries. See antialiasedEdgeTolerance and nearestSampleTolerance."
+	 the one the clip itself carries, and the maskAndClip cases carry it twice over, because a
+	 mask through a clip is scaled by the coverage of the rim of that clip. See
+	 antialiasedEdgeTolerance and nearestSampleTolerance."
+
 	| edges |
 	edges := self antialiasedEdgeTolerance.
 	^ {
@@ -241,6 +243,12 @@ VGAlexandrieCorpus class >> toleranceTable [
 		  (#lineColor -> edges).
 		  (#lineDash -> edges).
 		  (#linePath -> edges).
+		  (#maskAndClip1 -> edges).
+		  (#maskAndClip2 -> edges).
+		  (#maskAndClip3 -> edges).
+		  (#maskAndClip4 -> edges).
+		  (#maskAndClip5 -> edges).
+		  (#maskAndClip6 -> edges).
 		  (#polygonLinearGradient -> edges).
 		  (#radialGradientPattern1 -> edges).
 		  (#strokeAndFill -> edges).

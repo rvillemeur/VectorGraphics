@@ -390,12 +390,22 @@ VGCairoImageSurface >> status [
 	^ status
 ]
 
-{ #category : 'converting' }
+{ #category : 'accessing' }
 VGCairoImageSurface >> straightAlphaPixelAtX: x y: y [
-	| colour |
-	colour := self colorAtX: x y: y.
-	colour isTransparent ifTrue: [ ^ self class transparentFormPixel ].
-	^ colour pixelWordForDepth: 32
+	"The pixel word a Form keeps for mine: the stored premultiplication divided back out and
+	 truncated, which is what Alexandrie does, so the two Forms the corpus compares can be read
+	 byte for byte. The division is done on the stored bytes and not through a Pharo Color, which
+	 keeps ten bits a channel and loses a step of its own. A channel is held to the full byte
+	 because a channel above the alpha is not a premultiplied pixel at all, where Alexandrie would
+	 let it run into the next byte."
+
+	| pixel alpha scale |
+	pixel := self pixelAtX: x y: y.
+	alpha := format alphaOfPixel: pixel.
+	alpha = 0 ifTrue: [ ^ self class transparentFormPixel ].
+	scale := 255.0 / alpha.
+	^ (format premultipliedChannelsOfPixel: pixel) inject: alpha into: [ :word :each |
+		  (word bitShift: 8) + ((each * scale) truncated min: 255) ]
 ]
 
 { #category : 'accessing' }

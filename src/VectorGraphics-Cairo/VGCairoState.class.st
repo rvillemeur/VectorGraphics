@@ -15,7 +15,8 @@ Class {
 		'clip',
 		'strokeStyle',
 		'tolerance',
-		'antialias'
+		'antialias',
+		'operator'
 	],
 	#category : 'VectorGraphics-Cairo-Context',
 	#package : 'VectorGraphics-Cairo',
@@ -94,8 +95,9 @@ VGCairoState >> fillRule: aSymbol [
 VGCairoState >> initialize [
 	"Cairo's own defaults: the identity matrix, a solid pattern of opaque black whose own
 	 transformation is the identity, the winding fill rule, the stroke style of
-	 VGCairoStrokeStyle, a tolerance of a tenth of a pixel and antialiasing left to the backend.
-	 Every one of them is measured against a live Cairo context in a test."
+	 VGCairoStrokeStyle, a tolerance of a tenth of a pixel, antialiasing left to the backend and
+	 the source-over operator. Every one of them is measured against a live Cairo context in a
+	 test."
 
 	super initialize.
 	matrix := VGCairoMatrix newIdentity.
@@ -104,7 +106,8 @@ VGCairoState >> initialize [
 	sourceMatrix := VGCairoMatrix newIdentity.
 	strokeStyle := VGCairoStrokeStyle new.
 	tolerance := self class defaultTolerance.
-	antialias := self class antialiasNames first
+	antialias := self class antialiasNames first.
+	operator := VGCairoOperator over
 ]
 
 { #category : 'accessing' }
@@ -125,6 +128,16 @@ VGCairoState >> matrix [
 { #category : 'accessing' }
 VGCairoState >> matrix: aMatrix [
 	matrix := aMatrix
+]
+
+{ #category : 'accessing' }
+VGCairoState >> operator [
+	^ operator
+]
+
+{ #category : 'accessing' }
+VGCairoState >> operator: anOperator [
+	operator := anOperator
 ]
 
 { #category : 'copying' }

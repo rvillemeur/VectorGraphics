@@ -15,7 +15,9 @@ Class {
 		'points',
 		'startPoint',
 		'currentPoint',
-		'flatteningTolerance'
+		'flatteningTolerance',
+		'startTangent',
+		'endTangent'
 	],
 	#category : 'VectorGraphics-Cairo-Path',
 	#package : 'VectorGraphics-Cairo',
@@ -52,11 +54,12 @@ VGPathBuilder >> closePath [
 	 so that drawing on begins a new run from there, which is what Cairo does. A run of one
 	 point closes too: Cairo paints the round cap of a closed degenerate run, and nothing at all
 	 for a move that closes nothing."
-
 	points ifEmpty: [ ^ self ].
-	subPaths add: (VGSubPath points: points asArray closed: true).
+	subPaths add: (self runOfPoints: points asArray closed: true).
 	points := OrderedCollection with: startPoint.
-	currentPoint := startPoint
+	currentPoint := startPoint.
+	startTangent := nil.
+	endTangent := nil
 ]
 
 { #category : 'accessing' }
@@ -67,20 +70,34 @@ VGPathBuilder >> currentPoint [
 { #category : 'building' }
 VGPathBuilder >> curveVia: aControlPoint via: anotherControlPoint to: aPoint [
 	"The control points reach the grid before the curve is flattened, because Cairo subdivides a
-	 spline that is already on the grid."
-	| firstControl secondControl end |
+	 spline that is already on the grid. The spline's own two tangents are remembered before it
+	 becomes chords, because the chords of a flattened curve do not answer the direction the curve
+	 had where it began and where it ended."
+	| firstControl secondControl end from isFirstSegment |
 	self hasCurrentPoint ifFalse: [ self moveTo: aControlPoint ].
 	firstControl := self snapped: aControlPoint.
 	secondControl := self snapped: anotherControlPoint.
 	end := self snapped: aPoint.
+	from := currentPoint.
+	isFirstSegment := points size = 1.
 	self
-		flattenCubicFrom: currentPoint
+		flattenCubicFrom: from
 		via: firstControl
 		via: secondControl
 		to: end
 		depth: 0.
 	points add: end.
-	currentPoint := end
+	currentPoint := end.
+	self
+		noteTangentsFrom: (self firstOf: {
+					 (firstControl - from).
+					 (secondControl - from).
+					 (end - from) })
+		to: (self firstOf: {
+					 (end - secondControl).
+					 (end - firstControl).
+					 (end - from) })
+		firstSegment: isFirstSegment
 ]
 
 { #category : 'private' }
@@ -91,6 +108,13 @@ VGPathBuilder >> distanceFrom: aPoint toLineFrom: aStartPoint to: anEndPoint [
 	length isZero ifTrue: [ ^ (aPoint - aStartPoint) r ].
 	^ ((direction x * (aPoint y - aStartPoint y)) - (direction y * (aPoint x - aStartPoint x))) abs
 	  / length
+]
+
+{ #category : 'private' }
+VGPathBuilder >> firstOf: aCollectionOfPoints [
+	"The first of these differences that has a direction, which is how Cairo reads the tangent of
+	 a spline whose first or last control point sits on its end point."
+	^ aCollectionOfPoints detect: [ :each | each isZero not ] ifNone: [ 0 @ 0 ]
 ]
 
 { #category : 'private' }
@@ -149,13 +173,15 @@ VGPathBuilder >> flatteningTolerance: aNumber [
 	flatteningTolerance := aNumber
 ]
 
-{ #category : 'private' }
+{ #category : 'building' }
 VGPathBuilder >> flushRun [
 	"Move the run being built into the finished runs. A run of one point draws nothing: a move to
 	 that nothing follows leaves no mark in Cairo either."
 	points size >= 2 ifTrue: [
-		subPaths add: (VGSubPath points: points asArray closed: false) ].
-	points := OrderedCollection new
+		subPaths add: (self runOfPoints: points asArray closed: false) ].
+	points := OrderedCollection new.
+	startTangent := nil.
+	endTangent := nil
 ]
 
 { #category : 'accessing' }
@@ -202,6 +228,14 @@ VGPathBuilder >> inspectorBuildingContext: aContext [
 	aContext active: subPaths notNil
 ]
 
+{ #category : 'testing' }
+VGPathBuilder >> isAtRunStart [
+	"Whether the next segment appended will be the first of the run being built. A caller that
+	 appends a curve as chords of its own asks this before it starts, so that it can hand back the
+	 curve's tangents afterwards and say whether they are the tangents of the run as well."
+	^ points size <= 1
+]
+
 { #category : 'accessing' }
 VGPathBuilder >> isEmpty [
 	^ self path isEmpty
@@ -220,9 +254,14 @@ VGPathBuilder >> isFlatFrom: aPoint via: aControlPoint via: anotherControlPoint 
 { #category : 'building' }
 VGPathBuilder >> lineTo: aPoint [
 	"Cairo treats a line to with no current point as a move to rather than as an error."
-	| point |
+	| point direction |
 	self hasCurrentPoint ifFalse: [ ^ self moveTo: aPoint ].
 	point := self snapped: aPoint.
+	direction := point - currentPoint.
+	self
+		noteTangentsFrom: direction
+		to: direction
+		firstSegment: points size = 1.
 	points add: point.
 	currentPoint := point
 ]
@@ -237,14 +276,29 @@ VGPathBuilder >> moveTo: aPoint [
 	currentPoint := point
 ]
 
-{ #category : 'converting' }
+{ #category : 'building' }
+VGPathBuilder >> noteTangentsFrom: aPoint to: anotherPoint firstSegment: aBoolean [
+	"Remember the directions of the segment just added: a curve leaves its first point and arrives
+	 at its last one in two different directions, a line in one and the same. The first segment of
+	 a run gives the run its start tangent and every segment gives the run its end tangent. A
+	 direction of nothing is no direction at all and is not remembered.
+
+	 A caller that flattens a curve itself, as an arc does, sends this with the curve's own two
+	 tangents once its chords are in, so that the run remembers the direction the curve had and
+	 not the direction of the first and last chord. A stroke reads those to tell a seam that
+	 passes smoothly through its own first point from a corner Cairo caps."
+	(aBoolean and: [ aPoint isZero not ]) ifTrue: [ startTangent := aPoint ].
+	anotherPoint isZero ifFalse: [ endTangent := anotherPoint ]
+]
+
+{ #category : 'accessing' }
 VGPathBuilder >> path [
 	"The path built so far, as a value: the run still open is included, and building on afterwards
 	 cannot change what this answers."
 	| all |
 	all := subPaths asArray.
 	points size >= 2 ifTrue: [
-		all := all , { (VGSubPath points: points asArray closed: false) } ].
+		all := all , { (self runOfPoints: points asArray closed: false) } ].
 	^ VGPath subPaths: all
 ]
 
@@ -268,6 +322,16 @@ VGPathBuilder >> quadraticVia: aControlPoint to: aPoint [
 		curveVia: from + ((aControlPoint - from) * (2 / 3))
 		via: aPoint + ((aControlPoint - aPoint) * (2 / 3))
 		to: aPoint
+]
+
+{ #category : 'private' }
+VGPathBuilder >> runOfPoints: aPointCollection closed: aBoolean [
+	"The run those points make, carrying the tangents of the run being built."
+	^ VGSubPath
+		  points: aPointCollection
+		  closed: aBoolean
+		  startTangent: startTangent
+		  endTangent: endTangent
 ]
 
 { #category : 'private' }

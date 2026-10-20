@@ -66,3 +66,16 @@ VGPathExamples class >> starSegmentsUnderTheEvenOddRule [
 
 	^ self starPath segmentsWithFillRule: #evenOdd
 ]
+
+{ #category : 'examples' }
+VGPathExamples class >> subPathComingBackToItsStartSmoothly [
+	<sampleInstance>
+	"The run a full circle builds: its chords end where they began, and it carries the arc's own
+	 tangents, so it passes through its first point with no corner there. That is the run whose
+	 stroke needs a join in the seam rather than two caps."
+	| surface context |
+	surface := VGCairoImageSurface newFormat: VGCairoSurfaceFormat argb32 extent: 64 @ 64.
+	context := surface newContext.
+	context circleCenterX: 32 y: 32 radius: 20.
+	^ context pathBuilder path subPaths first
+]

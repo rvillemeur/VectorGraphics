@@ -77,9 +77,8 @@ VGConformanceCorpus class >> caseMethodSelectors [
 	"The one list the corpus grows by. A new group means a new entry here and a new method, and the
 	 conformance test reads this list rather than the protocol, so a method that nobody named cannot
 	 hide in the corpus."
-
 	^ #( #targetCases #transformCases #pathCases #strokeCases #sourceCases #clipCases #groupCases
-	     #textCases )
+	     #figureCases #textCases )
 ]
 
 { #category : 'cases' }
@@ -118,6 +117,48 @@ VGConformanceCorpus class >> clipCases [
 				   stroke ]) }
 ]
 
+{ #category : 'cases' }
+VGConformanceCorpus class >> figureCases [
+	"Unit 1.7: the two AeCanvas figure methods that emulate a border lying outside the path,
+	 written out message for message. AeCanvas cannot drive the replacement itself yet, because it
+	 sets font options on the context it is handed and those are unit 1.8, so each case here is the
+	 body of AeCanvas >> #drawFigureWithBorderOutsideAndNoBackground and of
+	 #drawFigureWithBorderOutsideAndTranslucentBackground with clipAfterwards false. The emulation
+	 is what the group and the clear operator are for: it strokes at double width inside a group and
+	 clears the inner half, so a group that leaks onto the target, a clear that escapes it or a
+	 state that outlives the pop all show here as a filled disc or an empty picture."
+	^ {
+		  (self
+			   antialiasedCase: 'figure-outskirts-outside-no-background'
+			   unit: '1.7'
+			   draw: [ :context |
+				   context circleCenterX: 32 y: 32 radius: 20.
+				   context paintGroupWith: [
+					   context
+						   sourceColor: (Color r: 0.1 g: 0.3 b: 0.8);
+						   strokeSize: 8.0;
+						   strokePreservingPath;
+						   setOperatorClear;
+						   fillPreservingPath: false ] ]).
+		  (self
+			   antialiasedCase: 'figure-outskirts-outside-translucent-background'
+			   unit: '1.7'
+			   draw: [ :context |
+				   context circleCenterX: 32 y: 32 radius: 20.
+				   context paintGroupWith: [
+					   context
+						   sourceColor: (Color r: 0.8 g: 0.2 b: 0.1);
+						   strokeSize: 8.0;
+						   strokePreservingPath;
+						   setOperatorClear;
+						   fillPreservingPath ].
+				   context sourceColor: (Color r: 0.2 g: 0.7 b: 0.3).
+				   context restoreStateAfter: [
+					   context
+						   clip;
+						   paintWithAlpha: 0.6 ] ]) }
+]
+
 { #category : 'constants' }
 VGConformanceCorpus class >> gradientInterpolationTolerance [
 	"How far a channel of a gradient may sit from Cairo's own. Cairo hands a gradient to pixman,
@@ -133,30 +174,43 @@ VGConformanceCorpus class >> gradientInterpolationTolerance [
 
 { #category : 'cases' }
 VGConformanceCorpus class >> groupCases [
-	"Unit 1.7: the group, the mask and the one operator AeCanvas sets. The mask surface is a real
-	 unit 1.1 surface, so a case stops on the group selector it is filed under."
-
+	"Unit 1.7: the group, the two masks, a paint carried through an alpha and the one operator
+	 AeCanvas sets by name. A group's block takes no argument, because Cairo redirects the context
+	 the caller already holds rather than handing over a second one, and a mask surface has to
+	 belong to whichever side is drawing, which is why these cases ask classNamed:for: for it
+	 through maskTileFor:. Every picture here has a curved or faded edge, so each is gated at the
+	 antialiasing tolerance."
 	^ {
-		  (self case: 'group-painted-with-alpha' unit: '1.7' draw: [ :context |
-			    context paintGroupWith: [ :each |
-				    each
-					    circleCenterX: 24 y: 32 radius: 18;
-					    fill;
-					    circleCenterX: 40 y: 32 radius: 18;
-					    fill ] alpha: 0.5 ]).
-		  (self case: 'group-masked-by-surface' unit: '1.7' draw: [ :context |
-			    context maskSurface: (VGCairoImageSurface extent: self caseExtent) x: 16 y: 16 ]).
-		  (self case: 'group-masked-with-a-block' unit: '1.7' draw: [ :context |
-			    context maskGroupWith: [ :each |
-				    each
-					    circleCenterX: 32 y: 32 radius: 16;
-					    fill ] ]).
-		  (self case: 'group-cleared-region' unit: '1.7' draw: [ :context |
-			    context
-				    paint;
-				    setOperatorClear;
-				    circleCenterX: 32 y: 32 radius: 14;
-				    fill ]) }
+		  (self antialiasedCase: 'group-painted-with-alpha' unit: '1.7' draw: [ :context |
+			   context sourceColor: (Color r: 0.9 g: 0.3 b: 0.1).
+			   context
+				   paintGroupWith: [
+					   context
+						   circleCenterX: 24 y: 32 radius: 18;
+						   fill;
+						   circleCenterX: 40 y: 32 radius: 18;
+						   fill ]
+				   alpha: 0.5 ]).
+		  (self antialiasedCase: 'paint-through-an-alpha' unit: '1.7' draw: [ :context |
+			   context
+				   sourceColor: (Color r: 0.1 g: 0.7 b: 0.4);
+				   paintWithAlpha: 0.4 ]).
+		  (self antialiasedCase: 'group-masked-by-surface' unit: '1.7' draw: [ :context |
+			   context
+				   sourceColor: (Color r: 0.2 g: 0.4 b: 0.9);
+				   maskSurface: (self maskTileFor: context) x: 8 y: 8 ]).
+		  (self antialiasedCase: 'group-masked-with-a-block' unit: '1.7' draw: [ :context |
+			   context sourceColor: (Color r: 0.8 g: 0.2 b: 0.6).
+			   context maskGroupWith: [
+				   context
+					   circleCenterX: 32 y: 32 radius: 16;
+					   fill ] ]).
+		  (self antialiasedCase: 'group-cleared-region' unit: '1.7' draw: [ :context |
+			   context
+				   paint;
+				   setOperatorClear;
+				   circleCenterX: 32 y: 32 radius: 14;
+				   fill ]) }
 ]
 
 { #category : 'inspecting' }
@@ -191,6 +245,27 @@ VGConformanceCorpus class >> interpolatedCase: aString unit: aUnitString draw: a
 	^ (self case: aString unit: aUnitString draw: aBlock)
 		  tolerance: self gradientInterpolationTolerance;
 		  yourself
+]
+
+{ #category : 'private' }
+VGConformanceCorpus class >> maskTileFor: aContext [
+	"A mask surface in the family of the context: transparent at the top left, half opaque over a
+	 band, and opaque under a disc, so that every one of the three alphas a mask can carry shows
+	 in the picture a case draws through it. A blank surface would mask everything away and the
+	 case would prove nothing."
+	| tile tileContext extent |
+	extent := self caseExtent.
+	tile := (self classNamed: 'ImageSurface' for: aContext) extent: extent.
+	tileContext := tile newContext.
+	tileContext clearTransparent.
+	tileContext sourceColorR: 1.0 g: 1.0 b: 1.0 a: 0.5.
+	tileContext rectangleX: 0 y: extent y / 2 width: extent x height: extent y / 2.
+	tileContext fill.
+	tileContext sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
+	tileContext circleCenterX: extent x / 2 y: extent y / 2 radius: extent x / 4.
+	tileContext fill.
+	tile flush.
+	^ tile
 ]
 
 { #category : 'cases' }

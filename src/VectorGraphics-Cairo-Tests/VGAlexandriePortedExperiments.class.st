@@ -808,7 +808,7 @@ VGAlexandriePortedExperiments class >> fillPaint2 [
 		fillPreserve;
 		sourceColor: Color yellow;
 		strokeSize: 4;
-		"antialias: AeCairoAntialias none;"operator: AeCairoOperator darken;
+		"antialias: AeCairoAntialias none;"operator: VGCairoOperator darken;
 		strokeDashPattern: (AeFFIDoubleArray newFrom: #( 8 4 2 )) size: 3 offset: 0;
 		useStrokeCapRound;
 		stroke.
@@ -1583,7 +1583,7 @@ VGAlexandriePortedExperiments class >> operatorAdd [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator add .
+	context operator: VGCairoOperator add .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1601,7 +1601,7 @@ VGAlexandriePortedExperiments class >> operatorAtop [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator atop .
+	context operator: VGCairoOperator atop .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1619,7 +1619,7 @@ VGAlexandriePortedExperiments class >> operatorClear [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator clear.
+	context operator: VGCairoOperator clear.
 	"or context setOperatorClear"
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
@@ -1638,7 +1638,7 @@ VGAlexandriePortedExperiments class >> operatorColorBurn [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator colorBurn .
+	context operator: VGCairoOperator colorBurn .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1656,7 +1656,7 @@ VGAlexandriePortedExperiments class >> operatorColorDodge [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator colorDodge .
+	context operator: VGCairoOperator colorDodge .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1674,7 +1674,7 @@ VGAlexandriePortedExperiments class >> operatorDarken [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator darken .
+	context operator: VGCairoOperator darken .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1692,7 +1692,7 @@ VGAlexandriePortedExperiments class >> operatorDest [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator dest .
+	context operator: VGCairoOperator dest .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1710,7 +1710,7 @@ VGAlexandriePortedExperiments class >> operatorDestAtop [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator destAtop .
+	context operator: VGCairoOperator destAtop .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1728,7 +1728,7 @@ VGAlexandriePortedExperiments class >> operatorDestIn [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator destIn .
+	context operator: VGCairoOperator destIn .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1746,7 +1746,7 @@ VGAlexandriePortedExperiments class >> operatorDestOut [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator destOut .
+	context operator: VGCairoOperator destOut .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1764,7 +1764,7 @@ VGAlexandriePortedExperiments class >> operatorDestOver [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator destOver .
+	context operator: VGCairoOperator destOver .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1782,7 +1782,7 @@ VGAlexandriePortedExperiments class >> operatorDifference [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator difference .
+	context operator: VGCairoOperator difference .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1800,7 +1800,7 @@ VGAlexandriePortedExperiments class >> operatorExclusion [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator exclusion .
+	context operator: VGCairoOperator exclusion .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1818,7 +1818,7 @@ VGAlexandriePortedExperiments class >> operatorHSLColor [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator hslColor .
+	context operator: VGCairoOperator hslColor .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1836,7 +1836,7 @@ VGAlexandriePortedExperiments class >> operatorHSLHue [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator hslHue .
+	context operator: VGCairoOperator hslHue .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1854,7 +1854,7 @@ VGAlexandriePortedExperiments class >> operatorHSLLuminosity [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator hslLuminosity .
+	context operator: VGCairoOperator hslLuminosity .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1872,7 +1872,7 @@ VGAlexandriePortedExperiments class >> operatorHSLSaturation [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator hslSaturation .
+	context operator: VGCairoOperator hslSaturation .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1890,7 +1890,7 @@ VGAlexandriePortedExperiments class >> operatorHardLight [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator hardLight .
+	context operator: VGCairoOperator hardLight .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1908,7 +1908,7 @@ VGAlexandriePortedExperiments class >> operatorIn [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator in .
+	context operator: VGCairoOperator in .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1926,7 +1926,7 @@ VGAlexandriePortedExperiments class >> operatorLighten [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator lighten .
+	context operator: VGCairoOperator lighten .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1944,7 +1944,7 @@ VGAlexandriePortedExperiments class >> operatorMultiply [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator multiply .
+	context operator: VGCairoOperator multiply .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1962,7 +1962,7 @@ VGAlexandriePortedExperiments class >> operatorOut [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator out .
+	context operator: VGCairoOperator out .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1980,7 +1980,7 @@ VGAlexandriePortedExperiments class >> operatorOver [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator over .
+	context operator: VGCairoOperator over .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -1998,7 +1998,7 @@ VGAlexandriePortedExperiments class >> operatorOverlay [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator overlay .
+	context operator: VGCairoOperator overlay .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -2016,7 +2016,7 @@ VGAlexandriePortedExperiments class >> operatorSaturate [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator saturate .
+	context operator: VGCairoOperator saturate .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -2034,7 +2034,7 @@ VGAlexandriePortedExperiments class >> operatorScreen [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator screen .
+	context operator: VGCairoOperator screen .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -2052,7 +2052,7 @@ VGAlexandriePortedExperiments class >> operatorSoftLight [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator softLight .
+	context operator: VGCairoOperator softLight .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -2070,7 +2070,7 @@ VGAlexandriePortedExperiments class >> operatorSource [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator source .
+	context operator: VGCairoOperator source .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 
@@ -2088,7 +2088,7 @@ VGAlexandriePortedExperiments class >> operatorXor [
 
 	context sourceColorR: 0.7 g: 0 b: 0 a: 0.8; rectangle: (0 @ 0 extent: 120 @ 90); fill.
 
-	context operator: AeCairoOperator xor .
+	context operator: VGCairoOperator xor .
 
 	context sourceColorR: 0 g: 0 b: 0.9 a: 0.4;	rectangle: (40 @ 30 extent: 120 @ 90); fill.
 

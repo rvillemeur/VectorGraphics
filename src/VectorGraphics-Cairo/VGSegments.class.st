@@ -14,7 +14,8 @@ Class {
 	#instVars : [
 		'coordinates',
 		'fillRule',
-		'antialias'
+		'antialias',
+		'alpha'
 	],
 	#category : 'VectorGraphics-Cairo-Path',
 	#package : 'VectorGraphics-Cairo',
@@ -62,6 +63,14 @@ VGSegments class >> rectangle: aRectangle [
 ]
 
 { #category : 'accessing' }
+VGSegments >> alpha [
+	"The constant alpha the fill is drawn through, one for an ordinary fill. It rides here, next
+	 to the fill rule and the antialiasing mode, because the backend's fill message carries the
+	 segments, the paint, the clip and the operator and nothing else."
+	^ alpha
+]
+
+{ #category : 'accessing' }
 VGSegments >> antialias [
 	"The antialiasing mode the fill I describe is sampled with. The backend answers three frozen
 	 messages and none of them carries a mode, so the mode rides here, as the fill rule does."
@@ -103,6 +112,18 @@ VGSegments >> boundingBox [
 { #category : 'accessing' }
 VGSegments >> coordinates [
 	^ coordinates
+]
+
+{ #category : 'drawing' }
+VGSegments >> drawOn: aBackend paint: aPaint clip: aClip operator: anOperator into: aTarget [
+	"A recorded command names what it is by answering this: I am the shape of a fill, so the
+	 backend rasterises me."
+	aBackend
+		rasterise: self
+		paint: aPaint
+		clip: aClip
+		operator: anOperator
+		into: aTarget
 ]
 
 { #category : 'accessing' }
@@ -201,14 +222,31 @@ VGSegments >> printOn: aStream [
 ]
 
 { #category : 'private' }
+VGSegments >> setAlpha: aNumber [
+	alpha := aNumber asFloat
+]
+
+{ #category : 'private' }
 VGSegments >> setCoordinates: anArray fillRule: aSymbol antialias: anotherSymbol [
 	coordinates := anArray.
 	fillRule := aSymbol.
-	antialias := anotherSymbol
+	antialias := anotherSymbol.
+	alpha := 1.0
 ]
 
 { #category : 'accessing' }
 VGSegments >> size [
 	"How many edges I hold."
 	^ coordinates size // 4
+]
+
+{ #category : 'copying' }
+VGSegments >> withAlpha: aNumber [
+	"A copy of these segments drawn through aNumber, which Cairo rasterises as a mask of one
+	 constant byte. A copy and not a mutation: a display list entry may hold the original
+	 already, and the entries are replayed as recorded."
+	| faded |
+	faded := self copy.
+	faded setAlpha: aNumber.
+	^ faded
 ]

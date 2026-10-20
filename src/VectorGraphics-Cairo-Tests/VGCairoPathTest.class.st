@@ -224,3 +224,19 @@ VGCairoPathTest >> testMoveToThenLineToMakesOneOpenSubPath [
 	self assert: path subPaths first points asArray equals: { 2 @ 3. 10 @ 3 }.
 	self deny: path subPaths first isClosed
 ]
+
+{ #category : 'tests' }
+VGCairoPathTest >> testSegmentsCarryAnAlphaOfOneUntilAFadedCopyIsAsked [
+	"A constant alpha rides inside the segments, next to the fill rule and the antialiasing mode,
+	 because the backend's fill message carries those four arguments and no more. Asking for a
+	 faded copy leaves the original alone, since a display list entry may hold it already."
+	| segments faded |
+	segments := VGSegments rectangle: (0 @ 0 corner: 4 @ 4).
+	self assert: segments alpha equals: 1.0.
+	faded := segments withAlpha: 0.25.
+	self assert: faded alpha equals: 0.25.
+	self assert: faded coordinates equals: segments coordinates.
+	self assert: faded fillRule equals: segments fillRule.
+	self assert: faded antialias equals: segments antialias.
+	self assert: segments alpha equals: 1.0
+]
