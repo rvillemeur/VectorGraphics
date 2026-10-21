@@ -17,6 +17,14 @@ Class {
 	#tag : 'Conformance'
 }
 
+{ #category : 'constants' }
+VGAlexandrieCase class >> examplePragma [
+	"The pragma Pharo's browser reads to offer a class-side method as a one-click example. It is
+	 named here as text because it is written into and taken out of generated source, never sent."
+
+	^ '<sampleInstance>'
+]
+
 { #category : 'instance creation' }
 VGAlexandrieCase class >> for: aSelector [
 	^ self new setExperimentSelector: aSelector
@@ -214,13 +222,19 @@ VGAlexandrieCase >> portedCopyIsCurrent [
 { #category : 'generating' }
 VGAlexandrieCase >> portedSource [
 	"My experiment's own source with every Alexandrie class name that has a counterpart of ours
-	 substituted for it, and the example pragma dropped, because a derived copy in a test package
-	 is not an example. Nothing else changes, which is what makes the copy a faithful script."
+	 substituted for it. Nothing else changes, which is what makes the copy a faithful script,
+	 except the example pragma: a copy that runs keeps it, so the browser draws the picture in one
+	 click, and a copy whose script still names a class we do not have loses it, because clicking
+	 that one raises a MessageNotUnderstood."
+
 	| source |
 	source := self experimentMethod sourceCode.
 	VGAlexandrieCorpus classNameMap do: [ :each |
 		source := source copyReplaceAll: each key with: each value ].
-	^ (source copyReplaceAll: '<sampleInstance>' with: '') trimRight: [ :each | each isSeparator ]
+	source := self isPortable
+		          ifTrue: [ self sourceWithTheExamplePragma: source ]
+		          ifFalse: [ source copyReplaceAll: self class examplePragma with: '' ].
+	^ source trimRight: [ :each | each isSeparator ]
 ]
 
 { #category : 'printing' }
@@ -244,6 +258,19 @@ VGAlexandrieCase >> referencedCairoClassNames [
 { #category : 'initialization' }
 VGAlexandrieCase >> setExperimentSelector: aSelector [
 	experimentSelector := aSelector
+]
+
+{ #category : 'generating' }
+VGAlexandrieCase >> sourceWithTheExamplePragma: aString [
+	"The pragma sits on its own line under the selector, which is where the experiments themselves
+	 write it. An experiment that carries none still yields an example of ours once its copy runs."
+
+	| lines |
+	(aString includesSubstring: self class examplePragma) ifTrue: [ ^ aString ].
+	lines := aString lines.
+	^ String cr join:
+		  (Array with: lines first with: String tab , self class examplePragma)
+		  , lines allButFirst
 ]
 
 { #category : 'comparing' }

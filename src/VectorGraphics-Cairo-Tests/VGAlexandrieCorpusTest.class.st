@@ -124,6 +124,28 @@ VGAlexandrieCorpusTest >> testEveryDerivedCopyIsWhatTheSubstitutionWritesNow [
 		description: 'send VGAlexandrieCorpus regenerate: ' , drifting asArray printString
 ]
 
+{ #category : 'tests' }
+VGAlexandrieCorpusTest >> testEveryDerivedCopyThatRunsIsASampleInstance [
+	"A derived copy that runs is a one-click example of the replacement, so it carries the pragma
+	 Pharo's browser reads. A copy whose script still names a class we do not have raises a
+	 MessageNotUnderstood when it is clicked, so that one carries no pragma."
+
+	| wrong |
+	self skipWithoutTheExperiments ifTrue: [ ^ self skip ].
+	wrong := OrderedCollection new.
+	VGAlexandrieCorpus cases do: [ :each |
+		VGAlexandrieCorpus portedClass class
+			compiledMethodAt: each experimentSelector
+			ifPresent: [ :method |
+				(method hasPragmaNamed: #sampleInstance) = each isPortable ifFalse: [
+					wrong add: each experimentSelector ] ]
+			ifAbsent: [ wrong add: each experimentSelector ] ].
+	self
+		assert: wrong asArray isEmpty
+		description: 'derived copies whose sampleInstance pragma does not match whether they run: '
+			, wrong asArray printString
+]
+
 { #category : 'tests - copies' }
 VGAlexandrieCorpusTest >> testEveryExperimentHasOneDerivedCopyAndNoMore [
 	| ported wanted |
