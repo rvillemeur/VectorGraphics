@@ -91,7 +91,7 @@ VGConformanceCorpus class >> caseMethodSelectors [
 	 hide in the corpus."
 
 	^ #( #targetCases #transformCases #pathCases #strokeCases #sourceCases #clipCases #groupCases
-	     #figureCases #textCases #shadowCases )
+	     #figureCases #textCases #shadowCases #meshCases )
 ]
 
 { #category : 'cases' }
@@ -281,6 +281,135 @@ VGConformanceCorpus class >> maskTileFor: aContext [
 	^ tile
 ]
 
+{ #category : 'tolerances' }
+VGConformanceCorpus class >> meshBoundaryPixelTable [
+	"How many pixels of each mesh case may be further from Cairo than meshColourTolerance, by case
+	 name. The number is the ring of pixels the edge of a patch grazes, where one rasteriser paints
+	 a pixel the other leaves alone and the colours part by the whole colour of the patch there. It
+	 is measured and then given a tenth of headroom, so a change of shape fails the gate while the
+	 ring does not. Measured on 21 October 2026: none on the straight patch, whose edges are the
+	 pixel grid itself and whose worst channel is four; none on the folded patch, whose worst
+	 channel is two; six on the triangle and ten on the curved patch, all of them pixels we paint
+	 where Cairo paints nothing, along the slanted and curved sides."
+
+	^ Dictionary newFrom: {
+		  ('mesh-straight-patch' -> 0).
+		  ('mesh-triangle' -> 7).
+		  ('mesh-curved-patch' -> 11).
+		  ('mesh-folded-patch' -> 0) }
+]
+
+{ #category : 'private' }
+VGConformanceCorpus class >> meshCase: aString draw: aBlock [
+	"A case whose paint is a mesh pattern. A mesh is the one paint with a hard edge, so its gate is
+	 a colour tolerance with a count of the pixels the edge of a patch is allowed to put past it;
+	 see meshColourTolerance, meshStrayAlphaAllowance and meshBoundaryPixelTable."
+
+	^ (self case: aString unit: '1.12' draw: aBlock)
+		  tolerance: self meshColourTolerance;
+		  strayAlphaAllowance: self meshStrayAlphaAllowance;
+		  pixelsAllowedBeyondTolerance: (self meshBoundaryPixelTable at: aString);
+		  yourself
+]
+
+{ #category : 'cases' }
+VGConformanceCorpus class >> meshCases [
+	"Unit 1.12: the four shapes a patch can take. The straight patch is bilinear colour over a
+	 square, which is the whole of the Coons surface when every side is a line. The triangle sets
+	 three sides and three corners and leaves Cairo to close it and to repeat the first corner's
+	 colour, which is Gouraud shading. The curved patch bends all four sides outwards, so the
+	 surface the colour runs over is no longer flat. The folded patch is one loop out to the right
+	 and back again, so the two halves of its first parameter reach the same pixels and the later
+	 half must win them."
+
+	^ {
+		  (self meshCase: 'mesh-straight-patch' draw: [ :context |
+			   context
+				   sourcePattern: ((self classNamed: 'MeshPattern' for: context) new
+						    beginPatch;
+						    moveToX: 8 y: 8;
+						    lineToX: 56 y: 8;
+						    lineToX: 56 y: 56;
+						    lineToX: 8 y: 56;
+						    cornerAt: 0 putColorRGB: Color red;
+						    cornerAt: 1 putColorRGB: Color green;
+						    cornerAt: 2 putColorRGB: Color blue;
+						    cornerAt: 3 putColorRGB: Color yellow;
+						    endPatch;
+						    yourself);
+				   paint ]).
+		  (self meshCase: 'mesh-triangle' draw: [ :context |
+			   context
+				   sourcePattern: ((self classNamed: 'MeshPattern' for: context) new
+						    beginPatch;
+						    moveToX: 32 y: 6;
+						    lineToX: 58 y: 54;
+						    lineToX: 6 y: 54;
+						    cornerAt: 0 putColorRGB: Color red;
+						    cornerAt: 1 putColorRGB: Color green;
+						    cornerAt: 2 putColorRGB: Color blue;
+						    endPatch;
+						    yourself);
+				   paint ]).
+		  (self meshCase: 'mesh-curved-patch' draw: [ :context |
+			   context
+				   sourcePattern: ((self classNamed: 'MeshPattern' for: context) new
+						    beginPatch;
+						    moveToX: 10 y: 10;
+						    curveViaX: 26 y: 2 viaX: 38 y: 2 toX: 54 y: 10;
+						    curveViaX: 62 y: 26 viaX: 62 y: 38 toX: 54 y: 54;
+						    curveViaX: 38 y: 62 viaX: 26 y: 62 toX: 10 y: 54;
+						    curveViaX: 2 y: 38 viaX: 2 y: 26 toX: 10 y: 10;
+						    cornerAt: 0 putColorRGB: Color red;
+						    cornerAt: 1 putColorRGB: Color green;
+						    cornerAt: 2 putColorRGB: Color blue;
+						    cornerAt: 3 putColorRGB: Color yellow;
+						    endPatch;
+						    yourself);
+				   paint ]).
+		  (self meshCase: 'mesh-folded-patch' draw: [ :context |
+			   context
+				   sourcePattern: ((self classNamed: 'MeshPattern' for: context) new
+						    beginPatch;
+						    moveToX: 8 y: 8;
+						    curveViaX: 56 y: 8 viaX: 56 y: 8 toX: 8 y: 8;
+						    curveViaX: 8 y: 24 viaX: 8 y: 40 toX: 8 y: 56;
+						    curveViaX: 56 y: 56 viaX: 56 y: 56 toX: 8 y: 56;
+						    curveViaX: 8 y: 40 viaX: 8 y: 24 toX: 8 y: 8;
+						    cornerAt: 0 putColorRGB: Color red;
+						    cornerAt: 1 putColorRGB: Color green;
+						    cornerAt: 2 putColorRGB: Color green;
+						    cornerAt: 3 putColorRGB: Color red;
+						    endPatch;
+						    yourself);
+				   paint ]) }
+]
+
+{ #category : 'tolerances' }
+VGConformanceCorpus class >> meshColourTolerance [
+	"How far a channel of a mesh may be from Cairo's. A mesh is bilinear colour over a surface
+	 Cairo subdivides into pieces about a pixel across, and our raster samples the same surface on
+	 a walk of its own, so a pixel of ours stands for a point of the surface a fraction of a pixel
+	 from the point Cairo took, and the colour parts by the gradient across that fraction. Eight
+	 of two hundred and fifty-five is what that measures at over the cases here; the pixels the
+	 edge of a patch grazes part by far more and are counted instead, by
+	 pixelsAllowedBeyondTolerance."
+
+	^ 8
+]
+
+{ #category : 'tolerances' }
+VGConformanceCorpus class >> meshStrayAlphaAllowance [
+	"How heavy a pixel we paint outside a mesh of Cairo's may be. A mesh has no antialiasing: a
+	 pixel a patch reaches is opaque and a pixel it does not reach is untouched, so a pixel the two
+	 rasterisers disagree about at the edge of a patch is opaque on whichever side painted it, and
+	 weighing it says nothing. What bounds the edge here is how many pixels may be wrong at all,
+	 which is pixelsAllowedBeyondTolerance, and a stray pixel is one of them because the tally
+	 counts it."
+
+	^ 255
+]
+
 { #category : 'cases' }
 VGConformanceCorpus class >> pathCases [
 	"Unit 1.3: a path, a fill rule, and the three painting verbs. The source is left alone, because
@@ -456,48 +585,49 @@ VGConformanceCorpus class >> shadowMaskFor: aContext geometry: aBlock blurRadius
 
 { #category : 'cases' }
 VGConformanceCorpus class >> sourceCases [
-	"Unit 1.5: what the painting verbs take their colour from. Each of the four pattern classes
-	 appears here, because a class no case names would never be exercised at all. No case names a
+	"Unit 1.5: what the painting verbs take their colour from. Every pattern class of unit 1.5
+	 appears here, because a class no case names would never be exercised at all; the mesh pattern
+	 of unit 1.12 is the one pattern not of this group and has meshCases to itself. No case names a
 	 class of either side itself; see classNamed:for:."
 
 	^ {
 		  (self case: 'source-flat-colour' unit: '1.5' draw: [ :context |
-			    context
-				    sourceColor: (Color r: 0.9 g: 0.3 b: 0.1);
-				    rectangleX: 8 y: 8 width: 48 height: 48;
-				    fill ]).
+			   context
+				   sourceColor: (Color r: 0.9 g: 0.3 b: 0.1);
+				   rectangleX: 8 y: 8 width: 48 height: 48;
+				   fill ]).
 		  (self case: 'source-colour-pattern' unit: '1.5' draw: [ :context |
-			    context
-				    sourcePattern:
-					    ((self classNamed: 'ColorPattern' for: context) r: 0.1 g: 0.7 b: 0.4);
-				    paint ]).
+			   context
+				   sourcePattern:
+					   ((self classNamed: 'ColorPattern' for: context) r: 0.1 g: 0.7 b: 0.4);
+				   paint ]).
 		  (self interpolatedCase: 'source-linear-gradient' unit: '1.5' draw: [ :context |
-			    context
-				    sourcePattern: ((self classNamed: 'LinearGradientPattern' for: context)
-						     from: 0 @ 0
-						     to: 64 @ 64
-						     addStopsFrom: self twoStopRamp);
-				    paint ]).
+			   context
+				   sourcePattern: ((self classNamed: 'LinearGradientPattern' for: context)
+						    from: 0 @ 0
+						    to: 64 @ 64
+						    addStopsFrom: self twoStopRamp);
+				   paint ]).
 		  (self interpolatedCase: 'source-radial-gradient' unit: '1.5' draw: [ :context |
-			    context
-				    sourcePattern: ((self classNamed: 'RadialGradientPattern' for: context)
-						     innerCenter: 32 @ 32
-						     innerRadius: 2
-						     outerCenter: 32 @ 32
-						     outerRadius: 30
-						     addStopsFrom: self twoStopRamp);
-				    paint ]).
+			   context
+				   sourcePattern: ((self classNamed: 'RadialGradientPattern' for: context)
+						    innerCenter: 32 @ 32
+						    innerRadius: 2
+						    outerCenter: 32 @ 32
+						    outerRadius: 30
+						    addStopsFrom: self twoStopRamp);
+				   paint ]).
 		  (self case: 'source-surface-pattern' unit: '1.5' draw: [ :context |
-			    context
-				    sourcePattern: ((self classNamed: 'SurfacePattern' for: context)
-						     surface: (self tileFor: context));
-				    rectangleX: 0 y: 0 width: 64 height: 64;
-				    fill ]).
+			   context
+				   sourcePattern: ((self classNamed: 'SurfacePattern' for: context)
+						    surface: (self tileFor: context));
+				   rectangleX: 0 y: 0 width: 64 height: 64;
+				   fill ]).
 		  (self case: 'source-surface-directly' unit: '1.5' draw: [ :context |
-			    context
-				    sourceSurface: (self tileFor: context);
-				    rectangleX: 0 y: 0 width: 64 height: 64;
-				    fill ]) }
+			   context
+				   sourceSurface: (self tileFor: context);
+				   rectangleX: 0 y: 0 width: 64 height: 64;
+				   fill ]) }
 ]
 
 { #category : 'constants' }

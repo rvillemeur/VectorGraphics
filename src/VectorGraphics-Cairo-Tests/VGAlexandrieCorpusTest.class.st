@@ -33,6 +33,28 @@ VGAlexandrieCorpusTest >> skipWithoutTheExperiments [
 	^ VGAlexandrieCorpus isAvailable not
 ]
 
+{ #category : 'tests' }
+VGAlexandrieCorpusTest >> testEveryBoundaryAllowanceNamesACaseTheCorpusHasAndACaseWithATolerance [
+	"A count of pixels allowed beyond a tolerance is only meaningful beside that tolerance, and
+	 an allowance for a case that no longer exists would pass quietly, so both are checked here
+	 as the tolerance table is checked."
+	| unknown untolerated |
+	self skipWithoutTheExperiments ifTrue: [ ^ self skip ].
+	unknown := VGAlexandrieCorpus meshBoundaryPixelTable
+		           reject: [ :each |
+		           VGAlexandrieCorpus experimentSelectors includes: each key ]
+		           thenCollect: [ :each | each key ].
+	self assert: unknown asArray isEmpty description: unknown asArray printString.
+	untolerated := VGAlexandrieCorpus meshBoundaryPixelTable
+		               reject: [ :each |
+			               (VGAlexandrieCorpus toleranceFor: each key)
+			               = VGAlexandrieCorpus meshColourTolerance ]
+		               thenCollect: [ :each | each key ].
+	self
+		assert: untolerated asArray isEmpty
+		description: untolerated asArray printString
+]
+
 { #category : 'tests - coverage' }
 VGAlexandrieCorpusTest >> testEveryCaseEitherDrawsOrNamesTheUnitThatUnblocksIt [
 	| unexplained |
@@ -46,10 +68,11 @@ VGAlexandrieCorpusTest >> testEveryCaseEitherDrawsOrNamesTheUnitThatUnblocksIt [
 { #category : 'tests' }
 VGAlexandrieCorpusTest >> testEveryCaseThatDrawsMatchesCairo [
 	"The oracle itself. A case that runs end to end on the replacement must produce the same
-	 picture as Alexandrie, within the tolerance the corpus states for it, and with nothing of
-	 ours outside Cairo's shape beyond the residue a rounded edge leaves. A case drawn in Cairo's
-	 toy default face is left out, with its reason, by `casesWithCairosToyDefaultFont`."
-
+	 picture as Alexandrie, within the tolerance the corpus states for it, with nothing of ours
+	 outside Cairo's shape beyond the residue a rounded edge leaves, and with no more pixels
+	 beyond that tolerance than the corpus allows the case, which is none unless the case paints
+	 a mesh. A case drawn in Cairo's toy default face is left out, with its reason, by
+	 `casesWithCairosToyDefaultFont`."
 	| failures |
 	self skipWithoutTheExperiments ifTrue: [ ^ self skip ].
 	failures := OrderedCollection new.
@@ -62,8 +85,9 @@ VGAlexandrieCorpusTest >> testEveryCaseThatDrawsMatchesCairo [
 			comparison isComparable
 				ifFalse: [ failures add: case name , ' differs in extent' ]
 				ifTrue: [
-					(comparison maximumStrayAlpha <= VGConformanceCorpus strayAlphaAllowance
-						 and: [ comparison maximumChannelDistance <= case tolerance ]) ifFalse: [
+					(comparison maximumStrayAlpha <= case strayAlphaAllowance and: [
+						 (comparison pixelsFartherThan: case tolerance)
+						 <= case boundaryPixelAllowance ]) ifFalse: [
 						failures add: case name , ' ' , comparison printString ] ] ] ].
 	self assert: failures asArray isEmpty description: failures asArray printString
 ]

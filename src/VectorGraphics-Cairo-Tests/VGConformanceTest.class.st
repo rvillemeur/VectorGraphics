@@ -30,6 +30,20 @@ VGConformanceTest >> defaultTimeLimit [
 ]
 
 { #category : 'tests' }
+VGConformanceTest >> testACaseAllowsNoPixelBeyondItsToleranceUnlessItSaysSo [
+	"The gate counts the pixels that part from Cairo by more than the case's tolerance, because a
+	 paint with a hard edge, such as a mesh, parts by a whole colour on the pixels its edge grazes
+	 and by very little everywhere else. A case that says nothing allows none of them, so stating
+	 the count changes no verdict already held."
+
+	| case |
+	case := VGConformanceCorpus case: 'pixels-beyond-tolerance' unit: '1.1' draw: [ :context | ].
+	self assert: case pixelsAllowedBeyondTolerance equals: 0.
+	case pixelsAllowedBeyondTolerance: 3.
+	self assert: case pixelsAllowedBeyondTolerance equals: 3
+]
+
+{ #category : 'tests' }
 VGConformanceTest >> testAPatternOrASurfaceInACaseIsBuiltFromTheFamilyOfTheContextItDrawsOn [
 	"A shared draw block may name no class of either side: handing one of our patterns to
 	 Alexandrie's context reaches a Cairo call with an object that holds no pointer."
@@ -157,10 +171,13 @@ VGConformanceTest >> testEveryCaseOfAFinishedUnitDraws [
 VGConformanceTest >> testEveryCaseThatDrawsMatchesCairo [
 	"The gate. Every case the implemented units can draw is rendered twice from one script, once
 	 by the replacement and once by Alexandrie, and the two pictures must agree: nothing of ours
-	 outside Cairo's shape beyond the residue a rounded edge leaves, and no channel further from
-	 Cairo's than the case allows. A case blocked on a later unit is skipped, which is what its
-	 blocking failure is for. The allowance for a pixel outside the reference is the case's own,
-	 because a reference FreeType rasterised does not have the exterior a scan converter has."
+	 outside Cairo's shape beyond the residue a rounded edge leaves, and no more pixels past the
+	 case's tolerance than the case allows. A case blocked on a later unit is skipped, which is
+	 what its blocking failure is for. Both allowances are the case's own, because a reference
+	 FreeType rasterised does not have the exterior a scan converter has, and a paint whose edge
+	 is a step rather than a shade parts from Cairo by a whole colour on the pixels that edge
+	 grazes."
+
 	| failures |
 	failures := OrderedCollection new.
 	VGConformanceCorpus cases do: [ :case |
@@ -170,10 +187,27 @@ VGConformanceTest >> testEveryCaseThatDrawsMatchesCairo [
 			comparison isComparable
 				ifFalse: [ failures add: case name , ' differs in extent' ]
 				ifTrue: [
-					(comparison maximumStrayAlpha <= case strayAlphaAllowance
-						 and: [ comparison maximumChannelDistance <= case tolerance ]) ifFalse: [
+					(comparison maximumStrayAlpha <= case strayAlphaAllowance and: [
+						 (comparison pixelsFartherThan: case tolerance)
+						 <= case pixelsAllowedBeyondTolerance ]) ifFalse: [
 						failures add: case name , ' ' , comparison printString ] ] ] ].
 	self assert: failures asArray isEmpty description: failures asArray printString
+]
+
+{ #category : 'tests' }
+VGConformanceTest >> testEveryMeshBoundaryAllowanceNamesAMeshCase [
+	"A case asks the table for its own allowance, so a case the table forgot fails at once; the
+	 other direction is this test, because an entry left behind by a renamed case would otherwise
+	 sit there stating a measurement of nothing."
+
+	| meshNames stale |
+	meshNames := ((VGConformanceCorpus cases select: [ :each | each unit = '1.12' ])
+		              collect: [ :each | each name ]) asSet.
+	stale := (VGConformanceCorpus meshBoundaryPixelTable keys
+		          reject: [ :each | meshNames includes: each ]) asSortedCollection asArray.
+	self
+		assert: stale isEmpty
+		description: 'these boundary allowances name no mesh case: ' , stale printString
 ]
 
 { #category : 'tests' }
@@ -188,6 +222,34 @@ VGConformanceTest >> testEveryUnitThatOwesPaintingSelectorsHasACase [
 	self
 		assert: uncovered isEmpty
 		description: 'no conformance case is filed under ' , uncovered printString
+]
+
+{ #category : 'tests' }
+VGConformanceTest >> testTheComparisonCountsThePixelsBeyondAToleranceAndNotOnlyTheWorstOne [
+	"What a case needs in order to allow a stated number of pixels to differ rather than a
+	 stated distance. A mesh pattern has no antialiasing: Cairo walks a patch over a grid of its
+	 own and paints whole pixels, so a pixel the patch grazes is a whole colour away wherever the
+	 two grids choose differently, and a gate that read only the worst channel would have to
+	 allow the whole range everywhere. The comparison therefore keeps the distribution of the
+	 distances, so a gate can ask how many pixels are beyond what it allows."
+	| ours theirs comparison |
+	ours := Form extent: 3 @ 1 depth: 32.
+	theirs := Form extent: 3 @ 1 depth: 32.
+	ours bits at: 1 put: 16rFF646464.
+	ours bits at: 2 put: 16rFF686464.
+	ours bits at: 3 put: 16rFF8C6464.
+	theirs bits at: 1 put: 16rFF646464.
+	theirs bits at: 2 put: 16rFF646464.
+	theirs bits at: 3 put: 16rFF646464.
+	comparison := VGFormComparison between: ours and: theirs.
+	self assert: comparison maximumChannelDistance equals: 16r28.
+	self assert: comparison differingPixelCount equals: 2.
+	self assert: (comparison pixelsFartherThan: 0) equals: 2.
+	self assert: (comparison pixelsFartherThan: 4) equals: 1.
+	self assert: (comparison pixelsFartherThan: 16r28) equals: 0.
+	self
+		assert: (VGFormComparison new beIncomparable pixelsFartherThan: 0)
+		equals: 0
 ]
 
 { #category : 'tests' }
@@ -220,6 +282,21 @@ VGConformanceTest >> testTheComparisonPremultipliesTheStoredBytesAndNotAFraction
 	self
 		assert: (VGFormComparison between: ours and: theirs) maximumChannelDistance
 		equals: 255
+]
+
+{ #category : 'tests' }
+VGConformanceTest >> testTheMeshCasesCoverEverySideAndFoldOfAPatch [
+	"Unit 1.12: the four shapes a patch can take, each in a case of its own, because what parts our
+	 raster from Cairo's differs between them. A patch with straight sides is bilinear colour over a
+	 square, a three-sided patch takes the fourth corner from the first, a patch with curved sides
+	 bends the surface the colour runs over, and a patch that folds over itself has two pieces of
+	 one patch reaching the same pixel."
+
+	| meshCases |
+	meshCases := VGConformanceCorpus cases select: [ :each | each unit = '1.12' ].
+	self
+		assertCollection: ((meshCases collect: [ :each | each name ]) asSortedCollection asArray)
+		hasSameElements: #( 'mesh-curved-patch' 'mesh-folded-patch' 'mesh-straight-patch' 'mesh-triangle' )
 ]
 
 { #category : 'accessing' }

@@ -42,6 +42,15 @@ VGAlexandrieCorpus class >> antialiasedEdgeTolerance [
 	^ 36
 ]
 
+{ #category : 'tolerances' }
+VGAlexandrieCorpus class >> boundaryPixelAllowanceFor: aSelector [
+	"How many pixels of that experiment may be further from Cairo than its tolerance allows.
+	 None, unless the experiment paints a mesh: see meshBoundaryPixelTable."
+	^ (self meshBoundaryPixelTable
+		   detect: [ :each | each key = aSelector ]
+		   ifNone: [ nil ]) ifNil: [ 0 ] ifNotNil: [ :each | each value ]
+]
+
 { #category : 'substitution' }
 VGAlexandrieCorpus class >> cairoClassNamesUsed [
 	"Every Alexandrie Cairo class the experiments name, read from their literals."
@@ -129,6 +138,50 @@ VGAlexandrieCorpus class >> isAvailable [
 	^ self experimentClass notNil and: [ VGCairoInventory isLiveCairoAvailable ]
 ]
 
+{ #category : 'tolerances' }
+VGAlexandrieCorpus class >> meshBoundaryPixelTable [
+	"The mesh experiments, each with how many pixels may be further from Cairo than
+	 meshColourTolerance allows, and why there are any at all. A mesh pattern is not
+	 antialiased: Cairo paints whole pixels for the pieces it subdivides a patch into, so the
+	 edge of a patch is a step, and a pixel that the patch only grazes is either the full colour
+	 or untouched. Two rasterisers that walk a patch over different grids therefore disagree
+	 about a ring of pixels one pixel wide along the boundary of every patch, and each of those
+	 pixels is a whole colour apart, either as a pixel of ours Cairo leaves untouched, a pixel of
+	 Cairo's we leave untouched, or a pixel where one of us has the patch and the other has
+	 whatever was beneath it. The allowance of a case is therefore a count of boundary pixels and
+	 not a distance; it is measured, with a tenth of headroom, and it is far below the perimeter
+	 it belongs to. The four quadrant experiment measures one thousand one hundred and eighteen
+	 against a perimeter of about two thousand eight hundred, because its patches lie over a
+	 stroked circle and share their straight edges with each other; the single quadrant measures
+	 forty-five, the Coons patch twenty-two and the mesh of the Cairo manual sixteen; the Gouraud
+	 shaded triangles measure none at all, because every edge of those patches is a straight line
+	 the two walks place identically."
+	^ {
+		  (#CanonicalGradientAllQuadrantPattern -> 1230).
+		  (#CanonicalGradientFirstQuadrantPattern -> 50).
+		  (#CoonsPatchMeshPattern -> 25).
+		  (#GouraudShadingTriangleMesh -> 0).
+		  (#meshPattern -> 18) }
+]
+
+{ #category : 'tolerances' }
+VGAlexandrieCorpus class >> meshColourTolerance [
+	"How far a channel of a mesh pattern may differ from Cairo away from the edge of a patch.
+	 Cairo does not evaluate a mesh pixel by pixel: it subdivides a patch until a piece of it is
+	 about a pixel across and writes the colour of the middle of that piece, so the colour of a
+	 pixel is the colour of the surface somewhere inside it. Our own walk is finer, and the
+	 sample we keep is the one nearest the middle of the pixel, so the two colours part by the
+	 gradient of the patch over a fraction of a pixel. Measured over the four mesh experiments
+	 that carry a gradient, that is eight of two hundred and fifty-five, and the pixels beyond it
+	 are on the edge of a patch: of the one thousand and fifty-three pixels of the four quadrant
+	 experiment that differ by more than eight, nine hundred and ninety-five lie on the arc the
+	 patches share with the circle stroked beneath them, forty-eight on the axes they share with
+	 each other, and ten beside the corner where all four patches collapse to a point, which is
+	 where the colour swings fastest; the worst of those ten is nineteen. See
+	 meshBoundaryPixelTable."
+	^ 8
+]
+
 { #category : 'constants' }
 VGAlexandrieCorpus class >> missingClassUnitTable [
 	"The Alexandrie Cairo classes the experiments name that the replacement has no counterpart for,
@@ -145,8 +198,7 @@ VGAlexandrieCorpus class >> missingClassUnitTable [
 		  (#AeCairoHintMetrics -> '1.10').
 		  (#AeCairoHintStyle -> '1.10').
 		  (#AeCairoScaledFont -> '1.10').
-		  (#AeCairoSubpixelOrder -> '1.10').
-		  (#AeCairoMeshPattern -> '1.12') }
+		  (#AeCairoSubpixelOrder -> '1.10') }
 ]
 
 { #category : 'constants' }
@@ -215,6 +267,17 @@ VGAlexandrieCorpus class >> regenerate [
 	^ self portedClass class selectors size
 ]
 
+{ #category : 'tolerances' }
+VGAlexandrieCorpus class >> strayAlphaAllowanceFor: aSelector [
+	"How heavy a pixel we may paint outside Cairo's shape in that experiment. The corpus's own
+	 allowance of one step of coverage holds everywhere but a mesh, whose edge is a step rather
+	 than a shade: a pixel of a mesh is opaque or untouched, so the alpha of a stray says nothing
+	 about how wrong it is and the count in meshBoundaryPixelTable is what bounds it."
+	^ (self meshBoundaryPixelTable anySatisfy: [ :each | each key = aSelector ])
+		  ifTrue: [ 255 ]
+		  ifFalse: [ VGConformanceCorpus strayAlphaAllowance ]
+]
+
 { #category : 'accessing' }
 VGAlexandrieCorpus class >> toleranceFor: aSelector [
 	^ (self toleranceTable detect: [ :each | each key = aSelector ] ifNone: [ nil ])
@@ -222,21 +285,25 @@ VGAlexandrieCorpus class >> toleranceFor: aSelector [
 		  ifNotNil: [ :each | each value ]
 ]
 
-{ #category : 'constants' }
+{ #category : 'tolerances' }
 VGAlexandrieCorpus class >> toleranceTable [
 	"The cases that may not match Cairo exactly, each with how far one channel may differ and why.
 	 It is empty while no case renders; a case added here has to carry its reason, so that a
-	 tolerance is never a quiet way of passing. Two reasons cover every entry: all but one of these
-	 experiments draw a curve, a slanted edge or a half-pixel stroke, so their edge pixels are
+	 tolerance is never a quiet way of passing. Three reasons cover every entry. All but one of
+	 the first group draw a curve, a slanted edge or a half-pixel stroke, so their edge pixels are
 	 shades and ours part from Cairo by a little, and fillPaint3 also scales a bitmap, which we
 	 still sample without a filter. A clip of a circle is an edge of that kind too: the shade is
 	 the one the clip itself carries, and the maskAndClip cases carry it twice over, because a
-	 mask through a clip is scaled by the coverage of the rim of that clip. See
-	 antialiasedEdgeTolerance and nearestSampleTolerance."
-
-	| edges |
+	 mask through a clip is scaled by the coverage of the rim of that clip. The mesh cases differ
+	 for a third reason, which is that Cairo colours a pixel of a mesh from the middle of the
+	 piece it subdivided the patch into rather than from the pixel itself. See
+	 antialiasedEdgeTolerance, nearestSampleTolerance and meshColourTolerance."
+	| edges meshes |
 	edges := self antialiasedEdgeTolerance.
+	meshes := self meshColourTolerance.
 	^ {
+		  (#CanonicalGradientAllQuadrantPattern -> meshes).
+		  (#CanonicalGradientFirstQuadrantPattern -> meshes).
 		  (#ContextPathWithArcCircle -> edges).
 		  (#ContextPathWithArcCurve -> edges).
 		  (#ContextPathWithArcCurveCW -> edges).
@@ -251,6 +318,8 @@ VGAlexandrieCorpus class >> toleranceTable [
 		  (#ContextPathWithLine -> edges).
 		  (#ContextPathWithQuadraticBezier -> edges).
 		  (#ContextPathWithRoundedRectangle -> edges).
+		  (#CoonsPatchMeshPattern -> meshes).
+		  (#GouraudShadingTriangleMesh -> meshes).
 		  (#clip1 -> edges).
 		  (#clip2 -> edges).
 		  (#fillLinearGradientExperiment -> edges).
@@ -265,6 +334,7 @@ VGAlexandrieCorpus class >> toleranceTable [
 		  (#maskAndClip4 -> edges).
 		  (#maskAndClip5 -> edges).
 		  (#maskAndClip6 -> edges).
+		  (#meshPattern -> meshes).
 		  (#polygonLinearGradient -> edges).
 		  (#radialGradientPattern1 -> edges).
 		  (#strokeAndFill -> edges).

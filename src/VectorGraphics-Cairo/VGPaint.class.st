@@ -20,15 +20,14 @@ Class {
 	#tag : 'Paint'
 }
 
-{ #category : 'abi' }
+{ #category : 'constants' }
 VGPaint class >> blockLayout [
 	"The frozen layout of the coefficient block, one entry per field, numbered from one. Fields 1
 	 to 8 mean the same thing for every tag; the rest are read according to it. This method is the
 	 ABI, and VGPaintTest holds every paint to it."
-
 	^ { 1 -> #matrixSx. 2 -> #matrixShy. 3 -> #matrixShx. 4 -> #matrixSy. 5 -> #matrixX.
 	    6 -> #matrixY. 7 -> #extendCode. 8 -> #filterCode.
-	    9 -> #redOrLineX0OrInnerX. 10 -> #greenOrLineY0OrInnerY.
+	    9 -> #redOrLineX0OrInnerXOrPatchCount. 10 -> #greenOrLineY0OrInnerY.
 	    11 -> #blueOrLineX1OrInnerRadius. 12 -> #alphaOrLineY1OrOuterX.
 	    13 -> #outerY. 14 -> #outerRadius. 15 -> #surfaceWidth. 16 -> #surfaceHeight }
 ]
@@ -152,17 +151,17 @@ VGPaint class >> rgbaOf: aColor [
 		  aColor alpha asFloat }
 ]
 
-{ #category : 'accessing' }
+{ #category : 'constants' }
 VGPaint class >> typeNames [
 	"The tag of a paint is cairo_pattern_type_t itself, so a paint and the pattern that built it
-	 carry the same number, and this is the name each number goes by. Cairo has two more, mesh and
-	 raster source, which this layer does not implement."
-
+	 carry the same number, and this is the name each number goes by. Cairo has one more, raster
+	 source, which this layer does not implement."
 	^ {
 		  (0 -> #solid).
 		  (1 -> #surface).
 		  (2 -> #linear).
-		  (3 -> #radial) }
+		  (3 -> #radial).
+		  (4 -> #mesh) }
 ]
 
 { #category : 'accessing' }

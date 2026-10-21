@@ -14,7 +14,8 @@ Class {
 		'extent',
 		'drawBlock',
 		'tolerance',
-		'strayAlphaAllowance'
+		'strayAlphaAllowance',
+		'pixelsAllowedBeyondTolerance'
 	],
 	#category : 'VectorGraphics-Cairo-Tests-Conformance',
 	#package : 'VectorGraphics-Cairo-Tests',
@@ -94,16 +95,19 @@ VGConformanceCase >> inspectorBlockingFailureContext: aContext [
 	aContext active: drawBlock notNil
 ]
 
-{ #category : 'comparing' }
+{ #category : 'testing' }
 VGConformanceCase >> matchesCairo [
-	"Two conditions, and the first is the strict one: we paint no pixel Cairo leaves untouched, and
-	 no channel anywhere is further from Cairo than my tolerance allows."
+	"Three conditions, and the first is the strict one: we paint no pixel Cairo leaves untouched
+	 beyond the residue a rounded edge leaves, and no more pixels than I allow are further from
+	 Cairo than my tolerance. The gate of VGConformanceTest reads the same three, so a case
+	 answers here what the suite says about it."
 
 	| comparison |
 	comparison := self comparisonWithCairo.
 	^ comparison isComparable and: [
-		  comparison extraneousPixelCount isZero and: [
-			  comparison maximumChannelDistance <= self tolerance ] ]
+		  comparison maximumStrayAlpha <= self strayAlphaAllowance and: [
+			  (comparison pixelsFartherThan: self tolerance)
+			  <= self pixelsAllowedBeyondTolerance ] ]
 ]
 
 { #category : 'accessing' }
@@ -128,6 +132,23 @@ VGConformanceCase >> ourForm [
 	self drawOn: surface newContext.
 	surface flush.
 	^ surface asForm
+]
+
+{ #category : 'accessing' }
+VGConformanceCase >> pixelsAllowedBeyondTolerance [
+	"How many pixels may part from the reference by more than my tolerance. None is the default,
+	 which is the strict reading: every pixel of the picture is within the tolerance. A paint whose
+	 edge is a step rather than a shade, such as a mesh, needs a count instead, because the two
+	 rasterisers disagree about the whole colour of the ring of pixels the edge grazes while
+	 agreeing closely everywhere else."
+
+	^ pixelsAllowedBeyondTolerance ifNil: [ 0 ]
+]
+
+{ #category : 'accessing' }
+VGConformanceCase >> pixelsAllowedBeyondTolerance: anInteger [
+
+	pixelsAllowedBeyondTolerance := anInteger
 ]
 
 { #category : 'printing' }

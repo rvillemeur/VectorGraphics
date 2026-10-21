@@ -13,7 +13,8 @@ Class {
 		'differingPixelCount',
 		'maximumChannelDistance',
 		'extraneousPixelCount',
-		'maximumStrayAlpha'
+		'maximumStrayAlpha',
+		'channelDistanceCounts'
 	],
 	#category : 'VectorGraphics-Cairo-Tests-Conformance',
 	#package : 'VectorGraphics-Cairo-Tests',
@@ -49,6 +50,22 @@ VGFormComparison class >> channelDistanceBetween: aWord and: anotherWord [
 		    - ((anotherWord bitShift: shift negated) bitAnd: 255)) abs ]) max
 ]
 
+{ #category : 'constants' }
+VGFormComparison class >> channelDistanceCount [
+	"How many distances a channel can be apart, from agreement to the whole range, which is the
+	 size of the tally I keep."
+	^ 256
+]
+
+{ #category : 'inspector' }
+VGFormComparison class >> inspectorDistanceSteps [
+	"The tolerances the distances view counts the pixels past. Zero says how many pixels differ at
+	 all, one is the residue of a rounded edge, and the rest double up to the whole range, which is
+	 where a pixel of a wholly different colour lands."
+
+	^ #( 0 1 2 4 8 16 32 64 128 254 )
+]
+
 { #category : 'comparing' }
 VGFormComparison class >> premultiplied: aWord [
 	"A Form holds unpremultiplied channels, and a fully transparent pixel is stored as transparent
@@ -82,7 +99,7 @@ VGFormComparison >> addOurPixel: aStoredWord againstReference: anotherStoredWord
 	 are premultiplied before anything is measured. A pixel we paint where the reference is
 	 untouched is counted and weighed: an alpha of one is the residue of the grid Cairo rounds a
 	 polygon edge to, while a heavier one is a shape we got wrong."
-	| ourWord theirWord ourAlpha |
+	| ourWord theirWord ourAlpha distance |
 	ourWord := self class premultiplied: aStoredWord.
 	theirWord := self class premultiplied: anotherStoredWord.
 	(self class alphaOf: theirWord) isZero ifTrue: [
@@ -92,11 +109,11 @@ VGFormComparison >> addOurPixel: aStoredWord againstReference: anotherStoredWord
 			maximumStrayAlpha := maximumStrayAlpha max: ourAlpha ] ].
 	ourWord = theirWord ifTrue: [ ^ self ].
 	differingPixelCount := differingPixelCount + 1.
-	maximumChannelDistance := maximumChannelDistance
-		                          max:
-		                          (self class
-			                           channelDistanceBetween: ourWord
-			                           and: theirWord)
+	distance := self class channelDistanceBetween: ourWord and: theirWord.
+	maximumChannelDistance := maximumChannelDistance max: distance.
+	channelDistanceCounts
+		at: distance + 1
+		put: (channelDistanceCounts at: distance + 1) + 1
 ]
 
 { #category : 'initialization' }
@@ -107,7 +124,10 @@ VGFormComparison >> beEmptyTally [
 	differingPixelCount := 0.
 	maximumChannelDistance := 0.
 	extraneousPixelCount := 0.
-	maximumStrayAlpha := 0
+	maximumStrayAlpha := 0.
+	channelDistanceCounts := Array
+		                         new: self class channelDistanceCount
+		                         withAll: 0
 ]
 
 { #category : 'initialization' }
@@ -116,7 +136,10 @@ VGFormComparison >> beIncomparable [
 	differingPixelCount := 0.
 	maximumChannelDistance := 0.
 	extraneousPixelCount := 0.
-	maximumStrayAlpha := 0
+	maximumStrayAlpha := 0.
+	channelDistanceCounts := Array
+		                         new: self class channelDistanceCount
+		                         withAll: 0
 ]
 
 { #category : 'accessing' }
@@ -129,6 +152,33 @@ VGFormComparison >> extraneousPixelCount [
 	"How many pixels we paint that the reference leaves untouched."
 
 	^ extraneousPixelCount
+]
+
+{ #category : 'inspector' }
+VGFormComparison >> inspectorDistances: aBuilder [
+	<inspectorPresentationOrder: 11 title: 'Distances'>
+	"How the pixels that differ are spread over the distances they differ by: one row per
+	 tolerance, with how many pixels lie past it. A gate that allows a count rather than a distance
+	 is read off this table, because a paint with a hard edge parts from the reference by a whole
+	 colour on the pixels its edge grazes and by very little everywhere else. The counts come from
+	 pixelsFartherThan:, which is the message the gate itself sends."
+
+	^ aBuilder newTable
+		  items: (self class inspectorDistanceSteps collect: [ :each |
+				   each -> (self pixelsFartherThan: each) ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Farther than'
+				   evaluated: [ :each | each key printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Pixels'
+				   evaluated: [ :each | each value printString ]);
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGFormComparison >> inspectorDistancesContext: aContext [
+
+	aContext active: (isComparable notNil and: [ isComparable ])
 ]
 
 { #category : 'inspecting' }
@@ -176,6 +226,17 @@ VGFormComparison >> maximumStrayAlpha [
 	^ maximumStrayAlpha
 ]
 
+{ #category : 'measuring' }
+VGFormComparison >> pixelsFartherThan: aChannelDistance [
+	"How many pixels differ from the reference by more than that distance in some channel. A
+	 gate that allows a stated number of pixels to be wrong, rather than a stated distance,
+	 reads this: a paint with a hard edge, such as a mesh, parts from Cairo by whole colours on
+	 the pixels its edge grazes, and by very little everywhere else."
+	^ ((aChannelDistance + 1 max: 0) to: self class channelDistanceCount - 1)
+		  inject: 0
+		  into: [ :sum :distance | sum + (channelDistanceCounts at: distance + 1) ]
+]
+
 { #category : 'printing' }
 VGFormComparison >> printOn: aStream [
 	super printOn: aStream.
@@ -190,21 +251,4 @@ VGFormComparison >> printOn: aStream [
 		nextPutAll: ' outside the reference at up to an alpha of ';
 		print: maximumStrayAlpha;
 		nextPut: $)
-]
-
-{ #category : 'initialization' }
-VGFormComparison >> setDifferingPixelCount: anInteger maximumChannelDistance: anotherInteger extraneousPixelCount: aThirdInteger [
-	isComparable := true.
-	differingPixelCount := anInteger.
-	maximumChannelDistance := anotherInteger.
-	extraneousPixelCount := aThirdInteger
-]
-
-{ #category : 'initialization' }
-VGFormComparison >> setDifferingPixelCount: anInteger maximumChannelDistance: anotherInteger extraneousPixelCount: aThirdInteger maximumStrayAlpha: aFourthInteger [
-	isComparable := true.
-	differingPixelCount := anInteger.
-	maximumChannelDistance := anotherInteger.
-	extraneousPixelCount := aThirdInteger.
-	maximumStrayAlpha := aFourthInteger
 ]

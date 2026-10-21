@@ -34,6 +34,7 @@ VGCairoExamplesTest >> exampleHolders [
 		  VGConformanceCorpusExamples.
 		  VGDisplayListExamples.
 		  VGFormComparisonExamples.
+		  VGMeshExamples.
 		  VGPaintExamples.
 		  VGPathExamples.
 		  VGRasteriserExamples.

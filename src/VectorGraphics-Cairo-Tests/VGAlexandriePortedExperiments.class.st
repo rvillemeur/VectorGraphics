@@ -39,7 +39,7 @@ VGAlexandriePortedExperiments class >> CanonicalGradientAllQuadrantPattern [
 		stroke.
 		
 	"first quadrant"
-	mesh := AeCairoMeshPattern new.
+	mesh := VGCairoMeshPattern new.
 	mesh beginPatch.
 	mesh
 		moveToX: 200 y: 200; lineToX: 200 y: 0;
@@ -59,7 +59,7 @@ VGAlexandriePortedExperiments class >> CanonicalGradientAllQuadrantPattern [
 		paint.
 
 	"second quadrant"
-	mesh := AeCairoMeshPattern new.
+	mesh := VGCairoMeshPattern new.
 	mesh beginPatch.
 	mesh
 		moveToX: 200 y: 200; lineToX: 400 y: 200;
@@ -79,7 +79,7 @@ VGAlexandriePortedExperiments class >> CanonicalGradientAllQuadrantPattern [
 		paint.
 		
 	"third quadrant"
-	mesh := AeCairoMeshPattern new.
+	mesh := VGCairoMeshPattern new.
 	mesh beginPatch.
 	mesh
 		moveToX: 200 y: 200; lineToX: 200 y: 400;
@@ -99,7 +99,7 @@ VGAlexandriePortedExperiments class >> CanonicalGradientAllQuadrantPattern [
 		paint.
 		
 	"fourth quadrant"
-	mesh := AeCairoMeshPattern new.
+	mesh := VGCairoMeshPattern new.
 	mesh beginPatch.
 	mesh
 		moveToX: 200 y: 200; lineToX: 0 y: 200;
@@ -134,7 +134,7 @@ VGAlexandriePortedExperiments class >> CanonicalGradientFirstQuadrantPattern [
 	"https://blogs.igalia.com/dpino/2020/06/11/renderization-of-conic-gradients/
 	For Bezier point calculation, refer to: https://pomax.github.io/bezierinfo/#circles"
 
-	meshPattern := AeCairoMeshPattern new.
+	meshPattern := VGCairoMeshPattern new.
 	meshPattern beginPatch.
 
 	meshPattern
@@ -521,7 +521,7 @@ VGAlexandriePortedExperiments class >> CoonsPatchMeshPattern [
 
 	"https://blogs.igalia.com/dpino/2020/06/11/renderization-of-conic-gradients/"
 
-	meshPattern := AeCairoMeshPattern new.
+	meshPattern := VGCairoMeshPattern new.
 	meshPattern beginPatch.
 
 	meshPattern
@@ -579,7 +579,7 @@ VGAlexandriePortedExperiments class >> GouraudShadingTriangleMesh [
 
 	"https://blogs.igalia.com/dpino/2020/06/11/renderization-of-conic-gradients/"
 
-	meshPattern := AeCairoMeshPattern new.
+	meshPattern := VGCairoMeshPattern new.
 	meshPattern beginPatch.
 
 	meshPattern
@@ -1527,7 +1527,7 @@ VGAlexandriePortedExperiments class >> meshPattern [
 
 	"https://www.cairographics.org/manual/cairo-cairo-pattern-t.html#cairo-pattern-create-mesh"
 
-	meshPattern := AeCairoMeshPattern new.
+	meshPattern := VGCairoMeshPattern new.
 	meshPattern beginPatch.
 
 	meshPattern

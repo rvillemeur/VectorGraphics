@@ -70,6 +70,14 @@ VGAlexandrieCase >> blockingUnit [
 	^ failure ifNotNil: [ failure unit ]
 ]
 
+{ #category : 'comparing' }
+VGAlexandrieCase >> boundaryPixelAllowance [
+	"How many pixels of mine may be further from Alexandrie than my tolerance allows. None,
+	 unless I paint a mesh, whose edge is a step the two rasterisers place differently: see
+	 VGAlexandrieCorpus class >> meshBoundaryPixelTable."
+	^ VGAlexandrieCorpus boundaryPixelAllowanceFor: experimentSelector
+]
+
 { #category : 'rendering' }
 VGAlexandrieCase >> cairoForm [
 	"The reference picture, drawn by Alexandrie itself."
@@ -161,14 +169,16 @@ VGAlexandrieCase >> isPortable [
 
 { #category : 'comparing' }
 VGAlexandrieCase >> matchesCairo [
-	"Two conditions, and the first is the strict one: we paint no pixel Alexandrie leaves
-	 untouched, and no channel anywhere is further from it than my tolerance allows."
-
+	"Three conditions, and the first is the strict one: no pixel of ours outside Alexandrie's
+	 shape beyond the residue a rounded edge leaves, no channel further from it than my tolerance
+	 allows, and no more pixels beyond that tolerance than my boundary allowance, which is none
+	 unless I paint a mesh."
 	| comparison |
 	comparison := self comparisonWithCairo.
 	^ comparison isComparable and: [
-		  comparison extraneousPixelCount isZero and: [
-			  comparison maximumChannelDistance <= self tolerance ] ]
+		  comparison maximumStrayAlpha <= self strayAlphaAllowance and: [
+			  (comparison pixelsFartherThan: self tolerance)
+			  <= self boundaryPixelAllowance ] ]
 ]
 
 { #category : 'accessing' }
@@ -234,6 +244,14 @@ VGAlexandrieCase >> referencedCairoClassNames [
 { #category : 'initialization' }
 VGAlexandrieCase >> setExperimentSelector: aSelector [
 	experimentSelector := aSelector
+]
+
+{ #category : 'comparing' }
+VGAlexandrieCase >> strayAlphaAllowance [
+	"How heavy a pixel I may paint outside Alexandrie's shape. The corpus's own allowance of one
+	 step of coverage, unless I paint a mesh: see VGAlexandrieCorpus class >>
+	 strayAlphaAllowanceFor:."
+	^ VGAlexandrieCorpus strayAlphaAllowanceFor: experimentSelector
 ]
 
 { #category : 'comparing' }
