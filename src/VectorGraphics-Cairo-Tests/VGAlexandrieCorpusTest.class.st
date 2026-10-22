@@ -92,6 +92,35 @@ VGAlexandrieCorpusTest >> testEveryCaseThatDrawsMatchesCairo [
 	self assert: failures asArray isEmpty description: failures asArray printString
 ]
 
+{ #category : 'tests - coverage' }
+VGAlexandrieCorpusTest >> testEveryCaseThatSelectsAFontCarriesTheGlyphAllowance [
+	"A case that selects a font and then draws a run has its glyphs rasterised by Cairo through
+	 FreeType, which grid-fits the outline first, so the two pictures part along every stem by more
+	 than an edge of a path parts. Such a case therefore carries the glyph tolerance and a count of
+	 the pixels allowed past it, and a case that carries them is such a case. The rule is asked of
+	 the ported source, so a case that starts or stops selecting a font fails here rather than
+	 failing the oracle."
+
+	| withAGlyphRun |
+	self skipWithoutTheExperiments ifTrue: [ ^ self skip ].
+	withAGlyphRun := VGAlexandrieCorpus cases
+		                 select: [ :case |
+			                 (case isPortable and: [ case blockingFailure isNil ]) and: [
+				                 (case portedSource includesSubstring: 'scaledFont:') and: [
+					                 #( 'showGlyphs:' 'showText:' 'appendGlyphsPath:' ) anySatisfy: [
+						                 :verb | case portedSource includesSubstring: verb ] ] ] ]
+		                 thenCollect: [ :case | case name asSymbol ].
+	self
+		assertCollection: withAGlyphRun asSet
+		hasSameElements:
+			(VGAlexandrieCorpus hintedGlyphRunPixelTable collect: [ :each | each key ])
+				asSet.
+	withAGlyphRun do: [ :each |
+		self
+			assert: (VGAlexandrieCorpus toleranceFor: each)
+			equals: VGAlexandrieCorpus hintedGlyphRunTolerance ]
+]
+
 { #category : 'tests' }
 VGAlexandrieCorpusTest >> testEveryCaseWithNoSelectedFontIsFiled [
 	"A case that draws text without selecting a font is drawn by Cairo in the toy default face it
@@ -153,6 +182,24 @@ VGAlexandrieCorpusTest >> testEveryExperimentHasOneDerivedCopyAndNoMore [
 	ported := VGAlexandrieCorpus portedClass class selectors asSortedCollection asArray.
 	wanted := VGAlexandrieCorpus experimentSelectors.
 	self assertCollection: ported hasSameElements: wanted
+]
+
+{ #category : 'tests - coverage' }
+VGAlexandrieCorpusTest >> testEveryExperimentIsPortable [
+	"Every experiment of the corpus names only classes the replacement has a counterpart for, so
+	 every one of them has a derived copy that runs. The font facade of unit 1.13 closed the last
+	 five; whether a copy then matches Cairo is a separate question, held by
+	 #testEveryCaseThatDrawsMatchesCairo."
+
+	| blocked |
+	self skipWithoutTheExperiments ifTrue: [ ^ self skip ].
+	blocked := VGAlexandrieCorpus cases
+		           reject: [ :each | each isPortable ]
+		           thenCollect: [ :each | each experimentSelector ].
+	self
+		assert: blocked asArray isEmpty
+		description: 'experiments still naming a class we have no counterpart for: '
+			, blocked asArray printString
 ]
 
 { #category : 'tests - coverage' }

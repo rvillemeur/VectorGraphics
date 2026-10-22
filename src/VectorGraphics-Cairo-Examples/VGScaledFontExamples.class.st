@@ -133,3 +133,22 @@ VGScaledFontExamples class >> scaledFontAtAReadableSize [
 		  userToDeviceMatrix: VGCairoMatrix newIdentity
 		  options: VGFontOptions new
 ]
+
+{ #category : 'examples' }
+VGScaledFontExamples class >> scaledFontBuiltTheWayCairoSpellsIt [
+	<sampleInstance>
+	"The same scaled font as #scaledFontAtAReadableSize, built the way a drawing written against
+	 Alexandrie builds one: the options named through the four enumeration classes, and the font
+	 asked of the face rather than of the scaled font class."
+
+	^ self fontFace
+		  newScaledFontWithFontMatrix:
+			  (VGCairoMatrix newScalingBy: self exampleFontSize asPoint)
+		  userToDeviceMatrix: VGCairoMatrix newIdentity
+		  options: (VGFontOptions new
+				   antialias: VGCairoAntialias gray;
+				   hintMetrics: VGCairoHintMetrics off;
+				   hintStyle: VGCairoHintStyle none;
+				   subpixelOrder: VGCairoSubpixelOrder default;
+				   yourself)
+]

@@ -38,6 +38,22 @@ VGCairoDrawingTest >> opaqueBlack [
 	^ 16rFF000000
 ]
 
+{ #category : 'fixtures' }
+VGCairoDrawingTest >> squareMaskOfSide: anInteger [
+	"An opaque square mask surface of that side, which is the shape a glyph mask has in the
+	 small."
+
+	| mask context |
+	mask := VGCairoImageSurface extent: anInteger asPoint.
+	context := mask newContext.
+	context sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
+	context
+		rectangleX: 0 y: 0 width: anInteger height: anInteger;
+		fill.
+	mask flush.
+	^ mask
+]
+
 { #category : 'tests' }
 VGCairoDrawingTest >> testAFillOutsideTheSurfaceTouchesNothing [
 	"The clip is the surface, so a path beyond it writes no byte at all. The bytes are read
@@ -130,6 +146,53 @@ VGCairoDrawingTest >> testAMaskSurfacePaintsTheSourceThroughItsAlphaChannel [
 	self assert: (target pixelAtX: 20 y: 10) equals: 16r80800000.
 	self assert: (target pixelAtX: 2 y: 2) equals: 0.
 	self assert: (target pixelAtX: 25 y: 25) equals: 0
+]
+
+{ #category : 'tests' }
+VGCairoDrawingTest >> testAMaskUnderABoundedOperatorIsReadNowhereOutsideItsOwnRectangle [
+	"A mask the size of a glyph on a surface the size of a page must cost the glyph and not the
+	 page. Under a bounded operator a mask byte of zero leaves the destination exactly as it was,
+	 so reading the mask outside its own rectangle buys nothing: a run of two thousand glyphs on a
+	 ten thousand pixel surface otherwise walks the whole surface two thousand times and takes
+	 hours. The walk is therefore narrowed to the rectangle of the mask, which is what this test
+	 counts, because the picture cannot tell a pixel left as it was from a pixel never read."
+
+	| mask stub target backend |
+	mask := self squareMaskOfSide: 4.
+	target := VGCairoImageSurface extent: 200 @ 200.
+	stub := VGCountingMaskStub surface: mask at: 10 @ 20.
+	backend := VGSoftwareBackend new.
+	backend
+		maskWith: stub
+		paint: (VGColorPaint color: Color red)
+		clip: (VGClip bounds: (0 @ 0 corner: 200 @ 200))
+		operator: VGCairoOperator over
+		into: target.
+	self assert: stub readPixels asSet size equals: 16.
+	self
+		assert: (stub readPixels allSatisfy: [ :each |
+				 (10 @ 20 corner: 14 @ 24) containsPoint: each ])
+		description: 'the walk left the rectangle of the mask'
+]
+
+{ #category : 'tests' }
+VGCairoDrawingTest >> testAMaskUnderAnUnboundedOperatorIsReadOverTheWholeClip [
+	"An unbounded operator writes where the mask covers nothing — `in` clears the destination
+	 there — so the walk of such a mask may not be narrowed to the rectangle of the mask. It stays
+	 the whole clip, which is the rule the narrowing of a bounded operator is the exception to."
+
+	| mask stub target backend |
+	mask := self squareMaskOfSide: 4.
+	target := VGCairoImageSurface extent: 40 @ 40.
+	stub := VGCountingMaskStub surface: mask at: 10 @ 20.
+	backend := VGSoftwareBackend new.
+	backend
+		maskWith: stub
+		paint: (VGColorPaint color: Color red)
+		clip: (VGClip bounds: (0 @ 0 corner: 40 @ 40))
+		operator: VGCairoOperator in
+		into: target.
+	self assert: stub readPixels asSet size equals: 40 * 40
 ]
 
 { #category : 'tests' }

@@ -63,6 +63,17 @@ VGCanvasExamples class >> canvasOnASmallSurface [
 ]
 
 { #category : 'examples' }
+VGCanvasExamples class >> fontFaceForTheFontManagersDefaultFace [
+	<sampleInstance>
+	"The face of ours for the FreeType face the font manager answers. A FreeType face carries a
+	 family name and a style name and no bytes, so the face is built from the bytes the manager
+	 registered under those two names; this is the resolution a drawing uses when it holds no
+	 canvas."
+
+	^ VGFontFace newForFace: AeFontManager globalInstance defaultFace
+]
+
+{ #category : 'examples' }
 VGCanvasExamples class >> scaledFontForTheDefaultFace [
 	<sampleInstance>
 	"The scaled font the canvas answers for a FreeType face and a size, built from the bytes the

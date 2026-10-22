@@ -42,6 +42,16 @@ VGClipExamples class >> emptyClipOfTwoDisjointRectangles [
 ]
 
 { #category : 'examples' }
+VGClipExamples class >> maskSizedNarrowingOfACircularClip [
+	<sampleInstance>
+	"The clip of #clipOfACircle narrowed the way the backend narrows it for a mask the size of a
+	 glyph: the same shape and the same coverage, and no pixel outside the rectangle the mask
+	 covers. Every glyph of a run of text asks this of the clip it draws through."
+
+	^ self clipOfACircle narrowedTo: (24 @ 24 corner: 40 @ 40)
+]
+
+{ #category : 'examples' }
 VGClipExamples class >> rectangularClip [
 	<sampleInstance>
 	"The fast path: a clip whose shape is four axis-aligned edges keeps no shape at all, only

@@ -131,6 +131,33 @@ VGFontOptions >> initialize [
 	subpixelOrder := #default
 ]
 
+{ #category : 'inspector' }
+VGFontOptions >> inspectorNames: aBuilder [
+	<inspectorPresentationOrder: 10 title: 'Cairo names'>
+	"My four options, each beside the class that names its values the way Alexandrie names them
+	 and the value that class answers for the name I hold. The value is asked of the real
+	 enumeration, so a name this package stops knowing shows up here as 'answers no such name'
+	 rather than as a row that still looks right."
+
+	^ aBuilder newTable
+		  items: {
+				  { 'Antialias'. self antialias. VGCairoAntialias }.
+				  { 'Hint style'. self hintStyle. VGCairoHintStyle }.
+				  { 'Hint metrics'. self hintMetrics. VGCairoHintMetrics }.
+				  { 'Subpixel order'. self subpixelOrder. VGCairoSubpixelOrder } };
+		  addColumn: (SpStringTableColumn title: 'Option' evaluated: [ :each |
+					   each first ]);
+		  addColumn: (SpStringTableColumn title: 'Value' evaluated: [ :each |
+					   each second printString ]);
+		  addColumn: (SpStringTableColumn title: 'Named by' evaluated: [ :each |
+					   each third name ]);
+		  addColumn: (SpStringTableColumn title: 'That class answers' evaluated: [ :each |
+					   (each third names includes: each second)
+						   ifTrue: [ (each third perform: each second) printString ]
+						   ifFalse: [ 'answers no such name' ] ]);
+		  yourself
+]
+
 { #category : 'printing' }
 VGFontOptions >> printOn: aStream [
 	aStream

@@ -27,24 +27,6 @@ Class {
 	#tag : 'Backend'
 }
 
-{ #category : 'font bridge' }
-VGCanvas class >> bytesForFamilyName: aFamilyName styleName: aStyleName [
-	"The bytes of the font the manager registered under this family and style. A face we cannot
-	 name falls back to the bundled default, because a frame drawn in the wrong font is better than
-	 a frame that raises inside the renderer."
-
-	| entry |
-	entry := AeFontManager globalInstance faceEntries
-		         detect: [ :each |
-			         each familyName = aFamilyName and: [
-				         each styleName = aStyleName ] ]
-		         ifNone: [ nil ].
-	entry ifNil: [ ^ VGFontFace defaultBytes ].
-	^ (entry isKindOf: AeMemoryFaceEntry)
-		  ifTrue: [ entry bytes ]
-		  ifFalse: [ entry location binaryReadStream upToEnd ]
-]
-
 { #category : 'instance creation' }
 VGCanvas class >> extent: aPoint [
 	"`AeCanvas class >> extent:` names `AeCairoImageSurface`, which is the one line that decides
@@ -64,18 +46,15 @@ VGCanvas class >> faceCache [
 
 { #category : 'font bridge' }
 VGCanvas class >> faceForFreeTypeFace: anAeFTFace [
-	"Bloc hands the canvas a FreeType face, which is a handle into the library this project
-	 replaces: it carries a family name and a style name, but no bytes and no file name. The font
-	 manager holds the entry that face was built from, so the bytes are matched back out of it."
+	"Bloc hands the canvas a FreeType face, which carries a family name and a style name and no
+	 bytes. The face answers the resolution; the canvas adds the cache, so a family and style
+	 pair is read from the font manager once however many frames ask for it."
 
 	^ self faceCache
 		  at: {
 				  anAeFTFace familyName.
 				  anAeFTFace styleName }
-		  ifAbsentPut: [
-			  VGFontFace newForBytes: (self
-					   bytesForFamilyName: anAeFTFace familyName
-					   styleName: anAeFTFace styleName) ]
+		  ifAbsentPut: [ VGFontFace newForFace: anAeFTFace ]
 ]
 
 { #category : 'form' }

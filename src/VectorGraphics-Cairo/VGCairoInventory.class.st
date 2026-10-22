@@ -198,13 +198,16 @@ VGCairoInventory class >> patternSelectors [
 	^ #( #autoRelease #externallyFree #filter: #matrix #matrix: #status #type )
 ]
 
-{ #category : 'inventory' }
+{ #category : 'constants' }
 VGCairoInventory class >> planUnits [
 	"The units of phase 1 that VECTORCANVAS-PLAN.md declares. A skeleton may only name one of
-	 these, which is what keeps the code and the plan from drifting apart. Units 1.10 to 1.12 own
-	 no selector of the Bloc union: 1.10 wires the renderer, 1.11 profiles, and 1.12 holds the mesh
-	 patterns that only the Alexandrie experiments ask for."
-	^ #( '1.0' '1.1' '1.2' '1.3' '1.4' '1.5' '1.6' '1.7' '1.8' '1.9' '1.10' '1.11' '1.12' )
+	 these, which is what keeps the code and the plan from drifting apart. Units 1.10 to 1.13 own
+	 no selector of the Bloc union: 1.10 wires the renderer, 1.11 profiles, 1.12 holds the mesh
+	 patterns that only the Alexandrie experiments ask for, and 1.13 gives the font classes the
+	 names those experiments call them by."
+
+	^ #( '1.0' '1.1' '1.2' '1.3' '1.4' '1.5' '1.6' '1.7' '1.8' '1.9' '1.10' '1.11' '1.12'
+	     '1.13' )
 ]
 
 { #category : 'inventory' }

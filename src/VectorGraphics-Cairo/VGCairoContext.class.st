@@ -1395,13 +1395,16 @@ VGCairoContext >> strokeDashPattern: aCollection offset: aNumber [
 		ifFalse: [ status := VGCairoStatus invalidDash ]
 ]
 
-{ #category : 'stroke style' }
+{ #category : 'stroking' }
 VGCairoContext >> strokeDashPattern: aCollection size: anInteger offset: aNumber [
 	"AeCanvas hands over an array and the count of entries to read separately, so the count
-	 rules and the tail of the array is no part of the pattern."
+	 rules and the tail of the array is no part of the pattern. The array is an external double
+	 array, which is indexable but cannot be copied like a collection, so the entries are read
+	 one at a time rather than through #first:."
 
 	self
-		strokeDashPattern: (aCollection first: anInteger)
+		strokeDashPattern:
+			((1 to: anInteger) collect: [ :index | aCollection at: index ])
 		offset: aNumber
 ]
 

@@ -161,6 +161,42 @@ VGCairoClipTest >> testAClipKeepsTheFillRuleItWasMadeWith [
 ]
 
 { #category : 'tests' }
+VGCairoClipTest >> testAClipNarrowedToARectangleAllowsWhatItAllowedInside [
+	"A mask carries no spans, so the backend scales it by the coverage of the clip and walks the
+	 clip to do it. Walking the whole clip for a mask the size of a glyph is what a text run costs,
+	 so the walk is narrowed to the rectangle of the mask; the narrowed clip must allow exactly
+	 what the clip allowed inside that rectangle and visit no row outside it."
+
+	| clip narrowed rows |
+	clip := VGClip bounds: (0 @ 0 corner: 64 @ 64).
+	narrowed := clip narrowedTo: (10 @ 20 corner: 14 @ 23).
+	self assert: narrowed bounds equals: (10 @ 20 corner: 14 @ 23).
+	self assert: narrowed shapes equals: clip shapes.
+	rows := OrderedCollection new.
+	narrowed coverageRowsDo: [ :y :coverage :left |
+		rows add: y.
+		self assert: left equals: 10.
+		self assert: coverage size equals: 4.
+		coverage do: [ :each | self assert: each equals: 1.0 ] ].
+	self assert: rows asArray equals: #( 20 21 22 )
+]
+
+{ #category : 'tests' }
+VGCairoClipTest >> testAClipNarrowedToARectangleItDoesNotMeetAllowsNothing [
+	"A mask that falls outside the clip has no pixel to be scaled into, and a clip of no area is
+	 not walked at all, which is the degenerate case the narrowing has to answer plainly rather
+	 than with a rectangle whose left is past its right."
+
+	| clip narrowed rows |
+	clip := VGClip bounds: (0 @ 0 corner: 10 @ 10).
+	narrowed := clip narrowedTo: (20 @ 20 corner: 30 @ 30).
+	self assert: narrowed isEmpty.
+	rows := OrderedCollection new.
+	narrowed coverageRowsDo: [ :y :coverage :left | rows add: y ].
+	self assert: rows asArray isEmpty
+]
+
+{ #category : 'tests' }
 VGCairoClipTest >> testAClipOfNoPathClipsEverythingAwayAndKeepsTheStatusSuccessful [
 	"Measured: clipping with an empty path is not an error. Cairo answers a successful status and
 	 clips everything away, so the paint that follows writes no pixel and the clip extents

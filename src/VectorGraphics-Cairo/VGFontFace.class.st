@@ -45,6 +45,24 @@ VGFontFace class >> argumentsAreWordsFlag [
 	^ 1
 ]
 
+{ #category : 'instance creation' }
+VGFontFace class >> bytesForFamilyName: aFamilyName styleName: aStyleName [
+	"The bytes of the font the manager registered under this family and style. A font we cannot
+	 name falls back to the bundled default, because a frame drawn in the wrong font is better
+	 than a frame that raises inside the renderer."
+
+	| entry |
+	entry := AeFontManager globalInstance faceEntries
+		         detect: [ :each |
+			         each familyName = aFamilyName and: [
+				         each styleName = aStyleName ] ]
+		         ifNone: [ nil ].
+	entry ifNil: [ ^ self defaultBytes ].
+	^ (entry isKindOf: AeMemoryFaceEntry)
+		  ifTrue: [ entry bytes ]
+		  ifFalse: [ entry location binaryReadStream upToEnd ]
+]
+
 { #category : 'constants' }
 VGFontFace class >> componentHasMatrixFlag [
 	^ 128
@@ -343,6 +361,20 @@ VGFontFace >> lineGap [
 { #category : 'accessing' }
 VGFontFace >> maxAdvanceWidth [
 	^ maxAdvanceWidth
+]
+
+{ #category : 'instance creation' }
+VGFontFace >> newScaledFontWithFontMatrix: aFontMatrix userToDeviceMatrix: aUserToDeviceMatrix options: aFontOptions [
+	"Myself at a size, under a user to device matrix, with those rendering options. Cairo spells
+	 the same thing both ways round, through the face and through the scaled font class, and a
+	 drawing uses either, so this is the face's spelling of
+	 VGScaledFont class >> #fontFace:fontMatrix:userToDeviceMatrix:options:."
+
+	^ VGScaledFont
+		  fontFace: self
+		  fontMatrix: aFontMatrix
+		  userToDeviceMatrix: aUserToDeviceMatrix
+		  options: aFontOptions
 ]
 
 { #category : 'private' }

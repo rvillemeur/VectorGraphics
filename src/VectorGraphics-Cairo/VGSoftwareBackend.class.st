@@ -134,15 +134,19 @@ VGSoftwareBackend >> maskWith: aMask paint: aPaint clip: aClip operator: anOpera
 	"One recorded mask: the mask's alpha stands where a fill's coverage stands, scaled by the
 	 coverage of the clip. A mask carries no spans, so a clip cannot meet it the way it meets a
 	 fill; Cairo multiplies the coverage of the clip into the mask instead, which keeps the rim of
-	 the clip shaded. The whole clip is visited and not only the mask's own rectangle, because an
-	 unbounded operator writes where the mask covers nothing; under a bounded one a mask byte of
-	 zero leaves the destination exactly as it was, so visiting those pixels changes nothing. A
-	 pixel the clip allows nothing of is left alone under every operator."
+	 the clip shaded. Under an unbounded operator the whole clip is visited, because such an
+	 operator writes where the mask covers nothing; under a bounded one a mask byte of zero leaves
+	 the destination exactly as it was, so the walk is narrowed to the rectangle of the mask and a
+	 glyph then costs the glyph rather than the surface. A pixel the clip allows nothing of is
+	 left alone under every operator."
 
-	| format unbounded |
+	| format unbounded walked |
 	format := aTarget format.
 	unbounded := anOperator isUnbounded.
-	aClip coverageRowsDo: [ :y :coverage :left |
+	walked := unbounded
+		          ifTrue: [ aClip ]
+		          ifFalse: [ aClip narrowedTo: aMask boundsRectangle ].
+	walked coverageRowsDo: [ :y :coverage :left |
 		1 to: coverage size do: [ :index |
 			| mask source x allowed |
 			allowed := coverage at: index.

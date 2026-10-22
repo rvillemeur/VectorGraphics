@@ -226,6 +226,22 @@ VGCairoStrokeTest >> testADashOffsetLargerThanThePatternPeriodWraps [
 ]
 
 { #category : 'tests - dashes' }
+VGCairoStrokeTest >> testADashPatternHandedOverAsAnExternalArrayIsReadElementByElement [
+	"AeCanvas and the drawings of the Alexandrie corpus hand the pattern over as an external
+	 double array, which lives outside object memory and cannot be copied the way a collection
+	 can: reading it with #first: ends in 'cannot have variable sized instances'. The count's
+	 worth of elements is read one at a time instead."
+
+	| external |
+	external := AeFFIDoubleArray newFrom: #( 8 4 2 ).
+	self
+		assert:
+		(self newContext strokeDashPattern: external size: 3 offset: 0) state
+			strokeStyle dashPattern
+		equals: #( 8 4 2 )
+]
+
+{ #category : 'tests - dashes' }
 VGCairoStrokeTest >> testADashPatternSplitsTheStrokeIntoRunsOfItsOwn [
 	"Nine on, four off, along a line fifty-two long: four painted runs, and each one carries its
 	 own caps because Cairo treats a dash run as a sub-path."

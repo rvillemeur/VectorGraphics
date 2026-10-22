@@ -72,6 +72,48 @@ VGCairoTextTest >> fixtureFontBytesWithTheTableTagsRenamed: aTag [
 ]
 
 { #category : 'helpers' }
+VGCairoTextTest >> fixtureFontFamilyName [
+	"The family name the font manager registers my fixture font under."
+
+	^ 'Source Sans Pro'
+]
+
+{ #category : 'helpers' }
+VGCairoTextTest >> fixtureFreeTypeFace [
+	"My fixture font as the font manager answers it: an AeFTFace, which carries a family name and
+	 a style name and no bytes at all. A drawing picks its font this way, so this is what the
+	 replacement is handed and has to resolve."
+
+	| manager |
+	manager := AeFontManager globalInstance.
+	^ manager
+		  detectFamilyName: self fixtureFontFamilyName
+		  slant: AeFontSlant normal
+		  weight: AeFontWeight normal
+		  stretch: AeFontStretch normal
+		  ifNone: [
+			  manager scanEmbeddedFonts.
+			  manager
+				  detectFamilyName: self fixtureFontFamilyName
+				  slant: AeFontSlant normal
+				  weight: AeFontWeight normal
+				  stretch: AeFontStretch normal
+				  ifNone: [ nil ] ]
+]
+
+{ #category : 'helpers' }
+VGCairoTextTest >> fixtureManagerEntryFor: anAeFTFace [
+	"The entry the font manager holds for that face. It is the entry, and not the face, that
+	 carries the bytes, which is why the replacement resolves a face through the manager."
+
+	^ AeFontManager globalInstance faceEntries
+		  detect: [ :each |
+			  each familyName = anAeFTFace familyName and: [
+				  each styleName = anAeFTFace styleName ] ]
+		  ifNone: [ nil ]
+]
+
+{ #category : 'helpers' }
 VGCairoTextTest >> fixtureScaledFontOfSize: aNumber hintMetrics: aSymbol [
 	"The fixture font at one size, with hinting of the metrics on or off. The user to device
 	 matrix is the identity, so user space and device space agree and a measured number is a
@@ -137,6 +179,46 @@ VGCairoTextTest >> testACompositeGlyphIsReadThroughItsComponentsAtTheirOffsets [
 	self assert: (points collect: [ :each | each x ]) max equals: 179.
 	self assert: (points collect: [ :each | each y ]) min equals: 0.
 	self assert: (points collect: [ :each | each y ]) max equals: 694
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFaceAnswersTheScaledFontTheClassSideConstructorBuilds [
+	"A drawing asks the face for a scaled font where this package asks the scaled font class for
+	 one. Both spellings must build the same font, down to the run it measures."
+
+	| face matrix identity options fromTheFace fromTheClass |
+	face := VGFontFace newForBytes: self fixtureFontBytes.
+	matrix := VGCairoMatrix newScalingBy: 30 asPoint.
+	identity := VGCairoMatrix newIdentity.
+	options := VGFontOptions new.
+	fromTheFace := face
+		               newScaledFontWithFontMatrix: matrix
+		               userToDeviceMatrix: identity
+		               options: options.
+	fromTheClass := VGScaledFont
+		                fontFace: face
+		                fontMatrix: matrix
+		                userToDeviceMatrix: identity
+		                options: options.
+	self assert: fromTheFace fontFace identicalTo: face.
+	self assert: fromTheFace fontMatrix equals: matrix.
+	self assert: fromTheFace options equals: options.
+	self
+		assert: (fromTheFace textExtentsOf: 'Cairo in Pharo') advance
+		equals: (fromTheClass textExtentsOf: 'Cairo in Pharo') advance
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFaceBuiltFromAFreeTypeFaceReadsTheFontTheManagerHolds [
+	"A drawing that picks its font by family name hands over an AeFTFace. The face of ours built
+	 from it must read the bytes the manager registered under that family and style, because
+	 otherwise the replacement draws the right shapes in the wrong typeface."
+
+	| freetypeFace ours |
+	freetypeFace := self fixtureFreeTypeFace.
+	ours := VGFontFace newForFace: freetypeFace.
+	self assert: ours bytes equals: (self fixtureManagerEntryFor: freetypeFace) bytes.
+	self assert: ours glyphCount equals: freetypeFace numberOfGlyphs
 ]
 
 { #category : 'tests' }
@@ -319,6 +401,26 @@ VGCairoTextTest >> testAppendingTheGlyphsPathAddsOneClosedSubPathPerContour [
 ]
 
 { #category : 'tests' }
+VGCairoTextTest >> testEveryCairoFontEnumerationAnswersTheNamesTheOptionsKnow [
+	"The enumeration classes and VGFontOptions may not drift apart, so each class is asked for a
+	 value under every name its option knows, and is allowed no value beyond them. #names is the
+	 one class-side selector that is not a value, because it is where the names come from."
+
+	{
+		{ VGCairoAntialias. VGFontOptions antialiasNames }.
+		{ VGCairoHintMetrics. VGFontOptions hintMetricsNames }.
+		{ VGCairoHintStyle. VGFontOptions hintStyleNames }.
+		{ VGCairoSubpixelOrder. VGFontOptions subpixelOrderNames } } do: [ :each |
+		| enumeration names |
+		enumeration := each first.
+		names := each second.
+		self assert: (names collect: [ :name | enumeration perform: name ]) equals: names.
+		self
+			assert: (enumeration class selectors reject: [ :selector | selector = #names ]) asSet
+			equals: names asSet ]
+]
+
+{ #category : 'tests' }
 VGCairoTextTest >> testHintedMetricsAreRoundedTheWayFreetypeRoundsThem [
 	"FreeType rounds the ascent and the descent up, and the height and the maximum advance to the
 	 nearest pixel. Measured on live Cairo with the metrics hinted: at size 30 it answers 30, 9, 38
@@ -333,6 +435,27 @@ VGCairoTextTest >> testHintedMetricsAreRoundedTheWayFreetypeRoundsThem [
 	self assert: atSixteen ascent equals: 16.
 	self assert: atSixteen descent equals: 5.
 	self assert: atSixteen height equals: 20
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testOptionsBuiltFromCairosEnumerationsEqualOursBuiltFromOurOwnNames [
+	"A drawing names Cairo's enumerations where this package names symbols, so the four
+	 enumeration classes have to be two spellings of one option rather than two options."
+
+	| throughEnumerations throughNames |
+	throughEnumerations := VGFontOptions new
+		                       antialias: VGCairoAntialias fast;
+		                       hintMetrics: VGCairoHintMetrics on;
+		                       hintStyle: VGCairoHintStyle slight;
+		                       subpixelOrder: VGCairoSubpixelOrder default;
+		                       yourself.
+	throughNames := VGFontOptions new
+		                antialias: #fast;
+		                hintMetrics: #on;
+		                hintStyle: #slight;
+		                subpixelOrder: #default;
+		                yourself.
+	self assert: throughEnumerations equals: throughNames
 ]
 
 { #category : 'tests' }

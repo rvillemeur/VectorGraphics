@@ -725,7 +725,7 @@ VGAlexandriePortedExperiments class >> fillLinearGradientExperimentDiagonal [
 { #category : 'generated - do not edit' }
 VGAlexandriePortedExperiments class >> fillPaint1 [
 
-	
+	<sampleInstance>
 	| surface context fontFace scaledFont |
 	surface := VGCairoImageSurface
 		           extent: 700 @ 500
@@ -773,14 +773,14 @@ VGAlexandriePortedExperiments class >> fillPaint1 [
 		stroke.
 
 	"some text in white blending in the background"
-	fontFace := AeCairoFreetypeFontFace newForFace:
+	fontFace := VGFontFace newForFace:
 		            (AeSourceSansPro_Regular firstFaceUsing:
 			             AeFTLibrary newInitialized).
 	scaledFont := fontFace
 		              newScaledFontWithFontMatrix:
 		              (VGCairoMatrix newScalingBy: 30 asPoint)
 		              userToDeviceMatrix: VGCairoMatrix newIdentity
-		              options: AeCairoFontOptions new.
+		              options: VGFontOptions new.
 	context
 		sourceColor: (Color white alpha: 0.5);
 		translateByX: 500 y: 100.
@@ -794,7 +794,7 @@ VGAlexandriePortedExperiments class >> fillPaint1 [
 { #category : 'generated - do not edit' }
 VGAlexandriePortedExperiments class >> fillPaint2 [
 
-	
+	<sampleInstance>
 	| surface context fontFace scaledFont |
 	surface := VGCairoImageSurface
 		           extent: 700 @ 500
@@ -813,7 +813,7 @@ VGAlexandriePortedExperiments class >> fillPaint2 [
 		fillPreserve;
 		sourceColor: Color yellow;
 		strokeSize: 4;
-		"antialias: AeCairoAntialias none;"operator: VGCairoOperator darken;
+		"antialias: VGCairoAntialias none;"operator: VGCairoOperator darken;
 		strokeDashPattern: (AeFFIDoubleArray newFrom: #( 8 4 2 )) size: 3 offset: 0;
 		useStrokeCapRound;
 		stroke.
@@ -848,14 +848,14 @@ VGAlexandriePortedExperiments class >> fillPaint2 [
 		stroke.
 
 	"some text in white blending in the background"
-	fontFace := AeCairoFreetypeFontFace newForFace:
+	fontFace := VGFontFace newForFace:
 		            (AeSourceSansPro_Regular firstFaceUsing:
 			             AeFTLibrary newInitialized).
 	scaledFont := fontFace
 		              newScaledFontWithFontMatrix:
 		              (VGCairoMatrix newScalingBy: 30 asPoint)
 		              userToDeviceMatrix: VGCairoMatrix newIdentity
-		              options: AeCairoFontOptions new.
+		              options: VGFontOptions new.
 	context
 		sourceColor: (Color white alpha: 0.5);
 		translateByX: 500 y: 100.
@@ -2242,7 +2242,7 @@ VGAlexandriePortedExperiments class >> strokeAndFill2 [
 { #category : 'generated - do not edit' }
 VGAlexandriePortedExperiments class >> texWithHarfbuzzWithFontManager [
 
-	
+	<sampleInstance>
 	| surface context scaledFont fontHeight fontOptions text aManager aFace buffer glyphs anAlexandrieCairoExperiment |
 	anAlexandrieCairoExperiment := self new.
 	text := 'a := A->B->>C <= c|=>d~~>e.'.
@@ -2275,14 +2275,14 @@ VGAlexandriePortedExperiments class >> texWithHarfbuzzWithFontManager [
 		         ifNone: [
 		         anAlexandrieCairoExperiment inform: 'missing font' ].
 
-	fontOptions := AeCairoFontOptions new
-		               antialias: AeCairoAntialias fast;
-		               hintMetrics: AeCairoHintMetrics on;
-		               hintStyle: AeCairoHintStyle slight;
-		               subpixelOrder: AeCairoSubpixelOrder default.
+	fontOptions := VGFontOptions new
+		               antialias: VGCairoAntialias fast;
+		               hintMetrics: VGCairoHintMetrics on;
+		               hintStyle: VGCairoHintStyle slight;
+		               subpixelOrder: VGCairoSubpixelOrder default.
 
-	scaledFont := AeCairoScaledFont
-		              fontFace: (AeCairoFreetypeFontFace newForFace: aFace)
+	scaledFont := VGScaledFont
+		              fontFace: (VGFontFace newForFace: aFace)
 		              fontMatrix:
 		              (VGCairoMatrix newScalingByX: fontHeight y: fontHeight)
 		              userToDeviceMatrix: VGCairoMatrix newIdentity
@@ -2325,7 +2325,7 @@ VGAlexandriePortedExperiments class >> texWithHarfbuzzWithFontManager [
 
 { #category : 'generated - do not edit' }
 VGAlexandriePortedExperiments class >> textAllGlyphsInFontFace [
-	
+	<sampleInstance>
 | surface context scaledFont fontHeight fontOptions text aManager aFace buffer glyphs  |
 
 fontHeight := 22.
@@ -2364,14 +2364,14 @@ text := String new writeStream.
 	text nextPut: character].
 
 
-fontOptions := AeCairoFontOptions new
-	               antialias: AeCairoAntialias fast;
-	               hintMetrics: AeCairoHintMetrics on;
-	               hintStyle: AeCairoHintStyle slight;
-	               subpixelOrder: AeCairoSubpixelOrder default.
+fontOptions := VGFontOptions new
+	               antialias: VGCairoAntialias fast;
+	               hintMetrics: VGCairoHintMetrics on;
+	               hintStyle: VGCairoHintStyle slight;
+	               subpixelOrder: VGCairoSubpixelOrder default.
 
-scaledFont := AeCairoScaledFont
-	              fontFace: (AeCairoFreetypeFontFace newForFace: aFace)
+scaledFont := VGScaledFont
+	              fontFace: (VGFontFace newForFace: aFace)
 	              fontMatrix:
 	              (VGCairoMatrix newScalingByX: fontHeight y: fontHeight)
 	              userToDeviceMatrix: VGCairoMatrix newIdentity
@@ -2401,7 +2401,7 @@ context
 { #category : 'generated - do not edit' }
 VGAlexandriePortedExperiments class >> textWithoutHarfbuzzWithFontManager [
 
-	
+	<sampleInstance>
 	| surface context scaledFont fontHeight fontOptions text aManager aFace anAlexandrieCairoExperiment |
 	anAlexandrieCairoExperiment := self new.
 	text := 'a := A->B->>C <= c|=>d~~>e.'.
@@ -2434,14 +2434,14 @@ VGAlexandriePortedExperiments class >> textWithoutHarfbuzzWithFontManager [
 		         ifNone: [
 		         anAlexandrieCairoExperiment inform: 'missing font' ].
 
-	fontOptions := AeCairoFontOptions new
-		               antialias: AeCairoAntialias fast;
-		               hintMetrics: AeCairoHintMetrics on;
-		               hintStyle: AeCairoHintStyle slight;
-		               subpixelOrder: AeCairoSubpixelOrder default.
+	fontOptions := VGFontOptions new
+		               antialias: VGCairoAntialias fast;
+		               hintMetrics: VGCairoHintMetrics on;
+		               hintStyle: VGCairoHintStyle slight;
+		               subpixelOrder: VGCairoSubpixelOrder default.
 
-	scaledFont := AeCairoScaledFont
-		              fontFace: (AeCairoFreetypeFontFace newForFace: aFace)
+	scaledFont := VGScaledFont
+		              fontFace: (VGFontFace newForFace: aFace)
 		              fontMatrix:
 		              (VGCairoMatrix newScalingByX: fontHeight y: fontHeight)
 		              userToDeviceMatrix: VGCairoMatrix newIdentity

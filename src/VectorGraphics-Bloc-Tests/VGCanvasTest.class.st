@@ -15,13 +15,29 @@ Class {
 }
 
 { #category : 'tests - font bridge' }
+VGCanvasTest >> testAFaceBuiltFromAFreeTypeFaceReadsTheFontTheManagerHolds [
+	"A drawing that picks its font by family name holds a FreeType face and no canvas, so the
+	 resolution belongs to the face itself. It must read the bytes the manager registered under
+	 that family and style, or the replacement draws the right shapes in the wrong typeface."
+
+	| face entry ours |
+	face := AeFontManager globalInstance defaultFace.
+	entry := AeFontManager globalInstance faceEntries detect: [ :each |
+		         each familyName = face familyName and: [
+			         each styleName = face styleName ] ].
+	ours := VGFontFace newForFace: face.
+	self assert: ours bytes equals: entry bytes.
+	self assert: ours glyphCount equals: face numberOfGlyphs
+]
+
+{ #category : 'tests - font bridge' }
 VGCanvasTest >> testAFamilyTheFontManagerDoesNotKnowFallsBackToTheBundledFace [
 	"A face the manager cannot name has no bytes anywhere, and raising inside the renderer would
 	 lose the frame and with it the window. The bundled face is the stated fallback: wrong glyphs
 	 are recoverable, a broken render loop is not."
 
 	self
-		assert: (VGCanvas
+		assert: (VGFontFace
 				 bytesForFamilyName: 'No Such Family At All'
 				 styleName: 'Regular')
 		equals: VGFontFace defaultBytes
@@ -73,7 +89,7 @@ VGCanvasTest >> testAScaledFontIsBuiltOnTheBytesOfTheFaceBlocAskedFor [
 	self assert: font class equals: VGScaledFont.
 	self
 		assert: font fontFace bytes
-		equals: (VGCanvas
+		equals: (VGFontFace
 				 bytesForFamilyName: face familyName
 				 styleName: face styleName).
 	self assert: font fontMatrix equals: (VGCairoMatrix newScalingByX: 17 y: 17)

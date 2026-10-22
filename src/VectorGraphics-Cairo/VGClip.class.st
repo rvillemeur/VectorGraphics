@@ -124,6 +124,49 @@ VGClip >> extents [
 ]
 
 { #category : 'inspector' }
+VGClip >> inspectorMaskSide [
+	"The side of the mask the walk view measures. Sixteen pixels is a glyph of a readable size,
+	 which is the mask whose cost made the narrowing worth having."
+
+	^ 16
+]
+
+{ #category : 'inspector' }
+VGClip >> inspectorMaskWalk: aBuilder [
+	<inspectorPresentationOrder: 20 title: 'Mask walk'>
+	"What one mask costs through me. A mask carries no spans to meet me with, so the backend
+	 scales it by my coverage pixel by pixel and walks me to do it; under a bounded operator a
+	 mask byte of zero leaves the destination as it was, so the walk is narrowed to the rectangle
+	 the mask covers, which is what narrowedTo: answers. Both counts are taken by walking the real
+	 clips, so they cannot drift from VGSoftwareBackend >> maskWith:paint:clip:operator:into:.
+	 Nothing here mutates me: narrowedTo: answers a new clip."
+
+	| rectangle narrowed |
+	rectangle := (self bounds center - (self inspectorMaskSide // 2)) extent:
+		             self inspectorMaskSide asPoint.
+	narrowed := self narrowedTo: rectangle.
+	^ aBuilder newText
+		  text: (String cr join: {
+					   'my bounds: ' , self bounds printString.
+					   'pixels walked for a mask: '
+					   , (self inspectorPixelsWalkedBy: self) printString.
+					   'a mask of ' , self inspectorMaskSide printString , ' square at: '
+					   , rectangle printString.
+					   'narrowed to: ' , narrowed bounds printString.
+					   'pixels walked once narrowed: '
+					   , (self inspectorPixelsWalkedBy: narrowed) printString });
+		  beNotEditable;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGClip >> inspectorMaskWalkContext: aContext [
+	"A clip of no area passes nothing anywhere, so there is no walk to measure for it."
+
+	aContext active: self isEmpty not
+]
+
+{ #category : 'inspector' }
 VGClip >> inspectorPassed: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Passed'>
 	"What a fill of my own extents keeps, one character a pixel, drawn by the real rasteriser
@@ -142,6 +185,17 @@ VGClip >> inspectorPassedContext: aContext [
 	aContext active: self isEmpty not
 ]
 
+{ #category : 'inspector' }
+VGClip >> inspectorPixelsWalkedBy: aClip [
+	"How many pixels a backend visits for one mask through that clip, counted by walking the clip
+	 itself rather than from its bounds, so a clip that keeps a shape counts what it really passes."
+
+	| walked |
+	walked := 0.
+	aClip coverageRowsDo: [ :y :coverage :left | walked := walked + coverage size ].
+	^ walked
+]
+
 { #category : 'testing' }
 VGClip >> isEmpty [
 	^ bounds width <= 0 or: [ bounds height <= 0 ]
@@ -153,6 +207,18 @@ VGClip >> isRectangular [
 	 scan conversion is needed to trim a fill to me."
 
 	^ shapes isEmpty
+]
+
+{ #category : 'clipping' }
+VGClip >> narrowedTo: aRectangle [
+	"The clip that is me inside that rectangle: my own shapes, my own coverage, and no pixel
+	 outside it. A mask carries no spans to meet me with, so it is scaled by my coverage pixel by
+	 pixel and the walk that does it is narrowed to the rectangle the mask covers; see
+	 VGSoftwareBackend >> maskWith:paint:clip:operator:into:."
+
+	^ self class new
+		  setBounds: (self boundsNarrowedTo: aRectangle)
+		  shapes: shapes
 ]
 
 { #category : 'enumerating' }

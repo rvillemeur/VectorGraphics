@@ -321,7 +321,10 @@ VGConformanceTest >> unitsWithoutAPicture [
 	 Unit 1.2 owns the matrix, which changes nothing visible on its own: a transformation shows up
 	 only through a shape, so its three cases are filed under unit 1.3 with the shape verbs they
 	 need.
-	 Unit 1.10 wires the renderer and unit 1.11 profiles it, and neither adds a drawing verb, so
-	 what they change is measured by the cases the earlier units already own."
-	^ #( '1.0' '1.2' '1.9' '1.10' '1.11' )
+	 Unit 1.10 wires the renderer, unit 1.11 profiles it and unit 1.13 gives the font classes the
+	 names Alexandrie calls them by, and none of the three adds a drawing verb, so what they
+	 change is measured by the cases the earlier units already own and, for 1.13, by the five
+	 experiments of the Alexandrie corpus that now draw."
+
+	^ #( '1.0' '1.2' '1.9' '1.10' '1.11' '1.13' )
 ]

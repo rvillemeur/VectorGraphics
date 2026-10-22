@@ -42,11 +42,14 @@ VGAlexandrieCorpus class >> antialiasedEdgeTolerance [
 	^ 36
 ]
 
-{ #category : 'tolerances' }
+{ #category : 'conformance' }
 VGAlexandrieCorpus class >> boundaryPixelAllowanceFor: aSelector [
 	"How many pixels of that experiment may be further from Cairo than its tolerance allows.
-	 None, unless the experiment paints a mesh: see meshBoundaryPixelTable."
-	^ (self meshBoundaryPixelTable
+	 None, unless the experiment paints a mesh or draws a run of glyphs: see meshBoundaryPixelTable
+	 and hintedGlyphRunPixelTable. The two tables name disjoint experiments, because a mesh carries
+	 no text, so the first entry found answers."
+
+	^ ((self meshBoundaryPixelTable , self hintedGlyphRunPixelTable)
 		   detect: [ :each | each key = aSelector ]
 		   ifNone: [ nil ]) ifNil: [ 0 ] ifNotNil: [ :each | each value ]
 ]
@@ -109,6 +112,42 @@ VGAlexandrieCorpus class >> experimentClass [
 VGAlexandrieCorpus class >> experimentSelectors [
 	^ self allExperimentSelectors
 		  reject: [ :each | self nonPictureSelectors includes: each ]
+]
+
+{ #category : 'conformance' }
+VGAlexandrieCorpus class >> hintedGlyphRunPixelTable [
+	"The experiments that select a font and draw a run of glyphs, each with how many pixels may be
+	 further from Cairo than hintedGlyphRunTolerance allows, and why there are any at all. Cairo
+	 rasterises a glyph through FreeType, which grid-fits the outline to the pixel grid before
+	 filling it, and this package fills the outline the font carries. Every stem therefore stands a
+	 fraction of a pixel away from Cairo's and is a whole shade different down its whole length,
+	 which is a disagreement about where the stem is and not about how much of a pixel it covers,
+	 so one worst channel cannot bound it and a count of pixels does, as it does for a mesh. Unit
+	 1.8 measured why it cannot be closed from outside Cairo's own face: the hinted advances are
+	 not reproducible there. Each count is measured, with a tenth of headroom. The two paragraph
+	 experiments measure one thousand two hundred and fifty-six and nine hundred and sixty-six
+	 pixels of eighty-eight thousand; the two paint experiments, which draw one line of text over a
+	 page of antialiased shapes, measure four hundred and seventy-four and one hundred and
+	 eighty-six of three hundred and fifty thousand; and the experiment that draws every glyph the
+	 face carries, which asks for hintStyle slight explicitly, measures thirty-four thousand nine
+	 hundred and twelve of eight hundred and eighty thousand."
+
+	^ {
+		  (#fillPaint1 -> 522).
+		  (#fillPaint2 -> 205).
+		  (#texWithHarfbuzzWithFontManager -> 1063).
+		  (#textAllGlyphsInFontFace -> 38404).
+		  (#textWithoutHarfbuzzWithFontManager -> 1382) }
+]
+
+{ #category : 'conformance' }
+VGAlexandrieCorpus class >> hintedGlyphRunTolerance [
+	"How far one channel of a glyph may stand from Cairo's. It is the tolerance the atlas cases of
+	 the plan's own corpus already carry, because the cause is the same one: Cairo rasterises a
+	 glyph through FreeType and we walk the outline the font carries. See
+	 VGConformanceCorpus class >> textAtlasTolerance and hintedGlyphRunPixelTable."
+
+	^ VGConformanceCorpus textAtlasTolerance
 ]
 
 { #category : 'inspecting' }
@@ -184,21 +223,14 @@ VGAlexandrieCorpus class >> meshColourTolerance [
 
 { #category : 'constants' }
 VGAlexandrieCorpus class >> missingClassUnitTable [
-	"The Alexandrie Cairo classes the experiments name that the replacement has no counterpart for,
-	 each against the unit of VECTORCANVAS-PLAN.md that owes it. The corpus reads this to say why a
-	 case cannot run yet, so a class missing from the table is a gap the test reports.
-	 The font classes name unit 1.10 rather than 1.8: unit 1.8 built the font face, the scaled
-	 font, the metrics and the glyph atlas, but a case that draws text picks its font by family
-	 name through AeFontManager and shapes it with HarfBuzz, and the bridge to those is what 1.10
-	 brings."
-	^ {
-		  (#AeCairoAntialias -> '1.4').
-		  (#AeCairoFontOptions -> '1.10').
-		  (#AeCairoFreetypeFontFace -> '1.10').
-		  (#AeCairoHintMetrics -> '1.10').
-		  (#AeCairoHintStyle -> '1.10').
-		  (#AeCairoScaledFont -> '1.10').
-		  (#AeCairoSubpixelOrder -> '1.10') }
+	"The Alexandrie Cairo classes the experiments name that the replacement has no counterpart
+	 for, each against the unit of VECTORCANVAS-PLAN.md that owes it. The corpus reads this to
+	 say why a case cannot run yet, so a class missing from the table is a gap the test reports.
+	 It is empty since unit 1.13 gave the font classes their counterparts, and it stays here
+	 because it is where the next gap is filed; testEveryFiledMissingClassIsReallyMissing is what
+	 empties it, since a filed class whose counterpart exists is a gap reported after it closed."
+
+	^ { }
 ]
 
 { #category : 'constants' }
@@ -221,10 +253,28 @@ VGAlexandrieCorpus class >> nonPictureSelectors [
 	^ #( #getNumberOfGlyph )
 ]
 
-{ #category : 'substitution' }
+{ #category : 'constants' }
+VGAlexandrieCorpus class >> ourNameExceptions [
+	"The Alexandrie Cairo classes whose counterpart here is not named by the prefix rule, each
+	 against the name we give it. The font classes are named for what they are rather than for
+	 Cairo, because the font stack of this project reads a font's own tables and calls no Cairo
+	 function; the four enumeration classes do follow the rule and need no entry."
+
+	^ {
+		  (#AeCairoFreetypeFontFace -> #VGFontFace).
+		  (#AeCairoScaledFont -> #VGScaledFont).
+		  (#AeCairoFontOptions -> #VGFontOptions) }
+]
+
+{ #category : 'constants' }
 VGAlexandrieCorpus class >> ourNameFor: anAlexandrieClassName [
-	"Our name for an Alexandrie Cairo class, which differs only in the prefix, or nil for a class
-	 that is not part of the Cairo engine at all."
+	"Our name for an Alexandrie Cairo class, which differs only in the prefix except for the
+	 classes ourNameExceptions names, or nil for a class that is not part of the Cairo engine at
+	 all."
+
+	(self ourNameExceptions
+		 detect: [ :each | each key = anAlexandrieClassName ]
+		 ifNone: [ nil ]) ifNotNil: [ :each | ^ each value ].
 	^ (anAlexandrieClassName beginsWith: 'AeCairo')
 		  ifTrue: [ ('VGCairo' , (anAlexandrieClassName allButFirst: 7)) asSymbol ]
 		  ifFalse: [ nil ]
@@ -285,22 +335,28 @@ VGAlexandrieCorpus class >> toleranceFor: aSelector [
 		  ifNotNil: [ :each | each value ]
 ]
 
-{ #category : 'tolerances' }
+{ #category : 'conformance' }
 VGAlexandrieCorpus class >> toleranceTable [
 	"The cases that may not match Cairo exactly, each with how far one channel may differ and why.
 	 It is empty while no case renders; a case added here has to carry its reason, so that a
-	 tolerance is never a quiet way of passing. Three reasons cover every entry. All but one of
+	 tolerance is never a quiet way of passing. Four reasons cover every entry. All but one of
 	 the first group draw a curve, a slanted edge or a half-pixel stroke, so their edge pixels are
 	 shades and ours part from Cairo by a little, and fillPaint3 also scales a bitmap, which we
 	 still sample without a filter. A clip of a circle is an edge of that kind too: the shade is
 	 the one the clip itself carries, and the maskAndClip cases carry it twice over, because a
 	 mask through a clip is scaled by the coverage of the rim of that clip. The mesh cases differ
 	 for a third reason, which is that Cairo colours a pixel of a mesh from the middle of the
-	 piece it subdivided the patch into rather than from the pixel itself. See
-	 antialiasedEdgeTolerance, nearestSampleTolerance and meshColourTolerance."
-	| edges meshes |
+	 piece it subdivided the patch into rather than from the pixel itself. The cases that select a
+	 font and draw a run of glyphs differ for a fourth, which is that Cairo grid-fits the outline
+	 of a glyph through FreeType before filling it, so a stem of ours stands a fraction of a pixel
+	 away from Cairo's; those cases are bounded by a count of pixels as well, because the distance
+	 of one channel says nothing about a stem in the wrong place. See antialiasedEdgeTolerance,
+	 nearestSampleTolerance, meshColourTolerance and hintedGlyphRunTolerance."
+
+	| edges meshes glyphs |
 	edges := self antialiasedEdgeTolerance.
 	meshes := self meshColourTolerance.
+	glyphs := self hintedGlyphRunTolerance.
 	^ {
 		  (#CanonicalGradientAllQuadrantPattern -> meshes).
 		  (#CanonicalGradientFirstQuadrantPattern -> meshes).
@@ -324,6 +380,8 @@ VGAlexandrieCorpus class >> toleranceTable [
 		  (#clip2 -> edges).
 		  (#fillLinearGradientExperiment -> edges).
 		  (#fillLinearGradientExperimentDiagonal -> edges).
+		  (#fillPaint1 -> glyphs).
+		  (#fillPaint2 -> glyphs).
 		  (#fillPaint3 -> self nearestSampleTolerance).
 		  (#lineColor -> edges).
 		  (#lineDash -> edges).
@@ -339,6 +397,9 @@ VGAlexandrieCorpus class >> toleranceTable [
 		  (#radialGradientPattern1 -> edges).
 		  (#strokeAndFill -> edges).
 		  (#strokeAndFill2 -> edges).
+		  (#texWithHarfbuzzWithFontManager -> glyphs).
+		  (#textAllGlyphsInFontFace -> glyphs).
+		  (#textWithoutHarfbuzzWithFontManager -> glyphs).
 		  (#transformationShear -> edges) }
 ]
 
