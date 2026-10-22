@@ -27,12 +27,48 @@ VGTiledFillExamples class >> coverageOfACircle [
 	^ VGTileCoverage of: surface displayList entries first
 ]
 
+{ #category : 'examples' }
+VGTiledFillExamples class >> encodingOfThreeShapes [
+	"The same three fills, binned and then written out as the buffers a dispatch uploads. The
+	 Tile table and Entries tabs read the buffers back, and the rasteriser draws this encoding
+	 as readily as it draws a binning."
+	<sampleInstance>
+	| surface |
+	surface := VGCairoImageSurface extent: self frameExtent.
+	surface newContext
+		sourceColorR: 0.1 g: 0.7 b: 0.2 a: 1.0;
+		rectangleX: 4 y: 4 width: 56 height: 56;
+		fill;
+		setOperatorSource;
+		sourceColorR: 0.9 g: 0.4 b: 0.0 a: 0.6;
+		circleCenterX: 26 y: 26 radius: 16.5;
+		fill;
+		setOperatorClear;
+		circleCenterX: 42 y: 42 radius: 10.25;
+		fill.
+	^ VGTiledFillEncoding of: surface displayList extent: self frameExtent
+]
+
 { #category : 'constants' }
 VGTiledFillExamples class >> frameExtent [
 	"The extent of the conformance cases, so that an example and a case can be read against each
 	 other. The corpus itself may not be named from this package."
 
 	^ 64 @ 64
+]
+
+{ #category : 'examples' }
+VGTiledFillExamples class >> pixelPaintOfATranslucentOrange [
+	"The paint a decoded entry carries: one premultiplied pixel, quantised once by the format
+	 the encoding writes and answered again wherever it is asked for."
+	<sampleInstance>
+	| pixel |
+	pixel := (VGColorPaint
+		          r: 0.9
+		          g: 0.4
+		          b: 0.0
+		          alpha: 0.6) pixelIn: VGTiledFillEncoding targetFormat atX: 0 y: 0.
+	^ VGPixelPaint pixel: pixel
 ]
 
 { #category : 'examples' }

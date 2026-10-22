@@ -7,7 +7,7 @@ Class {
 	#name : 'VGTiledFillRasteriser',
 	#superclass : 'Object',
 	#instVars : [
-		'binning'
+		'tiles'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -23,7 +23,15 @@ VGTiledFillRasteriser class >> of: aDisplayList extent: anExtent [
 
 { #category : 'instance creation' }
 VGTiledFillRasteriser class >> of: aDisplayList grid: aGrid [
-	^ self new setBinning: (VGTileBinning of: aDisplayList grid: aGrid)
+	^ self on: (VGTileBinning of: aDisplayList grid: aGrid)
+]
+
+{ #category : 'instance creation' }
+VGTiledFillRasteriser class >> on: aTileSource [
+	"A frame already cut into tiles, whether by a binning of a display list or by an encoding
+	 that holds the same frame in flat buffers. Four messages are all I send it: its grid, the
+	 tiles it touches, how many it touches and the entries of one of them."
+	^ self new setTiles: aTileSource
 ]
 
 { #category : 'testing' }
@@ -55,11 +63,6 @@ VGTiledFillRasteriser class >> supportsEntry: anEntry [
 		  anEntry paint isSolid and: [
 			  anEntry clip isRectangular and: [
 				  self supportedOperators includes: anEntry operator ] ] ]
-]
-
-{ #category : 'accessing' }
-VGTiledFillRasteriser >> binning [
-	^ binning
 ]
 
 { #category : 'drawing' }
@@ -99,7 +102,7 @@ VGTiledFillRasteriser >> drawOn: aSurface [
 	 the whole point of the binning: on the device one workgroup will own one tile and one
 	 invocation one pixel of it, and the order the tiles are drawn in will not be this one."
 
-	binning touchedTileIndexes asSortedCollection do: [ :index |
+	tiles touchedTileIndexes asSortedCollection do: [ :index |
 		self drawTileAt: index on: aSurface ]
 ]
 
@@ -110,7 +113,7 @@ VGTiledFillRasteriser >> drawTileAt: anIndex on: aSurface [
 
 	| bounds |
 	bounds := self grid boundsOfTileAt: anIndex.
-	(binning entriesOfTileAt: anIndex) do: [ :each |
+	(tiles entriesOfTileAt: anIndex) do: [ :each |
 		| box coverage |
 		box := bounds intersect: (self grid wholePixelsOf: each boundingBox).
 		coverage := VGTileCoverage of: each.
@@ -136,7 +139,7 @@ VGTiledFillRasteriser >> drawnForm [
 
 { #category : 'accessing' }
 VGTiledFillRasteriser >> grid [
-	^ binning grid
+	^ tiles grid
 ]
 
 { #category : 'inspector' }
@@ -152,7 +155,7 @@ VGTiledFillRasteriser >> inspectorDrawing: aBuilder [
 
 { #category : 'inspector' }
 VGTiledFillRasteriser >> inspectorDrawingContext: aContext [
-	aContext active: binning isNotNil
+	aContext active: tiles isNotNil
 ]
 
 { #category : 'inspector' }
@@ -180,7 +183,7 @@ VGTiledFillRasteriser >> inspectorTiles: aBuilder [
 
 { #category : 'inspector' }
 VGTiledFillRasteriser >> inspectorTilesContext: aContext [
-	aContext active: binning isNotNil
+	aContext active: tiles isNotNil
 ]
 
 { #category : 'printing' }
@@ -188,27 +191,32 @@ VGTiledFillRasteriser >> printOn: aStream [
 	aStream
 		nextPutAll: self class name;
 		nextPut: $(;
-		print: binning touchedTileCount;
+		print: tiles touchedTileCount;
 		nextPutAll: ' tiles, ';
-		print: binning binnedEntryCount;
+		print: tiles binnedEntryCount;
 		nextPutAll: ' entries)'
 ]
 
 { #category : 'initialization' }
-VGTiledFillRasteriser >> setBinning: aBinning [
-	binning := aBinning
+VGTiledFillRasteriser >> setTiles: aTileSource [
+	tiles := aTileSource
 ]
 
 { #category : 'inspector' }
 VGTiledFillRasteriser >> tileReport [
 	"The touched tiles in the order I draw them."
 
-	^ binning touchedTileIndexes asSortedCollection asArray collect: [ :index |
+	^ tiles touchedTileIndexes asSortedCollection asArray collect: [ :index |
 		  | entries |
-		  entries := binning entriesOfTileAt: index.
+		  entries := tiles entriesOfTileAt: index.
 		  {
 			  index.
 			  (self grid boundsOfTileAt: index).
 			  entries size.
 			  (entries allSatisfy: [ :each | self class supportsEntry: each ]) } ]
+]
+
+{ #category : 'accessing' }
+VGTiledFillRasteriser >> tiles [
+	^ tiles
 ]
