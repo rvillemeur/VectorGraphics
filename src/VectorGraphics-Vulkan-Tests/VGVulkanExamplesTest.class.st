@@ -15,5 +15,7 @@ Class {
 
 { #category : 'accessing' }
 VGVulkanExamplesTest >> exampleHolders [
-	^ { VGVulkanBackendExamples }
+	^ {
+		  VGVulkanBackendExamples.
+		  VGVulkanRoundTripExamples }
 ]

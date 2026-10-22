@@ -134,7 +134,6 @@ VGFrameProfile class >> stageByPackageAndTag [
 	"The stage each package and tag of this project belongs to, keyed by `'<package>/<tag>'`. The
 	 tag is the unit rather than the class, so a class moved between tags moves stage with it and
 	 nothing here has to be touched; `VGFrameProfileTest` holds these keys against the organiser.
-
 	 The stages are the frame read as a pipeline. `canvasApi` is the drawing verbs and the state
 	 they keep, `transforms` the matrices they multiply, `pathAndStroke` the flattening and the
 	 stroke outlines, `displayList` the recording and the draining of a frame, `coverage` the
@@ -143,7 +142,8 @@ VGFrameProfile class >> stageByPackageAndTag [
 	 format, which is both the reading and writing of a pixel and the byte arithmetic that
 	 quantises a colour or a coverage into one. Then `text`, `blur` and `handover`. `harness` is this class, which runs
 	 inside the frame it measures. `notInTheFrame` is code that cannot appear in a frame: the
-	 exporters, the reflection and inventory helpers, the examples, and the classes this project
+	 exporters, the reflection and inventory helpers, the examples, the budget measurement that
+	 weighs a device round trip against a frame of this profile, and the classes this project
 	 inherited from the earlier pure Pharo VectorGraphics package."
 
 	^ Dictionary newFrom: {
@@ -171,6 +171,7 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Bloc/Exporters' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc-Examples/Uncategorized' -> #notInTheFrame).
 			  ('VectorGraphics-Cairo-Examples/Examples' -> #notInTheFrame).
+			  ('VectorGraphics-Vulkan/Budget' -> #notInTheFrame).
 			  ('VectorGraphics-Vulkan-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics/Examples' -> #notInTheFrame).
 			  ('VectorGraphics/Kernel' -> #notInTheFrame).
