@@ -18,5 +18,6 @@ VGVulkanExamplesTest >> exampleHolders [
 	^ {
 		  VGVulkanBackendExamples.
 		  VGVulkanRoundTripExamples.
-		  VGTileBinningExamples }
+		  VGTileBinningExamples.
+		  VGTiledFillExamples }
 ]
