@@ -1,12 +1,13 @@
 "
 I hold the Vulkan backend to the contract VGBackend freezes.
-Three facts: it offers itself for selection ahead of the software backend, its probe answers an
-instance of it or nothing at all on whichever machine the suite runs, and every drawing message it
-inherits raises VGBackendFailure until unit 2.3 gives it pixels to write.
-The fourth test draws a real frame through it and requires the picture the software backend draws,
-which is the proof that the failover is arranged and not merely described.
-I keep and restore the selection state of VGBackend, because forcing a backend or failing one is
-class-side state that would otherwise leak into the next test.
+
+It offers itself for selection ahead of the software backend, its probe answers an instance of it or nothing at all on whichever machine the suite runs, and a frame of the tiled fill subset drawn through it holds the same bytes as the same frame drawn by the software backend, where a device computes at all.
+
+What it cannot draw it refuses rather than drawing wrongly: an entry outside the subset fails while the frame is recorded, a surface blit fails the same way, and a target of another format fails while the frame is drained. A frame the subset refuses draws the picture the software backend draws, which is the proof that the failover is arranged and not merely described.
+
+The pixels of a target go out packed row after row whatever its stride is, because the kernel indexes a pixel by its row and its column alone.
+
+I keep and restore the selection state of VGBackend, because forcing a backend or failing one is class-side state that would otherwise leak into the next test.
 "
 Class {
 	#name : 'VGVulkanBackendTest',
@@ -20,12 +21,61 @@ Class {
 	#tag : 'Tests'
 }
 
+{ #category : 'fixtures' }
+VGVulkanBackendTest >> displayListOfTheFixtureFrame [
+	"The fixture frame recorded and read before anything drains it."
+
+	| surface list |
+	surface := VGCairoImageSurface extent: self frame extent.
+	self frame drawOn: surface.
+	list := surface displayList.
+	^ list
+]
+
+{ #category : 'fixtures' }
+VGVulkanBackendTest >> formOfExtent: anExtent drawnWith: aBlock on: aBackend [
+	"A frame of my own drawn through that backend and answered as a Form, the way the fixture
+	 answers its own, so that a picture is held against another picture."
+
+	| surface |
+	surface := VGCairoImageSurface extent: anExtent.
+	surface backend: aBackend.
+	aBlock value: surface newContext.
+	surface flush.
+	^ surface asForm
+]
+
 { #category : 'running' }
 VGVulkanBackendTest >> frame [
 	"The frame the backend tests draw, the same fixture the selection tests of the engine use, so
 	 that a picture drawn here is held against the same picture."
 
 	^ VGBackendFrameFixture new
+]
+
+{ #category : 'fixtures' }
+VGVulkanBackendTest >> recordTheFrameOn: aBackend [
+	"The fixture frame recorded on that backend and not drained, which is what a surface does to
+	 the backend it holds: it replays its display list and drains afterwards."
+
+	| surface |
+	surface := VGCairoImageSurface extent: self frame extent.
+	self frame drawOn: surface.
+	surface displayList replayOn: aBackend.
+	surface displayList reset
+]
+
+{ #category : 'fixtures' }
+VGVulkanBackendTest >> refusedEntry [
+	"One recorded entry outside the subset, read out of a frame nothing has drained. The list is
+	 reset afterwards, so that nothing replays the frame when the surface is collected."
+
+	| surface entry |
+	surface := VGCairoImageSurface extent: self frame extent.
+	self unsupportedFrame value: surface newContext.
+	entry := surface displayList entries first.
+	surface displayList reset.
+	^ entry
 ]
 
 { #category : 'running' }
@@ -45,37 +95,113 @@ VGVulkanBackendTest >> tearDown [
 ]
 
 { #category : 'tests' }
-VGVulkanBackendTest >> testAFrameForcedOnTheVulkanBackendIsDrawnBySoftwareAnyway [
-	"The failover with the real backend and not a stub: a surface forced onto it draws the
+VGVulkanBackendTest >> testADrainWithNothingRecordedLeavesTheTargetAlone [
+	"A surface flushed with no frame recorded asks nothing of a device: there is no dispatch, no
+	 failure and no pixel written."
+
+	| backend target |
+	target := VGCairoImageSurface extent: self frame extent.
+	backend := VGVulkanBackend new.
+	backend drainInto: target.
+	self
+		assert: target asForm bits
+		equals: (VGCairoImageSurface extent: self frame extent) asForm bits
+]
+
+{ #category : 'tests' }
+VGVulkanBackendTest >> testAFrameOutsideTheSubsetIsDrawnBySoftwareAnyway [
+	"The failover with the real backend and not a stub: a frame the subset refuses draws the
 	 picture the software backend draws, and the Vulkan backend is out of selection afterwards."
 
 	| expected drawn |
-	expected := self frame drawnBy: VGSoftwareBackend new.
+	expected := self
+		            formOfExtent: self frame extent
+		            drawnWith: self unsupportedFrame
+		            on: VGSoftwareBackend new.
 	VGBackend clearPreference.
-	drawn := self frame drawnBy: VGVulkanBackend new.
+	drawn := self
+		         formOfExtent: self frame extent
+		         drawnWith: self unsupportedFrame
+		         on: VGVulkanBackend new.
 	self assert: drawn bits equals: expected bits.
 	self assert: (VGBackend rejectedClasses includes: VGVulkanBackend).
 	self assert: VGBackend preferredClass equals: VGSoftwareBackend
 ]
 
 { #category : 'tests' }
-VGVulkanBackendTest >> testEveryDrawingMessageFailsUntilTheBackendDraws [
-	"Unit 2.0 wires the failover and nothing else, so the backend answers the whole boundary with
-	 a failure that names it. The selectors are read from VGBackend itself rather than listed
-	 here, so a boundary message added later is held to the same rule."
+VGVulkanBackendTest >> testASurfaceBlitFailsTheFrame [
+	"The other boundary message: a mask or a surface paint is no fill, and the subset of unit 2.3
+	 holds fills alone. None of the arguments is read, so the refusal stands whatever they are."
 
-	| backend |
+	| backend raised |
 	backend := VGVulkanBackend new.
-	VGBackend selectors do: [ :each |
-		| arguments raised |
-		arguments := (1 to: each numArgs) collect: [ :index | nil ].
-		raised := [
-		          backend perform: each withArguments: arguments.
-		          nil ]
-			          on: VGBackendFailure
-			          do: [ :failure | failure ].
-		self assert: raised notNil.
-		self assert: raised backend identicalTo: backend ]
+	raised := [
+	          backend blitSurface: nil at: nil paint: nil clip: nil operator: nil.
+	          nil ]
+		          on: VGBackendFailure
+		          do: [ :failure | failure ].
+	self assert: raised notNil.
+	self assert: raised backend identicalTo: backend
+]
+
+{ #category : 'tests' }
+VGVulkanBackendTest >> testATargetOfAnotherFormatFailsTheFrame [
+	"A frame is encoded for one surface format, so a target of any other belongs to the software
+	 backend. The refusal comes while the frame is drained and before its first pixel, which is
+	 what lets the surface replay it whole."
+
+	| backend target raised |
+	backend := VGVulkanBackend new.
+	target := VGCairoImageSurface
+		          extent: self frame extent
+		          format: VGCairoSurfaceFormat a8.
+	self recordTheFrameOn: backend.
+	raised := [
+	          backend drainInto: target.
+	          nil ]
+		          on: VGBackendFailure
+		          do: [ :failure | failure ].
+	self assert: raised notNil.
+	self assert: raised backend identicalTo: backend
+]
+
+{ #category : 'tests' }
+VGVulkanBackendTest >> testAnEntryOfTheSubsetIsRecordedAndDrawnLater [
+	"A fill the kernel can draw is recorded and nothing is asked of a device while the frame is
+	 still being read: the drawing waits for the drain, which is what lets the whole frame be
+	 checked before its first pixel."
+
+	| backend entry |
+	backend := VGVulkanBackend new.
+	entry := (self displayListOfTheFixtureFrame) entries first.
+	backend
+		fillSegments: entry segments
+		paint: entry paint
+		clip: entry clip
+		operator: entry operator.
+	self assert: backend recordedFrame entries size equals: 1
+]
+
+{ #category : 'tests' }
+VGVulkanBackendTest >> testAnEntryOutsideTheSubsetFailsTheFrame [
+	"The subset is checked entry by entry while the frame is recorded, so a frame holding one
+	 entry the kernel cannot draw fails before any pixel of it is written. The failure names the
+	 backend, because the recovery rejects a backend by class."
+
+	| backend entry raised |
+	backend := VGVulkanBackend new.
+	entry := self refusedEntry.
+	raised := [
+	          backend
+		          fillSegments: entry segments
+		          paint: entry paint
+		          clip: entry clip
+		          operator: entry operator.
+	          nil ]
+		          on: VGBackendFailure
+		          do: [ :failure | failure ].
+	self assert: raised notNil.
+	self assert: raised backend identicalTo: backend
 ]
 
 { #category : 'tests' }
@@ -96,6 +222,70 @@ VGVulkanBackendTest >> testTheBackendIsProbedBeforeTheSoftwareOne [
 ]
 
 { #category : 'tests' }
+VGVulkanBackendTest >> testTheDeviceDrawsTheFrameTheSoftwareBackendDraws [
+	"The device and the processor on one frame, byte for byte. The fixture frame is two
+	 rectangles of whole pixels, so every coverage in it is nothing or everything and the single
+	 floats of the device answer what the Float64 of the rasteriser answer. A machine with no
+	 device has nothing to compare, so the fact is held where the probe answers a backend. Both
+	 the preference and the rejections are cleared first: a failover earlier in the session would
+	 otherwise keep this backend out of selection and make the fact below say nothing."
+
+	| expected drawn |
+	VGVulkanBackend probe ifNil: [ ^ self ].
+	expected := self frame drawnBy: VGSoftwareBackend new.
+	VGBackend restorePreference: nil rejections: #( ).
+	drawn := self frame drawnBy: VGVulkanBackend new.
+	self assert: drawn bits equals: expected bits.
+	self deny: (VGBackend rejectedClasses includes: VGVulkanBackend)
+]
+
+{ #category : 'tests' }
+VGVulkanBackendTest >> testThePixelsOfATargetArePackedRowAfterRowWhateverItsStrideIs [
+	"The kernel indexes a pixel by its row and its column alone, so what it is given holds no
+	 padding between the rows. A target whose stride is wider than its row keeps that padding:
+	 the rows go out packed, and they come back into the rows they came from with every padding
+	 byte of the target still as it was."
+
+	| backend width height stride data surface packed |
+	backend := VGVulkanBackend new.
+	width := 3.
+	height := 2.
+	stride := width * VGTiledFillEncoding targetFormat bytesPerPixel + 8.
+	data := ByteArray new: stride * height.
+	1 to: data size do: [ :index | data at: index put: 255 ].
+	surface := VGCairoImageSurface
+		           unownedNewForData: data
+		           format: VGTiledFillEncoding targetFormat
+		           width: width
+		           height: height
+		           stride: stride.
+	0 to: height - 1 do: [ :row |
+		0 to: width - 1 do: [ :column |
+			surface primitivePixelAtX: column y: row put: row * width + column ] ].
+	packed := backend pixelsOf: surface.
+	self
+		assert: packed size
+		equals: width * height * VGTiledFillEncoding targetFormat bytesPerPixel.
+	0 to: width * height - 1 do: [ :index |
+		self
+			assert: (packed uint32AtOffset: index * VGTiledFillEncoding targetFormat bytesPerPixel)
+			equals: index ].
+	0 to: width * height - 1 do: [ :index |
+		packed
+			uint32AtOffset: index * VGTiledFillEncoding targetFormat bytesPerPixel
+			put: index + 100 ].
+	backend write: packed into: surface.
+	0 to: height - 1 do: [ :row |
+		0 to: width - 1 do: [ :column |
+			self
+				assert: (surface primitivePixelAtX: column y: row)
+				equals: row * width + column + 100 ] ].
+	1 to: height do: [ :row |
+		(width * VGTiledFillEncoding targetFormat bytesPerPixel + 1 to: stride) do: [ :offset |
+			self assert: (data at: row - 1 * stride + offset) equals: 255 ] ]
+]
+
+{ #category : 'tests' }
 VGVulkanBackendTest >> testTheProbeAnswersTheBackendOrNothing [
 	"The probe runs a real dispatch, so its answer depends on the machine the suite runs on: an
 	 instance of the backend where a device computes, nil where none does. What may never happen
@@ -104,4 +294,20 @@ VGVulkanBackendTest >> testTheProbeAnswersTheBackendOrNothing [
 	| probed |
 	probed := VGVulkanBackend probe.
 	probed ifNotNil: [ self assert: probed class equals: VGVulkanBackend ]
+]
+
+{ #category : 'fixtures' }
+VGVulkanBackendTest >> unsupportedFrame [
+	"A frame the subset refuses: the clip is a circle, so the one entry it records is a fill the
+	 kernel cannot draw. The failover is held to this frame rather than to the fixture one,
+	 because the fixture frame is a solid fill inside a rectangular clip and the device draws
+	 that from unit 2.3 on."
+
+	^ [ :context |
+	  context
+		  circleCenterX: 20 y: 15 radius: 12;
+		  clip;
+		  sourceColorR: 0.0 g: 0.6 b: 0.3;
+		  rectangleX: 2 y: 2 width: 36 height: 26;
+		  fill ]
 ]

@@ -28,6 +28,35 @@ VGTiledFillExamples class >> coverageOfACircle [
 ]
 
 { #category : 'examples' }
+VGTiledFillExamples class >> dispatchOfThreeShapesOnThisMachine [
+	<sampleInstance>
+	"One click: the three shapes of the frame above sent to a device, with the Buffers tab
+	 holding what went out, binding by binding, and the target holding what came back.
+	 Where no device computes, the frame is encoded and nothing is dispatched: an example may not
+	 raise on a machine with no driver, and the bytes it would have uploaded are worth reading
+	 there too.
+	 The context is destroyed before the dispatch is answered, because the bytes a dispatch keeps
+	 are in object memory and a device held open by an example would outlive the click."
+
+	| encoding target context dispatch |
+	encoding := self encodingOfThreeShapes.
+	target := ByteArray new:
+		          self frameExtent x * self frameExtent y
+		          * VGTiledFillEncoding targetFormat bytesPerPixel.
+	context := [ VkContext computeContext ]
+		           on: Error
+		           do: [ :failure | nil ].
+	context ifNil: [
+		dispatch := VGTiledFillDispatch new.
+		dispatch encode: encoding target: target.
+		^ dispatch ].
+	dispatch := VGTiledFillDispatch on: context.
+	^ [
+	  dispatch draw: encoding into: target.
+	  dispatch ] ensure: [ context destroy ]
+]
+
+{ #category : 'examples' }
 VGTiledFillExamples class >> encodingOfThreeShapes [
 	"The same three fills, binned and then written out as the buffers a dispatch uploads. The
 	 Tile table and Entries tabs read the buffers back, and the rasteriser draws this encoding
@@ -55,6 +84,18 @@ VGTiledFillExamples class >> frameExtent [
 	 other. The corpus itself may not be named from this package."
 
 	^ 64 @ 64
+]
+
+{ #category : 'examples' }
+VGTiledFillExamples class >> kernelOfTheDefaultGrid [
+	"The tiled fill kernel of the tile size every frame of this engine is binned over, built so
+	 that its module and the bytes of it are there to be read."
+
+	<sampleInstance>
+	| kernel |
+	kernel := VGTiledFillKernel default.
+	kernel spirv.
+	^ kernel
 ]
 
 { #category : 'examples' }

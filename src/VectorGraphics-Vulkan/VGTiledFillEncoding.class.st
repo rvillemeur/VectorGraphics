@@ -97,6 +97,16 @@ VGTiledFillEncoding class >> edgeCountField [
 	^ 7
 ]
 
+{ #category : 'constants' }
+VGTiledFillEncoding class >> edgeEndXField [
+	^ 3
+]
+
+{ #category : 'constants' }
+VGTiledFillEncoding class >> edgeEndYField [
+	^ 4
+]
+
 { #category : 'layout' }
 VGTiledFillEncoding class >> edgeFloats [
 	"The floats one edge takes: its two ends, as x then y."
@@ -107,6 +117,19 @@ VGTiledFillEncoding class >> edgeFloats [
 VGTiledFillEncoding class >> edgeOffsetField [
 	"Where the edges of this entry start, counted in edges from the first edge of the buffer."
 	^ 6
+]
+
+{ #category : 'constants' }
+VGTiledFillEncoding class >> edgeStartXField [
+	"The four floats one edge of a fill takes, in the order writeEdgesOf:at: writes them, which
+	 is the order VGSegments holds a line in: the start, then the end."
+
+	^ 1
+]
+
+{ #category : 'constants' }
+VGTiledFillEncoding class >> edgeStartYField [
+	^ 2
 ]
 
 { #category : 'layout' }

@@ -16,6 +16,26 @@ Class {
 }
 
 { #category : 'constants' }
+VGTiledFillTest class >> deviceChannelTolerance [
+	"How far a channel of a pixel drawn on the device may stand from the same channel drawn by
+	 the software backend. The device computes a coverage in f32 where the rasteriser computes it
+	 in Float64, so the two agree exactly wherever a coverage is nothing or everything and the
+	 quantised byte of an antialiased edge can be one apart. Measured over the twenty-two cases
+	 of the subset: no pixel of any case is farther than this."
+
+	^ 1
+]
+
+{ #category : 'constants' }
+VGTiledFillTest class >> devicePixelsAllowedToDifferPerCase [
+	"How many pixels of one case may differ from the software backend at all. Measured over the
+	 twenty-two cases: one pixel of path-filled-rounded-rectangle differs, by one in one channel,
+	 and no pixel of the other twenty-one differs at all."
+
+	^ 1
+]
+
+{ #category : 'constants' }
 VGTiledFillTest class >> fillCaseCount [
 	"Counted over the corpus: twenty-two of the forty-one cases are fills of a solid paint inside
 	 a rectangular clip, which is the subset unit 2.3 draws. The other nineteen carry a gradient,
@@ -29,6 +49,36 @@ VGTiledFillTest >> caseExtent [
 	"The extent of every case of the conformance corpus, and of every frame I draw myself."
 
 	^ VGConformanceCorpus caseExtent
+]
+
+{ #category : 'private' }
+VGTiledFillTest >> classesNamedBy: aMethod [
+	"Every class that method names, read from its literals, so a rule about what a method may
+	 name is checked against the compiled method and not against its text."
+
+	^ (aMethod literals
+		   select: [ :each |
+		   each isVariableBinding and: [ each value isBehavior ] ])
+		  collect: [ :each | each value ]
+]
+
+{ #category : 'running' }
+VGTiledFillTest >> deviceFormOfExtent: anExtent drawnWith: aBlock on: aContext [
+	"The same frame drawn on the device: encoded, dispatched over one workgroup a tile and the
+	 pixels written back. The pixels are packed by the backend itself, because the frame has to
+	 reach the device the way a drained surface sends it. Nothing here goes through the failover,
+	 so a device that fails raises rather than quietly answering the software picture."
+
+	| surface encoding pixels backend |
+	surface := VGCairoImageSurface extent: anExtent.
+	aBlock value: surface newContext.
+	encoding := VGTiledFillEncoding of: surface displayList extent: anExtent.
+	surface displayList reset.
+	backend := VGVulkanBackend new.
+	pixels := backend pixelsOf: surface.
+	(VGTiledFillDispatch on: aContext) draw: encoding into: pixels.
+	backend write: pixels into: surface.
+	^ surface asForm
 ]
 
 { #category : 'fixtures' }
@@ -53,6 +103,23 @@ VGTiledFillTest >> encodedFormOfExtent: anExtent drawnWith: aBlock [
 		drawOn: surface.
 	surface displayList reset.
 	^ surface asForm
+]
+
+{ #category : 'private' }
+VGTiledFillTest >> kernelDecorationLiterals: aDecoration [
+	"Every literal that decoration carries in the kernel's module, read from the module's own
+	 decoration instructions and not from the bytes."
+
+	^ ((VGTiledFillKernel default module decorations select: [ :each |
+		    (each first = #decorate and: [ each third = aDecoration ]) ]) collect: [
+		   :each | each fourth ]) flattened
+]
+
+{ #category : 'private' }
+VGTiledFillTest >> kernelValidator [
+	"The kernel of the default grid, read by the one tool that knows what a module may be."
+
+	^ PVSpirvValidator on: VGTiledFillKernel default spirv
 ]
 
 { #category : 'fixtures' }
@@ -191,6 +258,47 @@ VGTiledFillTest >> testADecodedTileAnswersItsEntriesInTheOrderTheyWereDrawn [
 ]
 
 { #category : 'tests' }
+VGTiledFillTest >> testADispatchSendsOneRunOfBytesForEveryBindingTheKernelReads [
+	"What a dispatch uploads: one run of bytes for every binding the kernel declares, each as
+	 wide as the words behind it, and a frame record holding the extent the kernel indexes a
+	 pixel by. None of this needs a device, so it is held on every machine."
+
+	| encoding target bytes word |
+	word := VGTiledFillKernel elementStride.
+	encoding := VGTiledFillEncoding
+		            of: (self
+				             displayListOfExtent: self caseExtent
+				             drawnWith: self mixedFillFrame)
+		            extent: self caseExtent.
+	target := ByteArray new:
+		          self caseExtent x * self caseExtent y
+		          * VGTiledFillEncoding targetFormat bytesPerPixel.
+	bytes := VGTiledFillDispatch new bytesOf: encoding target: target.
+	self
+		assert: bytes keys asSortedCollection asArray
+		equals: VGTiledFillKernel bindingNames asSortedCollection asArray.
+	self
+		assert: (bytes at: #tileTable) size
+		equals: encoding tileTable size * word.
+	self assert: (bytes at: #edges) size equals: encoding edges size * word.
+	self assert: (bytes at: #target) identicalTo: target.
+	self
+		assert: ((bytes at: #frame) uint32AtOffset:
+				 VGTiledFillKernel frameWidthField - 1 * word)
+		equals: self caseExtent x.
+	self
+		assert: ((bytes at: #frame) uint32AtOffset:
+				 VGTiledFillKernel frameHeightField - 1 * word)
+		equals: self caseExtent y.
+	self
+		assert: ((bytes at: #edges) float32AtOffset: 0)
+		equals: (encoding edges at: 1).
+	self
+		assert: ((bytes at: #tileTable) uint32AtOffset: 0)
+		equals: (encoding tileTable at: 1)
+]
+
+{ #category : 'tests' }
 VGTiledFillTest >> testAFillBeyondTheSurfaceLeavesEverySurfacePixelAlone [
 	"A shape wholly outside the clip, which is the surface itself here: no tile is touched, and a
 	 pixel of a neighbouring tile is not written on its behalf."
@@ -203,6 +311,34 @@ VGTiledFillTest >> testAFillBeyondTheSurfaceLeavesEverySurfacePixelAlone [
 	self
 		assert: (self tiledFormOfExtent: self caseExtent drawnWith: draw) bits
 		equals: (self softwareFormOfExtent: self caseExtent drawnWith: draw) bits
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testAFrameThatTouchesNoTileIsDispatchedOnNoDeviceAtAll [
+	"A fill wholly beyond the surface is binned into no tile, so there is no workgroup to
+	 dispatch and no pixel to write. The dispatch answers the pixels it was given as they were,
+	 and asks nothing of a device to do it."
+
+	| encoding target dispatch |
+	encoding := VGTiledFillEncoding
+		            of: (self
+				             displayListOfExtent: self caseExtent
+				             drawnWith: [ :context |
+					             context
+						             rectangleX: self caseExtent x + 10
+						             y: self caseExtent y + 10
+						             width: 10
+						             height: 10;
+						             fill ])
+		            extent: self caseExtent.
+	target := ByteArray new:
+		          self caseExtent x * self caseExtent y
+		          * VGTiledFillEncoding targetFormat bytesPerPixel.
+	dispatch := VGTiledFillDispatch new.
+	self assert: encoding touchedTileCount equals: 0.
+	self assert: (dispatch draw: encoding into: target) identicalTo: target.
+	self assert: (target allSatisfy: [ :each | each = 0 ]).
+	self assert: dispatch bytes notNil
 ]
 
 { #category : 'tests' }
@@ -408,6 +544,49 @@ VGTiledFillTest >> testCoverageIsTheSameFloatAsTheRasteriserAnswersForEveryPixel
 ]
 
 { #category : 'tests' }
+VGTiledFillTest >> testEveryFillCaseOfTheCorpusDrawsOnTheDeviceWhatTheSoftwareBackendDraws [
+	"The gate of unit 2.3. Every case of the corpus the subset draws, drawn on the device and by
+	 the software backend on the same frame and compared premultiplied: no pixel farther than the
+	 tolerance in any channel, and at most the measured count of pixels differing at all. The
+	 count of cases is asserted as well, so that a subset quietly narrowed by a later change
+	 fails here.
+	 One context draws all of them, because a device costs 72 ms to open and a frame does not. A
+	 machine with no device has nothing to compare and holds nothing."
+
+	| context drawn |
+	context := [ VkContext computeContext ]
+		           on: Error
+		           do: [ :failure | nil ].
+	context ifNil: [ ^ self ].
+	drawn := 0.
+	[
+	VGConformanceCorpus cases do: [ :case |
+		| draw |
+		draw := [ :each | case drawOn: each ].
+		(VGTiledFillRasteriser supports:
+			 (self displayListOfExtent: case extent drawnWith: draw)) ifTrue: [
+			| comparison |
+			drawn := drawn + 1.
+			comparison := VGFormComparison
+				              between: (self
+						               deviceFormOfExtent: case extent
+						               drawnWith: draw
+						               on: context)
+				              and: (self
+						               softwareFormOfExtent: case extent
+						               drawnWith: draw).
+			self
+				assert:
+					(comparison pixelsFartherThan: self class deviceChannelTolerance) = 0
+				description: case name.
+			self
+				assert: comparison differingPixelCount
+					    <= self class devicePixelsAllowedToDifferPerCase
+				description: case name ] ] ] ensure: [ context destroy ].
+	self assert: drawn equals: self class fillCaseCount
+]
+
+{ #category : 'tests' }
 VGTiledFillTest >> testEveryFillCaseOfTheCorpusDrawsTheSameBytesAsTheSoftwareBackend [
 	"The gate of this step. The oracle is the software backend and not Cairo: that backend already
 	 held against Cairo on all forty-one cases in phase one, so matching it is both necessary and
@@ -526,6 +705,124 @@ VGTiledFillTest >> testTheFrameDrawnFromTheBuffersAloneHoldsTheSameBytesAsItsSin
 ]
 
 { #category : 'tests' }
+VGTiledFillTest >> testTheKernelBindsOneBufferForEveryBufferItReads [
+	"The seven buffers of the binding contract: the five VGTiledFillEncoding writes, the target
+	 pixels and the size of the frame. They stand at one descriptor set, numbered from zero in
+	 the order bindingNames holds them."
+
+	self
+		assert: (self kernelValidator variableIdsInStorageClass:
+				 SpvStorageClass storageBuffer) size
+		equals: VGTiledFillKernel bindingNames size.
+	self
+		assert:
+		(self kernelDecorationLiterals: SpvDecoration bindingDecoration)
+			asSortedCollection asArray
+		equals: (0 to: VGTiledFillKernel bindingNames size - 1) asArray.
+	self
+		assert: (self kernelDecorationLiterals: SpvDecoration descriptorSet) asSet
+		equals: { VGTiledFillKernel descriptorSetIndex } asSet
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testTheKernelModuleIsValidSpirv [
+	"The whole walk, assembled by hand: the block order, the merge instruction of every loop
+	 and the function variables that stand where VGTileCoverage answers early. spirv-val reads
+	 all of it, and a driver refuses what it refuses."
+
+	| validator |
+	PVSpirvValidator isAvailable ifFalse: [ ^ self skip ].
+	validator := self kernelValidator.
+	self
+		assert: validator isValid
+		description: 'the tiled fill kernel produced invalid SPIR-V: '
+			, validator validationOutput
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testTheKernelNamesEveryBufferAndBuiltInInItsInterface [
+	"Under SPIR-V 1.5 an entry point names every module-scope variable it touches, so a buffer
+	 or a built-in left out of the interface is a module a driver may refuse."
+
+	self
+		assert: self kernelValidator entryPointInterfaceIds size
+		equals: VGTiledFillKernel bindingNames size
+			+ VGTiledFillKernel builtInNumbers size
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testTheKernelNamesNoOpcodeWhereItEmits [
+	"Every instruction of the kernel comes out of the vocabulary it is written in, so nothing
+	 that emits names an opcode at all: one written in the walk would be an instruction whose
+	 type and arithmetic no other reader of that vocabulary could hold to. The inspecting
+	 methods are left out, because they count opcodes in a module already built instead of
+	 adding any."
+
+	self assert: (VGTiledFillKernel inheritsFrom: VGSpirvVocabulary).
+	VGTiledFillKernel methods , VGTiledFillKernel class methods do: [ :each |
+		each protocolName = #inspecting ifFalse: [
+			self
+				deny: ((self classesNamedBy: each) includes: SpvOpcode)
+				description: each printString , ' names an opcode' ] ]
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testTheKernelReadsTheTileFromTheWorkgroupAndThePixelFromTheInvocation [
+	"Two built-ins and no more: which tile this workgroup owns and which pixel of that tile
+	 this invocation owns. Nothing reads the global invocation id, because a tile is addressed
+	 by its record in the table and not by its place in the dispatch."
+
+	self
+		assert: self kernelValidator builtInsFromWords asSet
+		equals: (VGTiledFillKernel builtInNumbers collect: [ :each |
+				 PVSpirvValidator builtInNameFor: each ]) asSet
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testTheKernelRefusesAnOperatorWithNoArithmeticOfItsOwn [
+	"Every operator of the rasteriser's subset has its own mix of source, mask and destination
+	 in the kernel. One added to the subset without arithmetic here is refused while the module
+	 is built, so no frame is drawn by a branch that composites nothing."
+
+	VGTiledFillRasteriser supportedOperators do: [ :each |
+		self assert: (VGTiledFillKernel compositionSelectorFor: each) isSymbol ].
+	self
+		should: [ VGTiledFillKernel compositionSelectorFor: VGCairoOperator add ]
+		raise: Error
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testTheKernelSharesNothingAndSynchronisesNothing [
+	"A pixel belongs to one invocation alone: the kernel declares no workgroup storage and
+	 holds no barrier, which is what lets the tiles be dispatched in any order at all."
+
+	| validator |
+	validator := self kernelValidator.
+	self assert:
+		(validator variableIdsInStorageClass: SpvStorageClass workgroup) isEmpty.
+	self
+		assert: (validator countOfOpcode: SpvOpcode opControlBarrier)
+		equals: 0
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testTheKernelWorkgroupIsOneTileOfTheGrid [
+	"One workgroup owns one tile, so the local size is the tile's own extent and nothing else:
+	 an invocation finds its pixel by adding its local id to the corner its tile record
+	 carries."
+
+	| grid |
+	grid := VGTileGrid extent: self caseExtent.
+	self
+		assert: (PVSpirvValidator on:
+				 (VGTiledFillKernel onTileExtent: grid tileExtent) spirv) localSizeFromWords
+		equals: {
+				grid tileExtent x.
+				grid tileExtent y.
+				1 }
+]
+
+{ #category : 'tests' }
 VGTiledFillTest >> testTheSourceOperatorDrawsTheSameBytesAsTheSoftwareBackend [
 	"The source operator mixes with the destination instead of scaling the source, so the edge
 	 pixels of the second fill carry the first one's colour in proportion to the coverage."
@@ -607,6 +904,19 @@ VGTiledFillTest >> testTheTileSizeDoesNotChangeOneByte [
 	self
 		assert: small bits
 		equals: (self softwareFormOfExtent: self caseExtent drawnWith: draw) bits
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testTheVocabularyNamesNothingOfThisRasteriser [
+	"The vocabulary is the SPIR-V a hand-built module is written in and nothing of this
+	 rasteriser: a layout, a constant or a format named there would be a fact kept in two
+	 places, and the kernel is where the facts of the tiled fill belong."
+
+	VGSpirvVocabulary methods , VGSpirvVocabulary class methods do: [ :each |
+		(self classesNamedBy: each) do: [ :class |
+			self
+				deny: (class name beginsWith: 'VG')
+				description: each printString , ' names ' , class name ] ]
 ]
 
 { #category : 'fixtures' }

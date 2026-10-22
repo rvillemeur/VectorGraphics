@@ -1,19 +1,20 @@
 "
 I am the backend that draws a frame on a Vulkan device.
-My probe is a real dispatch and not a check that a library is present: it compiles the compute
-path's own example kernel, adds two vectors on the device and reads the sums back, because a driver
-that loads and a device that is listed say nothing about one that computes. It answers an instance
-of me where that works and nil where it does not, and it never raises, because selection probes a
-candidate without a handler of its own.
-Unit 2.0 wires selection and the failover and nothing else, so every message of the boundary
-VGBackend freezes raises VGBackendFailure here. The frame is then replayed on the software backend,
-which is why a machine with a broken driver draws the same picture as one with no driver at all.
-Units 2.1 to 2.6 fill the boundary in: I am the only class of this project allowed to name the
-PharoVulkan bindings, and VGBackendSelectionTest holds the rest of it to that.
+
+My probe is a real dispatch and not a check that a library is present: it compiles the compute path's own example kernel, adds two vectors on the device and reads the sums back, because a driver that loads and a device that is listed say nothing about one that computes. It answers an instance of me where that works and nil where it does not, and it never raises, because selection probes a candidate without a handler of its own.
+
+I record the frame I am given and draw it when I am drained. `fillSegments:paint:clip:operator:` builds the entry and keeps it, and an entry the tiled fill subset refuses — a gradient, a surface or a mesh paint, a shaped clip, or an operator that writes where no source covers — fails the frame there and then, while the surface can still replay the whole of it on the software backend. A surface blit is no fill and fails the same way. On `drainInto:` the frame is binned and encoded by `VGTiledFillEncoding`, dispatched through `VGTiledFillDispatch` over one workgroup a tile, and written into the target last of all, so that a fault of a driver leaves the target as it was. A target of another format than the one a frame is encoded for is refused before the first pixel too.
+
+The device is opened and destroyed around one frame, which is what unit 2.3 needs and no more: a later unit keeps it between frames.
+
+I am one of the classes of the Vulkan packages allowed to name the PharoVulkan bindings, and `VGCairoReferenceScanner` holds every other package of this project to naming none of them.
 "
 Class {
 	#name : 'VGVulkanBackend',
 	#superclass : 'VGBackend',
+	#instVars : [
+		'recordedFrame'
+	],
 	#category : 'VectorGraphics-Vulkan-Backend',
 	#package : 'VectorGraphics-Vulkan',
 	#tag : 'Backend'
@@ -112,26 +113,130 @@ VGVulkanBackend class >> probeWorkgroupCount [
 
 { #category : 'drawing' }
 VGVulkanBackend >> blitSurface: aSurface at: aPoint paint: aPaint clip: aClip operator: anOperator [
-	^ self cannotDrawYet
+	"A mask and a surface paint are no fill, and the subset of unit 2.3 holds fills alone. None of
+	 the arguments is read, because the refusal does not depend on them."
+
+	^ self refuseBecause: 'a surface blit, where the subset draws fills alone'
 ]
 
-{ #category : 'drawing - private' }
-VGVulkanBackend >> cannotDrawYet [
-	"Unit 2.0 wires selection and the failover and leaves the drawing to the units behind it. The
-	 failure is raised before any pixel of mine is written, which is what the boundary asks of a
-	 backend that can fail: a frame half drawn cannot be mended by replaying it elsewhere."
+{ #category : 'draining' }
+VGVulkanBackend >> dispatch: anEncoding into: aByteArray [
+	"The device trip, with every fault of a driver answered as a refusal: a missing library, a
+	 device that refuses a queue and a dispatch that raises are one answer here, which is that
+	 this frame belongs to the software backend. The context is created and destroyed around the
+	 one frame; a later unit keeps a device between frames, which is where the 72 ms of a context
+	 stop being paid once a frame."
 
-	^ VGBackendFailure
-		  signalFor: self
-		  because: 'the Vulkan backend draws no frame before unit 2.3'
+	| context |
+	context := nil.
+	^ [
+	  [
+	  context := VkContext computeContext.
+	  (VGTiledFillDispatch on: context) draw: anEncoding into: aByteArray ]
+		  on: Error
+		  do: [ :failure |
+			  self refuseBecause: 'the device failed the frame: ' , failure description ] ]
+		  ensure: [ context ifNotNil: [ context destroy ] ]
 ]
 
 { #category : 'draining' }
 VGVulkanBackend >> drainInto: aTarget [
-	^ self cannotDrawYet
+	"The frame on the device: binned, encoded, dispatched over one workgroup a tile, and the
+	 pixels written into the target last of all, so that a fault of a driver leaves the target as
+	 it was. The recorded frame is dropped either way, because the surface replays its own list
+	 and not mine."
+
+	[ self drawRecordedFrameInto: aTarget ] ensure: [ recordedFrame reset ]
+]
+
+{ #category : 'draining' }
+VGVulkanBackend >> drawRecordedFrameInto: aTarget [
+	"Nothing recorded is nothing to draw and no device to ask for. A target of another format
+	 belongs to the software backend, because a frame is encoded for one format and quantised
+	 while it is encoded."
+
+	| pixels |
+	recordedFrame isEmpty ifTrue: [ ^ self ].
+	aTarget format = VGTiledFillEncoding targetFormat ifFalse: [
+		^ self refuseBecause: 'a target of a format the frame is not encoded for' ].
+	pixels := self pixelsOf: aTarget.
+	self
+		dispatch:
+			(VGTiledFillEncoding of: recordedFrame extent: aTarget extent)
+		into: pixels.
+	self write: pixels into: aTarget
 ]
 
 { #category : 'drawing' }
 VGVulkanBackend >> fillSegments: aSegments paint: aPaint clip: aClip operator: anOperator [
-	^ self cannotDrawYet
+	"Recorded and not drawn. An entry the tiled fill subset refuses fails the frame here, while
+	 the surface can still replay the whole of it on the software backend."
+
+	| entry |
+	entry := VGFillEntry
+		         segments: aSegments
+		         paint: aPaint
+		         clip: aClip
+		         operator: anOperator.
+	(VGTiledFillRasteriser supportsEntry: entry) ifFalse: [
+		^ self refuseBecause: 'an entry outside the tiled fill subset' ].
+	recordedFrame add: entry
+]
+
+{ #category : 'initialization' }
+VGVulkanBackend >> initialize [
+	"A backend of mine records the frame it is given and draws it when it is drained, which is
+	 what the boundary asks of a backend that can fail: the whole frame is checked before its
+	 first pixel."
+
+	super initialize.
+	recordedFrame := VGDisplayList new
+]
+
+{ #category : 'pixels' }
+VGVulkanBackend >> pixelsOf: aTarget [
+	"The pixels of the target, packed row after row with no padding, because the kernel indexes a
+	 pixel by its row and its column alone. They are a copy and not the bytes of the surface: the
+	 device writes into the copy, and the target is written once the frame has come back whole."
+
+	| rowBytes answer |
+	rowBytes := aTarget width * aTarget format bytesPerPixel.
+	answer := ByteArray new: rowBytes * aTarget height.
+	0 to: aTarget height - 1 do: [ :row |
+		answer
+			replaceFrom: row * rowBytes + 1
+			to: row + 1 * rowBytes
+			with: aTarget data
+			startingAt: row * aTarget stride + 1 ].
+	^ answer
+]
+
+{ #category : 'accessing' }
+VGVulkanBackend >> recordedFrame [
+	"The frame recorded on me and not yet drained."
+
+	^ recordedFrame
+]
+
+{ #category : 'failing' }
+VGVulkanBackend >> refuseBecause: aReason [
+	"A refusal and not a frame half drawn: a backend may fail while a frame is recorded or while
+	 it is drained, never between its first pixel and its last."
+
+	^ VGBackendFailure signalFor: self because: aReason
+]
+
+{ #category : 'pixels' }
+VGVulkanBackend >> write: aByteArray into: aTarget [
+	"The frame back into the target, row by row, because a target may hold padding at the end of
+	 a row and nothing of this frame belongs there."
+
+	| rowBytes |
+	rowBytes := aTarget width * aTarget format bytesPerPixel.
+	0 to: aTarget height - 1 do: [ :row |
+		aTarget data
+			replaceFrom: row * aTarget stride + 1
+			to: row * aTarget stride + rowBytes
+			with: aByteArray
+			startingAt: row * rowBytes + 1 ]
 ]

@@ -121,16 +121,23 @@ VGRendererTest >> testAFrameDrawnThroughOurRendererEntersNoCairoFunction [
 	 other half, at run time: a frame drawn through our renderer enters none of the foreign
 	 functions of the Cairo package. Every method of that package that sends `ffiCall:` carries a
 	 metalink for the length of the draw, and one link per method is needed, because a single link
-	 shared between method nodes fires for the first only. The deliberate Cairo call at the end is
-	 the positive control: without it, instrumentation that silently failed to install would make
-	 this test pass."
+	 shared between method nodes fires for the first only. A link fires in whichever process makes
+	 the call, so only the calls of the process drawing the frame are counted: the finalisation
+	 process frees the Cairo objects of other tests through AeCairoContext class >> externallyFree:
+	 whenever a collection falls in this window, and a free of another test's object is not part
+	 of our frame. Our frame is drawn in this process from end to end, so nothing of it is lost by
+	 the filter. The deliberate Cairo call at the end is the positive control: without it,
+	 instrumentation that silently failed to install would make this test pass."
 
-	| entered links renderer stride pixels |
+	| entered links renderer stride pixels drawingProcess |
 	entered := OrderedCollection new.
+	drawingProcess := Processor activeProcess.
 	links := self cairoForeignCallMethods collect: [ :each |
 		         | link |
 		         link := MetaLink new.
-		         link metaObject: [ :context | entered add: context method ].
+		         link metaObject: [ :context |
+			         Processor activeProcess == drawingProcess ifTrue: [
+				         entered add: context method ] ].
 		         link selector: #value:.
 		         link arguments: #( #context ).
 		         each ast link: link.
