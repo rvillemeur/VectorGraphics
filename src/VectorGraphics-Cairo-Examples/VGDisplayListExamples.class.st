@@ -42,12 +42,15 @@ VGDisplayListExamples class >> blitEntryOfAMask [
 VGDisplayListExamples class >> fillEntryOfAStar [
 	<sampleInstance>
 	"One entry of a frame on its own: the edges, the paint, the clip and the operator the backend
-	 will be handed. The clip of a whole surface is a rectangle of a clip, which keeps no shape."
+	 will be handed. The clip of a whole surface is a rectangle of a clip, which keeps no shape.
+	 The operator is the object a recorded frame carries and not a symbol naming it: the entry asks
+	 it whether it is unbounded when it answers its bounding box."
+
 	^ VGFillEntry
 		  segments: (VGPathExamples starPath segmentsWithFillRule: #winding)
 		  paint: Color black
 		  clip: (VGClip bounds: (0 @ 0 corner: 64 @ 64))
-		  operator: #over
+		  operator: VGCairoOperator over
 ]
 
 { #category : 'examples' }

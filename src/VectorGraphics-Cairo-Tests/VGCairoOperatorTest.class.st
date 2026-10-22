@@ -303,6 +303,39 @@ VGCairoOperatorTest >> sourceForOperator: anOperator in: aFormat [
 ]
 
 { #category : 'tests' }
+VGCairoOperatorTest >> testAFillUnderAnUnboundedOperatorReportsTheWholeClipAsItsBoundingBox [
+	"A fill under in, out, dest-in or dest-atop writes where its own shape covers nothing: it
+	 takes the destination away outside the shape. The entry's bounding box is the dirty rectangle
+	 of the frame and, from unit 2.2 on, the rectangle the binning reads, so a box that stops at
+	 the shape loses every pixel the operator clears beyond it. VGBlitEntry already widens to the
+	 clip for this reason."
+
+	| surface context box outside alphaShift |
+	alphaShift := 24.
+	surface := VGCairoImageSurface extent: 40 @ 30.
+	context := surface newContext.
+	context sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
+	context paint.
+	surface flush.
+	outside := 35 @ 25.
+	self
+		assert: ((surface asForm pixelValueAt: outside) bitShift: alphaShift negated)
+		equals: 255.
+	context := surface newContext.
+	context operator: VGCairoOperator in.
+	context sourceColorR: 1.0 g: 0.0 b: 0.0 a: 1.0.
+	context rectangleX: 5 y: 5 width: 10 height: 10.
+	context fill.
+	box := surface displayList boundingBox.
+	surface flush.
+	self
+		assert: ((surface asForm pixelValueAt: outside) bitShift: alphaShift negated)
+		equals: 0.
+	self assert: (box containsPoint: outside).
+	self assert: box equals: (0 @ 0 corner: 40 @ 30)
+]
+
+{ #category : 'tests' }
 VGCairoOperatorTest >> testAnOperatorIsUnboundedExactlyWhenNoSourceStillChangesThePixel [
 	"Cairo runs an operator over the whole clip and not only over the shape, which only shows on
 	 the operators that write something where nothing is covered. The rule is not restated here:

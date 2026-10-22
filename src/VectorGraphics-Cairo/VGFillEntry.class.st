@@ -24,11 +24,16 @@ VGFillEntry class >> segments: aSegments paint: aPaint clip: aRectangle operator
 		  yourself
 ]
 
-{ #category : 'draining' }
+{ #category : 'accessing' }
 VGFillEntry >> boundingBox [
 	"What I can touch: where my edges are, cut down to my clip. The clip answers the narrowed
-	 rectangle itself, because a clip that does not meet the edges has to read as plainly empty."
+	 rectangle itself, because a clip that does not meet the edges has to read as plainly empty.
+	 Under an unbounded operator it is the whole clip instead, as it is for a blit: in, out,
+	 dest-in and dest-atop take the destination away where my shape covers nothing, so the pixels
+	 they write reach to the edge of the clip and not to the edge of my edges."
+
 	| box |
+	operator isUnbounded ifTrue: [ ^ clip boundsNarrowedTo: clip extents ].
 	box := segments boundingBox.
 	^ box ifNotNil: [ clip boundsNarrowedTo: box ]
 ]

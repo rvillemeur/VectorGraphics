@@ -29,7 +29,7 @@ BaselineOfVectorGraphics >> baseline: spec [
 				spec requires:
 						#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples'
 						   'VectorGraphics-Cairo-Tests' ) ];
-			package: 'VectorGraphics-Vulkan' with: [ spec requires: #( 'VectorGraphics-Cairo' ) ];
+			package: 'VectorGraphics-Vulkan' with: [ spec requires: #( 'VectorGraphics-Bloc' ) ];
 			package: 'VectorGraphics-Vulkan-Examples'
 			with: [ spec requires: #( 'VectorGraphics-Vulkan' ) ];
 			package: 'VectorGraphics-Vulkan-Tests'

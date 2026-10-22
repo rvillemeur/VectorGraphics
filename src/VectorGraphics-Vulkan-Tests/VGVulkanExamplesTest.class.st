@@ -17,5 +17,6 @@ Class {
 VGVulkanExamplesTest >> exampleHolders [
 	^ {
 		  VGVulkanBackendExamples.
-		  VGVulkanRoundTripExamples }
+		  VGVulkanRoundTripExamples.
+		  VGTileBinningExamples }
 ]

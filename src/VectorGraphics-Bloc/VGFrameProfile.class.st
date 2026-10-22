@@ -129,22 +129,23 @@ VGFrameProfile class >> sceneStage [
 	^ #sceneAndLayout
 ]
 
-{ #category : 'stages' }
+{ #category : 'reference' }
 VGFrameProfile class >> stageByPackageAndTag [
 	"The stage each package and tag of this project belongs to, keyed by `'<package>/<tag>'`. The
 	 tag is the unit rather than the class, so a class moved between tags moves stage with it and
 	 nothing here has to be touched; `VGFrameProfileTest` holds these keys against the organiser.
 	 The stages are the frame read as a pipeline. `canvasApi` is the drawing verbs and the state
 	 they keep, `transforms` the matrices they multiply, `pathAndStroke` the flattening and the
-	 stroke outlines, `displayList` the recording and the draining of a frame, `coverage` the
-	 rasteriser that says how much of a pixel a shape covers, `paintSource` the colour a pattern
-	 answers at a pixel, `compositing` the operators, and `pixelAccess` the surface and its pixel
-	 format, which is both the reading and writing of a pixel and the byte arithmetic that
-	 quantises a colour or a coverage into one. Then `text`, `blur` and `handover`. `harness` is this class, which runs
-	 inside the frame it measures. `notInTheFrame` is code that cannot appear in a frame: the
-	 exporters, the reflection and inventory helpers, the examples, the budget measurement that
-	 weighs a device round trip against a frame of this profile, and the classes this project
-	 inherited from the earlier pure Pharo VectorGraphics package."
+	 stroke outlines, `displayList` the recording and the draining of a frame and the binning of
+	 a recorded frame into tiles, `coverage` the rasteriser that says how much of a pixel a shape
+	 covers, `paintSource` the colour a pattern answers at a pixel, `compositing` the operators,
+	 and `pixelAccess` the surface and its pixel format, which is both the reading and writing of
+	 a pixel and the byte arithmetic that quantises a colour or a coverage into one. Then `text`,
+	 `blur` and `handover`. `harness` is this class, which runs inside the frame it measures.
+	 `notInTheFrame` is code that cannot appear in a frame: the exporters, the reflection and
+	 inventory helpers, the examples, the budget measurement that weighs a device round trip
+	 against a frame of this profile, and the classes this project inherited from the earlier pure
+	 Pharo VectorGraphics package."
 
 	^ Dictionary newFrom: {
 			  ('VectorGraphics-Cairo/Context' -> #canvasApi).
@@ -155,6 +156,7 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Cairo/Backend' -> #displayList).
 			  ('VectorGraphics-Cairo/Display list' -> #displayList).
 			  ('VectorGraphics-Vulkan/Backend' -> #displayList).
+			  ('VectorGraphics-Vulkan/Tiles' -> #displayList).
 			  ('VectorGraphics-Cairo/Rasterising' -> #coverage).
 			  ('VectorGraphics-Cairo/Paint' -> #paintSource).
 			  ('VectorGraphics-Cairo/Pattern' -> #paintSource).
