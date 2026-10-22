@@ -22,6 +22,7 @@ VGCairoExamplesTest >> exampleHolders [
 	^ {
 		  VGA8GaussianBlurFilterExamples.
 		  VGAlexandrieCorpusExamples.
+		  VGAlexandrieFontLifetimeExamples.
 		  VGBackendExamples.
 		  VGCairoContextExamples.
 		  VGCairoExportSurfaceExamples.

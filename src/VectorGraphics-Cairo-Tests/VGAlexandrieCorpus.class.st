@@ -114,6 +114,25 @@ VGAlexandrieCorpus class >> experimentSelectors [
 		  reject: [ :each | self nonPictureSelectors includes: each ]
 ]
 
+{ #category : 'ported copies' }
+VGAlexandrieCorpus class >> fontLifetimeSubstitutions [
+	"The rewrites a ported copy needs so that the picture it draws does not cost the image its
+	 life. FreeType destroys every face a library owns when the library goes, harfbuzz and Cairo
+	 each keep a C reference to a face they were handed and free it with FT_Done_Face, and nothing
+	 ties those lifetimes to the Smalltalk ones. A library built per call, or a font manager
+	 replaced and dropped, is therefore collected while a foreign font still points into it, and
+	 FT_Done_Face reads freed memory inside the finalisation process minutes after the drawing."
+	"Both rewrites keep an object for the session instead: one library for every case, and the
+	 manager a case leaves behind. The replacement is parenthesised so that it stands wherever
+	 the original expression stood."
+
+	^ {
+		  ('AeFTLibrary newInitialized'
+		   -> 'VGAlexandrieFontLifetime freeTypeLibrary').
+		  ('AeFontManager globalInstance'
+		   -> '(VGAlexandrieFontLifetime retain: AeFontManager globalInstance)') }
+]
+
 { #category : 'conformance' }
 VGAlexandrieCorpus class >> hintedGlyphRunPixelTable [
 	"The experiments that select a font and draw a run of glyphs, each with how many pixels may be

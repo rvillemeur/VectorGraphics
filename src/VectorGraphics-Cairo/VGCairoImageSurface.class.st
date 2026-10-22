@@ -115,9 +115,11 @@ VGCairoImageSurface >> asForm [
 
 { #category : 'accessing' }
 VGCairoImageSurface >> backend [
-	"Whichever backend draws my frames. The software one is the default and the failover; phase 2
-	 puts the Vulkan one here."
-	^ backend ifNil: [ backend := VGSoftwareBackend new ]
+	"Whichever backend draws my frames. It is the one selection chose for this image, so a
+	 surface built anywhere draws on the device when there is one and on the processor when
+	 there is not."
+
+	^ backend ifNil: [ backend := VGBackend preferred ]
 ]
 
 { #category : 'accessing' }
@@ -208,6 +210,15 @@ VGCairoImageSurface >> displayList [
 	^ displayList ifNil: [ displayList := VGDisplayList new ]
 ]
 
+{ #category : 'drawing - private' }
+VGCairoImageSurface >> drawRecordedFrameOn: aBackend [
+	"Replay the frame on that backend and let it write my pixels. The display list is left alone,
+	 so that the same frame can be replayed on another backend if this one fails."
+
+	self displayList replayOn: aBackend.
+	aBackend drainInto: self
+]
+
 { #category : 'lifecycle' }
 VGCairoImageSurface >> ensureNotFinished [
 	finished ifTrue: [
@@ -244,10 +255,19 @@ VGCairoImageSurface >> finish [
 VGCairoImageSurface >> flush [
 	"Draw the frame recorded on me and keep nothing. This is Cairo's own synchronisation point:
 	 everything that reads my pixels sends it first, and a caller holding a raw pointer has to send
-	 it itself."
+	 it itself.
+	 A backend that fails is rejected and the same frame is replayed on the failover, which is why
+	 a failover costs nothing to arrange: a backend may fail while the frame is recorded or while
+	 it is drained, but never between its first pixel and its last. I keep the failover
+	 afterwards, so a frame of mine is attempted once on a backend that has already given up."
+
 	self displayList isEmpty ifTrue: [ ^ self ].
-	self displayList replayOn: self backend.
-	self backend drainInto: self.
+	[ self drawRecordedFrameOn: self backend ]
+		on: VGBackendFailure
+		do: [ :failure |
+			VGBackend reject: failure backend class.
+			backend := VGBackend failover.
+			self drawRecordedFrameOn: backend ].
 	self displayList reset
 ]
 

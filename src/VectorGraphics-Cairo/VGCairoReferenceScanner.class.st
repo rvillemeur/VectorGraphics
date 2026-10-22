@@ -70,6 +70,34 @@ VGCairoReferenceScanner class >> testPackageSuffix [
 	^ '-Tests'
 ]
 
+{ #category : 'package names' }
+VGCairoReferenceScanner class >> vulkanBackendPackagePrefix [
+	"The Vulkan backend of this project and its own test and example packages all start with
+	 this, so the scan covers the family and exempts the whole of it."
+
+	^ 'VectorGraphics-Vulkan'
+]
+
+{ #category : 'package names' }
+VGCairoReferenceScanner class >> vulkanBindingsPackagePrefix [
+	"The Vulkan bindings the backend drives. Only the backend may name them, because they open a
+	 device and need a driver on the machine."
+
+	^ 'PharoVulkan'
+]
+
+{ #category : 'package names' }
+VGCairoReferenceScanner class >> vulkanPackageNames [
+	"Every package whose classes the engine must not name: the Vulkan backend of this project and
+	 the bindings it drives. They are read from the organiser, so a package added later is covered
+	 without this method being edited, and the engine stays loadable on a machine with no driver."
+
+	^ (PackageOrganizer default packages select: [ :each |
+		   (each name beginsWith: self vulkanBackendPackagePrefix) or: [
+			   each name beginsWith: self vulkanBindingsPackagePrefix ] ]) collect: [
+		  :each | each name ]
+]
+
 { #category : 'scanning' }
 VGCairoReferenceScanner >> bypassingBlocMethods [
 	"The methods of the Bloc backend package that build a Cairo object themselves. A failover
@@ -81,7 +109,16 @@ VGCairoReferenceScanner >> bypassingBlocMethods [
 
 { #category : 'scanning' }
 VGCairoReferenceScanner >> cairoClassesNamedBy: aCompiledMethod [
-	"The classes of the Cairo package that one method names. Literals are read through
+	"The classes of the Cairo package that one method names."
+
+	^ self
+		  classesNamedBy: aCompiledMethod
+		  inPackagesNamed: { self class cairoPackageName }
+]
+
+{ #category : 'scanning' }
+VGCairoReferenceScanner >> classesNamedBy: aCompiledMethod inPackagesNamed: aCollection [
+	"The classes of those packages that one method names. Literals are read through
 	 `allLiterals`, because a full block keeps its own literal frame and a class named inside a
 	 block would be missed otherwise."
 
@@ -90,7 +127,7 @@ VGCairoReferenceScanner >> cairoClassesNamedBy: aCompiledMethod [
 			  each isVariableBinding and: [
 				  each value isBehavior and: [
 					  each value package notNil and: [
-						  each value package name = self class cairoPackageName ] ] ] ]
+						  aCollection includes: each value package name ] ] ] ]
 		  thenCollect: [ :each | each value ]
 ]
 
@@ -158,16 +195,24 @@ VGCairoReferenceScanner >> offenders [
 
 { #category : 'scanning' }
 VGCairoReferenceScanner >> offendersIn: aPackageName [
-	"An association per method of that package that names a Cairo class, from the method to the
-	 classes it names. Extension methods are read too, because `package methods` answers them."
+	"The methods of that package that name a Cairo class."
+
+	^ self offendersIn: aPackageName naming: { self class cairoPackageName }
+]
+
+{ #category : 'scanning' }
+VGCairoReferenceScanner >> offendersIn: aPackageName naming: aCollection [
+	"An association per method of that package that names a class of one of those packages, from
+	 the method to the classes it names. Extension methods are read too, because `package methods`
+	 answers them."
 
 	| package |
 	package := PackageOrganizer default
 		           packageNamed: aPackageName
 		           ifAbsent: [ ^ #(  ) ].
 	^ (package methods collect: [ :each |
-		   each -> (self cairoClassesNamedBy: each) ]) select: [ :each |
-		  each value notEmpty ]
+		   each -> (self classesNamedBy: each inPackagesNamed: aCollection) ])
+		  select: [ :each | each value notEmpty ]
 ]
 
 { #category : 'accessing' }

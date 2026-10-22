@@ -20,6 +20,21 @@ Class {
 	#tag : 'Backend'
 }
 
+{ #category : 'selection' }
+VGSoftwareBackend class >> isCandidate [
+	"I am the failover, so I always stand for selection."
+
+	^ true
+]
+
+{ #category : 'selection' }
+VGSoftwareBackend class >> probe [
+	"I need no device and no library, so there is nothing to probe: I am available wherever the
+	 image runs, which is what makes me the failover."
+
+	^ self new
+]
+
 { #category : 'drawing' }
 VGSoftwareBackend >> blitSurface: aSurface at: aPoint paint: aPaint clip: aClip operator: anOperator [
 	"Recorded, not drawn, like a fill. The surface is the mask: its alpha channel says how much

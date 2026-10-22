@@ -775,7 +775,7 @@ VGAlexandriePortedExperiments class >> fillPaint1 [
 	"some text in white blending in the background"
 	fontFace := VGFontFace newForFace:
 		            (AeSourceSansPro_Regular firstFaceUsing:
-			             AeFTLibrary newInitialized).
+			             VGAlexandrieFontLifetime freeTypeLibrary).
 	scaledFont := fontFace
 		              newScaledFontWithFontMatrix:
 		              (VGCairoMatrix newScalingBy: 30 asPoint)
@@ -850,7 +850,7 @@ VGAlexandriePortedExperiments class >> fillPaint2 [
 	"some text in white blending in the background"
 	fontFace := VGFontFace newForFace:
 		            (AeSourceSansPro_Regular firstFaceUsing:
-			             AeFTLibrary newInitialized).
+			             VGAlexandrieFontLifetime freeTypeLibrary).
 	scaledFont := fontFace
 		              newScaledFontWithFontMatrix:
 		              (VGCairoMatrix newScalingBy: 30 asPoint)
@@ -2262,7 +2262,7 @@ VGAlexandriePortedExperiments class >> texWithHarfbuzzWithFontManager [
 
 	"font definition"
 	AeFontManager resetGlobalInstance.
-	aManager := AeFontManager globalInstance.
+	aManager := (VGAlexandrieFontLifetime retain: AeFontManager globalInstance).
 	aManager
 		scanDirectory: AeFilesystemResources fontsDirectory;
 		scanEmbeddedFonts.
@@ -2344,7 +2344,7 @@ context translateBy: fontHeight / 2 @ 0.
 
 "font definition"
 AeFontManager resetGlobalInstance.
-aManager := AeFontManager globalInstance.
+aManager := (VGAlexandrieFontLifetime retain: AeFontManager globalInstance).
 aManager
 	scanDirectory: AeFilesystemResources fontsDirectory;
 	scanEmbeddedFonts.
@@ -2421,7 +2421,7 @@ VGAlexandriePortedExperiments class >> textWithoutHarfbuzzWithFontManager [
 
 	"font definition"
 	AeFontManager resetGlobalInstance.
-	aManager := AeFontManager globalInstance.
+	aManager := (VGAlexandrieFontLifetime retain: AeFontManager globalInstance).
 	aManager
 		scanDirectory: AeFilesystemResources fontsDirectory;
 		scanEmbeddedFonts.

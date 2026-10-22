@@ -86,10 +86,18 @@ VGAlexandrieCase >> boundaryPixelAllowance [
 	^ VGAlexandrieCorpus boundaryPixelAllowanceFor: experimentSelector
 ]
 
-{ #category : 'rendering' }
+{ #category : 'accessing' }
 VGAlexandrieCase >> cairoForm [
-	"The reference picture, drawn by Alexandrie itself."
-	^ VGAlexandrieCorpus experimentClass perform: experimentSelector
+	"The reference picture, drawn by Alexandrie itself. Some of these experiments replace the
+	 global font manager and hand its face to harfbuzz, which frees that face with FT_Done_Face
+	 when its own font is collected, so the manager left behind is kept for the session: it owns
+	 the FreeType library underneath that face, and a library collected first takes the image down
+	 inside the finalisation process."
+
+	| form |
+	form := VGAlexandrieCorpus experimentClass perform: experimentSelector.
+	VGAlexandrieFontLifetime retain: AeFontManager globalInstance.
+	^ form
 ]
 
 { #category : 'inspecting' }
@@ -221,15 +229,11 @@ VGAlexandrieCase >> portedCopyIsCurrent [
 
 { #category : 'generating' }
 VGAlexandrieCase >> portedSource [
-	"My experiment's own source with every Alexandrie class name that has a counterpart of ours
-	 substituted for it. Nothing else changes, which is what makes the copy a faithful script,
-	 except the example pragma: a copy that runs keeps it, so the browser draws the picture in one
-	 click, and a copy whose script still names a class we do not have loses it, because clicking
-	 that one raises a MessageNotUnderstood."
-
 	| source |
 	source := self experimentMethod sourceCode.
 	VGAlexandrieCorpus classNameMap do: [ :each |
+		source := source copyReplaceAll: each key with: each value ].
+	VGAlexandrieCorpus fontLifetimeSubstitutions do: [ :each |
 		source := source copyReplaceAll: each key with: each value ].
 	source := self isPortable
 		          ifTrue: [ self sourceWithTheExamplePragma: source ]

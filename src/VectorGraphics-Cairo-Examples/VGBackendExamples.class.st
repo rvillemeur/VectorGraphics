@@ -17,3 +17,16 @@ VGBackendExamples class >> backendBoundary [
 
 	^ VGBackend
 ]
+
+{ #category : 'examples' }
+VGBackendExamples class >> selectionOnThisMachine [
+	<sampleInstance>
+	"The root of the backend hierarchy, with the preference forgotten and probed again, so that
+	 its class-side Selection tab shows a verdict this machine really gave: which backends stand
+	 for selection, in which order, which one a failure rejected and which one draws. Probing
+	 opens a device and destroys it again, which is why the tab itself probes nothing."
+
+	VGBackend clearPreference.
+	VGBackend preferredClass.
+	^ VGBackend
+]

@@ -28,13 +28,25 @@ BaselineOfVectorGraphics >> baseline: spec [
 			with: [
 				spec requires:
 						#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples'
+						   'VectorGraphics-Cairo-Tests' ) ];
+			package: 'VectorGraphics-Vulkan' with: [ spec requires: #( 'VectorGraphics-Cairo' ) ];
+			package: 'VectorGraphics-Vulkan-Examples'
+			with: [ spec requires: #( 'VectorGraphics-Vulkan' ) ];
+			package: 'VectorGraphics-Vulkan-Tests'
+			with: [
+				spec requires:
+						#( 'VectorGraphics-Vulkan' 'VectorGraphics-Vulkan-Examples'
 						   'VectorGraphics-Cairo-Tests' ) ].
 		spec
 			group: 'core' with: #( 'VectorGraphics' );
 			group: 'cairo' with: #( 'VectorGraphics-Cairo' );
 			group: 'bloc' with: #( 'VectorGraphics-Bloc' );
+			group: 'vulkan' with: #( 'VectorGraphics-Vulkan' );
 			group: 'examples'
-			with: #( 'VectorGraphics-Cairo-Examples' 'VectorGraphics-Bloc-Examples' );
-			group: 'tests' with: #( 'VectorGraphics-Cairo-Tests' 'VectorGraphics-Bloc-Tests' );
+			with: #( 'VectorGraphics-Cairo-Examples' 'VectorGraphics-Bloc-Examples'
+			         'VectorGraphics-Vulkan-Examples' );
+			group: 'tests'
+			with: #( 'VectorGraphics-Cairo-Tests' 'VectorGraphics-Bloc-Tests'
+			         'VectorGraphics-Vulkan-Tests' );
 			group: 'default' with: #( 'core' 'cairo' 'bloc' ) ]
 ]

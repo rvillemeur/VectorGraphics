@@ -128,25 +128,40 @@ VGCairoTextTest >> fixtureScaledFontOfSize: aNumber hintMetrics: aSymbol [
 				   yourself)
 ]
 
-{ #category : 'fixture' }
+{ #category : 'support' }
 VGCairoTextTest >> liveCairoScaledFontOfSize: aNumber [
 	"The same font, size and options as #fixtureScaledFontOfSize:hintMetrics:, through Cairo and
-	 FreeType themselves. The library and the face are held by the answered font, so the caller
-	 needs no second reference. Alexandrie is named here because this is the test package; the
-	 packages under test name none of it."
+	 FreeType themselves. The library is the one VGAlexandrieFontLifetime keeps and the face is
+	 kept beside it, because a face freed under a foreign library that still references it takes
+	 the image down. Alexandrie is named here because this is the test package; the packages under
+	 test name none of it."
 
-	| library options |
-	library := AeFTLibrary newInitialized.
+	| options |
 	options := AeCairoFontOptions new
 		           hintStyle: AeCairoHintStyle none;
 		           hintMetrics: AeCairoHintMetrics off;
 		           yourself.
 	^ AeCairoScaledFont
-		  fontFace: (AeCairoFreetypeFontFace newForFace:
-				   (library newFaceFromBytes: self fixtureFontBytes index: 0))
+		  fontFace: (AeCairoFreetypeFontFace newForFace: (VGAlexandrieFontLifetime
+					    retain: (VGAlexandrieFontLifetime freeTypeLibrary
+							     newFaceFromBytes: self fixtureFontBytes
+							     index: 0)))
 		  fontMatrix: (AeCairoMatrix newScalingBy: aNumber asPoint)
 		  userToDeviceMatrix: AeCairoMatrix newIdentity
 		  options: options
+]
+
+{ #category : 'support' }
+VGCairoTextTest >> methodsOfThisProjectSending: aSelector [
+	"Every method of every package of this project, test and example packages included, that
+	 sends that selector. The organiser is read rather than a list kept, so a package added later
+	 is covered."
+
+	^ (PackageOrganizer default packages
+		   select: [ :each |
+		   each name beginsWith: VGCairoReferenceScanner projectPackagePrefix ])
+		  flatCollect: [ :each |
+		  each methods select: [ :one | one sendsSelector: aSelector ] ]
 ]
 
 { #category : 'running' }
@@ -420,6 +435,24 @@ VGCairoTextTest >> testEveryCairoFontEnumerationAnswersTheNamesTheOptionsKnow [
 			equals: names asSet ]
 ]
 
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testEveryFaceHandedToHarfbuzzIsKeptForTheSession [
+	"hb_ft_font_create_referenced keeps the FreeType face alive at the C level and frees it with
+	 FT_Done_Face when the harfbuzz font is collected, and the face it was handed belongs to a
+	 font manager this project replaces whenever it draws one of these cases. So a method that
+	 hands a face to harfbuzz keeps the manager, and with it the library and the face, for the
+	 session; the rule is read off the code so a new case cannot forget it."
+
+	| callers |
+	callers := self methodsOfThisProjectSending: #cairoGlyphArrayForFace:size:.
+	self deny: callers isEmpty.
+	callers do: [ :each |
+		self
+			assert: (each sendsSelector: #retain:)
+			description: each methodClass name , ' >> ' , each selector
+				, ' hands a face to harfbuzz without keeping it' ]
+]
+
 { #category : 'tests' }
 VGCairoTextTest >> testHintedMetricsAreRoundedTheWayFreetypeRoundsThem [
 	"FreeType rounds the ascent and the descent up, and the height and the maximum advance to the
@@ -435,6 +468,19 @@ VGCairoTextTest >> testHintedMetricsAreRoundedTheWayFreetypeRoundsThem [
 	self assert: atSixteen ascent equals: 16.
 	self assert: atSixteen descent equals: 5.
 	self assert: atSixteen height equals: 20
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testNoMethodOfThisProjectMakesAFreeTypeLibraryOfItsOwn [
+	"A library made per call is a library collected per call, which is the crash above. The rule
+	 is read off the code rather than listed here, so a new sender is caught the day it is
+	 written: only the one place that keeps the library may build it."
+
+	| offenders |
+	offenders := self methodsOfThisProjectSending: #newInitialized.
+	self
+		assertCollection: (offenders collect: [ :each | each methodClass name , ' >> ' , each selector ]) asSet
+		hasSameElements: { 'VGAlexandrieFontLifetime class >> freeTypeLibrary' } asSet
 ]
 
 { #category : 'tests' }
@@ -494,6 +540,21 @@ VGCairoTextTest >> testShowingTextDrawsFromTheCurrentPointAndLeavesItAfterTheRun
 						 y: glyph y + origin y ]).
 	throughGlyphs flush.
 	self assert: throughText data asArray equals: throughGlyphs data asArray
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testTheAlexandrieFreeTypeLibraryIsOneObjectForTheWholeSession [
+	"FreeType destroys every face a library owns when the library goes, and harfbuzz holds its own
+	 C reference to a face it was handed, with FT_Done_Face as the callback that frees it. Nothing
+	 ties the two lifetimes together, so a library collected before the harfbuzz font that
+	 outlived it means FT_Done_Face reads freed memory and the virtual machine takes a
+	 segmentation fault inside the finalisation process, minutes after the drawing. One library,
+	 held for the session, cannot be collected."
+
+	| library |
+	library := VGAlexandrieFontLifetime freeTypeLibrary.
+	self assert: library identicalTo: VGAlexandrieFontLifetime freeTypeLibrary.
+	self assert: (VGAlexandrieFontLifetime retained includes: library)
 ]
 
 { #category : 'tests' }
@@ -692,6 +753,21 @@ VGCairoTextTest >> testTheGlyphsOfAStringMatchLiveCairoAndFreeType [
 			assert: each y
 			closeTo: theirGlyph y
 			precision: self class liveCairoMetricTolerance ]
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testTheReferencePictureKeepsTheFontManagerItLeavesBehind [
+	"The reference picture is drawn by Alexandrie's own experiment, which this project may not
+	 edit, and several of those replace the global font manager and hand its face to harfbuzz. The
+	 manager left behind therefore owns a library a foreign font still references, so whoever runs
+	 the reference keeps it: the collector would otherwise free the library first, and
+	 FT_Done_Face inside the finalisation process would read freed memory."
+
+	| case |
+	case := VGAlexandrieCase for: #lineCap.
+	case cairoForm.
+	self assert:
+		(VGAlexandrieFontLifetime retained includes: AeFontManager globalInstance)
 ]
 
 { #category : 'tests' }

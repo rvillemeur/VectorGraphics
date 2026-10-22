@@ -154,6 +154,7 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Cairo/Path' -> #pathAndStroke).
 			  ('VectorGraphics-Cairo/Backend' -> #displayList).
 			  ('VectorGraphics-Cairo/Display list' -> #displayList).
+			  ('VectorGraphics-Vulkan/Backend' -> #displayList).
 			  ('VectorGraphics-Cairo/Rasterising' -> #coverage).
 			  ('VectorGraphics-Cairo/Paint' -> #paintSource).
 			  ('VectorGraphics-Cairo/Pattern' -> #paintSource).
@@ -170,6 +171,7 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Bloc/Exporters' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc-Examples/Uncategorized' -> #notInTheFrame).
 			  ('VectorGraphics-Cairo-Examples/Examples' -> #notInTheFrame).
+			  ('VectorGraphics-Vulkan-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics/Examples' -> #notInTheFrame).
 			  ('VectorGraphics/Kernel' -> #notInTheFrame).
 			  ('VectorGraphics/Manifest' -> #notInTheFrame).

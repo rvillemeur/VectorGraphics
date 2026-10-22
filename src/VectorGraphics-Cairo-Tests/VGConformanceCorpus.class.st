@@ -461,9 +461,10 @@ VGConformanceCorpus class >> scaledFontFor: aContext size: aNumber [
 					   yourself) ].
 	^ AeCairoScaledFont
 		  fontFace: (AeCairoFreetypeFontFace newForFace:
-				   (AeFTLibrary newInitialized
-					    newFaceFromBytes: self textCaseFontBytes
-					    index: 0))
+				   (VGAlexandrieFontLifetime retain:
+					    (VGAlexandrieFontLifetime freeTypeLibrary
+						     newFaceFromBytes: self textCaseFontBytes
+						     index: 0)))
 		  fontMatrix: (AeCairoMatrix newScalingBy: aNumber asPoint)
 		  userToDeviceMatrix: AeCairoMatrix newIdentity
 		  options: (AeCairoFontOptions new
