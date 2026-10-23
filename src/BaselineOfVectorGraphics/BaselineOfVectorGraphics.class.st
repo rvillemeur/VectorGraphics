@@ -15,6 +15,11 @@ Class {
 { #category : 'baselines' }
 BaselineOfVectorGraphics >> baseline: spec [
 	<baseline>
+	"Every package names each package it really depends on, and not only the nearest one that
+	 would drag the rest in: VGArchitectureTest holds this declaration against the references
+	 the code makes. The one edge it cannot state is Cairo-Examples on Cairo-Tests, because the
+	 reverse is stated and a cycle has no load order."
+
 	spec for: #common do: [
 		spec
 			package: 'VectorGraphics';
@@ -23,20 +28,24 @@ BaselineOfVectorGraphics >> baseline: spec [
 			package: 'VectorGraphics-Cairo-Tests'
 			with: [ spec requires: #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples' ) ];
 			package: 'VectorGraphics-Bloc' with: [ spec requires: #( 'VectorGraphics-Cairo' ) ];
-			package: 'VectorGraphics-Bloc-Examples' with: [ spec requires: #( 'VectorGraphics-Bloc' ) ];
+			package: 'VectorGraphics-Bloc-Examples'
+			with: [ spec requires: #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ) ];
 			package: 'VectorGraphics-Bloc-Tests'
 			with: [
 				spec requires:
-						#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples'
+						#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples' 'VectorGraphics-Cairo'
 						   'VectorGraphics-Cairo-Tests' ) ];
-			package: 'VectorGraphics-Vulkan' with: [ spec requires: #( 'VectorGraphics-Bloc' ) ];
+			package: 'VectorGraphics-Vulkan'
+			with: [ spec requires: #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ) ];
 			package: 'VectorGraphics-Vulkan-Examples'
-			with: [ spec requires: #( 'VectorGraphics-Vulkan' ) ];
+			with: [
+				spec requires:
+						#( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Vulkan' ) ];
 			package: 'VectorGraphics-Vulkan-Tests'
 			with: [
 				spec requires:
-						#( 'VectorGraphics-Vulkan' 'VectorGraphics-Vulkan-Examples'
-						   'VectorGraphics-Cairo-Tests' ) ].
+						#( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Tests'
+						   'VectorGraphics-Vulkan' 'VectorGraphics-Vulkan-Examples' ) ].
 		spec
 			group: 'core' with: #( 'VectorGraphics' );
 			group: 'cairo' with: #( 'VectorGraphics-Cairo' );
