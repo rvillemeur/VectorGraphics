@@ -42,13 +42,14 @@ VGTiledFillSupportCensus class >> onTheReferenceFrame [
 	^ census
 ]
 
-{ #category : 'constants' }
+{ #category : 'accessing' }
 VGTiledFillSupportCensus class >> refusalReasons [
 	"One reason for each clause of VGTiledFillRasteriser class >> supportsEntry:, in the order
 	 that predicate asks them. An entry is counted under the first clause it fails, so the
 	 reasons partition the entries and their counts add up to the frame."
 
-	^ #( #notAFill #paintNotSupported #clipNotRectangular #operatorNotSupported )
+	^ #( #notAFillOrABlit #paintNotSupported #clipNotRectangular
+	     #operatorNotSupported )
 ]
 
 { #category : 'constants' }
@@ -224,7 +225,8 @@ VGTiledFillSupportCensus >> reasonFor: anEntry [
 	 one is asked of the rasteriser itself rather than restated, so a subset that widens is
 	 reported by this census on the same day."
 
-	(anEntry isKindOf: VGFillEntry) ifFalse: [ ^ #notAFill ].
+	(VGTiledFillRasteriser supportsKindOf: anEntry) ifFalse: [
+		^ #notAFillOrABlit ].
 	(VGTiledFillRasteriser supportsPaint: anEntry paint) ifFalse: [
 		^ #paintNotSupported ].
 	anEntry clip isRectangular ifFalse: [ ^ #clipNotRectangular ].

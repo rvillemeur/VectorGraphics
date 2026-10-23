@@ -10,13 +10,7 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'grid',
-		'tileTable',
-		'entryRefs',
-		'headers',
-		'clips',
-		'edges',
-		'paints',
-		'stops',
+		'buffers',
 		'decoded'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
@@ -135,6 +129,15 @@ VGTiledFillEncoding class >> edgeStartYField [
 ]
 
 { #category : 'layout' }
+VGTiledFillEncoding class >> emptyMaskRectangle [
+	"The rectangle an entry with no mask carries, and the rectangle a blit whose mask does not
+	 meet its clip carries. Both read full alpha everywhere, because a pixel is tested against
+	 the rectangle and this one holds none."
+
+	^ 0 @ 0 corner: 0 @ 0
+]
+
+{ #category : 'layout' }
 VGTiledFillEncoding class >> entryHeaderWords [
 	"The words one entry of the header buffer takes. Eleven carry meaning and the rest is
 	 padding: a power of two, so that a kernel reaches a header by a shift and not by a
@@ -204,6 +207,40 @@ VGTiledFillEncoding class >> isInteriorReference: aWord [
 	 every pixel of it is one."
 
 	^ (aWord bitAnd: self interiorReferenceFlag) ~= 0
+]
+
+{ #category : 'layout' }
+VGTiledFillEncoding class >> maskByteBits [
+	"The bits one alpha byte of the mask buffer takes, which is the shift between two bytes of
+	 one word."
+
+	^ 8
+]
+
+{ #category : 'layout' }
+VGTiledFillEncoding class >> maskBytesPerWord [
+	"The alpha bytes of a mask that one word of the mask buffer holds. A storage buffer the
+	 kernel reads holds words, so a byte at position p of the mask buffer sits in word p divided
+	 by this one, at the shift the remainder names."
+
+	^ 4
+]
+
+{ #category : 'layout' }
+VGTiledFillEncoding class >> maskBytesShownPerEntry [
+	"How many alpha bytes of a mask the Masks tab lists beside the count of them. A glyph mask
+	 carries hundreds and a row of a table holds a few."
+
+	^ 8
+]
+
+{ #category : 'layout' }
+VGTiledFillEncoding class >> maskOffsetField [
+	"Where the alpha bytes of this entry''s mask start, counted in bytes from the first byte of
+	 the mask buffer. An entry with no mask leaves the field at zero and carries an empty
+	 rectangle, which is what says it has none."
+
+	^ 12
 ]
 
 { #category : 'instance creation' }
@@ -374,22 +411,23 @@ VGTiledFillEncoding class >> tileTopField [
 	^ 3
 ]
 
-{ #category : 'initialization' }
-VGTiledFillEncoding >> allocateBuffersFor: aCollection edges: anEdgeCount stops: aStopCount [
-	"The five buffers an entry writes into, sized by the frame alone. A header and a clip
-	 rectangle and a paint block an entry, and as many edges and stops as the entries hold
-	 between them."
+{ #category : 'writing' }
+VGTiledFillEncoding >> allocateBuffersFor: aCollection edges: anEdgeCount stops: aStopCount masks: aByteCount [
+	"The buffers one frame rides to the device in. How large each of them is for that many
+	 entries, edges, stops and mask bytes belongs to VGTiledFillBuffers, which knows their sizes
+	 and nothing of what a record holds; what goes inside one is mine."
 
-	headers := WordArray new: aCollection size * self class entryHeaderWords.
-	clips := Float32Array new: aCollection size * self class clipFloats.
-	paints := Float32Array new: aCollection size * self class paintBlockFloats.
-	edges := Float32Array new: anEdgeCount * self class edgeFloats.
-	stops := Float32Array new: aStopCount * self class stopFloats
+	buffers := VGTiledFillBuffers new.
+	buffers
+		allocateForEntries: aCollection size
+		edges: anEdgeCount
+		stops: aStopCount
+		masks: aByteCount
 ]
 
 { #category : 'tiles' }
 VGTiledFillEncoding >> binnedEntryCount [
-	^ entryRefs size
+	^ buffers entryRefs size
 ]
 
 { #category : 'decoding' }
@@ -398,13 +436,13 @@ VGTiledFillEncoding >> blockOfEntryAt: anIndex [
 	 stand: a paint keeps its block in single floats too, so nothing widens here."
 
 	| base block |
-	base := (headers
+	base := (buffers headers
 	         at:
 	         (anIndex - 1) * self class entryHeaderWords
 	         + self class paintBlockOffsetField) * self class paintBlockFloats.
 	block := Float32Array new: self class paintBlockFloats.
 	1 to: self class paintBlockFloats do: [ :field |
-		block at: field put: (paints at: base + field) ].
+		block at: field put: (buffers paints at: base + field) ].
 	^ block
 ]
 
@@ -413,15 +451,15 @@ VGTiledFillEncoding >> clipOfEntryAt: anIndex [
 	| base |
 	base := (anIndex - 1) * self class clipFloats.
 	^ Rectangle
-		  left: (clips at: base + self class clipLeftField)
-		  right: (clips at: base + self class clipRightField)
-		  top: (clips at: base + self class clipTopField)
-		  bottom: (clips at: base + self class clipBottomField)
+		  left: (buffers clips at: base + self class clipLeftField)
+		  right: (buffers clips at: base + self class clipRightField)
+		  top: (buffers clips at: base + self class clipTopField)
+		  bottom: (buffers clips at: base + self class clipBottomField)
 ]
 
 { #category : 'accessing' }
 VGTiledFillEncoding >> clips [
-	^ clips
+	^ buffers clips
 ]
 
 { #category : 'decoding' }
@@ -430,36 +468,43 @@ VGTiledFillEncoding >> coordinatesOfEntryAt: anIndex [
 	 again unchanged."
 	| base count start coordinates |
 	base := (anIndex - 1) * self class entryHeaderWords.
-	count := (headers at: base + self class edgeCountField)
+	count := (buffers headers at: base + self class edgeCountField)
 	         * self class edgeFloats.
-	start := (headers at: base + self class edgeOffsetField)
+	start := (buffers headers at: base + self class edgeOffsetField)
 	         * self class edgeFloats.
 	coordinates := Array new: count.
 	1 to: count do: [ :offset |
-		coordinates at: offset put: (edges at: start + offset) ].
+		coordinates at: offset put: (buffers edges at: start + offset) ].
 	^ coordinates
 ]
 
-{ #category : 'decoding' }
+{ #category : 'reading' }
 VGTiledFillEncoding >> decodeEntryAt: anIndex [
 	"One entry out of the buffers and nothing else: this is what makes the step one rasteriser
 	 draw from the encoding alone, and so what a test can hold the layout to before a kernel
-	 exists."
+	 exists. An entry whose mask rectangle is empty carries no mask and is the fill it looks
+	 like; one with a rectangle is the masked fill a blit was written as."
 
-	| base |
+	| base fill rectangle |
 	base := (anIndex - 1) * self class entryHeaderWords.
-	^ VGFillEntry
-		  segments: (self segmentsOfEntryAt: anIndex)
-		  paint: (self paintOfEntryAt: anIndex)
-		  clip: (VGClip bounds: (self clipOfEntryAt: anIndex))
-		  operator:
-		  (self class operatorAtCode:
-			   (headers at: base + self class operatorField))
+	fill := VGFillEntry
+		        segments: (self segmentsOfEntryAt: anIndex)
+		        paint: (self paintOfEntryAt: anIndex)
+		        clip: (VGClip bounds: (self clipOfEntryAt: anIndex))
+		        operator:
+		        (self class operatorAtCode:
+			         (buffers headers at: base + self class operatorField)).
+	rectangle := self maskRectangleOfEntryAt: anIndex.
+	rectangle = self class emptyMaskRectangle ifTrue: [ ^ fill ].
+	^ VGMaskedFillEntry
+		  fill: fill
+		  bytes: (self maskBytesOfEntryAt: anIndex)
+		  over: rectangle
 ]
 
 { #category : 'accessing' }
 VGTiledFillEncoding >> edgeCount [
-	^ edges size / self class edgeFloats
+	^ buffers edges size / self class edgeFloats
 ]
 
 { #category : 'initialization' }
@@ -469,7 +514,7 @@ VGTiledFillEncoding >> edgeCountOf: anEntry [
 
 { #category : 'accessing' }
 VGTiledFillEncoding >> edges [
-	^ edges
+	^ buffers edges
 ]
 
 { #category : 'decoding' }
@@ -482,12 +527,12 @@ VGTiledFillEncoding >> entriesOfTileAt: anIndex [
 	row := self rowOfTileAt: anIndex.
 	row ifNil: [ ^ #(  ) ].
 	base := (row - 1) * self class tileRecordWords.
-	^ (1 to: (tileTable at: base + self class referenceCountField)) collect: [
+	^ (1 to: (buffers tileTable at: base + self class referenceCountField)) collect: [
 		  :position |
 		  self entryAt: (self class identifierOfReference:
-				   (entryRefs
+				   (buffers entryRefs
 					    at:
-					    (tileTable at: base + self class referenceOffsetField)
+					    (buffers tileTable at: base + self class referenceOffsetField)
 					    + position)) ]
 ]
 
@@ -501,12 +546,12 @@ VGTiledFillEncoding >> entryAt: anIndex [
 
 { #category : 'accessing' }
 VGTiledFillEncoding >> entryCount [
-	^ headers size / self class entryHeaderWords
+	^ buffers headers size / self class entryHeaderWords
 ]
 
 { #category : 'accessing' }
 VGTiledFillEncoding >> entryRefs [
-	^ entryRefs
+	^ buffers entryRefs
 ]
 
 { #category : 'inspecting' }
@@ -519,12 +564,12 @@ VGTiledFillEncoding >> entryRows [
 		  entry := self entryAt: index.
 		  {
 			  index.
-			  (headers at: base + self class sourcePixelField) printStringHex.
+			  (buffers headers at: base + self class sourcePixelField) printStringHex.
 			  entry operator.
 			  entry segments fillRule.
 			  entry segments isAliased.
-			  (headers at: base + self class alphaByteField).
-			  (headers at: base + self class edgeCountField).
+			  (buffers headers at: base + self class alphaByteField).
+			  (buffers headers at: base + self class edgeCountField).
 			  entry clip bounds } ]
 ]
 
@@ -535,7 +580,7 @@ VGTiledFillEncoding >> grid [
 
 { #category : 'accessing' }
 VGTiledFillEncoding >> headers [
-	^ headers
+	^ buffers headers
 ]
 
 { #category : 'inspecting' }
@@ -575,7 +620,37 @@ VGTiledFillEncoding >> inspectorEntries: aBuilder [
 
 { #category : 'inspecting' }
 VGTiledFillEncoding >> inspectorEntriesContext: aContext [
-	aContext active: headers isNotNil
+	aContext active: buffers isNotNil
+]
+
+{ #category : 'inspector' }
+VGTiledFillEncoding >> inspectorMasks: aBuilder [
+	<inspectorPresentationOrder: 14 title: 'Masks'>
+	"The mask buffers as the kernel reads them: the rectangle written for each entry and the
+	 bytes that lie under it, read back out of the buffers themselves. An entry that carries no
+	 mask has an empty rectangle and no bytes at all, which is how one code path draws a fill and
+	 a blit alike."
+
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn
+				   title: 'Entry'
+				   evaluated: [ :each | (each at: 1) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Rectangle'
+				   evaluated: [ :each | (each at: 2) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Bytes'
+				   evaluated: [ :each | (each at: 3) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Alphas'
+				   evaluated: [ :each | (each at: 4) printString ]);
+		  items: self maskRows;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGTiledFillEncoding >> inspectorMasksContext: aContext [
+	aContext active: buffers isNotNil
 ]
 
 { #category : 'inspector' }
@@ -612,7 +687,7 @@ VGTiledFillEncoding >> inspectorPaints: aBuilder [
 
 { #category : 'inspector' }
 VGTiledFillEncoding >> inspectorPaintsContext: aContext [
-	aContext active: paints isNotNil
+	aContext active: buffers isNotNil
 ]
 
 { #category : 'inspector' }
@@ -643,7 +718,7 @@ VGTiledFillEncoding >> inspectorStops: aBuilder [
 
 { #category : 'inspector' }
 VGTiledFillEncoding >> inspectorStopsContext: aContext [
-	aContext active: stops isNotNil
+	aContext active: buffers isNotNil
 ]
 
 { #category : 'inspecting' }
@@ -670,7 +745,79 @@ VGTiledFillEncoding >> inspectorTileTable: aBuilder [
 
 { #category : 'inspecting' }
 VGTiledFillEncoding >> inspectorTileTableContext: aContext [
-	aContext active: tileTable isNotNil
+	aContext active: buffers isNotNil
+]
+
+{ #category : 'writing' }
+VGTiledFillEncoding >> maskByteCountOf: anEntry [
+	"The alpha bytes the mask of an entry takes, which an entry that is not a blit has none of."
+
+	^ anEntry tiledMaskBytes size
+]
+
+{ #category : 'accessing' }
+VGTiledFillEncoding >> maskBytes [
+	^ buffers maskBytes
+]
+
+{ #category : 'reading' }
+VGTiledFillEncoding >> maskBytesOfEntryAt: anIndex [
+	"The alpha bytes of that entry''s mask, read back out of the buffer of words in the order
+	 they were written: one byte a pixel, row by row from the top left of its rectangle."
+
+	| rectangle offset perWord bytes |
+	rectangle := self maskRectangleOfEntryAt: anIndex.
+	offset := buffers headers
+		          at: (anIndex - 1) * self class entryHeaderWords
+			          + self class maskOffsetField.
+	perWord := self class maskBytesPerWord.
+	bytes := ByteArray new: rectangle width * rectangle height.
+	1 to: bytes size do: [ :index |
+		| position |
+		position := offset + index - 1.
+		bytes
+			at: index
+			put: (((buffers maskBytes at: position // perWord + 1) bitShift:
+					  (position \\ perWord * self class maskByteBits) negated)
+					 bitAnd: self class fullAlphaByte) ].
+	^ bytes
+]
+
+{ #category : 'reading' }
+VGTiledFillEncoding >> maskRectangleOfEntryAt: anIndex [
+	"The rectangle of that entry''s mask, read back out of the buffer. A mask rectangle is laid
+	 out as a clip rectangle, so the field constants of a clip name its fields. Its sides are
+	 whole pixels - it is the extents of a clip - so they widen from a single float unchanged and
+	 are answered as whole numbers, which is what indexing a run of bytes by a row needs."
+
+	| base |
+	base := (anIndex - 1) * self class clipFloats.
+	^ Rectangle
+		  left: (buffers maskRects at: base + self class clipLeftField) truncated
+		  right: (buffers maskRects at: base + self class clipRightField) truncated
+		  top: (buffers maskRects at: base + self class clipTopField) truncated
+		  bottom: (buffers maskRects at: base + self class clipBottomField) truncated
+]
+
+{ #category : 'accessing' }
+VGTiledFillEncoding >> maskRects [
+	^ buffers maskRects
+]
+
+{ #category : 'inspector' }
+VGTiledFillEncoding >> maskRows [
+	"One entry a row, with the rectangle and the bytes of its mask read back out of the mask
+	 buffers. The bytes are counted and the first of them listed, because a glyph carries
+	 hundreds and a row of a table holds a few."
+
+	^ (1 to: self entryCount) collect: [ :index |
+		  | bytes |
+		  bytes := self maskBytesOfEntryAt: index.
+		  {
+			  index.
+			  (self maskRectangleOfEntryAt: index).
+			  bytes size.
+			  (bytes first: (bytes size min: self class maskBytesShownPerEntry)) } ]
 ]
 
 { #category : 'initialization' }
@@ -697,10 +844,10 @@ VGTiledFillEncoding >> paintOfEntryAt: anIndex [
 
 	| base tag paint |
 	base := (anIndex - 1) * self class entryHeaderWords.
-	tag := headers at: base + self class paintTagField.
+	tag := buffers headers at: base + self class paintTagField.
 	tag = VGPixelPaint paintTag ifTrue: [
 		^ VGPixelPaint pixel:
-			  (headers at: base + self class sourcePixelField) ].
+			  (buffers headers at: base + self class sourcePixelField) ].
 	paint := (self class gradientClassAtTag: tag) fromBlock:
 		         (self blockOfEntryAt: anIndex).
 	(self stopsOfEntryAt: anIndex) do: [ :stop |
@@ -723,9 +870,9 @@ VGTiledFillEncoding >> paintRows [
 		  {
 			  index.
 			  paint class name.
-			  (headers at: base + self class paintTagField).
+			  (buffers headers at: base + self class paintTagField).
 			  (VGPaint extendFor: (block at: VGPaint extendFieldIndex) truncated).
-			  (headers at: base + self class stopCountField).
+			  (buffers headers at: base + self class stopCountField).
 			  (VGPaint matrixFieldIndices collect: [ :field | block at: field ]).
 			  ((VGPaint filterFieldIndex + 1 to: self class paintBlockFloats)
 				   collect: [ :field | block at: field ]) } ]
@@ -733,7 +880,7 @@ VGTiledFillEncoding >> paintRows [
 
 { #category : 'accessing' }
 VGTiledFillEncoding >> paints [
-	^ paints
+	^ buffers paints
 ]
 
 { #category : 'printing' }
@@ -760,7 +907,7 @@ VGTiledFillEncoding >> rowOfTileAt: anIndex [
 	[ low <= high ] whileTrue: [
 		| middle found |
 		middle := low + high // 2.
-		found := tileTable at:
+		found := buffers tileTable at:
 			         (middle - 1) * self class tileRecordWords
 			         + self class tileIndexField.
 		found = anIndex ifTrue: [ ^ middle ].
@@ -780,32 +927,39 @@ VGTiledFillEncoding >> segmentsOfEntryAt: anIndex [
 	^ (VGSegments
 		   coordinates: (self coordinatesOfEntryAt: anIndex)
 		   fillRule:
-		   (self class fillRuleAtCode: (headers at: base + self class fillRuleField))
+		   (self class fillRuleAtCode: (buffers headers at: base + self class fillRuleField))
 		   antialias:
-		   (self class antialiasAtFlag: (headers at: base + self class aliasedField)))
+		   (self class antialiasAtFlag: (buffers headers at: base + self class aliasedField)))
 		  withAlpha:
-		  (headers at: base + self class alphaByteField) / self class fullAlphaByte
+		  (buffers headers at: base + self class alphaByteField) / self class fullAlphaByte
 ]
 
-{ #category : 'initialization' }
+{ #category : 'writing' }
 VGTiledFillEncoding >> setBinning: aBinning [
-	"Write the frame out: a header, a clip rectangle, a paint block, a run of edges and a run of
-	 stops for every entry, then the table of the tiles it touches and the references into it.
-	 The entries are the binning''s own copy of the display list, so nothing here reads a frame
-	 that has already drained."
+	"Write the frame out: a header, a clip rectangle, a mask rectangle, a paint block, a run of
+	 edges, a run of stops and a run of mask bytes for every entry, then the table of the tiles it
+	 touches and the references into it. Every entry is written as the fill it is drawn as, which
+	 for a blit is a fill of its own narrowed clip carrying the alpha of its mask, so the buffers
+	 describe one kind of entry and the kernel reads one kind. The entries are the binning's own
+	 copy of the display list, so nothing here reads a frame that has already drained, and the
+	 tiles are written from the binning itself, which knows the entries it binned and not the
+	 fills they became."
 
-	| entries edgeOffsets stopOffsets |
+	| entries edgeOffsets stopOffsets maskOffsets |
 	grid := aBinning grid.
 	decoded := Dictionary new.
-	entries := aBinning entries.
+	entries := aBinning entries collect: [ :each | each asTiledFill ].
 	edgeOffsets := self offsetsFor: entries by: [ :each |
 		               self edgeCountOf: each ].
 	stopOffsets := self offsetsFor: entries by: [ :each |
 		               self stopCountOf: each ].
+	maskOffsets := self offsetsFor: entries by: [ :each |
+		               self maskByteCountOf: each ].
 	self
 		allocateBuffersFor: entries
 		edges: edgeOffsets last
-		stops: stopOffsets last.
+		stops: stopOffsets last
+		masks: maskOffsets last.
 	entries withIndexDo: [ :each :index |
 		self
 			writeHeaderOf: each
@@ -814,13 +968,14 @@ VGTiledFillEncoding >> setBinning: aBinning [
 			stopOffset: (stopOffsets at: index).
 		self writeClipOf: each at: index.
 		self writeEdgesOf: each at: (edgeOffsets at: index).
-		self writePaintOf: each at: index stopOffset: (stopOffsets at: index) ].
+		self writePaintOf: each at: index stopOffset: (stopOffsets at: index).
+		self writeMaskOf: each at: index offset: (maskOffsets at: index) ].
 	self writeTilesOf: aBinning
 ]
 
 { #category : 'accessing' }
 VGTiledFillEncoding >> stopCount [
-	^ stops size / self class stopFloats
+	^ buffers stops size / self class stopFloats
 ]
 
 { #category : 'initialization' }
@@ -852,7 +1007,7 @@ VGTiledFillEncoding >> stopRows [
 
 { #category : 'accessing' }
 VGTiledFillEncoding >> stops [
-	^ stops
+	^ buffers stops
 ]
 
 { #category : 'decoding' }
@@ -862,19 +1017,19 @@ VGTiledFillEncoding >> stopsOfEntryAt: anIndex [
 
 	| base count start |
 	base := (anIndex - 1) * self class entryHeaderWords.
-	count := headers at: base + self class stopCountField.
-	start := headers at: base + self class stopOffsetField.
+	count := buffers headers at: base + self class stopCountField.
+	start := buffers headers at: base + self class stopOffsetField.
 	^ (1 to: count) collect: [ :index |
 		  | stopBase |
 		  stopBase := (start + index - 1) * self class stopFloats.
-		  (stops at: stopBase + self class stopPositionField)
+		  (buffers stops at: stopBase + self class stopPositionField)
 		  -> (self class stopChannelFields collect: [ :field |
-			   stops at: stopBase + field ]) ]
+			   buffers stops at: stopBase + field ]) ]
 ]
 
 { #category : 'accessing' }
 VGTiledFillEncoding >> tileTable [
-	^ tileTable
+	^ buffers tileTable
 ]
 
 { #category : 'inspecting' }
@@ -884,23 +1039,23 @@ VGTiledFillEncoding >> tileTableRows [
 		  | base |
 		  base := (row - 1) * self class tileRecordWords.
 		  {
-			  (tileTable at: base + self class tileIndexField).
-			  ((tileTable at: base + self class tileLeftField)
-			   @ (tileTable at: base + self class tileTopField)).
-			  (tileTable at: base + self class referenceOffsetField).
-			  (tileTable at: base + self class referenceCountField) } ]
+			  (buffers tileTable at: base + self class tileIndexField).
+			  ((buffers tileTable at: base + self class tileLeftField)
+			   @ (buffers tileTable at: base + self class tileTopField)).
+			  (buffers tileTable at: base + self class referenceOffsetField).
+			  (buffers tileTable at: base + self class referenceCountField) } ]
 ]
 
 { #category : 'tiles' }
 VGTiledFillEncoding >> touchedTileCount [
-	^ tileTable size / self class tileRecordWords
+	^ buffers tileTable size / self class tileRecordWords
 ]
 
 { #category : 'tiles' }
 VGTiledFillEncoding >> touchedTileIndexes [
 	"The tiles the frame touches, read from the table itself."
 	^ (1 to: self touchedTileCount) collect: [ :row |
-		  tileTable at:
+		  buffers tileTable at:
 			  (row - 1) * self class tileRecordWords + self class tileIndexField ]
 ]
 
@@ -910,10 +1065,10 @@ VGTiledFillEncoding >> writeClipOf: anEntry at: anIndex [
 	| base bounds |
 	base := (anIndex - 1) * self class clipFloats.
 	bounds := anEntry clip bounds.
-	clips at: base + self class clipLeftField put: bounds left.
-	clips at: base + self class clipTopField put: bounds top.
-	clips at: base + self class clipRightField put: bounds right.
-	clips at: base + self class clipBottomField put: bounds bottom
+	buffers clips at: base + self class clipLeftField put: bounds left.
+	buffers clips at: base + self class clipTopField put: bounds top.
+	buffers clips at: base + self class clipRightField put: bounds right.
+	buffers clips at: base + self class clipBottomField put: bounds bottom
 ]
 
 { #category : 'initialization' }
@@ -924,7 +1079,7 @@ VGTiledFillEncoding >> writeEdgesOf: anEntry at: anOffset [
 	base := anOffset * self class edgeFloats.
 	coordinates := anEntry segments coordinates.
 	1 to: coordinates size do: [ :offset |
-		edges at: base + offset put: (coordinates at: offset) ]
+		buffers edges at: base + offset put: (coordinates at: offset) ]
 ]
 
 { #category : 'initialization' }
@@ -936,35 +1091,77 @@ VGTiledFillEncoding >> writeHeaderOf: anEntry at: anIndex edgeOffset: anOffset s
 	| base format |
 	base := (anIndex - 1) * self class entryHeaderWords.
 	format := self class targetFormat.
-	headers
+	buffers headers
 		at: base + self class sourcePixelField
 		put: (anEntry paint isSolid
 				 ifTrue: [ anEntry paint pixelIn: format atX: 0 y: 0 ]
 				 ifFalse: [ 0 ]).
-	headers
+	buffers headers
 		at: base + self class operatorField
 		put: (self class codeForOperator: anEntry operator).
-	headers
+	buffers headers
 		at: base + self class fillRuleField
 		put: (self class codeForFillRule: anEntry segments fillRule).
-	headers
+	buffers headers
 		at: base + self class aliasedField
 		put: (self class flagForAliased: anEntry segments isAliased).
-	headers
+	buffers headers
 		at: base + self class alphaByteField
 		put: (format shortByteOf: anEntry segments alpha).
-	headers at: base + self class edgeOffsetField put: anOffset.
-	headers
+	buffers headers at: base + self class edgeOffsetField put: anOffset.
+	buffers headers
 		at: base + self class edgeCountField
 		put: (self edgeCountOf: anEntry).
-	headers
+	buffers headers
 		at: base + self class paintTagField
 		put: anEntry paint class paintTag.
-	headers at: base + self class paintBlockOffsetField put: anIndex - 1.
-	headers at: base + self class stopOffsetField put: aStopOffset.
-	headers
+	buffers headers at: base + self class paintBlockOffsetField put: anIndex - 1.
+	buffers headers at: base + self class stopOffsetField put: aStopOffset.
+	buffers headers
 		at: base + self class stopCountField
 		put: (self stopCountOf: anEntry)
+]
+
+{ #category : 'writing' }
+VGTiledFillEncoding >> writeMaskBytes: aByteArray at: anOffset [
+	"The alpha bytes of one mask into the buffer of words the kernel reads. The byte at position
+	 p sits in the word p divided by the bytes a word holds, at the shift the remainder names,
+	 which is the little-endian order the device reads that same word in. Each byte is written
+	 once into a buffer that starts at zero, so a sum writes it."
+
+	| perWord |
+	perWord := self class maskBytesPerWord.
+	1 to: aByteArray size do: [ :index |
+		| position word |
+		position := anOffset + index - 1.
+		word := position // perWord + 1.
+		buffers maskBytes
+			at: word
+			put: (buffers maskBytes at: word) + ((aByteArray at: index) bitShift:
+					 position \\ perWord * self class maskByteBits) ]
+]
+
+{ #category : 'writing' }
+VGTiledFillEncoding >> writeMaskOf: anEntry at: anIndex offset: anOffset [
+	"The rectangle of an entry''s mask and the run of alpha bytes inside it. A mask rectangle is
+	 laid out as a clip rectangle - four sides in the order left, top, right, bottom - so the
+	 field constants of a clip name its fields too. An entry with no mask writes the empty
+	 rectangle and no byte at all: the kernel tests a pixel against the rectangle and answers
+	 full alpha outside it, and scaling a byte by full alpha leaves it as it was, so nothing else
+	 has to mark the difference."
+
+	| base rectangle |
+	base := (anIndex - 1) * self class clipFloats.
+	rectangle := anEntry tiledMaskRectangle.
+	buffers maskRects at: base + self class clipLeftField put: rectangle left.
+	buffers maskRects at: base + self class clipTopField put: rectangle top.
+	buffers maskRects at: base + self class clipRightField put: rectangle right.
+	buffers maskRects at: base + self class clipBottomField put: rectangle bottom.
+	buffers headers
+		at: (anIndex - 1) * self class entryHeaderWords
+			+ self class maskOffsetField
+		put: anOffset.
+	self writeMaskBytes: anEntry tiledMaskBytes at: anOffset
 ]
 
 { #category : 'initialization' }
@@ -978,14 +1175,14 @@ VGTiledFillEncoding >> writePaintOf: anEntry at: anIndex stopOffset: aStopOffset
 	base := (anIndex - 1) * self class paintBlockFloats.
 	paint := anEntry paint.
 	1 to: self class paintBlockFloats do: [ :field |
-		paints at: base + field put: (paint coefficients at: field) ].
+		buffers paints at: base + field put: (paint coefficients at: field) ].
 	paint hasStops ifFalse: [ ^ self ].
 	paint stops withIndexDo: [ :stop :index |
 		| stopBase |
 		stopBase := (aStopOffset + index - 1) * self class stopFloats.
-		stops at: stopBase + self class stopPositionField put: stop key.
+		buffers stops at: stopBase + self class stopPositionField put: stop key.
 		self class stopChannelFields doWithIndex: [ :field :channel |
-			stops at: stopBase + field put: (stop value at: channel) ] ]
+			buffers stops at: stopBase + field put: (stop value at: channel) ] ]
 ]
 
 { #category : 'initialization' }
@@ -995,11 +1192,11 @@ VGTiledFillEncoding >> writeTileRecordAt: aRow tile: aTileIndex offset: anOffset
 	| base bounds |
 	base := (aRow - 1) * self class tileRecordWords.
 	bounds := grid boundsOfTileAt: aTileIndex.
-	tileTable at: base + self class tileIndexField put: aTileIndex.
-	tileTable at: base + self class tileLeftField put: bounds left.
-	tileTable at: base + self class tileTopField put: bounds top.
-	tileTable at: base + self class referenceOffsetField put: anOffset.
-	tileTable at: base + self class referenceCountField put: aCount
+	buffers tileTable at: base + self class tileIndexField put: aTileIndex.
+	buffers tileTable at: base + self class tileLeftField put: bounds left.
+	buffers tileTable at: base + self class tileTopField put: bounds top.
+	buffers tileTable at: base + self class referenceOffsetField put: anOffset.
+	buffers tileTable at: base + self class referenceCountField put: aCount
 ]
 
 { #category : 'tiles' }
@@ -1014,8 +1211,7 @@ VGTiledFillEncoding >> writeTilesOf: aBinning [
 	aBinning entries withIndexDo: [ :each :index |
 		identifiers at: each put: index ].
 	indexes := aBinning touchedTileIndexes asSortedCollection asArray.
-	tileTable := WordArray new: indexes size * self class tileRecordWords.
-	entryRefs := WordArray new: aBinning binnedEntryCount.
+	buffers allocateForTiles: indexes size references: aBinning binnedEntryCount.
 	offset := 0.
 	indexes withIndexDo: [ :tileIndex :row |
 		| tileEntries |
@@ -1026,7 +1222,7 @@ VGTiledFillEncoding >> writeTilesOf: aBinning [
 			offset: offset
 			count: tileEntries size.
 		tileEntries withIndexDo: [ :each :position |
-			entryRefs
+			buffers entryRefs
 				at: offset + position
 				put: (self class
 						 referenceFor: (identifiers at: each)

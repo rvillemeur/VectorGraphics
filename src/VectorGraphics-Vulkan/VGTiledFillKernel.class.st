@@ -26,12 +26,12 @@ Class {
 
 { #category : 'contract' }
 VGTiledFillKernel class >> bindingNames [
-	"The nine buffers I read, in the order they are bound: the seven an encoding writes, the
-	 pixels of the target and the size of the frame. A binding number is the position of the
-	 name here, counted from zero, so this one list states the whole contract."
+	"The eleven buffers I read, in the order they are bound: the nine an encoding writes, the
+	 pixels of the target and the size of the frame. A binding number is the position of the name
+	 here, counted from zero, so this one list states the whole contract."
 
-	^ #( #tileTable #entryRefs #headers #clips #edges #paints #stops #target
-	     #frame )
+	^ #( #tileTable #entryRefs #headers #clips #edges #paints #stops
+	     #maskRects #maskBytes #target #frame )
 ]
 
 { #category : 'constants' }
@@ -100,11 +100,12 @@ VGTiledFillKernel class >> entryPointName [
 
 { #category : 'contract' }
 VGTiledFillKernel class >> floatBindingNames [
-	"The four buffers of single floats. A clip side, an edge end, a coefficient of a paint and
-	 the offset and channels of a stop are all floating point; everything else a frame carries
-	 is a word."
+	"The five buffers of single floats. A clip side, a mask side, an edge end, a coefficient of a
+	 paint and the offset and channels of a stop are all floating point; everything else a frame
+	 carries is a word, the alpha bytes of a mask among them, because a storage buffer holds
+	 words and four of those bytes ride in each."
 
-	^ #( #clips #edges #paints #stops )
+	^ #( #clips #maskRects #edges #paints #stops )
 ]
 
 { #category : 'constants' }
@@ -273,10 +274,11 @@ VGTiledFillKernel class >> variableNames [
 { #category : 'contract' }
 VGTiledFillKernel class >> wordVariableNames [
 	"The function variables that hold a word: the destination pixel, the source pixel of the
-	 fill and whether the fill lays one down at all, the three loop counters, the stop loop with
-	 the two stops it looks for and the flags that stand where VGTileCoverage answers early."
+	 fill and whether the fill lays one down at all, the byte the mask of the fill carries here,
+	 the three loop counters, the stop loop with the two stops it looks for and the flags that
+	 stand where VGTileCoverage answers early."
 
-	^ #( #dest #source #hasSource #reference #sample #runsMore
+	^ #( #dest #source #hasSource #maskByte #reference #sample #runsMore
 	     #runFromSearching #runFromFound #endRunning #edge #nearestFound #stop
 	     #beforeStop #afterStop #beforeFound #afterFound )
 ]
@@ -324,9 +326,9 @@ VGTiledFillKernel >> componentOfBuiltIn: aBuiltIn at: anInteger [
 
 { #category : 'building' }
 VGTiledFillKernel >> declareBuffers [
-	"One variable per binding, numbered by its position in the contract. Two element types
-	 serve all seven and the registry answers one array and one structure for each, so the
-	 stride and the block decoration are written once per type and never twice."
+	"One variable per binding, numbered by its position in the contract. Two element types serve
+	 all of them and the registry answers one array and one structure for each, so the stride and
+	 the block decoration are written once per type and never twice."
 
 	| pointerTypes |
 	bindings := Dictionary new.
@@ -700,13 +702,18 @@ VGTiledFillKernel >> emitEndOfRunFrom: aStartId to: aRightId onSubRow: aSubRowId
 
 { #category : 'emission - entry' }
 VGTiledFillKernel >> emitEntry [
-	"One fill of this tile at this pixel: its header, its clip, the pixel its paint lays down
-	 here, the coverage of the walk over it and the composition of the two into the destination.
+	"One fill of this tile at this pixel: its header, its clip, the rectangle of its mask, the
+	 pixel its paint lays down here, the coverage of the walk over it and the composition of the
+	 two into the destination.
 	 The reference holds the identifier of the entry, counting from one as VGTiledFillEncoding
 	 writes it, and in its top bit the mark that says the entry covers the whole of this tile.
 	 A pixel the paint lays nothing down at is left alone, which the subset may do because every
 	 operator in it is bounded, and which is what the software rasteriser does with the nil a
 	 paint answers.
+	 The mask scales the coverage after the alpha of the fill does, which is the order
+	 VGTiledFillRasteriser scales them in and the order the software backend scales a blit in;
+	 an entry that carries no mask answers full alpha and scaling by that leaves a byte as it
+	 was, so one path serves a fill and a blit alike.
 	 The paint and the composition are emitted by VGTiledFillPixelEmitter, which shares this
 	 module while I emit this entry; the walk over the edges between them is my own."
 
@@ -733,9 +740,14 @@ VGTiledFillKernel >> emitEntry [
 		rememberClipAt: (self
 				 productOfWord: previous
 				 and: (self constantWord: VGTiledFillEncoding clipFloats)).
+	self
+		rememberMaskRectAt: (self
+				 productOfWord: previous
+				 and: (self constantWord: VGTiledFillEncoding clipFloats)).
 	pixels emitSource.
 	self emitCoverageGivenInterior: (self emitIsInteriorReference: reference).
 	mask := pixels emitMaskForCoverage: (self load: #coverage).
+	mask := pixels emitScaleOfByte: mask by: self emitMaskByte.
 	builder
 		emitIf: (self
 				 both: (self word: (self constantWord: 0) below: mask)
@@ -804,6 +816,73 @@ VGTiledFillKernel >> emitMain [
 		literals: self localSize.
 	self emitBody.
 	builder emitReturn
+]
+
+{ #category : 'emitting' }
+VGTiledFillKernel >> emitMaskByte [
+	"The alpha the mask of this entry carries at this pixel, which the coverage is scaled by. It
+	 is full alpha where the entry carries no mask at all: the rectangle written for such an
+	 entry is empty, so every pixel falls outside it, and VGMaskedFillEntry answers full alpha
+	 outside its own rectangle for the same reason. The bytes lie four to a word, row by row from
+	 the top left of the rectangle, so the one wanted is found by a division and a shift the
+	 invocation computes rather than the module. The load sits inside the test and not in a
+	 select, because a select evaluates both of its arms and outside the rectangle the index is
+	 not one the buffer holds."
+
+	| inside column row width position index shift |
+	self
+		store: (self constantWord: VGTiledFillEncoding fullAlphaByte)
+		into: #maskByte.
+	inside := self
+		          both: (self
+				           both: (self
+						            float: (self valueNamed: #pixelLeft)
+						            atLeast: (self valueNamed: #maskLeft))
+				           and: (self
+						            float: (self valueNamed: #pixelLeft)
+						            below: (self valueNamed: #maskRight)))
+		          and: (self
+				           both: (self
+						            float: (self valueNamed: #pixelRow)
+						            atLeast: (self valueNamed: #maskTop))
+				           and: (self
+						            float: (self valueNamed: #pixelRow)
+						            below: (self valueNamed: #maskBottom))).
+	builder emitIf: inside then: [
+		column := self wordOfFloat: (self
+				          differenceOfFloat: (self valueNamed: #pixelLeft)
+				          and: (self valueNamed: #maskLeft)).
+		row := self wordOfFloat: (self
+				       differenceOfFloat: (self valueNamed: #pixelRow)
+				       and: (self valueNamed: #maskTop)).
+		width := self wordOfFloat: (self
+				         differenceOfFloat: (self valueNamed: #maskRight)
+				         and: (self valueNamed: #maskLeft)).
+		position := self
+			            sumOfWord: (self valueNamed: #maskOffset)
+			            and: (self
+					             sumOfWord: (self productOfWord: row and: width)
+					             and: column).
+		index := self
+			         word: position
+			         dividedBy:
+			         (self constantWord: VGTiledFillEncoding maskBytesPerWord).
+		shift := self
+			         productOfWord: (self
+					          differenceOfWord: position
+					          and: (self
+							           productOfWord: index
+							           and: (self constantWord:
+									            VGTiledFillEncoding maskBytesPerWord)))
+			         and: (self constantWord: VGTiledFillEncoding maskByteBits).
+		self
+			store: (self
+					 bitsOfWord: (self
+							  word: (self elementOf: #maskBytes at: index)
+							  shiftedRightByWord: shift)
+					 and: (self constantWord: VGTiledFillEncoding fullAlphaByte))
+			into: #maskByte ].
+	^ self load: #maskByte
 ]
 
 { #category : 'emitting' }
@@ -1238,17 +1317,35 @@ VGTiledFillKernel >> rememberClipAt: aBaseId [
 
 { #category : 'emission - entry' }
 VGTiledFillKernel >> rememberHeaderAt: aBaseId [
-	"The eleven words of one entry''s header, read once for the whole walk over it."
+	"The twelve words of the header of one entry, read once for the whole walk over it."
 
 	#( #sourcePixelField #operatorField #fillRuleField #aliasedField
 	   #alphaByteField #edgeOffsetField #edgeCountField #paintTagField
-	   #paintBlockOffsetField #stopOffsetField #stopCountField ) do: [ :each |
+	   #paintBlockOffsetField #stopOffsetField #stopCountField
+	   #maskOffsetField ) do: [ :each |
 		self
 			remember: (self
 					 elementOf: #headers
 					 atBase: aBaseId
 					 field: (VGTiledFillEncoding perform: each))
 			as: (each copyUpToLast: $F) asSymbol ]
+]
+
+{ #category : 'emitting' }
+VGTiledFillKernel >> rememberMaskRectAt: aBaseId [
+	"The four sides of the rectangle of the mask of one entry. A mask rectangle is laid out as a
+	 clip rectangle, so the field constants of a clip name its fields, and the names these are
+	 remembered under are their own because a pixel is tested against both rectangles."
+
+	#( #clipLeftField #clipTopField #clipRightField #clipBottomField )
+		with: #( #maskLeft #maskTop #maskRight #maskBottom )
+		do: [ :field :name |
+			self
+				remember: (self
+						 elementOf: #maskRects
+						 atBase: aBaseId
+						 field: (VGTiledFillEncoding perform: field))
+				as: name ]
 ]
 
 { #category : 'emitting' }

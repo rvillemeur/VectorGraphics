@@ -14,6 +14,36 @@ Class {
 }
 
 { #category : 'examples' }
+VGTiledFillExamples class >> blitRewrittenAsAFill [
+	"The fill the tiled rasteriser draws a blit as, which is what unit 2.6 added: a blit of a
+	 mask at an offset, asked for the fill it becomes. Its segments are the rectangle of its own
+	 narrowed clip and its Mask tab holds the alpha of every pixel of that rectangle, flattened
+	 once here rather than sampled once a tile."
+
+	<sampleInstance>
+	| surface |
+	surface := VGCairoImageSurface extent: self frameExtent.
+	surface newContext
+		sourceColorR: 0.2 g: 0.4 b: 0.9 a: 1.0;
+		recordBlitOf: self maskTileOfTheFrame at: 7 @ 5.
+	^ surface displayList entries first asTiledFill
+]
+
+{ #category : 'examples' }
+VGTiledFillExamples class >> buffersOfAFrameOfTwoEntries [
+	<sampleInstance>
+	"The buffers one frame rides to the device in, sized for two entries with eight edges, three
+	 gradient stops and a mask of 1024 bytes between them, and for the six tiles those entries
+	 touch. Nothing is written into them here: the point of the set is the sizes, which the
+	 Buffers tab reads off the live arrays."
+
+	^ VGTiledFillBuffers new
+		  allocateForEntries: 2 edges: 8 stops: 3 masks: 1024;
+		  allocateForTiles: 6 references: 9;
+		  yourself
+]
+
+{ #category : 'examples' }
 VGTiledFillExamples class >> coverageOfACircle [
 	"The coverage of one antialiased circle, on fractional coordinates so that no edge of it falls
 	 on a pixel boundary."
@@ -54,6 +84,25 @@ VGTiledFillExamples class >> dispatchOfThreeShapesOnThisMachine [
 	^ [
 	  dispatch draw: encoding into: target.
 	  dispatch ] ensure: [ context destroy ]
+]
+
+{ #category : 'examples' }
+VGTiledFillExamples class >> encodingOfABlitAndASolidFill [
+	"A blit of a mask at an offset and a solid rectangle beside it, written out as the buffers a
+	 dispatch uploads. The Masks tab reads the rectangle and the alphas of the blit back out of
+	 the mask buffers and shows the solid fill carrying an empty rectangle and no bytes, which is
+	 how one kind of entry reaches the device for both of them."
+
+	<sampleInstance>
+	| surface |
+	surface := VGCairoImageSurface extent: self frameExtent.
+	surface newContext
+		sourceColorR: 0.2 g: 0.4 b: 0.9 a: 1.0;
+		recordBlitOf: self maskTileOfTheFrame at: 7 @ 5;
+		sourceColorR: 0.1 g: 0.1 b: 0.1 a: 1.0;
+		rectangleX: 40 y: 40 width: 20 height: 20;
+		fill.
+	^ VGTiledFillEncoding of: surface displayList extent: self frameExtent
 ]
 
 { #category : 'examples' }
@@ -136,6 +185,28 @@ VGTiledFillExamples class >> kernelOfTheDefaultGrid [
 	kernel := VGTiledFillKernel default.
 	kernel spirv.
 	^ kernel
+]
+
+{ #category : 'examples' }
+VGTiledFillExamples class >> maskTileOfTheFrame [
+	"A mask surface carrying all three alphas a mask can carry: transparent at the top, half
+	 opaque over a band and opaque under a disc, so that a blit through it shows more than a copy
+	 of one byte. It is half the frame wide, so that a blit of it sits at an offset inside the
+	 frame rather than over the whole of it."
+
+	| extent tile |
+	extent := self frameExtent // 2.
+	tile := VGCairoImageSurface extent: extent.
+	tile newContext
+		clearTransparent;
+		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 0.5;
+		rectangleX: 0 y: extent y / 2 width: extent x height: extent y / 2;
+		fill;
+		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0;
+		circleCenterX: extent x / 2 y: extent y / 2 radius: extent x / 4;
+		fill.
+	tile flush.
+	^ tile
 ]
 
 { #category : 'examples' }

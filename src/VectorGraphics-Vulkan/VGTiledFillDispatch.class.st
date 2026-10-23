@@ -20,6 +20,15 @@ Class {
 }
 
 { #category : 'constants' }
+VGTiledFillDispatch class >> bindingsNotOfAnEncoding [
+	"The two bindings of the kernel that an encoding does not answer: the pixels of the target,
+	 which the caller owns, and the record of the frame, which is written here because the extent
+	 is the one thing an encoding does not carry into a buffer."
+
+	^ #( #target #frame )
+]
+
+{ #category : 'constants' }
 VGTiledFillDispatch class >> emptyBufferWordCount [
 	"Vulkan refuses a buffer of no bytes, so a binding with nothing behind it is one word wide.
 	 The kernel never reads that word: a frame with no entry of its own touches no tile, and a
@@ -92,17 +101,18 @@ VGTiledFillDispatch >> bytes [
 
 { #category : 'dispatching' }
 VGTiledFillDispatch >> bytesOf: anEncoding target: aByteArray [
-	"The bytes of every binding the kernel reads, by name: the three word buffers and the four
-	 float buffers of the encoding as they lie in object memory, the pixels of the target as
-	 they are, and the frame record written here, because the extent is the one thing an
-	 encoding does not carry into a buffer."
+	"The bytes of every binding the kernel reads, by name: the buffers of the encoding as they
+	 lie in object memory, the pixels of the target as they are, and the frame record written
+	 here. The names are the contract of the kernel with the two that are not an encoding buffer
+	 taken off it, so a binding added to that contract is named in one place and reaches the
+	 device without this method being edited."
 
 	| answer |
 	answer := Dictionary new.
-	#( #tileTable #entryRefs #headers ) do: [ :each |
-		answer at: each put: (self bytesOfWords: (anEncoding perform: each)) ].
-	#( #clips #edges #paints #stops ) do: [ :each |
-		answer at: each put: (self bytesOfWords: (anEncoding perform: each)) ].
+	(VGTiledFillKernel bindingNames
+		 reject: [ :each | self class bindingsNotOfAnEncoding includes: each ])
+		do: [ :each |
+			answer at: each put: (self bytesOfWords: (anEncoding perform: each)) ].
 	answer at: #target put: aByteArray.
 	answer at: #frame put: (self frameRecordOf: anEncoding).
 	^ answer

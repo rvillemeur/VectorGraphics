@@ -113,10 +113,20 @@ VGVulkanBackend class >> probeWorkgroupCount [
 
 { #category : 'drawing' }
 VGVulkanBackend >> blitSurface: aSurface at: aPoint paint: aPaint clip: aClip operator: anOperator [
-	"A mask and a surface paint are no fill, and the subset of unit 2.3 holds fills alone. None of
-	 the arguments is read, because the refusal does not depend on them."
+	"Recorded and not drawn, as a fill is. The blit itself is recorded and not the fill the tiled
+	 rasteriser rewrites it into, because the surface may still replay this frame on the software
+	 backend and that backend draws a blit from its mask."
 
-	^ self refuseBecause: 'a surface blit, where the subset draws fills alone'
+	| entry |
+	entry := VGBlitEntry
+		         surface: aSurface
+		         at: aPoint
+		         paint: aPaint
+		         clip: aClip
+		         operator: anOperator.
+	(VGTiledFillRasteriser supportsEntry: entry) ifFalse: [
+		^ self refuseBecause: 'a blit outside the tiled fill subset' ].
+	recordedFrame add: entry
 ]
 
 { #category : 'draining' }

@@ -7,7 +7,8 @@ Class {
 	#name : 'VGTiledFillRasteriser',
 	#superclass : 'Object',
 	#instVars : [
-		'tiles'
+		'tiles',
+		'fills'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -48,21 +49,31 @@ VGTiledFillRasteriser class >> supportedOperators [
 
 { #category : 'subset' }
 VGTiledFillRasteriser class >> supports: aDisplayList [
-	"The frames I can draw: fills of a solid colour or of a gradient inside a rectangular clip
-	 under one of the three operators the fill cases of the conformance corpus ask for. Everything
-	 else — a surface or a mesh paint, a blit, a shaped clip, or an operator that writes where no
-	 source covers — belongs to a later unit, and a backend that meets one owes VGBackendFailure
-	 rather than a frame half drawn."
+	"The frames I can draw: a fill of a solid colour or of a gradient, and a blit of either
+	 through its mask, inside a rectangular clip under one of the three operators the fill cases
+	 of the conformance corpus ask for. Everything else — a surface or a mesh paint, a shaped
+	 clip, or an operator that writes where no source covers — belongs to a later unit, and a
+	 backend that meets one owes VGBackendFailure rather than a frame half drawn."
 
 	^ aDisplayList entries allSatisfy: [ :each | self supportsEntry: each ]
 ]
 
 { #category : 'subset' }
 VGTiledFillRasteriser class >> supportsEntry: anEntry [
-	^ (anEntry isKindOf: VGFillEntry) and: [
+	^ (self supportsKindOf: anEntry) and: [
 		  (self supportsPaint: anEntry paint) and: [
 			  anEntry clip isRectangular and: [
 				  self supportedOperators includes: anEntry operator ] ] ]
+]
+
+{ #category : 'subset' }
+VGTiledFillRasteriser class >> supportsKindOf: anEntry [
+	"The two kinds of entry a display list holds and I draw. A fill carries a path, and its
+	 coverage is the walk over its own edges; a blit carries a mask surface, and its coverage is
+	 the coverage of its clip scaled by the alpha of that mask. A third kind owes a refusal and
+	 not a walk over edges it does not have."
+
+	^ (anEntry isKindOf: VGFillEntry) or: [ anEntry isKindOf: VGBlitEntry ]
 ]
 
 { #category : 'subset' }
@@ -77,18 +88,25 @@ VGTiledFillRasteriser class >> supportsPaint: aPaint [
 
 { #category : 'drawing' }
 VGTiledFillRasteriser >> draw: aCoverage atX: anX y: aRow on: aSurface [
-	"Quantise the coverage, scale it by the fill's own alpha and composite — the three sends the
-	 software backend makes, through the same format and the same operator, so the bytes can only
-	 differ where the coverage does. A pixel no source covers is left alone, which the subset I
-	 draw may do because every operator in it is bounded. The read is the primitive one: I am
-	 called from inside the surface's own flush, and the public reader flushes before it answers."
+	"Quantise the coverage, scale it by the fill's own alpha and by the byte its mask carries
+	 here, and composite — the sends the software backend makes, through the same format and the
+	 same operator, so the bytes can only differ where the coverage does. Every entry but a blit
+	 answers full alpha for the mask and scaling by that leaves a byte as it was, so no branch on
+	 the kind of an entry is needed; scaleByte:by: is symmetric, so the two scalings in this order
+	 are the one the software backend makes of a blit as well. A pixel no source covers is left
+	 alone, which the subset I draw may do because every operator in it is bounded. The read is the
+	 primitive one: I am called from inside the surface's own flush, and the public reader flushes
+	 before it answers."
 
 	| entry format mask source |
 	entry := aCoverage entry.
 	format := aSurface format.
 	mask := format
-		        scaleByte: (format maskByteForCoverage: (aCoverage atX: anX row: aRow))
-		        by: (format shortByteOf: entry segments alpha).
+		        scaleByte: (format
+				         scaleByte:
+				         (format maskByteForCoverage: (aCoverage atX: anX row: aRow))
+				         by: (format shortByteOf: entry segments alpha))
+		        by: (entry tiledMaskByteAtX: anX y: aRow).
 	mask > 0 ifFalse: [ ^ self ].
 	source := entry operator
 		          sourceFromPaint: entry paint
@@ -119,14 +137,16 @@ VGTiledFillRasteriser >> drawOn: aSurface [
 { #category : 'drawing' }
 VGTiledFillRasteriser >> drawTileAt: anIndex on: aSurface [
 	"The entries of one tile in the order they were drawn, because compositing is not commutative,
-	 and of each entry the pixels of the tile it can reach."
+	 and of each entry the pixels of the tile it can reach. A blit is drawn as the fill it becomes,
+	 so the walk below knows one kind of entry alone."
 
 	| bounds |
 	bounds := self grid boundsOfTileAt: anIndex.
 	(tiles entriesOfTileAt: anIndex) do: [ :each |
-		| box coverage |
-		box := bounds intersect: (self grid wholePixelsOf: each boundingBox).
-		coverage := VGTileCoverage of: each.
+		| box coverage fill |
+		fill := self fillOf: each.
+		box := bounds intersect: (self grid wholePixelsOf: fill boundingBox).
+		coverage := VGTileCoverage of: fill.
 		box top to: box bottom - 1 do: [ :y |
 			box left to: box right - 1 do: [ :x |
 				self
@@ -145,6 +165,15 @@ VGTiledFillRasteriser >> drawnForm [
 	surface := VGCairoImageSurface extent: self grid extent.
 	self drawOn: surface.
 	^ surface asForm
+]
+
+{ #category : 'drawing' }
+VGTiledFillRasteriser >> fillOf: anEntry [
+	"The fill I draw in that entry's place, remembered. A blit becomes a fill of its own clip
+	 carrying the alpha of its mask, and flattening that mask costs its rectangle, so the
+	 conversion happens once a frame and not once for each of the tiles the entry reaches."
+
+	^ fills at: anEntry ifAbsentPut: [ anEntry asTiledFill ]
 ]
 
 { #category : 'accessing' }
@@ -209,7 +238,8 @@ VGTiledFillRasteriser >> printOn: aStream [
 
 { #category : 'initialization' }
 VGTiledFillRasteriser >> setTiles: aTileSource [
-	tiles := aTileSource
+	tiles := aTileSource.
+	fills := IdentityDictionary new
 ]
 
 { #category : 'inspector' }

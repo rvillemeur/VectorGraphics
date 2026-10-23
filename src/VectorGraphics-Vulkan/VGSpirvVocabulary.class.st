@@ -467,6 +467,19 @@ VGSpirvVocabulary >> word: anId shiftedRightBy: anInteger [
 ]
 
 { #category : 'arithmetic' }
+VGSpirvVocabulary >> word: anId shiftedRightByWord: anotherId [
+	"The same shift by a width computed on the device rather than written into the module, which
+	 is what reading one byte out of a word of a buffer needs: the byte wanted is not known until
+	 the invocation knows which pixel it owns."
+
+	^ builder
+		  emitBinaryOp: SpvOpcode opShiftRightLogical
+		  left: anId
+		  right: anotherId
+		  type: self wordType
+]
+
+{ #category : 'arithmetic' }
 VGSpirvVocabulary >> wordOfFloat: anId [
 	"A float truncated to an unsigned word. Every value converted here is a coverage or a byte
 	 and so never negative."

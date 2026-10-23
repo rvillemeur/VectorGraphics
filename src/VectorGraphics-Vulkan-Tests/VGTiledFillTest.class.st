@@ -9,7 +9,7 @@ compositing fails here as readily as a difference in the geometry.
 "
 Class {
 	#name : 'VGTiledFillTest',
-	#superclass : 'TestCase',
+	#superclass : 'VGTiledFrameTestCase',
 	#category : 'VectorGraphics-Vulkan-Tests-Tests',
 	#package : 'VectorGraphics-Vulkan-Tests',
 	#tag : 'Tests'
@@ -22,32 +22,6 @@ VGTiledFillTest class >> degenerateGradientFrameNames [
 	 frames a test of painted pixels has to leave out."
 
 	^ #( #linearWithNoStops #linearOfNoLength )
-]
-
-{ #category : 'constants' }
-VGTiledFillTest class >> deviceChannelTolerance [
-	"How far a channel of a device pixel may sit from the same channel drawn by the software
-	 backend. The device computes in f32 and the software backend in Float64, so a pixel on an
-	 antialiased edge or inside a gradient ramp can land one byte either side of the rounding
-	 boundary. Measured over the twenty-four cases of the subset and the fifteen gradient frames
-	 of the fixture: no pixel of any of them is farther than this."
-	^ 1
-]
-
-{ #category : 'constants' }
-VGTiledFillTest class >> devicePixelsAllowedToDifferPerCase [
-	"How many pixels of one frame may differ from the software backend at all, within the channel
-	 tolerance. Measured over the twenty-four cases of the subset and the fifteen gradient frames
-	 of the fixture: six frames differ and the rest are byte for byte identical. One pixel of
-	 path-filled-rounded-rectangle differs, which is the antialiased edge of unit 2.3, and the
-	 other five are gradients, where a whole run of the ramp lands on a rounding boundary —
-	 128 pixels of linearUnderRepeat and of linearUnderReflect, 64 of source-linear-gradient and
-	 48 of linearUnderNone and of linearUnderPad.
-	 Those runs are not device arithmetic. The device reads the stop channels as f32, and against
-	 a software frame whose own stops are narrowed the same way only the one antialiased pixel
-	 differs at all, so what the ramp crosses is the quantisation of the narrowed stop and not the
-	 evaluation."
-	^ 128
 ]
 
 { #category : 'constants' }
@@ -69,53 +43,18 @@ VGTiledFillTest class >> gradientFrameCount [
 ]
 
 { #category : 'fixtures' }
-VGTiledFillTest >> caseExtent [
-	"The extent of every case of the conformance corpus, and of every frame I draw myself."
+VGTiledFillTest >> fillCasesDo: aBlock [
+	"Every case the subset draws that records no blit, with the block that draws it. The count is
+	 asserted here, so that a subset quietly narrowed by a later change fails in every test that
+	 walks the corpus. A case that records a blit is gated by VGTiledBlitTest."
 
-	^ VGConformanceCorpus caseExtent
-]
-
-{ #category : 'running' }
-VGTiledFillTest >> deviceFormOfExtent: anExtent drawnWith: aBlock on: aContext [
-	"The same frame drawn on the device: encoded, dispatched over one workgroup a tile and the
-	 pixels written back. The pixels are packed by the backend itself, because the frame has to
-	 reach the device the way a drained surface sends it. Nothing here goes through the failover,
-	 so a device that fails raises rather than quietly answering the software picture."
-
-	| surface encoding pixels backend |
-	surface := VGCairoImageSurface extent: anExtent.
-	aBlock value: surface newContext.
-	encoding := VGTiledFillEncoding of: surface displayList extent: anExtent.
-	surface displayList reset.
-	backend := VGVulkanBackend new.
-	pixels := backend pixelsOf: surface.
-	(VGTiledFillDispatch on: aContext) draw: encoding into: pixels.
-	backend write: pixels into: surface.
-	^ surface asForm
-]
-
-{ #category : 'fixtures' }
-VGTiledFillTest >> displayListOfExtent: anExtent drawnWith: aBlock [
-	"The recorded frame itself, read before anything drains it."
-
-	| surface |
-	surface := VGCairoImageSurface extent: anExtent.
-	aBlock value: surface newContext.
-	^ surface displayList
-]
-
-{ #category : 'fixtures' }
-VGTiledFillTest >> encodedFormOfExtent: anExtent drawnWith: aBlock [
-	"The same frame drawn from the buffers alone: the rasteriser of step one reads the encoding
-	 and never the display list it came from."
-	| surface |
-	surface := VGCairoImageSurface extent: anExtent.
-	aBlock value: surface newContext.
-	(VGTiledFillRasteriser on:
-		 (VGTiledFillEncoding of: surface displayList extent: anExtent))
-		drawOn: surface.
-	surface displayList reset.
-	^ surface asForm
+	| drawn |
+	drawn := 0.
+	self supportedCasesDo: [ :case :draw :entries |
+		(entries anySatisfy: [ :each | each isKindOf: VGBlitEntry ]) ifFalse: [
+			drawn := drawn + 1.
+			aBlock value: case value: draw ] ].
+	self assert: drawn equals: self class fillCaseCount
 ]
 
 { #category : 'running' }
@@ -163,99 +102,6 @@ VGTiledFillTest >> referenceOfTileAt: anIndex in: anEncoding [
 	^ anEncoding entryRefs at:
 		  (anEncoding tileTable
 			   at: base + VGTiledFillEncoding referenceOffsetField) + 1
-]
-
-{ #category : 'fixtures' }
-VGTiledFillTest >> roundedToSingleFloat: aNumber [
-	"The number as a buffer of single floats keeps it, widened again so that the oracle of this
-	 step computes in the values the buffers hold. Read through the bit pattern rather than
-	 through a Float32Array, so that the oracle narrows by its own route and not by the
-	 encoding's."
-	^ Float fromIEEE32Bit: aNumber asFloat asIEEE32BitWord
-]
-
-{ #category : 'fixtures' }
-VGTiledFillTest >> singleFloatCopyOf: aDisplayList [
-	"A display list of my own, holding the same frame in single floats. It is built before the
-	 frame is drained, because draining resets the list."
-	| copied |
-	copied := VGDisplayList new.
-	aDisplayList entries do: [ :each |
-		copied add: (self singleFloatEntryOf: each) ].
-	^ copied
-]
-
-{ #category : 'running' }
-VGTiledFillTest >> singleFloatEntryOf: anEntry [
-	"The entry with its coordinates, its clip and the stops of its paint narrowed to single
-	 floats and everything else its own: the operator, the fill rule, the antialiasing mode, the
-	 alpha and the paint''s own coefficient block are carried by the encoding without arithmetic,
-	 so this step gates the layout alone."
-
-	| segments |
-	segments := (VGSegments
-		             coordinates:
-			             (anEntry segments coordinates collect: [ :each |
-				              self roundedToSingleFloat: each ])
-		             fillRule: anEntry segments fillRule
-		             antialias: anEntry segments antialias) withAlpha:
-		            anEntry segments alpha.
-	^ VGFillEntry
-		  segments: segments
-		  paint: (self singleFloatPaintOf: anEntry paint)
-		  clip: (VGClip bounds: (self singleFloatRectangleOf: anEntry clip bounds))
-		  operator: anEntry operator
-]
-
-{ #category : 'fixtures' }
-VGTiledFillTest >> singleFloatFormOfExtent: anExtent drawnWith: aBlock [
-	"The oracle of this step: the same frame narrowed to single floats and drawn through the
-	 entries themselves. Where the buffers hold the frame and nothing more, the two agree byte
-	 for byte."
-	| surface list |
-	surface := VGCairoImageSurface extent: anExtent.
-	aBlock value: surface newContext.
-	list := self singleFloatCopyOf: surface displayList.
-	surface displayList reset.
-	(VGTiledFillRasteriser of: list extent: anExtent) drawOn: surface.
-	^ surface asForm
-]
-
-{ #category : 'running' }
-VGTiledFillTest >> singleFloatPaintOf: aPaint [
-	"The paint as the buffers can hold it. A coefficient block is single floats already, so it
-	 travels unchanged; a stop list is kept in Float64 and is narrowed here. A paint with no stop
-	 list is its own narrowing."
-
-	| narrowed |
-	aPaint hasStops ifFalse: [ ^ aPaint ].
-	narrowed := aPaint class fromBlock: aPaint coefficients.
-	aPaint stops do: [ :stop |
-		narrowed
-			addStopAt: (self roundedToSingleFloat: stop key)
-			channels: (stop value collect: [ :channel |
-					 self roundedToSingleFloat: channel ]) ].
-	^ narrowed
-]
-
-{ #category : 'fixtures' }
-VGTiledFillTest >> singleFloatRectangleOf: aRectangle [
-	^ Rectangle
-		  left: (self roundedToSingleFloat: aRectangle left)
-		  right: (self roundedToSingleFloat: aRectangle right)
-		  top: (self roundedToSingleFloat: aRectangle top)
-		  bottom: (self roundedToSingleFloat: aRectangle bottom)
-]
-
-{ #category : 'fixtures' }
-VGTiledFillTest >> softwareFormOfExtent: anExtent drawnWith: aBlock [
-	"The frame the software backend draws, which is the oracle of every test of mine."
-
-	| surface |
-	surface := VGCairoImageSurface extent: anExtent.
-	aBlock value: surface newContext.
-	surface flush.
-	^ surface asForm
 ]
 
 { #category : 'tests' }
@@ -643,88 +489,80 @@ VGTiledFillTest >> testCoverageIsTheSameFloatAsTheRasteriserAnswersForEveryPixel
 ]
 
 { #category : 'tests' }
+VGTiledFillTest >> testEveryBufferTheKernelBindsOutOfAnEncodingIsOneTheBuffersAnswer [
+	"The set holds one buffer a binding of the kernel that an encoding writes, and the encoding
+	 answers each of them by the name the binding carries. A binding added to the contract and
+	 not to the set would reach the device as nothing at all."
+
+	| buffers encoding names list |
+	names := VGTiledFillKernel bindingNames reject: [ :each |
+		         VGTiledFillDispatch bindingsNotOfAnEncoding includes: each ].
+	buffers := VGTiledFillBuffers new.
+	buffers allocateForEntries: 1 edges: 4 stops: 0 masks: 0.
+	buffers allocateForTiles: 1 references: 1.
+	list := self
+		        displayListOfExtent: 64 @ 64
+		        drawnWith: [ :context |
+			        context
+				        rectangleX: 8 y: 8 width: 48 height: 48;
+				        fill ].
+	encoding := VGTiledFillEncoding
+		            of: list
+		            grid: (VGTileGrid extent: 64 @ 64 tileExtent: 16 @ 16).
+	names do: [ :name |
+		self assert: (buffers respondsTo: name).
+		self assert: (buffers perform: name) isNotNil.
+		self assert: (encoding perform: name) isNotNil ].
+	self
+		assert: VGTiledFillBuffers instVarNames asSortedCollection asArray
+		equals: (names collect: [ :each | each asString ]) asSortedCollection asArray
+]
+
+{ #category : 'tests' }
 VGTiledFillTest >> testEveryFillCaseOfTheCorpusDrawsOnTheDeviceWhatTheSoftwareBackendDraws [
 	"The gate of unit 2.3. Every case of the corpus the subset draws, drawn on the device and by
 	 the software backend on the same frame and compared premultiplied: no pixel farther than the
-	 tolerance in any channel, and at most the measured count of pixels differing at all. The
-	 count of cases is asserted as well, so that a subset quietly narrowed by a later change
-	 fails here.
+	 tolerance in any channel, and at most the measured count of pixels differing at all.
 	 One context draws all of them, because a device costs 72 ms to open and a frame does not. A
 	 machine with no device has nothing to compare and holds nothing."
 
-	| context drawn |
+	| context |
 	context := [ VkContext computeContext ]
 		           on: Error
 		           do: [ :failure | nil ].
 	context ifNil: [ ^ self ].
-	drawn := 0.
 	[
-	VGConformanceCorpus cases do: [ :case |
-		| draw |
-		draw := [ :each | case drawOn: each ].
-		(VGTiledFillRasteriser supports:
-			 (self displayListOfExtent: case extent drawnWith: draw)) ifTrue: [
-			| comparison |
-			drawn := drawn + 1.
-			comparison := VGFormComparison
-				              between: (self
-						               deviceFormOfExtent: case extent
-						               drawnWith: draw
-						               on: context)
-				              and: (self
-						               softwareFormOfExtent: case extent
-						               drawnWith: draw).
-			self
-				assert:
-					(comparison pixelsFartherThan: self class deviceChannelTolerance) = 0
-				description: case name.
-			self
-				assert: comparison differingPixelCount
-					    <= self class devicePixelsAllowedToDifferPerCase
-				description: case name ] ] ] ensure: [ context destroy ].
-	self assert: drawn equals: self class fillCaseCount
+	self fillCasesDo: [ :case :draw |
+		self
+			assertDeviceDrawsCase: case
+			with: draw
+			on: context ] ] ensure: [ context destroy ]
 ]
 
 { #category : 'tests' }
 VGTiledFillTest >> testEveryFillCaseOfTheCorpusDrawsTheSameBytesAsTheSoftwareBackend [
-	"The gate of this step. The oracle is the software backend and not Cairo: that backend already
+	"The gate of unit 2.3. The oracle is the software backend and not Cairo: that backend already
 	 held against Cairo on all forty-one cases in phase one, so matching it is both necessary and
-	 sufficient. Every case the subset refuses belongs to a later unit, and the count is asserted
-	 so that a subset quietly narrowed by a later change fails here."
+	 sufficient. Every case the subset refuses belongs to a later unit, and fillCasesDo: asserts
+	 the count, so a subset quietly narrowed by a later change fails here."
 
-	| drawn |
-	drawn := 0.
-	VGConformanceCorpus cases do: [ :case |
-		| draw |
-		draw := [ :context | case drawOn: context ].
-		(VGTiledFillRasteriser supports:
-			 (self displayListOfExtent: case extent drawnWith: draw)) ifTrue: [
-			drawn := drawn + 1.
-			self
-				assert: (self tiledFormOfExtent: case extent drawnWith: draw) bits
-				equals: (self softwareFormOfExtent: case extent drawnWith: draw) bits ] ].
-	self assert: drawn equals: self class fillCaseCount
+	self fillCasesDo: [ :case :draw |
+		self
+			assert: (self tiledFormOfExtent: case extent drawnWith: draw) bits
+			equals: (self softwareFormOfExtent: case extent drawnWith: draw) bits ]
 ]
 
 { #category : 'tests' }
 VGTiledFillTest >> testEveryFillCaseOfTheCorpusDrawsTheSameBytesFromTheBuffersAsFromItsOwnEntries [
-	"The gate of this step, over the same twenty-two cases the first step holds against the
-	 software backend. The oracle is the frame narrowed to single floats, because that is what
-	 the buffers can hold; what a single float costs against the software backend is measured in
-	 the last step of this unit and not here."
-	| drawn |
-	drawn := 0.
-	VGConformanceCorpus cases do: [ :case |
-		| draw |
-		draw := [ :context | case drawOn: context ].
-		(VGTiledFillRasteriser supports:
-			 (self displayListOfExtent: case extent drawnWith: draw)) ifTrue: [
-			drawn := drawn + 1.
-			self
-				assert: (self encodedFormOfExtent: case extent drawnWith: draw) bits
-				equals:
-				(self singleFloatFormOfExtent: case extent drawnWith: draw) bits ] ].
-	self assert: drawn equals: self class fillCaseCount
+	"The gate of the encoding, over the same cases the first step holds against the software
+	 backend. The oracle is the frame narrowed to single floats, because that is what the buffers
+	 can hold; what a single float costs against the software backend is measured in the last
+	 step of unit 2.4 and not here."
+
+	self fillCasesDo: [ :case :draw |
+		self
+			assert: (self encodedFormOfExtent: case extent drawnWith: draw) bits
+			equals: (self singleFloatFormOfExtent: case extent drawnWith: draw) bits ]
 ]
 
 { #category : 'tests - gradients' }
@@ -879,6 +717,33 @@ VGTiledFillTest >> testTheBuffersAreSizedByTheFrameAndByNothingElse [
 			assert: encoding tileTable size
 			equals: binning touchedTileCount * VGTiledFillEncoding tileRecordWords.
 		self assert: encoding entryRefs size equals: binning binnedEntryCount ]
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testTheBuffersOfAFrameAreSizedByTheCountsOfThatFrame [
+	"The sizes are the whole of what VGTiledFillBuffers knows, so they are what a test of it
+	 states. A run of mask bytes that does not fill its last word still owes that word, because
+	 a storage buffer of the kernel holds words."
+
+	| buffers |
+	buffers := VGTiledFillBuffers new.
+	buffers allocateForEntries: 2 edges: 8 stops: 3 masks: 9.
+	self
+		assert: buffers headers size
+		equals: 2 * VGTiledFillEncoding entryHeaderWords.
+	self assert: buffers clips size equals: 2 * VGTiledFillEncoding clipFloats.
+	self assert: buffers maskRects size equals: 2 * VGTiledFillEncoding clipFloats.
+	self
+		assert: buffers paints size
+		equals: 2 * VGTiledFillEncoding paintBlockFloats.
+	self assert: buffers edges size equals: 8 * VGTiledFillEncoding edgeFloats.
+	self assert: buffers stops size equals: 3 * VGTiledFillEncoding stopFloats.
+	self assert: buffers maskBytes size equals: 3.
+	buffers allocateForTiles: 6 references: 9.
+	self
+		assert: buffers tileTable size
+		equals: 6 * VGTiledFillEncoding tileRecordWords.
+	self assert: buffers entryRefs size equals: 9
 ]
 
 { #category : 'tests' }
@@ -1085,35 +950,6 @@ VGTiledFillTest >> testTheTileSizeDoesNotChangeOneByte [
 	self
 		assert: small bits
 		equals: (self softwareFormOfExtent: self caseExtent drawnWith: draw) bits
-]
-
-{ #category : 'fixtures' }
-VGTiledFillTest >> tiledFormOfExtent: anExtent drawnWith: aBlock [
-	"The same frame drawn through the tiles. The display list is read before anything drains it and
-	 reset afterwards, so that reading the pixels does not replay the frame on the software
-	 backend as well."
-
-	| surface |
-	surface := VGCairoImageSurface extent: anExtent.
-	aBlock value: surface newContext.
-	(VGTiledFillRasteriser of: surface displayList extent: anExtent) drawOn: surface.
-	surface displayList reset.
-	^ surface asForm
-]
-
-{ #category : 'fixtures' }
-VGTiledFillTest >> tiledFormOfExtent: anExtent tileExtent: aTileExtent drawnWith: aBlock [
-	"The same frame over a grid of that tile size. A tile owns its pixels alone, so the size of a
-	 tile may change how the work is cut up and may not change one byte of the result."
-
-	| surface |
-	surface := VGCairoImageSurface extent: anExtent.
-	aBlock value: surface newContext.
-	(VGTiledFillRasteriser
-		 of: surface displayList
-		 grid: (VGTileGrid extent: anExtent tileExtent: aTileExtent)) drawOn: surface.
-	surface displayList reset.
-	^ surface asForm
 ]
 
 { #category : 'fixtures' }

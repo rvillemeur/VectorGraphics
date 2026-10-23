@@ -95,6 +95,28 @@ VGVulkanBackendTest >> tearDown [
 ]
 
 { #category : 'tests' }
+VGVulkanBackendTest >> testABlitOutsideTheSubsetFailsTheFrame [
+	"A blit is refused for the same reasons a fill is, and for no other: here the paint carries the
+	 pixels of another surface, which no block and stop list describes, so the frame fails while it
+	 is recorded and the surface replays the whole of it on the failover."
+
+	| backend raised |
+	backend := VGVulkanBackend new.
+	raised := [ backend
+		           blitSurface: (VGCairoImageSurface extent: 8 @ 6)
+		           at: 2 @ 3
+		           paint: (VGSurfacePaint surface:
+				            (VGCairoImageSurface extent: self frame extent))
+		           clip: (VGClip bounds: (0 @ 0 corner: self frame extent))
+		           operator: VGCairoOperator over.
+	          nil ]
+		          on: VGBackendFailure
+		          do: [ :failure | failure ].
+	self assert: raised notNil.
+	self assert: raised backend identicalTo: backend
+]
+
+{ #category : 'tests' }
 VGVulkanBackendTest >> testADrainWithNothingRecordedLeavesTheTargetAlone [
 	"A surface flushed with no frame recorded asks nothing of a device: there is no dispatch, no
 	 failure and no pixel written."
@@ -175,19 +197,24 @@ VGVulkanBackendTest >> testAPaintTheKernelCannotEvaluateFailsTheFrame [
 ]
 
 { #category : 'tests' }
-VGVulkanBackendTest >> testASurfaceBlitFailsTheFrame [
-	"The other boundary message: a mask or a surface paint is no fill, and the subset of unit 2.3
-	 holds fills alone. None of the arguments is read, so the refusal stands whatever they are."
+VGVulkanBackendTest >> testASurfaceBlitIsRecordedAndDrawnRatherThanRefused [
+	"Unit 2.6 draws a blit, so a blit of a solid paint through a mask inside a rectangular clip is
+	 recorded here and not refused. What is recorded is the blit itself and not the fill it is
+	 drawn as: the rasteriser rewrites it when it draws it, and the surface may still replay the
+	 recorded frame on the software backend, which needs the mask and not a flattened copy of it.
+	 The pixels of a blit are held against the software backend in VGTiledBlitTest."
 
-	| backend raised |
+	| backend mask |
 	backend := VGVulkanBackend new.
-	raised := [
-	          backend blitSurface: nil at: nil paint: nil clip: nil operator: nil.
-	          nil ]
-		          on: VGBackendFailure
-		          do: [ :failure | failure ].
-	self assert: raised notNil.
-	self assert: raised backend identicalTo: backend
+	mask := VGCairoImageSurface extent: 8 @ 6.
+	backend
+		blitSurface: mask
+		at: 2 @ 3
+		paint: (VGColorPaint r: 0.2 g: 0.4 b: 0.9 alpha: 1.0)
+		clip: (VGClip bounds: (0 @ 0 corner: self frame extent))
+		operator: VGCairoOperator over.
+	self assert: backend recordedFrame entries size equals: 1.
+	self assert: (backend recordedFrame entries first isKindOf: VGBlitEntry)
 ]
 
 { #category : 'tests' }
