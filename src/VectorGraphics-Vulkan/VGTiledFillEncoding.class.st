@@ -15,6 +15,8 @@ Class {
 		'headers',
 		'clips',
 		'edges',
+		'paints',
+		'stops',
 		'decoded'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
@@ -134,10 +136,11 @@ VGTiledFillEncoding class >> edgeStartYField [
 
 { #category : 'layout' }
 VGTiledFillEncoding class >> entryHeaderWords [
-	"The words one entry of the header buffer takes. Seven carry meaning and the eighth is
+	"The words one entry of the header buffer takes. Eleven carry meaning and the rest is
 	 padding: a power of two, so that a kernel reaches a header by a shift and not by a
 	 multiplication."
-	^ 8
+
+	^ 16
 ]
 
 { #category : 'codes' }
@@ -168,6 +171,14 @@ VGTiledFillEncoding class >> fullAlphaByte [
 	 top byte, so two hundred and fifty-seven times a byte, shifted down by eight, is that byte
 	 again: a byte read back this way quantises to itself."
 	^ 255
+]
+
+{ #category : 'layout' }
+VGTiledFillEncoding class >> gradientClassAtTag: aCode [
+	"The gradient paint class that goes by that tag, asked of the classes themselves rather than
+	 read from a table of mine, so a gradient added to the hierarchy needs no edit here."
+
+	^ VGGradientPaint allSubclasses detect: [ :each | each paintTag = aCode ]
 ]
 
 { #category : 'instance creation' }
@@ -208,6 +219,33 @@ VGTiledFillEncoding class >> operatorTable [
 ]
 
 { #category : 'layout' }
+VGTiledFillEncoding class >> paintBlockFloats [
+	"The floats one coefficient block takes. It is the paint ABI of rule 2 and not a number of
+	 this class, so a paint that grows a field grows the buffer with it."
+
+	^ VGPaint coefficientCount
+]
+
+{ #category : 'layout' }
+VGTiledFillEncoding class >> paintBlockOffsetField [
+	"Where the coefficient block of this fill starts, counted in blocks from the first block of
+	 the buffer. Every entry writes a block of its own, so this is the entry index less one, and
+	 the kernel reads the field rather than assuming that, because a later unit may let two
+	 fills share one paint."
+
+	^ 9
+]
+
+{ #category : 'layout' }
+VGTiledFillEncoding class >> paintTagField [
+	"How the kernel is to read the paint block of this fill. The code is the paint tag itself,
+	 which is cairo_pattern_type_t, so a header and the pattern that built it carry the same
+	 number and no table stands between them."
+
+	^ 8
+]
+
+{ #category : 'layout' }
 VGTiledFillEncoding class >> referenceCountField [
 	^ 5
 ]
@@ -223,6 +261,43 @@ VGTiledFillEncoding class >> referenceOffsetField [
 VGTiledFillEncoding class >> sourcePixelField [
 	"The premultiplied pixel the fill's paint answers, because the kernel carries a pixel and
 	 not a paint."
+	^ 1
+]
+
+{ #category : 'layout' }
+VGTiledFillEncoding class >> stopChannelFields [
+	"Where the four channels of a stop sit, in the order a stop list keeps them."
+
+	^ 2 to: 5
+]
+
+{ #category : 'layout' }
+VGTiledFillEncoding class >> stopCountField [
+	"How many stops this fill has. Zero stands both for a solid paint and for a gradient whose
+	 stop list is empty, which Cairo draws as nothing at all, so the kernel needs no other mark
+	 for either."
+
+	^ 11
+]
+
+{ #category : 'layout' }
+VGTiledFillEncoding class >> stopFloats [
+	"The floats one stop takes: its offset along the ramp, then its four unpremultiplied
+	 channels in the order red, green, blue, alpha."
+
+	^ 5
+]
+
+{ #category : 'layout' }
+VGTiledFillEncoding class >> stopOffsetField [
+	"Where the stops of this fill start, counted in stops from the first stop of the buffer. A
+	 paint with no stop list writes nothing there and leaves the count at zero."
+
+	^ 10
+]
+
+{ #category : 'layout' }
+VGTiledFillEncoding class >> stopPositionField [
 	^ 1
 ]
 
@@ -257,25 +332,37 @@ VGTiledFillEncoding class >> tileTopField [
 ]
 
 { #category : 'initialization' }
-VGTiledFillEncoding >> allocateBuffersFor: aCollection [
-	"The three buffers an entry writes into, sized by the frame alone, and the edge each entry
-	 starts at, which is the running total of the edges before it."
-	| offsets edgeCount |
-	offsets := Array new: aCollection size.
-	edgeCount := 0.
-	aCollection withIndexDo: [ :each :index |
-		offsets at: index put: edgeCount.
-		edgeCount := edgeCount
-		             + (each segments coordinates size / self class edgeFloats) ].
+VGTiledFillEncoding >> allocateBuffersFor: aCollection edges: anEdgeCount stops: aStopCount [
+	"The five buffers an entry writes into, sized by the frame alone. A header and a clip
+	 rectangle and a paint block an entry, and as many edges and stops as the entries hold
+	 between them."
+
 	headers := WordArray new: aCollection size * self class entryHeaderWords.
 	clips := Float32Array new: aCollection size * self class clipFloats.
-	edges := Float32Array new: edgeCount * self class edgeFloats.
-	^ offsets
+	paints := Float32Array new: aCollection size * self class paintBlockFloats.
+	edges := Float32Array new: anEdgeCount * self class edgeFloats.
+	stops := Float32Array new: aStopCount * self class stopFloats
 ]
 
 { #category : 'tiles' }
 VGTiledFillEncoding >> binnedEntryCount [
 	^ entryRefs size
+]
+
+{ #category : 'decoding' }
+VGTiledFillEncoding >> blockOfEntryAt: anIndex [
+	"The coefficient block of that entry''s paint, the single floats of the buffer taken as they
+	 stand: a paint keeps its block in single floats too, so nothing widens here."
+
+	| base block |
+	base := (headers
+	         at:
+	         (anIndex - 1) * self class entryHeaderWords
+	         + self class paintBlockOffsetField) * self class paintBlockFloats.
+	block := Float32Array new: self class paintBlockFloats.
+	1 to: self class paintBlockFloats do: [ :field |
+		block at: field put: (paints at: base + field) ].
+	^ block
 ]
 
 { #category : 'decoding' }
@@ -315,13 +402,12 @@ VGTiledFillEncoding >> decodeEntryAt: anIndex [
 	"One entry out of the buffers and nothing else: this is what makes the step one rasteriser
 	 draw from the encoding alone, and so what a test can hold the layout to before a kernel
 	 exists."
+
 	| base |
 	base := (anIndex - 1) * self class entryHeaderWords.
 	^ VGFillEntry
 		  segments: (self segmentsOfEntryAt: anIndex)
-		  paint:
-		  (VGPixelPaint pixel:
-			   (headers at: base + self class sourcePixelField))
+		  paint: (self paintOfEntryAt: anIndex)
 		  clip: (VGClip bounds: (self clipOfEntryAt: anIndex))
 		  operator:
 		  (self class operatorAtCode:
@@ -331,6 +417,11 @@ VGTiledFillEncoding >> decodeEntryAt: anIndex [
 { #category : 'accessing' }
 VGTiledFillEncoding >> edgeCount [
 	^ edges size / self class edgeFloats
+]
+
+{ #category : 'initialization' }
+VGTiledFillEncoding >> edgeCountOf: anEntry [
+	^ anEntry segments coordinates size / self class edgeFloats
 ]
 
 { #category : 'accessing' }
@@ -439,6 +530,74 @@ VGTiledFillEncoding >> inspectorEntriesContext: aContext [
 	aContext active: headers isNotNil
 ]
 
+{ #category : 'inspector' }
+VGTiledFillEncoding >> inspectorPaints: aBuilder [
+	<inspectorPresentationOrder: 12 title: 'Paints'>
+	"Every paint of the frame read back out of the paint buffer: the class its tag resolves to,
+	 the tag itself, the extend mode, the number of stops, the matrix and the type-specific
+	 fields of its block."
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn
+				   title: 'Entry'
+				   evaluated: [ :each | (each at: 1) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Paint'
+				   evaluated: [ :each | each at: 2 ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Tag'
+				   evaluated: [ :each | (each at: 3) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Extend'
+				   evaluated: [ :each | (each at: 4) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Stops'
+				   evaluated: [ :each | (each at: 5) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Matrix'
+				   evaluated: [ :each | (each at: 6) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Geometry'
+				   evaluated: [ :each | (each at: 7) printString ]);
+		  items: self paintRows;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGTiledFillEncoding >> inspectorPaintsContext: aContext [
+	aContext active: paints isNotNil
+]
+
+{ #category : 'inspector' }
+VGTiledFillEncoding >> inspectorStops: aBuilder [
+	<inspectorPresentationOrder: 13 title: 'Stops'>
+	"The stop buffer as the kernel searches it: the entry a stop belongs to, its place in that
+	 entry, its offset, its four unpremultiplied channels and the premultiplied pixel they
+	 quantise to. The tab is empty where no paint of the frame carries a stop."
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn
+				   title: 'Entry'
+				   evaluated: [ :each | (each at: 1) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Stop'
+				   evaluated: [ :each | (each at: 2) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Offset'
+				   evaluated: [ :each | (each at: 3) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Channels'
+				   evaluated: [ :each | (each at: 4) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Pixel'
+				   evaluated: [ :each | (each at: 5) printStringHex ]);
+		  items: self stopRows;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGTiledFillEncoding >> inspectorStopsContext: aContext [
+	aContext active: stops isNotNil
+]
+
 { #category : 'inspecting' }
 VGTiledFillEncoding >> inspectorTileTable: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Tile table'>
@@ -464,6 +623,69 @@ VGTiledFillEncoding >> inspectorTileTable: aBuilder [
 { #category : 'inspecting' }
 VGTiledFillEncoding >> inspectorTileTableContext: aContext [
 	aContext active: tileTable isNotNil
+]
+
+{ #category : 'initialization' }
+VGTiledFillEncoding >> offsetsFor: aCollection by: aBlock [
+	"The running total of aBlock over the entries: where each entry starts in the buffer that
+	 holds that thing. It answers one number more than there are entries, the last being the
+	 total, which is the size the buffer is allocated at."
+
+	| offsets total |
+	offsets := Array new: aCollection size + 1.
+	total := 0.
+	aCollection withIndexDo: [ :each :index |
+		offsets at: index put: total.
+		total := total + (aBlock value: each) ].
+	offsets at: aCollection size + 1 put: total.
+	^ offsets
+]
+
+{ #category : 'decoding' }
+VGTiledFillEncoding >> paintOfEntryAt: anIndex [
+	"The paint the buffers describe. A solid paint is the one pixel the header carries, which is
+	 what the kernel will read of it; a gradient is rebuilt from its own block and then from its
+	 stops, so the decode and the kernel read the same coefficients."
+
+	| base tag paint |
+	base := (anIndex - 1) * self class entryHeaderWords.
+	tag := headers at: base + self class paintTagField.
+	tag = VGPixelPaint paintTag ifTrue: [
+		^ VGPixelPaint pixel:
+			  (headers at: base + self class sourcePixelField) ].
+	paint := (self class gradientClassAtTag: tag) fromBlock:
+		         (self blockOfEntryAt: anIndex).
+	(self stopsOfEntryAt: anIndex) do: [ :stop |
+		paint addStopAt: stop key channels: stop value ].
+	^ paint
+]
+
+{ #category : 'inspector' }
+VGTiledFillEncoding >> paintRows [
+	"Every paint of the frame as the buffers describe it: the class the tag resolves to, the
+	 extend mode, how many stops it carries, and the two halves of its block that mean something
+	 to a reader — the matrix and the type-specific fields, which are the ones after the filter.
+	 Each row asks the decoder and the paint for the name of a code, so nothing here restates the
+	 layout."
+	^ (1 to: self entryCount) collect: [ :index |
+		  | base paint block |
+		  base := (index - 1) * self class entryHeaderWords.
+		  paint := self paintOfEntryAt: index.
+		  block := self blockOfEntryAt: index.
+		  {
+			  index.
+			  paint class name.
+			  (headers at: base + self class paintTagField).
+			  (VGPaint extendFor: (block at: VGPaint extendFieldIndex) truncated).
+			  (headers at: base + self class stopCountField).
+			  (VGPaint matrixFieldIndices collect: [ :field | block at: field ]).
+			  ((VGPaint filterFieldIndex + 1 to: self class paintBlockFloats)
+				   collect: [ :field | block at: field ]) } ]
+]
+
+{ #category : 'accessing' }
+VGTiledFillEncoding >> paints [
+	^ paints
 ]
 
 { #category : 'printing' }
@@ -519,19 +741,87 @@ VGTiledFillEncoding >> segmentsOfEntryAt: anIndex [
 
 { #category : 'initialization' }
 VGTiledFillEncoding >> setBinning: aBinning [
-	"Write the frame out: a header, a clip rectangle and a run of edges for every entry, then
-	 the table of the tiles it touches and the references into it. The entries are the binning's
-	 own copy of the display list, so nothing here reads a frame that has already drained."
-	| entries offsets |
+	"Write the frame out: a header, a clip rectangle, a paint block, a run of edges and a run of
+	 stops for every entry, then the table of the tiles it touches and the references into it.
+	 The entries are the binning''s own copy of the display list, so nothing here reads a frame
+	 that has already drained."
+
+	| entries edgeOffsets stopOffsets |
 	grid := aBinning grid.
 	decoded := Dictionary new.
 	entries := aBinning entries.
-	offsets := self allocateBuffersFor: entries.
+	edgeOffsets := self offsetsFor: entries by: [ :each |
+		               self edgeCountOf: each ].
+	stopOffsets := self offsetsFor: entries by: [ :each |
+		               self stopCountOf: each ].
+	self
+		allocateBuffersFor: entries
+		edges: edgeOffsets last
+		stops: stopOffsets last.
 	entries withIndexDo: [ :each :index |
-		self writeHeaderOf: each at: index edgeOffset: (offsets at: index).
+		self
+			writeHeaderOf: each
+			at: index
+			edgeOffset: (edgeOffsets at: index)
+			stopOffset: (stopOffsets at: index).
 		self writeClipOf: each at: index.
-		self writeEdgesOf: each at: (offsets at: index) ].
+		self writeEdgesOf: each at: (edgeOffsets at: index).
+		self writePaintOf: each at: index stopOffset: (stopOffsets at: index) ].
 	self writeTilesOf: aBinning
+]
+
+{ #category : 'accessing' }
+VGTiledFillEncoding >> stopCount [
+	^ stops size / self class stopFloats
+]
+
+{ #category : 'initialization' }
+VGTiledFillEncoding >> stopCountOf: anEntry [
+	"The stops of a fill''s paint, which a paint that is not a gradient has none of."
+
+	^ anEntry paint hasStops
+		  ifTrue: [ anEntry paint stops size ]
+		  ifFalse: [ 0 ]
+]
+
+{ #category : 'inspector' }
+VGTiledFillEncoding >> stopRows [
+	"Every stop of every gradient of the frame, in the order the buffer holds them, with the
+	 pixel its channels quantise to beside it. That pixel is the stop lookup table the kernel
+	 searches, so a stop whose bytes drift from the software path is visible here."
+	^ (1 to: self entryCount) inject: OrderedCollection new into: [ :rows :index |
+		  | stopsOfEntry |
+		  stopsOfEntry := self stopsOfEntryAt: index.
+		  stopsOfEntry doWithIndex: [ :stop :ordinal |
+			  rows add: {
+					  index.
+					  ordinal.
+					  stop key.
+					  stop value.
+					  (self class targetFormat pixelForRgba: stop value) } ].
+		  rows ]
+]
+
+{ #category : 'accessing' }
+VGTiledFillEncoding >> stops [
+	^ stops
+]
+
+{ #category : 'decoding' }
+VGTiledFillEncoding >> stopsOfEntryAt: anIndex [
+	"The stops of that entry''s paint, each as its offset and its four unpremultiplied channels,
+	 in the order the buffer holds them, which is the order the paint had them in."
+
+	| base count start |
+	base := (anIndex - 1) * self class entryHeaderWords.
+	count := headers at: base + self class stopCountField.
+	start := headers at: base + self class stopOffsetField.
+	^ (1 to: count) collect: [ :index |
+		  | stopBase |
+		  stopBase := (start + index - 1) * self class stopFloats.
+		  (stops at: stopBase + self class stopPositionField)
+		  -> (self class stopChannelFields collect: [ :field |
+			   stops at: stopBase + field ]) ]
 ]
 
 { #category : 'accessing' }
@@ -590,15 +880,19 @@ VGTiledFillEncoding >> writeEdgesOf: anEntry at: anOffset [
 ]
 
 { #category : 'initialization' }
-VGTiledFillEncoding >> writeHeaderOf: anEntry at: anIndex edgeOffset: anOffset [
-	"What a kernel needs of one fill and nothing more. The paint is sampled at the origin
-	 because the subset holds solid paints alone, which answer the same pixel everywhere."
+VGTiledFillEncoding >> writeHeaderOf: anEntry at: anIndex edgeOffset: anOffset stopOffset: aStopOffset [
+	"What a kernel needs of one fill and nothing more. A solid paint is sampled at the origin,
+	 because it answers the same pixel everywhere and a pixel is less to read than a block; any
+	 other paint is read from its block, and the tag says which."
+
 	| base format |
 	base := (anIndex - 1) * self class entryHeaderWords.
 	format := self class targetFormat.
 	headers
 		at: base + self class sourcePixelField
-		put: (anEntry paint pixelIn: format atX: 0 y: 0).
+		put: (anEntry paint isSolid
+				 ifTrue: [ anEntry paint pixelIn: format atX: 0 y: 0 ]
+				 ifFalse: [ 0 ]).
 	headers
 		at: base + self class operatorField
 		put: (self class codeForOperator: anEntry operator).
@@ -614,7 +908,36 @@ VGTiledFillEncoding >> writeHeaderOf: anEntry at: anIndex edgeOffset: anOffset [
 	headers at: base + self class edgeOffsetField put: anOffset.
 	headers
 		at: base + self class edgeCountField
-		put: anEntry segments coordinates size / self class edgeFloats
+		put: (self edgeCountOf: anEntry).
+	headers
+		at: base + self class paintTagField
+		put: anEntry paint class paintTag.
+	headers at: base + self class paintBlockOffsetField put: anIndex - 1.
+	headers at: base + self class stopOffsetField put: aStopOffset.
+	headers
+		at: base + self class stopCountField
+		put: (self stopCountOf: anEntry)
+]
+
+{ #category : 'initialization' }
+VGTiledFillEncoding >> writePaintOf: anEntry at: anIndex stopOffset: aStopOffset [
+	"The coefficient block of the fill''s paint as the paint itself holds it, and its stops
+	 beside it. The block is already a run of single floats, so it travels unchanged; a stop
+	 carries its offset along the ramp and then its four unpremultiplied channels, which is how
+	 the stop list keeps a colour and what an interpolation in the kernel needs."
+
+	| base paint |
+	base := (anIndex - 1) * self class paintBlockFloats.
+	paint := anEntry paint.
+	1 to: self class paintBlockFloats do: [ :field |
+		paints at: base + field put: (paint coefficients at: field) ].
+	paint hasStops ifFalse: [ ^ self ].
+	paint stops withIndexDo: [ :stop :index |
+		| stopBase |
+		stopBase := (aStopOffset + index - 1) * self class stopFloats.
+		stops at: stopBase + self class stopPositionField put: stop key.
+		self class stopChannelFields doWithIndex: [ :field :channel |
+			stops at: stopBase + field put: (stop value at: channel) ] ]
 ]
 
 { #category : 'initialization' }

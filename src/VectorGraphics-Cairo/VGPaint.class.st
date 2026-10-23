@@ -96,6 +96,17 @@ VGPaint class >> filterNames [
 	^ { 0 -> #fast. 1 -> #good. 2 -> #best. 3 -> #nearest. 4 -> #bilinear. 5 -> #gaussian }
 ]
 
+{ #category : 'instance creation' }
+VGPaint class >> fromBlock: aFloat32Array [
+	"A paint of mine carrying those coefficients, which is how a block that has travelled through
+	 a buffer becomes a paint again. The block is the ABI of rule 2 and holds every field but the
+	 stops, so a gradient rebuilt this way still needs its stops added."
+
+	^ self new
+		  setBlock: aFloat32Array;
+		  yourself
+]
+
 { #category : 'abi' }
 VGPaint class >> matrixFieldIndices [
 	^ 1 to: 6
@@ -201,6 +212,14 @@ VGPaint >> filter: anObject [
 	coefficients
 		at: self class filterFieldIndex
 		put: (self class codeFor: name in: self class filterNames) asFloat
+]
+
+{ #category : 'accessing' }
+VGPaint >> hasStops [
+	"Whether I carry a stop list beside my block. Only a gradient does, and a reader that writes
+	 a paint out asks this rather than asking what class I am."
+
+	^ false
 ]
 
 { #category : 'initialization' }
@@ -364,6 +383,16 @@ VGPaint >> rgbaAtX: x y: y [
 { #category : 'evaluating' }
 VGPaint >> rgbaInPaintSpace: aPoint [
 	^ self subclassResponsibility
+]
+
+{ #category : 'private' }
+VGPaint >> setBlock: aFloat32Array [
+	"My coefficients, copied rather than held, so that a buffer written again does not move a
+	 paint already built from it. The decoded matrix goes with them, because the block is the
+	 truth and the decode is read from it afresh."
+
+	coefficients := aFloat32Array copy.
+	matrix := nil
 ]
 
 { #category : 'accessing' }

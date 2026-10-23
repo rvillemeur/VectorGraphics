@@ -21,13 +21,14 @@ Class {
 	#tag : 'Tiles'
 }
 
-{ #category : 'constants' }
+{ #category : 'contract' }
 VGTiledFillKernel class >> bindingNames [
-	"The seven buffers I read, in the order they are bound: the five an encoding writes, the
+	"The nine buffers I read, in the order they are bound: the seven an encoding writes, the
 	 pixels of the target and the size of the frame. A binding number is the position of the
 	 name here, counted from zero, so this one list states the whole contract."
 
-	^ #( #tileTable #entryRefs #headers #clips #edges #target #frame )
+	^ #( #tileTable #entryRefs #headers #clips #edges #paints #stops #target
+	     #frame )
 ]
 
 { #category : 'constants' }
@@ -47,33 +48,6 @@ VGTiledFillKernel class >> columnComponent [
 	 tile."
 
 	^ 0
-]
-
-{ #category : 'composition' }
-VGTiledFillKernel class >> compositionSelectorFor: anOperator [
-	"Which arithmetic composites under that operator. An operator added to the rasteriser's
-	 subset without arithmetic here is refused while the module is built, so no frame is drawn
-	 by a branch that composites nothing."
-
-	^ self compositionSelectors
-		  at: anOperator operatorName
-		  ifAbsent: [
-		  self error: anOperator operatorName , ' has no arithmetic in this kernel' ]
-]
-
-{ #category : 'composition' }
-VGTiledFillKernel class >> compositionSelectors [
-	"The arithmetic of each operator of the subset, by the operator's own name. A reader of
-	 VGTiledFillRasteriser class >> supportedOperators finds one entry here for each operator it
-	 lists, and each answers the pair of weights the source and the destination are mixed by."
-
-	^ Dictionary newFromPairs: {
-			  #over.
-			  #emitOverWeightsWithMask:.
-			  #source.
-			  #emitSourceWeightsWithMask:.
-			  #clear.
-			  #emitClearWeightsWithMask: }
 ]
 
 { #category : 'instance creation' }
@@ -106,12 +80,13 @@ VGTiledFillKernel class >> entryPointName [
 	^ 'main'
 ]
 
-{ #category : 'constants' }
+{ #category : 'contract' }
 VGTiledFillKernel class >> floatBindingNames [
-	"The two buffers of single floats. A clip side and an edge end are coordinates in device
-	 space; everything else a frame carries is a word."
+	"The four buffers of single floats. A clip side, an edge end, a coefficient of a paint and
+	 the offset and channels of a stop are all floating point; everything else a frame carries
+	 is a word."
 
-	^ #( #clips #edges )
+	^ #( #clips #edges #paints #stops )
 ]
 
 { #category : 'constants' }
@@ -171,6 +146,18 @@ VGTiledFillKernel class >> onTileExtent: anExtent [
 	^ self new setTileExtent: anExtent
 ]
 
+{ #category : 'contract' }
+VGTiledFillKernel class >> rgbaChannelShifts [
+	"Where each channel of an unpremultiplied quadruple sits in a pixel word of the one format a
+	 frame is encoded for. The format lists its shifts lowest first, which is blue, green, red
+	 and then alpha, and a quadruple runs red, green, blue, alpha, so the three colours are the
+	 format''s own list read backwards and the alpha is the last of it."
+
+	| shifts |
+	shifts := VGTiledFillEncoding targetFormat channelShifts.
+	^ shifts allButLast reversed , { shifts last }
+]
+
 { #category : 'constants' }
 VGTiledFillKernel class >> roundingAddend [
 	"Half of the full byte, added before the division by that byte: the rounding division of
@@ -182,14 +169,6 @@ VGTiledFillKernel class >> roundingAddend [
 { #category : 'constants' }
 VGTiledFillKernel class >> rowComponent [
 	^ 1
-]
-
-{ #category : 'constants' }
-VGTiledFillKernel class >> scalarBitWidth [
-	"Every scalar of the module is thirty-two bits wide: a word of a buffer, a single float of a
-	 coordinate and the signed winding number alike."
-
-	^ 32
 ]
 
 { #category : 'constants' }
@@ -231,13 +210,15 @@ VGTiledFillKernel class >> variableNames [
 	^ self wordVariableNames , self signedVariableNames , self floatVariableNames
 ]
 
-{ #category : 'constants' }
+{ #category : 'contract' }
 VGTiledFillKernel class >> wordVariableNames [
-	"The function variables that hold a word: the destination pixel, the three loop counters and
-	 the flags that stand where VGTileCoverage answers early."
+	"The function variables that hold a word: the destination pixel, the source pixel of the
+	 fill and whether the fill lays one down at all, the three loop counters, the stop loop with
+	 the two stops it looks for and the flags that stand where VGTileCoverage answers early."
 
-	^ #( #dest #reference #sample #runsMore #runFromSearching #runFromFound
-	     #endRunning #edge #nearestFound )
+	^ #( #dest #source #hasSource #reference #sample #runsMore
+	     #runFromSearching #runFromFound #endRunning #edge #nearestFound #stop
+	     #beforeStop #afterStop #beforeFound #afterFound )
 ]
 
 { #category : 'inspecting' }
@@ -451,44 +432,6 @@ VGTiledFillKernel >> emitBody [
 	builder emitIf: inside then: [ self emitPixel ]
 ]
 
-{ #category : 'composition' }
-VGTiledFillKernel >> emitByteOf: aPixelId atShift: anInteger [
-	"The channel of a pixel word that sits at that shift. The full byte doubles as the mask of
-	 one channel, because a channel of this format is a byte wide."
-
-	^ self
-		  bitsOfWord: (self word: aPixelId shiftedRightBy: anInteger)
-		  and: (self constantWord: VGTiledFillEncoding fullAlphaByte)
-]
-
-{ #category : 'composition' }
-VGTiledFillKernel >> emitClearWeightsWithMask: aMaskId [
-	"Clear reads no source at all: the mask weighs the destination, and clearing a pixel the
-	 shape covers by half leaves half of the destination standing, as VGClearOperator was
-	 measured to do."
-
-	^ {
-		  (self constantWord: 0).
-		  (self
-			   differenceOfWord:
-			   (self constantWord: VGTiledFillEncoding fullAlphaByte)
-			   and: aMaskId) }
-]
-
-{ #category : 'composition' }
-VGTiledFillKernel >> emitCompositeWithMask: aMaskId [
-	"The destination pixel after this fill has been composited into it, which is the one place
-	 a pixel of the target changes. The read and the write are of a function variable, because
-	 this invocation owns the pixel for the whole of the frame."
-
-	self
-		store: (self
-				 emitPixelOfSource: (self valueNamed: #sourcePixel)
-				 over: (self load: #dest)
-				 weights: (self emitWeightsWithMask: aMaskId))
-		into: #dest
-]
-
 { #category : 'emitting' }
 VGTiledFillKernel >> emitCoverageOfSubRows [
 	"The part of this pixel the fill covers, summed over the sub-rows of its row and capped at
@@ -681,13 +624,18 @@ VGTiledFillKernel >> emitEndOfRunFrom: aStartId to: aRightId onSubRow: aSubRowId
 						self store: (self constantWord: 0) into: #endRunning ] ] ]
 ]
 
-{ #category : 'emitting' }
+{ #category : 'emission - entry' }
 VGTiledFillKernel >> emitEntry [
-	"One fill of this tile at this pixel: its header, its clip, the coverage of the walk over
-	 it and the composition of its own pixel into the destination. The identifier a reference
-	 holds counts from one, as VGTiledFillEncoding writes it."
-
-	| identifier previous mask |
+	"One fill of this tile at this pixel: its header, its clip, the pixel its paint lays down
+	 here, the coverage of the walk over it and the composition of the two into the destination.
+	 The identifier a reference holds counts from one, as VGTiledFillEncoding writes it. A pixel
+	 the paint lays nothing down at is left alone, which the subset may do because every
+	 operator in it is bounded, and which is what the software rasteriser does with the nil a
+	 paint answers.
+	 The paint and the composition are emitted by VGTiledFillPixelEmitter, which shares this
+	 module while I emit this entry; the walk over the edges between them is my own."
+	| identifier previous mask pixels |
+	pixels := VGTiledFillPixelEmitter on: self.
 	identifier := self
 		              elementOf: #entryRefs
 		              at: (self
@@ -704,12 +652,15 @@ VGTiledFillKernel >> emitEntry [
 		rememberClipAt: (self
 				 productOfWord: previous
 				 and: (self constantWord: VGTiledFillEncoding clipFloats)).
+	pixels emitSource.
 	self store: (self constantFloat: 0) into: #coverage.
 	builder emitIf: self emitAllowsRow then: [ self emitCoverageOfSubRows ].
-	mask := self emitMaskForCoverage: (self load: #coverage).
+	mask := pixels emitMaskForCoverage: (self load: #coverage).
 	builder
-		emitIf: (self word: (self constantWord: 0) below: mask)
-		then: [ self emitCompositeWithMask: mask ]
+		emitIf: (self
+				 both: (self word: (self constantWord: 0) below: mask)
+				 and: (self word: (self constantWord: 0) below: (self load: #hasSource)))
+		then: [ pixels emitCompositeWithMask: mask ]
 ]
 
 { #category : 'emitting' }
@@ -760,43 +711,6 @@ VGTiledFillKernel >> emitMain [
 	builder emitReturn
 ]
 
-{ #category : 'composition' }
-VGTiledFillKernel >> emitMaskForCoverage: aCoverageId [
-	"The mask that coverage reaches the composition as: the eight-bit mask
-	 VGCairoSurfaceFormat >> maskByteForCoverage: quantises it to, scaled by the alpha byte of
-	 the fill. Pharo's rounded adds a half and takes the floor, and the conversion to a word
-	 truncates, so the half is added here."
-
-	^ self
-		  emitScaleOfByte: (self
-				   smallerWordOf: (self wordOfFloat: (self
-							    sumOfFloat: (self
-									     productOfFloat: aCoverageId
-									     and: (self constantFloat: self class maskScale))
-							    and: (self constantFloat: self class halfUnit)))
-				   and: (self constantWord: VGTiledFillEncoding fullAlphaByte))
-		  by: (self valueNamed: #alphaByte)
-]
-
-{ #category : 'composition' }
-VGTiledFillKernel >> emitOverWeightsWithMask: aMaskId [
-	"Source over destination: the whole of the source scaled by the mask, and what the alpha of
-	 that scaled source leaves of the destination. VGPorterDuffOperator weighs the source by one
-	 and the destination by one minus the source alpha, and a scaling by the full byte is the
-	 identity, so the mask is the source's own weight here."
-
-	^ {
-		  aMaskId.
-		  (self
-			   differenceOfWord:
-			   (self constantWord: VGTiledFillEncoding fullAlphaByte)
-			   and: (self
-					    emitScaleOfByte: (self
-							     emitByteOf: (self valueNamed: #sourcePixel)
-							     atShift: VGTiledFillEncoding targetFormat channelShifts last)
-					    by: aMaskId)) }
-]
-
 { #category : 'emitting' }
 VGTiledFillKernel >> emitPixel [
 	"The pixel of this invocation: the destination word read once, every entry of the tile
@@ -828,33 +742,6 @@ VGTiledFillKernel >> emitPixel [
 					(self sumOfWord: (self load: #reference) and: (self constantWord: 1))
 				into: #reference ].
 	self storeWord: (self load: #dest) into: #target at: index
-]
-
-{ #category : 'composition' }
-VGTiledFillKernel >> emitPixelOfSource: aSourceId over: aDestinationId weights: aPair [
-	"Two premultiplied pixels, each scaled by a weight of its own and added channel by channel,
-	 which is VGCairoSurfaceFormat >> mixPixel:weightedBy:withPixel:weightedBy: on the one
-	 format a frame is encoded for. The sum is capped, because a pair of weights can overflow a
-	 byte."
-
-	^ VGTiledFillEncoding targetFormat channelShifts
-		  inject: (self constantWord: 0)
-		  into: [ :pixel :shift |
-			  self
-				  sumOfWord: pixel
-				  and: (self
-						   word: (self
-								    smallerWordOf: (self
-										     sumOfWord: (self
-												      emitScaleOfByte: (self emitByteOf: aSourceId atShift: shift)
-												      by: aPair first)
-										     and: (self
-												      emitScaleOfByte:
-												      (self emitByteOf: aDestinationId atShift: shift)
-												      by: aPair second))
-								    and:
-								    (self constantWord: VGTiledFillEncoding fullAlphaByte))
-						   shiftedLeftBy: shift) ]
 ]
 
 { #category : 'emitting' }
@@ -945,32 +832,6 @@ VGTiledFillKernel >> emitRunsFrom: aLeftId to: aRightId onSubRow: aSubRowId [
 					self store: (self load: #endResult) into: #runCursor ] ]
 ]
 
-{ #category : 'composition' }
-VGTiledFillKernel >> emitScaleOfByte: aByteId by: aWeightId [
-	"One byte scaled by another, divided by the full byte with rounding, which is
-	 VGCairoSurfaceFormat >> scaleByte:by: and so Cairo's own integer blend."
-
-	^ self
-		  word: (self
-				   sumOfWord: (self productOfWord: aByteId and: aWeightId)
-				   and: (self constantWord: self class roundingAddend))
-		  dividedBy: (self constantWord: VGTiledFillEncoding fullAlphaByte)
-]
-
-{ #category : 'composition' }
-VGTiledFillKernel >> emitSourceWeightsWithMask: aMaskId [
-	"The source operator mixes the two pixels by the mask alone, which is what a live Cairo
-	 context was measured to do: at half coverage it writes half of each pixel and not a source
-	 scaled to half its alpha. VGSourceOperator says the same with a lerp."
-
-	^ {
-		  aMaskId.
-		  (self
-			   differenceOfWord:
-			   (self constantWord: VGTiledFillEncoding fullAlphaByte)
-			   and: aMaskId) }
-]
-
 { #category : 'emitting' }
 VGTiledFillKernel >> emitSpansOnSubRow: aSubRowId [
 	"My fill's inside runs within this pixel on that sub-row, trimmed to the clip, which is
@@ -996,35 +857,6 @@ VGTiledFillKernel >> emitSpansOnSubRow: aSubRowId [
 		builder
 			emitIf: (self negation: aliased)
 			then: [ self emitRunsFrom: left to: right onSubRow: aSubRowId ] ]
-]
-
-{ #category : 'composition' }
-VGTiledFillKernel >> emitWeightsWithMask: aMaskId [
-	"The weights the source and the destination are mixed by under the entry's own operator.
-	 The arithmetic of all three operators of the subset is emitted and a chain of selections
-	 picks the one the header names: each is a handful of instructions and none of them writes
-	 anything, so a selection costs less than a branch and keeps the walk straight."
-
-	| weights chosen |
-	weights := VGTiledFillRasteriser supportedOperators collect: [ :each |
-		           {
-			           (VGTiledFillEncoding codeForOperator: each).
-			           (self
-				            perform: (self class compositionSelectorFor: each)
-				            with: aMaskId) } ].
-	chosen := weights first second.
-	weights allButFirst do: [ :each |
-		| isThisOne |
-		isThisOne := self
-			             word: (self valueNamed: #operator)
-			             equals: (self constantWord: each first).
-		chosen := chosen with: each second collect: [ :standing :mine |
-			          self
-				          select: isThisOne
-				          ifTrue: mine
-				          ifFalse: standing
-				          type: self wordType ] ].
-	^ chosen
 ]
 
 { #category : 'emitting' }
@@ -1309,12 +1141,13 @@ VGTiledFillKernel >> rememberClipAt: aBaseId [
 			as: (each copyUpToLast: $F) asSymbol ]
 ]
 
-{ #category : 'emitting' }
+{ #category : 'emission - entry' }
 VGTiledFillKernel >> rememberHeaderAt: aBaseId [
-	"The seven words of one entry's header, read once for the whole walk over it."
+	"The eleven words of one entry''s header, read once for the whole walk over it."
 
 	#( #sourcePixelField #operatorField #fillRuleField #aliasedField
-	   #alphaByteField #edgeOffsetField #edgeCountField ) do: [ :each |
+	   #alphaByteField #edgeOffsetField #edgeCountField #paintTagField
+	   #paintBlockOffsetField #stopOffsetField #stopCountField ) do: [ :each |
 		self
 			remember: (self
 					 elementOf: #headers

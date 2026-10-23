@@ -57,6 +57,33 @@ VGTiledFillExamples class >> dispatchOfThreeShapesOnThisMachine [
 ]
 
 { #category : 'examples' }
+VGTiledFillExamples class >> encodingOfAGradientAndASolidFill [
+	"A linear gradient of three uneven stops over the whole frame and a solid rectangle on top
+	 of it, written out as the buffers a dispatch uploads. The Paints tab reads the gradient back
+	 out of the paint buffer and the Stops tab reads its three stops, which is what unit 2.4
+	 added to the encoding; the solid fill is there so that both kinds of paint are in one frame,
+	 as a real one has them."
+	<sampleInstance>
+	| surface pattern |
+	pattern := VGCairoLinearGradientPattern
+		           from: 4 @ 4
+		           to: 60 @ 44
+		           addStopsFrom: {
+				           (0.0 -> (Color r: 1.0 g: 0.1 b: 0.0)).
+				           (0.35 -> (Color r: 0.0 g: 0.9 b: 0.3)).
+				           (1.0 -> (Color r: 0.0 g: 0.2 b: 1.0 alpha: 0.4)) }.
+	surface := VGCairoImageSurface extent: self frameExtent.
+	surface newContext
+		sourcePattern: pattern;
+		rectangleX: 0 y: 0 width: self frameExtent x height: self frameExtent y;
+		fill;
+		sourceColorR: 0.1 g: 0.1 b: 0.1 a: 1.0;
+		rectangleX: 20 y: 20 width: 24 height: 24;
+		fill.
+	^ VGTiledFillEncoding of: surface displayList extent: self frameExtent
+]
+
+{ #category : 'examples' }
 VGTiledFillExamples class >> encodingOfThreeShapes [
 	"The same three fills, binned and then written out as the buffers a dispatch uploads. The
 	 Tile table and Entries tabs read the buffers back, and the rasteriser draws this encoding
@@ -96,6 +123,18 @@ VGTiledFillExamples class >> kernelOfTheDefaultGrid [
 	kernel := VGTiledFillKernel default.
 	kernel spirv.
 	^ kernel
+]
+
+{ #category : 'examples' }
+VGTiledFillExamples class >> pixelEmitterOfTheDefaultKernel [
+	"The emitter of a kernel that has already built its module, which is the only state it has:
+	 the builder, the GLSL set and the value table of that module. The Composition tab reads the
+	 arithmetic it holds for each operator of the subset."
+	<sampleInstance>
+	| kernel |
+	kernel := VGTiledFillKernel default.
+	kernel spirv.
+	^ VGTiledFillPixelEmitter on: kernel
 ]
 
 { #category : 'examples' }

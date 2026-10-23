@@ -16,32 +16,56 @@ Class {
 }
 
 { #category : 'constants' }
-VGTiledFillTest class >> deviceChannelTolerance [
-	"How far a channel of a pixel drawn on the device may stand from the same channel drawn by
-	 the software backend. The device computes a coverage in f32 where the rasteriser computes it
-	 in Float64, so the two agree exactly wherever a coverage is nothing or everything and the
-	 quantised byte of an antialiased edge can be one apart. Measured over the twenty-two cases
-	 of the subset: no pixel of any case is farther than this."
+VGTiledFillTest class >> degenerateGradientFrameNames [
+	"The two frames of the fixture that lay down nothing at all: a gradient with no stops and a
+	 line of no length. They are drawn for the branch that answers nothing, so they are the two
+	 frames a test of painted pixels has to leave out."
 
+	^ #( #linearWithNoStops #linearOfNoLength )
+]
+
+{ #category : 'constants' }
+VGTiledFillTest class >> deviceChannelTolerance [
+	"How far a channel of a device pixel may sit from the same channel drawn by the software
+	 backend. The device computes in f32 and the software backend in Float64, so a pixel on an
+	 antialiased edge or inside a gradient ramp can land one byte either side of the rounding
+	 boundary. Measured over the twenty-four cases of the subset and the fifteen gradient frames
+	 of the fixture: no pixel of any of them is farther than this."
 	^ 1
 ]
 
 { #category : 'constants' }
 VGTiledFillTest class >> devicePixelsAllowedToDifferPerCase [
-	"How many pixels of one case may differ from the software backend at all. Measured over the
-	 twenty-two cases: one pixel of path-filled-rounded-rectangle differs, by one in one channel,
-	 and no pixel of the other twenty-one differs at all."
-
-	^ 1
+	"How many pixels of one frame may differ from the software backend at all, within the channel
+	 tolerance. Measured over the twenty-four cases of the subset and the fifteen gradient frames
+	 of the fixture: six frames differ and the rest are byte for byte identical. One pixel of
+	 path-filled-rounded-rectangle differs, which is the antialiased edge of unit 2.3, and the
+	 other five are gradients, where a whole run of the ramp lands on a rounding boundary —
+	 128 pixels of linearUnderRepeat and of linearUnderReflect, 64 of source-linear-gradient and
+	 48 of linearUnderNone and of linearUnderPad.
+	 Those runs are not device arithmetic. The device reads the stop channels as f32, and against
+	 a software frame whose own stops are narrowed the same way only the one antialiased pixel
+	 differs at all, so what the ramp crosses is the quantisation of the narrowed stop and not the
+	 evaluation."
+	^ 128
 ]
 
 { #category : 'constants' }
 VGTiledFillTest class >> fillCaseCount [
-	"Counted over the corpus: twenty-two of the forty-one cases are fills of a solid paint inside
-	 a rectangular clip, which is the subset unit 2.3 draws. The other nineteen carry a gradient,
-	 a surface or a mesh paint, a blit or a shaped clip, and wait for units 2.4 to 2.6."
+	"Counted over the corpus: twenty-four of the forty-one cases are fills of a solid colour or of
+	 a gradient inside a rectangular clip, which is the subset units 2.3 and 2.4 draw. Unit 2.3
+	 drew twenty-two of them and unit 2.4 added the two gradient cases. The other seventeen carry
+	 a surface or a mesh paint, a blit or a shaped clip, and wait for units 2.5 and 2.6."
 
-	^ 22
+	^ 24
+]
+
+{ #category : 'constants' }
+VGTiledFillTest class >> gradientFrameCount [
+	"The frames VGGradientFrameFixture holds. Asserted wherever they are drawn, so that a frame
+	 dropped from the fixture cannot quietly narrow the gate of unit 2.4."
+
+	^ 15
 ]
 
 { #category : 'fixtures' }
@@ -49,17 +73,6 @@ VGTiledFillTest >> caseExtent [
 	"The extent of every case of the conformance corpus, and of every frame I draw myself."
 
 	^ VGConformanceCorpus caseExtent
-]
-
-{ #category : 'private' }
-VGTiledFillTest >> classesNamedBy: aMethod [
-	"Every class that method names, read from its literals, so a rule about what a method may
-	 name is checked against the compiled method and not against its text."
-
-	^ (aMethod literals
-		   select: [ :each |
-		   each isVariableBinding and: [ each value isBehavior ] ])
-		  collect: [ :each | each value ]
 ]
 
 { #category : 'running' }
@@ -105,21 +118,15 @@ VGTiledFillTest >> encodedFormOfExtent: anExtent drawnWith: aBlock [
 	^ surface asForm
 ]
 
-{ #category : 'private' }
-VGTiledFillTest >> kernelDecorationLiterals: aDecoration [
-	"Every literal that decoration carries in the kernel's module, read from the module's own
-	 decoration instructions and not from the bytes."
+{ #category : 'running' }
+VGTiledFillTest >> gradientFrames [
+	"The gradient frames of the fixture, each as its name and the block that draws it. The count
+	 is held in every test that reads them, so the fixture cannot shrink unnoticed."
 
-	^ ((VGTiledFillKernel default module decorations select: [ :each |
-		    (each first = #decorate and: [ each third = aDecoration ]) ]) collect: [
-		   :each | each fourth ]) flattened
-]
-
-{ #category : 'private' }
-VGTiledFillTest >> kernelValidator [
-	"The kernel of the default grid, read by the one tool that knows what a module may be."
-
-	^ PVSpirvValidator on: VGTiledFillKernel default spirv
+	| frames |
+	frames := VGGradientFrameFixture frames.
+	self assert: frames size equals: self class gradientFrameCount.
+	^ frames
 ]
 
 { #category : 'fixtures' }
@@ -165,11 +172,13 @@ VGTiledFillTest >> singleFloatCopyOf: aDisplayList [
 	^ copied
 ]
 
-{ #category : 'fixtures' }
+{ #category : 'running' }
 VGTiledFillTest >> singleFloatEntryOf: anEntry [
-	"The entry with its coordinates and its clip narrowed to single floats and everything else
-	 its own: the paint, the operator, the fill rule, the antialiasing mode and the alpha are
-	 carried by the encoding without arithmetic, so this step gates the layout alone."
+	"The entry with its coordinates, its clip and the stops of its paint narrowed to single
+	 floats and everything else its own: the operator, the fill rule, the antialiasing mode, the
+	 alpha and the paint''s own coefficient block are carried by the encoding without arithmetic,
+	 so this step gates the layout alone."
+
 	| segments |
 	segments := (VGSegments
 		             coordinates:
@@ -180,7 +189,7 @@ VGTiledFillTest >> singleFloatEntryOf: anEntry [
 		            anEntry segments alpha.
 	^ VGFillEntry
 		  segments: segments
-		  paint: anEntry paint
+		  paint: (self singleFloatPaintOf: anEntry paint)
 		  clip: (VGClip bounds: (self singleFloatRectangleOf: anEntry clip bounds))
 		  operator: anEntry operator
 ]
@@ -197,6 +206,23 @@ VGTiledFillTest >> singleFloatFormOfExtent: anExtent drawnWith: aBlock [
 	surface displayList reset.
 	(VGTiledFillRasteriser of: list extent: anExtent) drawOn: surface.
 	^ surface asForm
+]
+
+{ #category : 'running' }
+VGTiledFillTest >> singleFloatPaintOf: aPaint [
+	"The paint as the buffers can hold it. A coefficient block is single floats already, so it
+	 travels unchanged; a stop list is kept in Float64 and is narrowed here. A paint with no stop
+	 list is its own narrowing."
+
+	| narrowed |
+	aPaint hasStops ifFalse: [ ^ aPaint ].
+	narrowed := aPaint class fromBlock: aPaint coefficients.
+	aPaint stops do: [ :stop |
+		narrowed
+			addStopAt: (self roundedToSingleFloat: stop key)
+			channels: (stop value collect: [ :channel |
+					 self roundedToSingleFloat: channel ]) ].
+	^ narrowed
 ]
 
 { #category : 'fixtures' }
@@ -452,6 +478,45 @@ VGTiledFillTest >> testAnEmptyFrameLeavesEverySurfacePixelAlone [
 		equals: (self softwareFormOfExtent: self caseExtent drawnWith: draw) bits
 ]
 
+{ #category : 'tests - encoding' }
+VGTiledFillTest >> testAnEncodedEntryCarriesItsOwnPaintAndItsStops [
+	"What the header and the two paint buffers hold of a fill: the tag of its paint, the sixteen
+	 floats of its coefficient block as the paint itself holds them, and, for a gradient, every
+	 stop as an offset and four unpremultiplied channels narrowed to single floats. A solid paint
+	 carries no stop and keeps the source pixel unit 2.3 gave it, because one pixel is less for
+	 the kernel to read than a block it would find the same colour in."
+
+	| frames |
+	frames := (self gradientFrames collect: [ :each | each value ])
+		          copyWith: self mixedFillFrame.
+	frames do: [ :draw |
+		| list encoding |
+		list := self displayListOfExtent: self caseExtent drawnWith: draw.
+		encoding := VGTiledFillEncoding of: list extent: self caseExtent.
+		list entries withIndexDo: [ :each :index |
+			| decoded |
+			decoded := encoding entryAt: index.
+			self
+				assert: decoded paint class paintTag
+				equals: each paint class paintTag.
+			each paint isSolid
+				ifTrue: [ self deny: (decoded paint isKindOf: VGGradientPaint) ]
+				ifFalse: [
+					self
+						assert: decoded paint coefficients asArray
+						equals: each paint coefficients asArray.
+					self
+						assert: (decoded paint stops collect: [ :stop | stop key ])
+						equals: (each paint stops collect: [ :stop |
+								 self roundedToSingleFloat: stop key ]).
+					self
+						assert:
+						(decoded paint stops collect: [ :stop | stop value asArray ])
+						equals: (each paint stops collect: [ :stop |
+								 (stop value collect: [ :channel |
+									  self roundedToSingleFloat: channel ]) asArray ]) ] ] ]
+]
+
 { #category : 'tests' }
 VGTiledFillTest >> testAnEncodedEntryCarriesThePixelItsPaintAnswersAndItsOwnAlphaByte [
 	"What a header holds of a fill: the premultiplied pixel, because the kernel carries a pixel
@@ -628,32 +693,158 @@ VGTiledFillTest >> testEveryFillCaseOfTheCorpusDrawsTheSameBytesFromTheBuffersAs
 	self assert: drawn equals: self class fillCaseCount
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests - gradients' }
+VGTiledFillTest >> testEveryGradientFrameButTheDegenerateOnesLaysDownPixels [
+	"A frame that draws nothing matches the software backend for nothing, so the gate above would
+	 pass on a fixture of empty frames. Every frame but the two degenerate ones changes a pixel of
+	 a surface nothing has drawn on, and those two change none."
+
+	| blank |
+	blank := (VGCairoImageSurface extent: VGGradientFrameFixture extent) asForm.
+	self gradientFrames do: [ :each |
+		| drawn degenerate |
+		drawn := self
+			         softwareFormOfExtent: VGGradientFrameFixture extent
+			         drawnWith: each value.
+		degenerate := self class degenerateGradientFrameNames includes:
+			              each key.
+		self
+			assert: drawn bits = blank bits = degenerate
+			description: each key ]
+]
+
+{ #category : 'tests - encoding' }
+VGTiledFillTest >> testEveryGradientFrameDrawsTheSameBytesFromTheBuffersAloneAsFromItsOwnEntries [
+	"The gate of the encoding over the gradient frames: the rasteriser reads the buffers and
+	 never the display list they came from, and the oracle is the same frame narrowed to single
+	 floats, which is all a buffer can hold. Every extend mode, both geometries and the
+	 degenerate gradients are in the fixture, so a field of the paint block left unwritten shows
+	 here and not in a picture no test draws."
+
+	self gradientFrames do: [ :each |
+		| draw |
+		draw := each value.
+		self
+			assert: (VGTiledFillRasteriser supports:
+					 (self displayListOfExtent: self caseExtent drawnWith: draw))
+			description: each key printString , ' is not in the subset'.
+		self
+			assert: (self encodedFormOfExtent: self caseExtent drawnWith: draw) bits
+			= (self singleFloatFormOfExtent: self caseExtent drawnWith: draw) bits
+			description: each key printString
+				, ' draws other bytes from the buffers' ]
+]
+
+{ #category : 'tests - device' }
+VGTiledFillTest >> testEveryGradientFrameOfTheFixtureDrawsOnTheDeviceWhatTheSoftwareBackendDraws [
+	"The gate of unit 2.4. Every gradient frame of the fixture, drawn on the device and by the
+	 software backend on the same frame, holds to the same tolerance and the same per-case count
+	 as the corpus; and against a software frame whose stops are narrowed to f32 first it is byte
+	 for byte identical, which is the sharper half of the gate: the kernel evaluates a paint and
+	 searches a stop list to the same bytes as the rasteriser, and what the loose half allows is
+	 the narrowing of the stop and not the evaluation.
+	 One context draws all of them. A machine with no device holds nothing."
+	| context drawn |
+	context := [ VkContext computeContext ]
+		           on: Error
+		           do: [ :failure | nil ].
+	context ifNil: [ ^ self ].
+	drawn := 0.
+	[
+	self gradientFrames do: [ :each |
+		| extent device comparison |
+		extent := VGGradientFrameFixture extent.
+		drawn := drawn + 1.
+		device := self
+			          deviceFormOfExtent: extent
+			          drawnWith: each value
+			          on: context.
+		comparison := VGFormComparison
+			              between: device
+			              and: (self
+					               softwareFormOfExtent: extent
+					               drawnWith: each value).
+		self
+			assert: (comparison pixelsFartherThan: self class deviceChannelTolerance) = 0
+			description: each key.
+		self
+			assert: comparison differingPixelCount
+				    <= self class devicePixelsAllowedToDifferPerCase
+			description: each key.
+		self
+			assert: device bits
+			= (self singleFloatFormOfExtent: extent drawnWith: each value) bits
+			description: each key ] ] ensure: [ context destroy ].
+	self assert: drawn equals: self class gradientFrameCount
+]
+
+{ #category : 'tests - gradients' }
+VGTiledFillTest >> testEveryGradientFrameOfTheFixtureDrawsTheSameBytesAsTheSoftwareBackend [
+	"The gate of the first step of unit 2.4 over the frames the corpus does not draw: the four
+	 extend modes, three stops, a hard edge inside the ramp, the two degenerate gradients, a
+	 pattern matrix, both radial geometries, and a gradient meeting an operator, a constant alpha
+	 and a fractional clip. Each of them is in the subset, because a frame the subset refuses
+	 would hold nothing here."
+
+	self gradientFrames do: [ :each |
+		| extent |
+		extent := VGGradientFrameFixture extent.
+		self assert:
+			(VGTiledFillRasteriser supports:
+				 (self displayListOfExtent: extent drawnWith: each value))
+			description: each key.
+		self
+			assert:
+			(self tiledFormOfExtent: extent drawnWith: each value) bits
+			= (self softwareFormOfExtent: extent drawnWith: each value) bits
+			description: each key ]
+]
+
+{ #category : 'tests - encoding' }
 VGTiledFillTest >> testTheBuffersAreSizedByTheFrameAndByNothingElse [
-	"A header and a clip rectangle an entry, four floats an edge, a record a tile the frame
-	 touches and a reference an entry binned into one. Nothing is reserved and nothing is
-	 rounded up, so a frame can be weighed from its own counts."
-	| list encoding binning edges |
-	list := self displayListOfExtent: self caseExtent drawnWith: self mixedFillFrame.
-	binning := VGTileBinning of: list extent: self caseExtent.
-	encoding := VGTiledFillEncoding of: list extent: self caseExtent.
-	edges := list entries inject: 0 into: [ :sum :each |
-		         sum + (each segments coordinates size / VGTiledFillEncoding edgeFloats) ].
-	self assert: encoding entryCount equals: list entries size.
-	self
-		assert: encoding headers size
-		equals: list entries size * VGTiledFillEncoding entryHeaderWords.
-	self
-		assert: encoding clips size
-		equals: list entries size * VGTiledFillEncoding clipFloats.
-	self assert: encoding edgeCount equals: edges.
-	self
-		assert: encoding edges size
-		equals: edges * VGTiledFillEncoding edgeFloats.
-	self
-		assert: encoding tileTable size
-		equals: binning touchedTileCount * VGTiledFillEncoding tileRecordWords.
-	self assert: encoding entryRefs size equals: binning binnedEntryCount
+	"A header, a clip rectangle and a paint block an entry, four floats an edge, five floats a
+	 stop of a gradient, a record a tile the frame touches and a reference an entry binned into
+	 one. Nothing is reserved and nothing is rounded up, so a frame can be weighed from its own
+	 counts. A frame of solid fills and a frame of a gradient are both weighed, because a solid
+	 paint contributes a block and no stop at all."
+
+	{
+		self mixedFillFrame.
+		VGGradientFrameFixture linearWithThreeStops } do: [ :draw |
+		| list encoding binning edges stopCount |
+		list := self displayListOfExtent: self caseExtent drawnWith: draw.
+		binning := VGTileBinning of: list extent: self caseExtent.
+		encoding := VGTiledFillEncoding of: list extent: self caseExtent.
+		edges := list entries inject: 0 into: [ :sum :each |
+			         sum
+			         + (each segments coordinates size
+					          / VGTiledFillEncoding edgeFloats) ].
+		stopCount := list entries inject: 0 into: [ :sum :each |
+			             sum + (each paint hasStops
+					              ifTrue: [ each paint stops size ]
+					              ifFalse: [ 0 ]) ].
+		self assert: encoding entryCount equals: list entries size.
+		self
+			assert: encoding headers size
+			equals: list entries size * VGTiledFillEncoding entryHeaderWords.
+		self
+			assert: encoding clips size
+			equals: list entries size * VGTiledFillEncoding clipFloats.
+		self
+			assert: encoding paints size
+			equals: list entries size * VGTiledFillEncoding paintBlockFloats.
+		self assert: encoding edgeCount equals: edges.
+		self
+			assert: encoding edges size
+			equals: edges * VGTiledFillEncoding edgeFloats.
+		self assert: encoding stopCount equals: stopCount.
+		self
+			assert: encoding stops size
+			equals: stopCount * VGTiledFillEncoding stopFloats.
+		self
+			assert: encoding tileTable size
+			equals: binning touchedTileCount * VGTiledFillEncoding tileRecordWords.
+		self assert: encoding entryRefs size equals: binning binnedEntryCount ]
 ]
 
 { #category : 'tests' }
@@ -705,107 +896,6 @@ VGTiledFillTest >> testTheFrameDrawnFromTheBuffersAloneHoldsTheSameBytesAsItsSin
 ]
 
 { #category : 'tests' }
-VGTiledFillTest >> testTheKernelBindsOneBufferForEveryBufferItReads [
-	"The seven buffers of the binding contract: the five VGTiledFillEncoding writes, the target
-	 pixels and the size of the frame. They stand at one descriptor set, numbered from zero in
-	 the order bindingNames holds them."
-
-	self
-		assert: (self kernelValidator variableIdsInStorageClass:
-				 SpvStorageClass storageBuffer) size
-		equals: VGTiledFillKernel bindingNames size.
-	self
-		assert:
-		(self kernelDecorationLiterals: SpvDecoration bindingDecoration)
-			asSortedCollection asArray
-		equals: (0 to: VGTiledFillKernel bindingNames size - 1) asArray.
-	self
-		assert: (self kernelDecorationLiterals: SpvDecoration descriptorSet) asSet
-		equals: { VGTiledFillKernel descriptorSetIndex } asSet
-]
-
-{ #category : 'tests' }
-VGTiledFillTest >> testTheKernelModuleIsValidSpirv [
-	"The whole walk, assembled by hand: the block order, the merge instruction of every loop
-	 and the function variables that stand where VGTileCoverage answers early. spirv-val reads
-	 all of it, and a driver refuses what it refuses."
-
-	| validator |
-	PVSpirvValidator isAvailable ifFalse: [ ^ self skip ].
-	validator := self kernelValidator.
-	self
-		assert: validator isValid
-		description: 'the tiled fill kernel produced invalid SPIR-V: '
-			, validator validationOutput
-]
-
-{ #category : 'tests' }
-VGTiledFillTest >> testTheKernelNamesEveryBufferAndBuiltInInItsInterface [
-	"Under SPIR-V 1.5 an entry point names every module-scope variable it touches, so a buffer
-	 or a built-in left out of the interface is a module a driver may refuse."
-
-	self
-		assert: self kernelValidator entryPointInterfaceIds size
-		equals: VGTiledFillKernel bindingNames size
-			+ VGTiledFillKernel builtInNumbers size
-]
-
-{ #category : 'tests' }
-VGTiledFillTest >> testTheKernelNamesNoOpcodeWhereItEmits [
-	"Every instruction of the kernel comes out of the vocabulary it is written in, so nothing
-	 that emits names an opcode at all: one written in the walk would be an instruction whose
-	 type and arithmetic no other reader of that vocabulary could hold to. The inspecting
-	 methods are left out, because they count opcodes in a module already built instead of
-	 adding any."
-
-	self assert: (VGTiledFillKernel inheritsFrom: VGSpirvVocabulary).
-	VGTiledFillKernel methods , VGTiledFillKernel class methods do: [ :each |
-		each protocolName = #inspecting ifFalse: [
-			self
-				deny: ((self classesNamedBy: each) includes: SpvOpcode)
-				description: each printString , ' names an opcode' ] ]
-]
-
-{ #category : 'tests' }
-VGTiledFillTest >> testTheKernelReadsTheTileFromTheWorkgroupAndThePixelFromTheInvocation [
-	"Two built-ins and no more: which tile this workgroup owns and which pixel of that tile
-	 this invocation owns. Nothing reads the global invocation id, because a tile is addressed
-	 by its record in the table and not by its place in the dispatch."
-
-	self
-		assert: self kernelValidator builtInsFromWords asSet
-		equals: (VGTiledFillKernel builtInNumbers collect: [ :each |
-				 PVSpirvValidator builtInNameFor: each ]) asSet
-]
-
-{ #category : 'tests' }
-VGTiledFillTest >> testTheKernelRefusesAnOperatorWithNoArithmeticOfItsOwn [
-	"Every operator of the rasteriser's subset has its own mix of source, mask and destination
-	 in the kernel. One added to the subset without arithmetic here is refused while the module
-	 is built, so no frame is drawn by a branch that composites nothing."
-
-	VGTiledFillRasteriser supportedOperators do: [ :each |
-		self assert: (VGTiledFillKernel compositionSelectorFor: each) isSymbol ].
-	self
-		should: [ VGTiledFillKernel compositionSelectorFor: VGCairoOperator add ]
-		raise: Error
-]
-
-{ #category : 'tests' }
-VGTiledFillTest >> testTheKernelSharesNothingAndSynchronisesNothing [
-	"A pixel belongs to one invocation alone: the kernel declares no workgroup storage and
-	 holds no barrier, which is what lets the tiles be dispatched in any order at all."
-
-	| validator |
-	validator := self kernelValidator.
-	self assert:
-		(validator variableIdsInStorageClass: SpvStorageClass workgroup) isEmpty.
-	self
-		assert: (validator countOfOpcode: SpvOpcode opControlBarrier)
-		equals: 0
-]
-
-{ #category : 'tests' }
 VGTiledFillTest >> testTheKernelWorkgroupIsOneTileOfTheGrid [
 	"One workgroup owns one tile, so the local size is the tile's own extent and nothing else:
 	 an invocation finds its pixel by adding its local id to the corner its tile record
@@ -842,12 +932,13 @@ VGTiledFillTest >> testTheSourceOperatorDrawsTheSameBytesAsTheSoftwareBackend [
 		equals: (self softwareFormOfExtent: self caseExtent drawnWith: draw) bits
 ]
 
-{ #category : 'tests' }
-VGTiledFillTest >> testTheSubsetHoldsASolidFillAndNothingElse [
-	"What the kernel will be able to draw. A frame outside the subset is not drawn wrongly: it is
-	 refused here, so that the backend can hand it to the failover whole."
+{ #category : 'tests - subset' }
+VGTiledFillTest >> testTheSubsetHoldsAFillOfASolidColourOrAGradientAndNothingElse [
+	"What the kernel can draw, which unit 2.4 widened from a solid colour to a gradient. A frame
+	 outside the subset is not drawn wrongly: it is refused here, so that the backend can hand it
+	 to the failover whole."
 
-	| solid gradient blit shaped |
+	| solid gradient surfacePaint blit shaped |
 	solid := self
 		         displayListOfExtent: self caseExtent
 		         drawnWith: [ :context |
@@ -861,6 +952,15 @@ VGTiledFillTest >> testTheSubsetHoldsASolidFillAndNothingElse [
 				            sourcePattern: self twoStopGradient;
 				            rectangleX: 1 y: 1 width: 10 height: 10;
 				            fill ].
+	surfacePaint := self
+		                displayListOfExtent: self caseExtent
+		                drawnWith: [ :context |
+			                context
+				                sourceSurface: (VGCairoImageSurface extent: 4 @ 4)
+				                x: 0
+				                y: 0;
+				                rectangleX: 1 y: 1 width: 10 height: 10;
+				                fill ].
 	blit := self
 		        displayListOfExtent: self caseExtent
 		        drawnWith: [ :context |
@@ -876,7 +976,8 @@ VGTiledFillTest >> testTheSubsetHoldsASolidFillAndNothingElse [
 				          rectangleX: 1 y: 1 width: 10 height: 10;
 				          fill ].
 	self assert: (VGTiledFillRasteriser supports: solid).
-	self deny: (VGTiledFillRasteriser supports: gradient).
+	self assert: (VGTiledFillRasteriser supports: gradient).
+	self deny: (VGTiledFillRasteriser supports: surfacePaint).
 	self deny: (VGTiledFillRasteriser supports: blit).
 	self deny: (VGTiledFillRasteriser supports: shaped)
 ]
@@ -904,19 +1005,6 @@ VGTiledFillTest >> testTheTileSizeDoesNotChangeOneByte [
 	self
 		assert: small bits
 		equals: (self softwareFormOfExtent: self caseExtent drawnWith: draw) bits
-]
-
-{ #category : 'tests' }
-VGTiledFillTest >> testTheVocabularyNamesNothingOfThisRasteriser [
-	"The vocabulary is the SPIR-V a hand-built module is written in and nothing of this
-	 rasteriser: a layout, a constant or a format named there would be a fact kept in two
-	 places, and the kernel is where the facts of the tiled fill belong."
-
-	VGSpirvVocabulary methods , VGSpirvVocabulary class methods do: [ :each |
-		(self classesNamedBy: each) do: [ :class |
-			self
-				deny: (class name beginsWith: 'VG')
-				description: each printString , ' names ' , class name ] ]
 ]
 
 { #category : 'fixtures' }

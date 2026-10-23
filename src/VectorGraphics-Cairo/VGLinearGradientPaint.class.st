@@ -16,6 +16,22 @@ VGLinearGradientPaint class >> from: aPoint to: anotherPoint [
 	^ (self new) from: aPoint to: anotherPoint; yourself
 ]
 
+{ #category : 'layout' }
+VGLinearGradientPaint class >> lineEndFields [
+	"Where the end of my line sits in the block, as x then y."
+
+	^ #( 11 12 )
+]
+
+{ #category : 'layout' }
+VGLinearGradientPaint class >> lineStartFields [
+	"Where the start of my line sits in the block, as x then y. The ABI of rule 2 numbers the
+	 fields and VGPaint class >> blockLayout names them; this says which of them are mine, so a
+	 reader outside this class, such as the SPIR-V kernel, asks rather than counts."
+
+	^ #( 9 10 )
+]
+
 { #category : 'constants' }
 VGLinearGradientPaint class >> paintTag [
 	^ 2
@@ -23,15 +39,24 @@ VGLinearGradientPaint class >> paintTag [
 
 { #category : 'accessing' }
 VGLinearGradientPaint >> from [
-	^ (coefficients at: 9) @ (coefficients at: 10)
+	^ (coefficients at: self class lineStartFields first)
+	  @ (coefficients at: self class lineStartFields second)
 ]
 
 { #category : 'accessing' }
 VGLinearGradientPaint >> from: aPoint to: anotherPoint [
-	coefficients at: 9 put: aPoint x asFloat.
-	coefficients at: 10 put: aPoint y asFloat.
-	coefficients at: 11 put: anotherPoint x asFloat.
-	coefficients at: 12 put: anotherPoint y asFloat
+	coefficients
+		at: self class lineStartFields first
+		put: aPoint x asFloat.
+	coefficients
+		at: self class lineStartFields second
+		put: aPoint y asFloat.
+	coefficients
+		at: self class lineEndFields first
+		put: anotherPoint x asFloat.
+	coefficients
+		at: self class lineEndFields second
+		put: anotherPoint y asFloat
 ]
 
 { #category : 'evaluating' }
@@ -47,5 +72,6 @@ VGLinearGradientPaint >> offsetInPaintSpace: aPoint [
 
 { #category : 'accessing' }
 VGLinearGradientPaint >> to [
-	^ (coefficients at: 11) @ (coefficients at: 12)
+	^ (coefficients at: self class lineEndFields first)
+	  @ (coefficients at: self class lineEndFields second)
 ]

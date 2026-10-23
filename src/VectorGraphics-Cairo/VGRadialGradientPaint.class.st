@@ -11,6 +11,32 @@ Class {
 	#tag : 'Paint'
 }
 
+{ #category : 'layout' }
+VGRadialGradientPaint class >> circleFields [
+	"Where my two circles sit in the block, by name: the ABI of rule 2 numbers the fields and
+	 VGPaint class >> blockLayout names them, and this says which of them are mine, so a reader
+	 outside this class, such as the SPIR-V kernel, asks rather than counts."
+
+	^ Dictionary newFromPairs: {
+			  #innerCenterX.
+			  9.
+			  #innerCenterY.
+			  10.
+			  #innerRadius.
+			  11.
+			  #outerCenterX.
+			  12.
+			  #outerCenterY.
+			  13.
+			  #outerRadius.
+			  14 }
+]
+
+{ #category : 'layout' }
+VGRadialGradientPaint class >> fieldNamed: aName [
+	^ self circleFields at: aName
+]
+
 { #category : 'instance creation' }
 VGRadialGradientPaint class >> innerCenter: innerCenter innerRadius: innerRadius outerCenter: outerCenter outerRadius: outerRadius [
 	^ (self new)
@@ -41,22 +67,35 @@ VGRadialGradientPaint >> acceptableRootsAmong: aCollection [
 
 { #category : 'accessing' }
 VGRadialGradientPaint >> innerCenter [
-	^ (coefficients at: 9) @ (coefficients at: 10)
+	^ (coefficients at: (self class fieldNamed: #innerCenterX))
+	  @ (coefficients at: (self class fieldNamed: #innerCenterY))
 ]
 
 { #category : 'accessing' }
 VGRadialGradientPaint >> innerCenter: innerCenter innerRadius: innerRadius outerCenter: outerCenter outerRadius: outerRadius [
-	coefficients at: 9 put: innerCenter x asFloat.
-	coefficients at: 10 put: innerCenter y asFloat.
-	coefficients at: 11 put: innerRadius asFloat.
-	coefficients at: 12 put: outerCenter x asFloat.
-	coefficients at: 13 put: outerCenter y asFloat.
-	coefficients at: 14 put: outerRadius asFloat
+	coefficients
+		at: (self class fieldNamed: #innerCenterX)
+		put: innerCenter x asFloat.
+	coefficients
+		at: (self class fieldNamed: #innerCenterY)
+		put: innerCenter y asFloat.
+	coefficients
+		at: (self class fieldNamed: #innerRadius)
+		put: innerRadius asFloat.
+	coefficients
+		at: (self class fieldNamed: #outerCenterX)
+		put: outerCenter x asFloat.
+	coefficients
+		at: (self class fieldNamed: #outerCenterY)
+		put: outerCenter y asFloat.
+	coefficients
+		at: (self class fieldNamed: #outerRadius)
+		put: outerRadius asFloat
 ]
 
 { #category : 'accessing' }
 VGRadialGradientPaint >> innerRadius [
-	^ coefficients at: 11
+	^ coefficients at: (self class fieldNamed: #innerRadius)
 ]
 
 { #category : 'evaluating' }
@@ -97,10 +136,11 @@ VGRadialGradientPaint >> offsetInPaintSpace: aPoint [
 
 { #category : 'accessing' }
 VGRadialGradientPaint >> outerCenter [
-	^ (coefficients at: 12) @ (coefficients at: 13)
+	^ (coefficients at: (self class fieldNamed: #outerCenterX))
+	  @ (coefficients at: (self class fieldNamed: #outerCenterY))
 ]
 
 { #category : 'accessing' }
 VGRadialGradientPaint >> outerRadius [
-	^ coefficients at: 14
+	^ coefficients at: (self class fieldNamed: #outerRadius)
 ]

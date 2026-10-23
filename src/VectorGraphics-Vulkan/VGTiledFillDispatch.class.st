@@ -90,20 +90,19 @@ VGTiledFillDispatch >> bytes [
 	^ bytes
 ]
 
-{ #category : 'encoding' }
+{ #category : 'dispatching' }
 VGTiledFillDispatch >> bytesOf: anEncoding target: aByteArray [
-	"The bytes of every binding the kernel reads, by name: the three word buffers and the two
-	 float buffers of the encoding as they lie in object memory, the pixels of the target as they
-	 are, and the frame record written here, because the extent is the one thing an encoding does
-	 not carry into a buffer."
+	"The bytes of every binding the kernel reads, by name: the three word buffers and the four
+	 float buffers of the encoding as they lie in object memory, the pixels of the target as
+	 they are, and the frame record written here, because the extent is the one thing an
+	 encoding does not carry into a buffer."
 
 	| answer |
 	answer := Dictionary new.
-	answer at: #tileTable put: (self bytesOfWords: anEncoding tileTable).
-	answer at: #entryRefs put: (self bytesOfWords: anEncoding entryRefs).
-	answer at: #headers put: (self bytesOfWords: anEncoding headers).
-	answer at: #clips put: (self bytesOfWords: anEncoding clips).
-	answer at: #edges put: (self bytesOfWords: anEncoding edges).
+	#( #tileTable #entryRefs #headers ) do: [ :each |
+		answer at: each put: (self bytesOfWords: (anEncoding perform: each)) ].
+	#( #clips #edges #paints #stops ) do: [ :each |
+		answer at: each put: (self bytesOfWords: (anEncoding perform: each)) ].
 	answer at: #target put: aByteArray.
 	answer at: #frame put: (self frameRecordOf: anEncoding).
 	^ answer

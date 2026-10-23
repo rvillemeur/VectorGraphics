@@ -53,6 +53,15 @@ VGSpirvVocabulary class >> inspectorVocabularyContext: aContext [
 	aContext active: self superclass = Object
 ]
 
+{ #category : 'constants' }
+VGSpirvVocabulary class >> scalarBitWidth [
+	"Every scalar of a module built with this vocabulary is thirty-two bits wide: a word of a
+	 buffer, a single float of a coordinate and the signed winding number alike. The vocabulary
+	 itself owns the width, because the three type methods below read it and every vocabulary
+	 sharing one module must answer the same one."
+	^ 32
+]
+
 { #category : 'inspecting' }
 VGSpirvVocabulary class >> vocabularyRows [
 	"Every word of the vocabulary, read from the class's own methods and grouped by the
@@ -98,6 +107,11 @@ VGSpirvVocabulary >> both: anId and: anotherId [
 		  left: anId
 		  right: anotherId
 		  type: self boolType
+]
+
+{ #category : 'accessing' }
+VGSpirvVocabulary >> builder [
+	^ builder
 ]
 
 { #category : 'extended' }
@@ -228,6 +242,11 @@ VGSpirvVocabulary >> floorOfFloat: anId [
 		  type: self floatType
 ]
 
+{ #category : 'accessing' }
+VGSpirvVocabulary >> glsl [
+	^ glsl
+]
+
 { #category : 'comparing' }
 VGSpirvVocabulary >> integer: anId differsFrom: anotherId [
 	^ builder
@@ -313,6 +332,18 @@ VGSpirvVocabulary >> select: aConditionId ifTrue: anId ifFalse: anotherId type: 
 		  type: aType
 ]
 
+{ #category : 'initialization' }
+VGSpirvVocabulary >> shareStateWith: aVocabulary [
+	"Emit into the module another vocabulary is building, with its GLSL set and its value table.
+	 The table is held and not copied, because a value one of us remembers is a value the other
+	 reads: the two of us are emitting one function and an identifier means the same thing in
+	 both. A vocabulary that shares this way may only emit while the other is emitting, since the
+	 builder answers nothing once its module is serialised."
+	builder := aVocabulary builder.
+	glsl := aVocabulary glsl.
+	values := aVocabulary values
+]
+
 { #category : 'types' }
 VGSpirvVocabulary >> signedType [
 	^ builder types intType: self class scalarBitWidth signed: true
@@ -336,6 +367,18 @@ VGSpirvVocabulary >> smallerWordOf: anId and: anotherId [
 				  anId.
 				  anotherId }
 		  type: self wordType
+]
+
+{ #category : 'arithmetic' }
+VGSpirvVocabulary >> squareRootOfFloat: anId [
+	"The square root of a float, which the core instruction set has none of. A negative argument
+	 answers a NaN rather than raising, so a caller that can reach one selects the result away
+	 instead of branching around it."
+
+	^ self
+		  extended: GlslStd450 sqrt
+		  of: { anId }
+		  type: self floatType
 ]
 
 { #category : 'arithmetic' }
@@ -368,6 +411,11 @@ VGSpirvVocabulary >> sumOfWord: anId and: anotherId [
 { #category : 'private' }
 VGSpirvVocabulary >> valueNamed: aName [
 	^ values at: aName
+]
+
+{ #category : 'accessing' }
+VGSpirvVocabulary >> values [
+	^ values
 ]
 
 { #category : 'types' }

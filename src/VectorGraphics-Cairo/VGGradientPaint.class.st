@@ -25,6 +25,15 @@ VGGradientPaint class >> stopTableSize [
 	^ 256
 ]
 
+{ #category : 'stops' }
+VGGradientPaint >> addStopAt: anOffset channels: aCollection [
+	"A stop whose colour is already four unpremultiplied channels, which is how a stop that has
+	 travelled through a buffer comes back. The channels are copied, so a buffer read again does
+	 not move a stop already added."
+
+	stops add: anOffset asFloat -> aCollection copy
+]
+
 { #category : 'accessing' }
 VGGradientPaint >> addStopAt: anOffset color: aColor [
 	"The stop list keeps channels and not colours, because the interpolation between two stops

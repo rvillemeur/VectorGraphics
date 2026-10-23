@@ -207,6 +207,37 @@ VGPaintTest >> testAPaintDecodesItsMatrixOnceAndSettingItDecodesItAgain [
 	self assert: paint matrix == paint matrix
 ]
 
+{ #category : 'tests - block' }
+VGPaintTest >> testAPaintRebuildsItselfFromItsOwnBlockAndItsStopsFromChannels [
+	"The block of rule 2 is all a reader is given, and phase 2 hands it to a device and takes it
+	 back: a paint built from the block of another paint of its class carries the same sixteen
+	 floats and reads the same geometry, matrix and extend mode out of them. The stops travel
+	 beside the block as channels and not as colours, because that is what a buffer of floats
+	 holds, and a stop added from channels is the stop the colour added."
+
+	| gradient rebuilt channels |
+	gradient := (VGLinearGradientPaint from: 3 @ 5 to: 40 @ 11)
+		            extend: #reflect;
+		            matrix: (VGCairoMatrix newRotationByRadians: 0.4);
+		            yourself.
+	gradient addStopAt: 0.25 color: (Color r: 0.2 g: 0.4 b: 0.6 alpha: 0.8).
+	channels := gradient stops first value.
+	rebuilt := VGLinearGradientPaint fromBlock: gradient coefficients.
+	rebuilt addStopAt: 0.25 channels: channels.
+	self assert: rebuilt coefficients equals: gradient coefficients.
+	self assert: rebuilt from equals: gradient from.
+	self assert: rebuilt to equals: gradient to.
+	self assert: rebuilt extend equals: #reflect.
+	self
+		assert: (rebuilt matrix value: 7 @ 9)
+		equals: (gradient matrix value: 7 @ 9).
+	self assert: rebuilt stops first key equals: 0.25.
+	self assert: rebuilt stops first value equals: channels.
+	self
+		assert: (rebuilt rgbaAtX: 12 y: 8)
+		equals: (gradient rgbaAtX: 12 y: 8)
+]
+
 { #category : 'tests' }
 VGPaintTest >> testAPatternDescribesItselfByAskingItsOwnPaint [
 	| pattern description bare |
@@ -392,6 +423,43 @@ VGPaintTest >> testOnlyAColourIsSolidAndFadingItMultipliesItsAlpha [
 	self
 		assert: (paint rgbaInPaintSpace: 0 @ 0)
 		equals: { 1.0. 0.5. 0.0. 0.5 }
+]
+
+{ #category : 'tests' }
+VGPaintTest >> testSamplingTheStopTableIsNotTheBytesTheStopsThemselvesGive [
+	"Why the GPU evaluator of unit 2.4 searches the stops instead of reading the table of rule 2:
+	 the table describes two hundred and fifty-six offsets, and an offset between two of them has
+	 to be quantised to one, which moves the colour. Over a sweep of one thousand and twenty-four
+	 offsets of a three-stop ramp, 898 of the 4096 channel samples differ from the exact
+	 evaluation, the farthest by two. Measured on the two gradient cases of the conformance corpus
+	 the same way, 2498 of 16384 channel samples of the linear case and 1548 of the radial case
+	 move, each of them by one. So a device that sampled the table could not hold the byte for byte
+	 gate against the software backend, and this test fails if the drift ever goes away, which is
+	 the day the table may be read in the path again."
+
+	| paint table size drift worst |
+	paint := VGLinearGradientPaint from: 0 @ 0 to: 1 @ 0.
+	paint addStopAt: 0.0 color: Color red.
+	paint addStopAt: 0.25 color: Color green.
+	paint addStopAt: 1.0 color: Color blue.
+	size := VGGradientPaint stopTableSize.
+	table := paint stopTable.
+	drift := 0.
+	worst := 0.
+	0 to: 1023 do: [ :step |
+		| offset index exact |
+		offset := step / 1023.
+		index := (offset * (size - 1)) rounded.
+		exact := (paint rgbaAtOffset: offset) collect: [ :each |
+			         (each * 255) rounded ].
+		1 to: 4 do: [ :channel |
+			| sampled |
+			sampled := table at: index * 4 + channel.
+			sampled = (exact at: channel) ifFalse: [
+				drift := drift + 1.
+				worst := worst max: (sampled - (exact at: channel)) abs ] ] ].
+	self assert: drift equals: 898.
+	self assert: worst equals: 2
 ]
 
 { #category : 'tests - abi' }

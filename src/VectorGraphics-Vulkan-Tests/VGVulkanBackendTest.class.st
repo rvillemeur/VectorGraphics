@@ -129,6 +129,52 @@ VGVulkanBackendTest >> testAFrameOutsideTheSubsetIsDrawnBySoftwareAnyway [
 ]
 
 { #category : 'tests' }
+VGVulkanBackendTest >> testAGradientFillIsRecordedAndDrawnRatherThanRefused [
+	"Unit 2.4 widens the subset to a gradient, so a gradient fill inside a rectangular clip is
+	 recorded here and not refused. The pixels of a gradient frame are held against the software
+	 backend in VGTiledFillTest, where one context draws all fifteen of them; what is held here
+	 is that the frame reaches the device at all and comes back with ink in it. The ink is
+	 counted against a surface nothing has drawn on, because a new ARGB32 surface reads as
+	 transparent white and not as zero."
+	| backend surface drawn blank |
+	VGVulkanBackend probe ifNil: [ ^ self ].
+	VGBackend restorePreference: nil rejections: #( ).
+	backend := VGVulkanBackend new.
+	surface := VGCairoImageSurface extent: VGGradientFrameFixture extent.
+	surface backend: backend.
+	VGGradientFrameFixture linearWithThreeStops value: surface newContext.
+	surface flush.
+	drawn := surface asForm.
+	blank := (VGCairoImageSurface extent: VGGradientFrameFixture extent) asForm.
+	self deny: (VGBackend rejectedClasses includes: VGVulkanBackend).
+	self
+		assert:
+		(VGFormComparison between: drawn and: blank) differingPixelCount > 0
+]
+
+{ #category : 'tests' }
+VGVulkanBackendTest >> testAPaintTheKernelCannotEvaluateFailsTheFrame [
+	"The widening of unit 2.4 reaches a block and a stop list and no further. A surface paint
+	 carries the pixels of another surface, so a fill of one fails the frame while it is recorded,
+	 exactly as a shaped clip does, and the surface replays the whole frame on the failover."
+	| backend raised paint |
+	backend := VGVulkanBackend new.
+	paint := VGSurfacePaint surface:
+		         (VGCairoImageSurface extent: self frame extent).
+	raised := [
+	          backend
+		          fillSegments: self refusedEntry segments
+		          paint: paint
+		          clip: (VGClip bounds: (0 @ 0 corner: self frame extent))
+		          operator: VGCairoOperator over.
+	          nil ]
+		          on: VGBackendFailure
+		          do: [ :failure | failure ].
+	self assert: raised notNil.
+	self assert: raised backend identicalTo: backend
+]
+
+{ #category : 'tests' }
 VGVulkanBackendTest >> testASurfaceBlitFailsTheFrame [
 	"The other boundary message: a mask or a surface paint is no fill, and the subset of unit 2.3
 	 holds fills alone. None of the arguments is read, so the refusal stands whatever they are."

@@ -46,23 +46,33 @@ VGTiledFillRasteriser class >> supportedOperators [
 		  VGCairoOperator clear }
 ]
 
-{ #category : 'testing' }
+{ #category : 'subset' }
 VGTiledFillRasteriser class >> supports: aDisplayList [
-	"The frames I can draw: fills of a solid paint inside a rectangular clip under one of the
-	 three operators the fill cases of the conformance corpus ask for. Everything else — a
-	 gradient, a surface or a mesh paint, a blit, a shaped clip, or an operator that writes where
-	 no source covers — belongs to a later unit, and a backend that meets one owes
-	 VGBackendFailure rather than a frame half drawn."
+	"The frames I can draw: fills of a solid colour or of a gradient inside a rectangular clip
+	 under one of the three operators the fill cases of the conformance corpus ask for. Everything
+	 else — a surface or a mesh paint, a blit, a shaped clip, or an operator that writes where no
+	 source covers — belongs to a later unit, and a backend that meets one owes VGBackendFailure
+	 rather than a frame half drawn."
 
 	^ aDisplayList entries allSatisfy: [ :each | self supportsEntry: each ]
 ]
 
-{ #category : 'testing' }
+{ #category : 'subset' }
 VGTiledFillRasteriser class >> supportsEntry: anEntry [
 	^ (anEntry isKindOf: VGFillEntry) and: [
-		  anEntry paint isSolid and: [
+		  (self supportsPaint: anEntry paint) and: [
 			  anEntry clip isRectangular and: [
 				  self supportedOperators includes: anEntry operator ] ] ]
+]
+
+{ #category : 'subset' }
+VGTiledFillRasteriser class >> supportsPaint: aPaint [
+	"The paints I evaluate: a solid colour, which is one pixel wherever it is asked for, and a
+	 gradient, which is the matrix and the geometry of its own coefficient block together with its
+	 stops. A mesh paint carries patches and a surface paint carries the pixels of another surface;
+	 neither is in a block and a stop list, so both wait for a later unit."
+
+	^ aPaint isSolid or: [ aPaint isKindOf: VGGradientPaint ]
 ]
 
 { #category : 'drawing' }
