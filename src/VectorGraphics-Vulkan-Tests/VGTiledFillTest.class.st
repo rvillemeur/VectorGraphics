@@ -152,6 +152,19 @@ VGTiledFillTest >> mixedFillFrame [
 		  fill ]
 ]
 
+{ #category : 'private' }
+VGTiledFillTest >> referenceOfTileAt: anIndex in: anEncoding [
+	"The first reference word of that tile, its flag and its identifier together, which is the
+	 word an invocation of the kernel reads."
+
+	| base |
+	base := (anEncoding rowOfTileAt: anIndex) - 1
+	        * VGTiledFillEncoding tileRecordWords.
+	^ anEncoding entryRefs at:
+		  (anEncoding tileTable
+			   at: base + VGTiledFillEncoding referenceOffsetField) + 1
+]
+
 { #category : 'fixtures' }
 VGTiledFillTest >> roundedToSingleFloat: aNumber [
 	"The number as a buffer of single floats keeps it, widened again so that the oracle of this
@@ -365,6 +378,27 @@ VGTiledFillTest >> testAFrameThatTouchesNoTileIsDispatchedOnNoDeviceAtAll [
 	self assert: (dispatch draw: encoding into: target) identicalTo: target.
 	self assert: (target allSatisfy: [ :each | each = 0 ]).
 	self assert: dispatch bytes notNil
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testAReferenceCarriesItsIdentifierUnchangedWhetherItIsMarkedOrNot [
+	"The flag rides in the top bit of the reference, so the identifier has to read back the same
+	 with the flag set and clear. A frame of two thousand million entries would reach that bit,
+	 and an encoding of one would not fit in memory."
+
+	| identifier marked plain |
+	identifier := 12345.
+	marked := VGTiledFillEncoding referenceFor: identifier interior: true.
+	plain := VGTiledFillEncoding referenceFor: identifier interior: false.
+	self assert: (VGTiledFillEncoding isInteriorReference: marked).
+	self deny: (VGTiledFillEncoding isInteriorReference: plain).
+	self
+		assert: (VGTiledFillEncoding identifierOfReference: marked)
+		equals: identifier.
+	self
+		assert: (VGTiledFillEncoding identifierOfReference: plain)
+		equals: identifier.
+	self assert: plain equals: identifier
 ]
 
 { #category : 'tests' }
@@ -896,6 +930,24 @@ VGTiledFillTest >> testTheFrameDrawnFromTheBuffersAloneHoldsTheSameBytesAsItsSin
 ]
 
 { #category : 'tests' }
+VGTiledFillTest >> testTheFrameTheDeviceGateDrawsReallyCarriesMarkedReferences [
+	"The interior fast path of the kernel is under test only where a frame marks a tile, so the
+	 frame the gate above draws has to carry marks. The mixed fill frame does: its rectangles are
+	 wider than a tile."
+
+	| encoding marked |
+	encoding := VGTiledFillEncoding
+		            of: (self
+				             displayListOfExtent: self caseExtent
+				             drawnWith: self mixedFillFrame)
+		            extent: self caseExtent.
+	marked := (1 to: encoding entryRefs size) count: [ :index |
+		          VGTiledFillEncoding isInteriorReference:
+			          (encoding entryRefs at: index) ].
+	self assert: marked > 0
+]
+
+{ #category : 'tests' }
 VGTiledFillTest >> testTheKernelWorkgroupIsOneTileOfTheGrid [
 	"One workgroup owns one tile, so the local size is the tile's own extent and nothing else:
 	 an invocation finds its pixel by adding its local id to the corner its tile record
@@ -910,6 +962,34 @@ VGTiledFillTest >> testTheKernelWorkgroupIsOneTileOfTheGrid [
 				grid tileExtent x.
 				grid tileExtent y.
 				1 }
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testTheReferenceOfATileAFillCoversWhollyCarriesItsFlagAndItsIdentifier [
+	"The mark the binning made travels to the device in the reference word itself, in the bit no
+	 identifier of a frame can reach: the kernel then takes the coverage of the pixel as one and
+	 walks no edge there. A tile the fill cuts carries the identifier alone."
+
+	| list encoding grid inside onTheEdge |
+	grid := VGTileGrid extent: 64 @ 64 tileExtent: 16 @ 16.
+	list := self
+		        displayListOfExtent: 64 @ 64
+		        drawnWith: [ :context |
+			        context
+				        rectangleX: 8 y: 8 width: 48 height: 48;
+				        fill ].
+	encoding := VGTiledFillEncoding of: list grid: grid.
+	inside := (grid indexesIntersecting: (33 @ 33 corner: 34 @ 34)) anyOne.
+	onTheEdge := (grid indexesIntersecting: (0 @ 0 corner: 1 @ 1)) anyOne.
+	self assert: (VGTiledFillEncoding isInteriorReference:
+			 (self referenceOfTileAt: inside in: encoding)).
+	self deny: (VGTiledFillEncoding isInteriorReference:
+			 (self referenceOfTileAt: onTheEdge in: encoding)).
+	self
+		assert: (VGTiledFillEncoding identifierOfReference:
+				 (self referenceOfTileAt: inside in: encoding))
+		equals: 1.
+	self assert: (encoding entriesOfTileAt: inside) size equals: 1
 ]
 
 { #category : 'tests' }

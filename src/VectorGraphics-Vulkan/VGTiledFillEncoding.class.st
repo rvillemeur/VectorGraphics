@@ -181,6 +181,31 @@ VGTiledFillEncoding class >> gradientClassAtTag: aCode [
 	^ VGGradientPaint allSubclasses detect: [ :each | each paintTag = aCode ]
 ]
 
+{ #category : 'codes' }
+VGTiledFillEncoding class >> identifierOfReference: aWord [
+	"The entry that reference names, counted from one, with the interior flag taken off."
+
+	^ aWord bitAnd: self referenceIdentifierMask
+]
+
+{ #category : 'constants' }
+VGTiledFillEncoding class >> interiorReferenceFlag [
+	"The bit a reference word carries when the entry covers the whole of the tile it is a
+	 reference of. It is the top bit of the word, which no identifier of a drawable frame can
+	 reach: an entry count that high would need more memory for its headers alone than a device
+	 has."
+
+	^ 16r80000000
+]
+
+{ #category : 'codes' }
+VGTiledFillEncoding class >> isInteriorReference: aWord [
+	"Whether that reference says the entry covers the whole of its tile, so that the coverage of
+	 every pixel of it is one."
+
+	^ (aWord bitAnd: self interiorReferenceFlag) ~= 0
+]
+
 { #category : 'instance creation' }
 VGTiledFillEncoding class >> of: aDisplayList extent: anExtent [
 	"The frame of a surface of that extent, binned over a grid of the default tile size and
@@ -248,6 +273,24 @@ VGTiledFillEncoding class >> paintTagField [
 { #category : 'layout' }
 VGTiledFillEncoding class >> referenceCountField [
 	^ 5
+]
+
+{ #category : 'codes' }
+VGTiledFillEncoding class >> referenceFor: anIdentifier interior: aBoolean [
+	"The reference word of that entry, marked or not. Both sides read this one place: the kernel
+	 asks the flag of the word it loads and the decoder asks the identifier of the same word."
+
+	^ aBoolean
+		  ifTrue: [ anIdentifier bitOr: self interiorReferenceFlag ]
+		  ifFalse: [ anIdentifier ]
+]
+
+{ #category : 'constants' }
+VGTiledFillEncoding class >> referenceIdentifierMask [
+	"The bits of a reference word that are the identifier of the entry, which is every bit but
+	 the interior flag."
+
+	^ self interiorReferenceFlag - 1
 ]
 
 { #category : 'layout' }
@@ -429,18 +472,23 @@ VGTiledFillEncoding >> edges [
 	^ edges
 ]
 
-{ #category : 'tiles' }
+{ #category : 'decoding' }
 VGTiledFillEncoding >> entriesOfTileAt: anIndex [
 	"The entries of that tile, rebuilt from the buffers and in the order the references hold
-	 them. A tile the frame does not touch has no record and no entry."
+	 them. A tile the frame does not touch has no record and no entry. The identifier is read
+	 out of the reference, because the reference also carries the interior flag."
+
 	| row base |
 	row := self rowOfTileAt: anIndex.
 	row ifNil: [ ^ #(  ) ].
 	base := (row - 1) * self class tileRecordWords.
 	^ (1 to: (tileTable at: base + self class referenceCountField)) collect: [
 		  :position |
-		  self entryAt: (entryRefs
-				   at: (tileTable at: base + self class referenceOffsetField) + position) ]
+		  self entryAt: (self class identifierOfReference:
+				   (entryRefs
+					    at:
+					    (tileTable at: base + self class referenceOffsetField)
+					    + position)) ]
 ]
 
 { #category : 'decoding' }
@@ -954,11 +1002,13 @@ VGTiledFillEncoding >> writeTileRecordAt: aRow tile: aTileIndex offset: anOffset
 	tileTable at: base + self class referenceCountField put: aCount
 ]
 
-{ #category : 'initialization' }
+{ #category : 'tiles' }
 VGTiledFillEncoding >> writeTilesOf: aBinning [
 	"One record a touched tile, in tile order so that a row can be found by a halving search,
 	 and the references of a tile in the order the entries were drawn, because compositing is
-	 not commutative."
+	 not commutative. A reference also carries the mark the binning made of the pair: the entry
+	 covers the whole of this tile, so the kernel takes the coverage as one there."
+
 	| indexes identifiers offset |
 	identifiers := IdentityDictionary new.
 	aBinning entries withIndexDo: [ :each :index |
@@ -976,6 +1026,10 @@ VGTiledFillEncoding >> writeTilesOf: aBinning [
 			offset: offset
 			count: tileEntries size.
 		tileEntries withIndexDo: [ :each :position |
-			entryRefs at: offset + position put: (identifiers at: each) ].
+			entryRefs
+				at: offset + position
+				put: (self class
+						 referenceFor: (identifiers at: each)
+						 interior: (aBinning isEntry: each interiorToTileAt: tileIndex)) ].
 		offset := offset + tileEntries size ]
 ]

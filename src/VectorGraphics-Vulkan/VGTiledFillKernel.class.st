@@ -16,6 +16,9 @@ Class {
 		'spirvModule',
 		'spirv'
 	],
+	#classInstVars : [
+		'spirvByTileExtent'
+	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
 	#tag : 'Tiles'
@@ -40,6 +43,21 @@ VGTiledFillKernel class >> builtInNumbers [
 	^ {
 		  SpvBuiltIn workgroupId.
 		  SpvBuiltIn localInvocationId }
+]
+
+{ #category : 'module cache' }
+VGTiledFillKernel class >> cachedTileExtents [
+	"The tile sizes a module has been built for in this session."
+
+	^ self spirvCache keys
+]
+
+{ #category : 'module cache' }
+VGTiledFillKernel class >> clearSpirvCache [
+	"Forget every module built so far. The cache is a saving and never a decision, so what is
+	 built next is byte for byte what was forgotten."
+
+	spirvByTileExtent := nil
 ]
 
 { #category : 'constants' }
@@ -122,6 +140,29 @@ VGTiledFillKernel class >> halfUnit [
 	^ 1 / 2
 ]
 
+{ #category : 'inspector' }
+VGTiledFillKernel class >> inspectorModuleCache: aBuilder [
+	<inspectorPresentationOrder: 2 title: 'Module cache'>
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn title: 'Tile' evaluated: [ :each |
+					   each printString ]);
+		  addColumn: (SpStringTableColumn title: 'Bytes' evaluated: [ :each |
+					   (self spirvCache at: each) size printString ]);
+		  addColumn: (SpStringTableColumn title: 'Words' evaluated: [ :each |
+					   ((self spirvCache at: each) size // 4) printString ]);
+		  items: (self cachedTileExtents asSortedCollection: [ :a :b | a x <= b x ])
+				  asArray;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGTiledFillKernel class >> inspectorModuleCacheContext: aContext [
+	"Nothing to show on a session that has dispatched no frame, and the tab asks the cache
+	 rather than building a module, so inspecting the class opens no device and costs nothing."
+
+	aContext active: self spirvCache isNotEmpty
+]
+
 { #category : 'constants' }
 VGTiledFillKernel class >> layerCount [
 	"One layer: a tile is two dimensional, so the third dimension of the workgroup holds one
@@ -184,6 +225,25 @@ VGTiledFillKernel class >> signedVariableNames [
 	"The three winding numbers, which run negative under the winding rule."
 
 	^ #( #runFromWinding #endWinding #scanWinding )
+]
+
+{ #category : 'module cache' }
+VGTiledFillKernel class >> spirvCache [
+	"Tile extent to bytes, built on first use. The key is the extent because the extent is the
+	 shape of the workgroup, so one entry cannot serve another tile size."
+
+	^ spirvByTileExtent ifNil: [ spirvByTileExtent := Dictionary new ]
+]
+
+{ #category : 'module cache' }
+VGTiledFillKernel class >> spirvOnTileExtent: anExtent [
+	"The bytes of the kernel of that tile size, built once a session. Unit 2.4a measured the
+	 build at one to four milliseconds of every frame, and the module depends on the tile extent
+	 and on nothing a frame carries, so a frame that built one would pay that twice."
+
+	^ self spirvCache
+		  at: anExtent
+		  ifAbsentPut: [ (self onTileExtent: anExtent) spirv ]
 ]
 
 { #category : 'constants' }
@@ -432,6 +492,20 @@ VGTiledFillKernel >> emitBody [
 	builder emitIf: inside then: [ self emitPixel ]
 ]
 
+{ #category : 'emission - entry' }
+VGTiledFillKernel >> emitCoverageGivenInterior: aBooleanId [
+	"The coverage of this pixel for this entry: one where the reference says the entry covers the
+	 whole of the tile, and the walk over the edges where it does not. The walk samples fifteen
+	 sub-rows of the pixel and scans the edges of the entry at each of them, so a tile deep
+	 inside a shape pays all of that for an answer that was one from the start."
+
+	self store: (self constantFloat: 0) into: #coverage.
+	builder emitIf: aBooleanId then: [
+		self store: (self constantFloat: 1) into: #coverage ].
+	builder emitIf: (self negation: aBooleanId) then: [
+		builder emitIf: self emitAllowsRow then: [ self emitCoverageOfSubRows ] ]
+]
+
 { #category : 'emitting' }
 VGTiledFillKernel >> emitCoverageOfSubRows [
 	"The part of this pixel the fill covers, summed over the sub-rows of its row and capped at
@@ -628,19 +702,26 @@ VGTiledFillKernel >> emitEndOfRunFrom: aStartId to: aRightId onSubRow: aSubRowId
 VGTiledFillKernel >> emitEntry [
 	"One fill of this tile at this pixel: its header, its clip, the pixel its paint lays down
 	 here, the coverage of the walk over it and the composition of the two into the destination.
-	 The identifier a reference holds counts from one, as VGTiledFillEncoding writes it. A pixel
-	 the paint lays nothing down at is left alone, which the subset may do because every
+	 The reference holds the identifier of the entry, counting from one as VGTiledFillEncoding
+	 writes it, and in its top bit the mark that says the entry covers the whole of this tile.
+	 A pixel the paint lays nothing down at is left alone, which the subset may do because every
 	 operator in it is bounded, and which is what the software rasteriser does with the nil a
 	 paint answers.
 	 The paint and the composition are emitted by VGTiledFillPixelEmitter, which shares this
 	 module while I emit this entry; the walk over the edges between them is my own."
-	| identifier previous mask pixels |
+
+	| reference identifier previous mask pixels |
 	pixels := VGTiledFillPixelEmitter on: self.
+	reference := self
+		             elementOf: #entryRefs
+		             at: (self
+				              sumOfWord: (self valueNamed: #referenceOffset)
+				              and: (self load: #reference)).
 	identifier := self
-		              elementOf: #entryRefs
-		              at: (self
-				               sumOfWord: (self valueNamed: #referenceOffset)
-				               and: (self load: #reference)).
+		              bitsOfWord: reference
+		              and:
+		              (self constantWord:
+				               VGTiledFillEncoding referenceIdentifierMask).
 	previous := self
 		            differenceOfWord: identifier
 		            and: (self constantWord: 1).
@@ -653,8 +734,7 @@ VGTiledFillKernel >> emitEntry [
 				 productOfWord: previous
 				 and: (self constantWord: VGTiledFillEncoding clipFloats)).
 	pixels emitSource.
-	self store: (self constantFloat: 0) into: #coverage.
-	builder emitIf: self emitAllowsRow then: [ self emitCoverageOfSubRows ].
+	self emitCoverageGivenInterior: (self emitIsInteriorReference: reference).
 	mask := pixels emitMaskForCoverage: (self load: #coverage).
 	builder
 		emitIf: (self
@@ -687,6 +767,21 @@ VGTiledFillKernel >> emitIsInside: aWindingId [
 		  ifTrue: odd
 		  ifFalse: nonZero
 		  type: self boolType
+]
+
+{ #category : 'emission - entry' }
+VGTiledFillKernel >> emitIsInteriorReference: aReferenceId [
+	"Whether that reference carries the mark of a tile the entry covers in full, which is
+	 VGTiledFillEncoding class >> isInteriorReference: read in the kernel."
+
+	^ self
+		  word:
+		  (self
+			   bitsOfWord: aReferenceId
+			   and:
+			   (self constantWord: VGTiledFillEncoding interiorReferenceFlag))
+		  equals:
+		  (self constantWord: VGTiledFillEncoding interiorReferenceFlag)
 ]
 
 { #category : 'building' }

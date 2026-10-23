@@ -134,8 +134,9 @@ VGTiledFillDispatch >> draw: anEncoding into: aByteArray [
 	"One frame on the device: a buffer for every binding, the bytes of each uploaded, one
 	 workgroup for every tile the frame touches, and the target read back into the bytes it came
 	 from. A frame that touches no tile has nothing to dispatch and leaves the pixels alone. The
-	 kernel is destroyed before the buffers, because a buffer freed under a live pipeline takes
-	 the image with it."
+	 module comes from VGTiledFillKernel's cache, because it depends on the tile extent alone.
+	 The kernel is destroyed before the buffers, because a buffer freed under a live pipeline
+	 takes the image with it."
 
 	| kernel buffers names |
 	self encode: anEncoding target: aByteArray.
@@ -144,7 +145,7 @@ VGTiledFillDispatch >> draw: anEncoding into: aByteArray [
 	kernel := PVComputeKernel
 		          on: context
 		          spirv:
-		          (VGTiledFillKernel onTileExtent: anEncoding grid tileExtent) spirv.
+		          (VGTiledFillKernel spirvOnTileExtent: anEncoding grid tileExtent).
 	buffers := names collect: [ :each |
 		           VkBuffer
 			           storageBuffer: (self wordCountOf: (bytes at: each))

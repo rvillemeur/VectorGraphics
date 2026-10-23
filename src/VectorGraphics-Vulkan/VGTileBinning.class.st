@@ -22,7 +22,8 @@ Class {
 	#instVars : [
 		'grid',
 		'bins',
-		'entries'
+		'entries',
+		'interiors'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -43,10 +44,14 @@ VGTileBinning class >> of: aDisplayList grid: aGrid [
 VGTileBinning >> bin: anEntry [
 	"Where the entry says it can touch, and nowhere else. The entry answers its own bounding box,
 	 clip and operator included, so an operator that writes beyond its shape widens the box there
-	 and not here."
+	 and not here. A tile the entry covers in full is marked as it is binned, because the tile
+	 and the entry are both in hand here and nothing later holds the pair."
 
 	(grid indexesIntersecting: anEntry boundingBox) do: [ :index |
-		(bins at: index ifAbsentPut: [ OrderedCollection new ]) add: anEntry ]
+		(bins at: index ifAbsentPut: [ OrderedCollection new ]) add: anEntry.
+		(anEntry coversEveryPixelOf: (grid boundsOfTileAt: index)) ifTrue: [
+			(interiors at: index ifAbsentPut: [ OrderedCollection new ]) add:
+				anEntry ] ]
 ]
 
 { #category : 'accessing' }
@@ -119,6 +124,30 @@ VGTileBinning >> inspectorBusiestTilesContext: aContext [
 ]
 
 { #category : 'accessing' }
+VGTileBinning >> interiorEntriesOfTileAt: anIndex [
+	"The entries that cover the whole of that tile, in the order they were drawn. A rasteriser
+	 may take the coverage of every pixel of the tile as one for each of them and walk no edge."
+
+	^ interiors at: anIndex ifAbsent: [ #(  ) ]
+]
+
+{ #category : 'accessing' }
+VGTileBinning >> interiorReferenceCount [
+	"How many of the binned pairs are marked interior. Against binnedEntryCount it is the share
+	 of the frame that needs no walk at all."
+
+	^ interiors inject: 0 into: [ :sum :each | sum + each size ]
+]
+
+{ #category : 'accessing' }
+VGTileBinning >> isEntry: anEntry interiorToTileAt: anIndex [
+	"Whether that pair was marked when it was binned. The identity of the entry is what counts,
+	 because one entry may be drawn twice with the same edges."
+
+	^ (self interiorEntriesOfTileAt: anIndex) identityIncludes: anEntry
+]
+
+{ #category : 'accessing' }
 VGTileBinning >> maxEntriesInATile [
 	"The depth of the busiest tile, which decides whether one dispatch can carry a tile's work."
 
@@ -150,6 +179,9 @@ VGTileBinning >> reportRows [
 		  ('tiles touched'
 		   -> (self touchedTileCount printString , ' of ' , grid tileCount printString)).
 		  ('entries binned' -> self binnedEntryCount printString).
+		  ('pairs interior'
+		   -> (self interiorReferenceCount printString , ' of '
+			   , self binnedEntryCount printString)).
 		  ('busiest tile' -> self maxEntriesInATile printString) }
 ]
 
@@ -161,6 +193,7 @@ VGTileBinning >> setDisplayList: aDisplayList grid: aGrid [
 	grid := aGrid.
 	entries := aDisplayList entries asArray.
 	bins := Dictionary new.
+	interiors := Dictionary new.
 	entries do: [ :each | self bin: each ]
 ]
 

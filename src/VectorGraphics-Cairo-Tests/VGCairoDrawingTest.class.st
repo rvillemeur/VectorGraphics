@@ -55,6 +55,24 @@ VGCairoDrawingTest >> squareMaskOfSide: anInteger [
 ]
 
 { #category : 'tests' }
+VGCairoDrawingTest >> testAFillCoversEveryPixelOfARectangleInsideBothItsShapeAndItsClip [
+	"What a tiled rasteriser asks of an entry before it walks a tile of it: a rectangle every
+	 pixel of which this fill covers in full needs no walk, because the coverage of each of them
+	 is one. The shape has to enclose the rectangle and so has the clip, and either one failing
+	 is a no."
+
+	| entry |
+	entry := VGFillEntry
+		         segments: (VGSegments rectangle: (8 @ 8 corner: 40 @ 40))
+		         paint: Color black
+		         clip: (VGClip bounds: (0 @ 0 corner: 64 @ 64))
+		         operator: VGCairoOperator over.
+	self assert: (entry coversEveryPixelOf: (16 @ 16 corner: 32 @ 32)).
+	self deny: (entry coversEveryPixelOf: (32 @ 32 corner: 48 @ 48)).
+	self deny: (entry coversEveryPixelOf: (48 @ 48 corner: 56 @ 56))
+]
+
+{ #category : 'tests' }
 VGCairoDrawingTest >> testAFillOutsideTheSurfaceTouchesNothing [
 	"The clip is the surface, so a path beyond it writes no byte at all. The bytes are read
 	 directly: a Form conversion turns a transparent pixel into white, which would hide the
@@ -419,6 +437,35 @@ VGCairoDrawingTest >> testMaskingWithAGroupPaintsTheSourceWhereTheGroupDrew [
 	self assert: (target pixelAtX: 8 y: 8) equals: 16rFF0000FF.
 	self assert: (target pixelAtX: 20 y: 8) equals: 16r40000040.
 	self assert: (target pixelAtX: 8 y: 20) equals: 0
+]
+
+{ #category : 'tests' }
+VGCairoDrawingTest >> testNoFillCoversEveryPixelOfARectangleItsClipCutsOrCanOnlyCutByAShape [
+	"A clip cut out by a shape keeps a scanner rather than a rectangle, and what it allows at a
+	 pixel is then the coverage of that shape, so a fill under it can promise nothing about a
+	 whole pixel. A rectangular clip that leaves part of the rectangle out is a no as well. A
+	 blit is a no in every case: it paints the alpha of a mask and not a shape it fills."
+
+	| shape shaped narrow |
+	shape := VGSegments rectangle: (8 @ 8 corner: 40 @ 40).
+	shaped := (VGClip bounds: (0 @ 0 corner: 64 @ 64)) clippedBy:
+		          (VGPathExamples starPath segmentsWithFillRule: #winding).
+	narrow := (VGClip bounds: (0 @ 0 corner: 64 @ 64)) narrowedTo:
+		          (0 @ 0 corner: 24 @ 24).
+	self deny: ((VGFillEntry
+			  segments: shape
+			  paint: Color black
+			  clip: shaped
+			  operator: VGCairoOperator over) coversEveryPixelOf:
+			 (16 @ 16 corner: 32 @ 32)).
+	self deny: ((VGFillEntry
+			  segments: shape
+			  paint: Color black
+			  clip: narrow
+			  operator: VGCairoOperator over) coversEveryPixelOf:
+			 (16 @ 16 corner: 32 @ 32)).
+	self deny: (VGDisplayListExamples blitEntryOfAMask coversEveryPixelOf:
+			 (10 @ 10 corner: 14 @ 14))
 ]
 
 { #category : 'tests - the display list' }

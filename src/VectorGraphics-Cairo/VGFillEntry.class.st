@@ -24,7 +24,7 @@ VGFillEntry class >> segments: aSegments paint: aPaint clip: aRectangle operator
 		  yourself
 ]
 
-{ #category : 'accessing' }
+{ #category : 'draining' }
 VGFillEntry >> boundingBox [
 	"What I can touch: where my edges are, cut down to my clip. The clip answers the narrowed
 	 rectangle itself, because a clip that does not meet the edges has to read as plainly empty.
@@ -36,6 +36,17 @@ VGFillEntry >> boundingBox [
 	operator isUnbounded ifTrue: [ ^ clip boundsNarrowedTo: clip extents ].
 	box := segments boundingBox.
 	^ box ifNotNil: [ clip boundsNarrowedTo: box ]
+]
+
+{ #category : 'testing' }
+VGFillEntry >> coversEveryPixelOf: aRectangle [
+	"Every pixel of that rectangle takes my paint at full coverage when my edges enclose the
+	 rectangle and my clip allows the whole of it. A clip cut out by a shape allows a pixel only
+	 as far as that shape covers it, so it answers no here however wide its bounds are."
+
+	clip isRectangular ifFalse: [ ^ false ].
+	(clip bounds containsRect: aRectangle) ifFalse: [ ^ false ].
+	^ segments enclosesWholly: aRectangle
 ]
 
 { #category : 'accessing' }

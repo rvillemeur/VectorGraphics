@@ -50,6 +50,28 @@ VGTileBinningTest >> testADegenerateRectangleTouchesNoTileAtAll [
 		equals: #( 1 )
 ]
 
+{ #category : 'tests' }
+VGTileBinningTest >> testAFillUnderAClipCutByAShapeMarksNoTileInterior [
+	"The clip allows a pixel only as far as its own shape covers it, so no tile under such a clip
+	 is covered in full, however far inside the fill it lies. The binning asks the entry, which
+	 is where that rule is kept."
+
+	| binning grid |
+	grid := VGTileGrid extent: 64 @ 64 tileExtent: 16 @ 16.
+	binning := VGTileBinning
+		           of: (self
+				            frameOfExtent: 64 @ 64
+				            drawnWith: [ :context |
+					            context
+						            circleCenterX: 32 y: 32 radius: 30;
+						            clip;
+						            rectangleX: 0 y: 0 width: 64 height: 64;
+						            fill ])
+		           grid: grid.
+	self assert: binning touchedTileCount > 0.
+	self assert: binning interiorReferenceCount equals: 0
+]
+
 { #category : 'tests - binning' }
 VGTileBinningTest >> testAFillUnderAnUnboundedOperatorLandsInEveryTileOfTheClip [
 	"An unbounded operator writes where the shape covers nothing, so its entry owes every tile of
@@ -99,6 +121,30 @@ VGTileBinningTest >> testARectangleTouchesTheTilesItOverlapsAndNoOthers [
 		equals: grid tileCount
 ]
 
+{ #category : 'tests' }
+VGTileBinningTest >> testATileWhollyInsideAFillIsMarkedInteriorAndATileOnItsEdgeIsNot [
+	"A tile the fill covers in full needs no walk over the edges: every pixel of it has coverage
+	 one. The binning marks those pairs as it bins them, because it has the tile and the entry in
+	 hand there and nothing later holds the pair. The fill runs from 8 to 56 of a 64 pixel frame,
+	 so the four middle tiles of the sixteen are inside it and the twelve around them are cut."
+
+	| binning grid inside onTheEdge |
+	grid := VGTileGrid extent: 64 @ 64 tileExtent: 16 @ 16.
+	binning := VGTileBinning
+		           of: (self
+				            frameOfExtent: 64 @ 64
+				            drawnWith: [ :context |
+					            context
+						            rectangleX: 8 y: 8 width: 48 height: 48;
+						            fill ])
+		           grid: grid.
+	inside := (grid indexesIntersecting: (33 @ 33 corner: 34 @ 34)) anyOne.
+	onTheEdge := (grid indexesIntersecting: (0 @ 0 corner: 1 @ 1)) anyOne.
+	self assert: (binning interiorEntriesOfTileAt: inside) size equals: 1.
+	self assert: (binning interiorEntriesOfTileAt: onTheEdge) isEmpty.
+	self assert: binning interiorReferenceCount equals: 4
+]
+
 { #category : 'tests - binning' }
 VGTileBinningTest >> testAnEmptyDisplayListTouchesNoTile [
 	| binning |
@@ -130,6 +176,42 @@ VGTileBinningTest >> testAnEntryLandsInTheTilesItsOwnBoundingBoxTouches [
 		equals: { entry }
 ]
 
+{ #category : 'tests' }
+VGTileBinningTest >> testEveryPairMarkedInteriorHasCoverageOneAtEveryPixelOfItsTile [
+	"The gate of the mark, and it reads the software coverage rather than the rule that made the
+	 mark: for every tile and entry the binning marked, VGTileCoverage answers one at every pixel
+	 of that tile. A mark that is wrong by a single pixel makes the device paint whole what the
+	 walk would have painted in part."
+
+	| binning grid marked |
+	grid := VGTileGrid extent: 64 @ 64 tileExtent: 16 @ 16.
+	binning := VGTileBinning
+		           of: (self
+				            frameOfExtent: 64 @ 64
+				            drawnWith: [ :context |
+					            context
+						            circleCenterX: 30 y: 30 radius: 24;
+						            fill;
+						            rectangleX: 20 y: 20 width: 40 height: 40;
+						            fill ])
+		           grid: grid.
+	marked := 0.
+	1 to: grid tileCount do: [ :index |
+		| bounds |
+		bounds := grid boundsOfTileAt: index.
+		(binning interiorEntriesOfTileAt: index) do: [ :entry |
+			| coverage |
+			marked := marked + 1.
+			coverage := VGTileCoverage of: entry.
+			bounds top to: bounds bottom - 1 do: [ :row |
+				bounds left to: bounds right - 1 do: [ :column |
+					self
+						assert: (coverage atX: column row: row) = 1.0
+						description: 'tile ' , index printString , ' pixel '
+							, (column @ row) printString ] ] ] ].
+	self assert: marked > 0
+]
+
 { #category : 'tests - corpus' }
 VGTileBinningTest >> testEveryPixelEveryCorpusFrameDrawsLiesInATouchedTile [
 	"The gate of this unit, and the only check here that does not read a bounding box: every corpus
@@ -143,6 +225,22 @@ VGTileBinningTest >> testEveryPixelEveryCorpusFrameDrawsLiesInATouchedTile [
 	census rows do: [ :row |
 		self assert: row strayPixelCount isZero description: row name ].
 	self assert: census strayPixelCount equals: 0
+]
+
+{ #category : 'tests' }
+VGTileBinningTest >> testTheBinningReportNamesHowManyPairsAreInteriorOfHowManyBinned [
+	"The interior marks are what the kernel reads instead of walking sub rows, so the report has
+	 to show them: a frame whose marks vanished would otherwise look exactly like one whose marks
+	 are all there."
+
+	| binning row |
+	binning := VGTileBinningExamples binningWithInteriorTilesMarked.
+	row := binning reportRows detect: [ :each | each key = 'pairs interior' ].
+	self
+		assert: row value
+		equals: binning interiorReferenceCount printString , ' of '
+			, binning binnedEntryCount printString.
+	self assert: binning interiorReferenceCount > 0
 ]
 
 { #category : 'tests - corpus' }

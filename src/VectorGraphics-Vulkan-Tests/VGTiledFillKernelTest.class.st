@@ -45,6 +45,16 @@ VGTiledFillKernelTest >> kernelValidator [
 ]
 
 { #category : 'tests' }
+VGTiledFillKernelTest >> testADispatchAsksTheCacheForItsModuleAndBuildsNoneOfItsOwn [
+	"Measured in unit 2.4a: building the module was one to four milliseconds of every frame, and
+	 the frame carries nothing the module depends on. So the dispatch asks the cache, and a
+	 module built there would be that cost back."
+
+	self assert: ((VGTiledFillDispatch >> #draw:into:) sendsSelector: #spirvOnTileExtent:).
+	self deny: ((VGTiledFillDispatch >> #draw:into:) sendsSelector: #onTileExtent:)
+]
+
+{ #category : 'tests' }
 VGTiledFillKernelTest >> testAPixelEmitterSharesTheModuleOfTheKernelThatBuildsIt [
 	"The emitter is a second vocabulary of one module: the builder it emits into and the value
 	 table it reads are the kernel's own objects and not copies of them, because an identifier
@@ -60,6 +70,22 @@ VGTiledFillKernelTest >> testAPixelEmitterSharesTheModuleOfTheKernelThatBuildsIt
 	self
 		assert: (emitter valueNamed: #alphaByte)
 		equals: (kernel valueNamed: #alphaByte)
+]
+
+{ #category : 'tests' }
+VGTiledFillKernelTest >> testClearingTheSpirvCacheBuildsTheSameBytesAgain [
+	"The cache is a saving and never a decision: the module built after it is cleared is the
+	 module it held, byte for byte, so a test or a caller may clear it at any point."
+
+	| first second |
+	VGTiledFillKernel clearSpirvCache.
+	first := VGTiledFillKernel spirvOnTileExtent: VGTileGrid defaultTileExtent.
+	VGTiledFillKernel clearSpirvCache.
+	self assert: VGTiledFillKernel cachedTileExtents isEmpty.
+	second := VGTiledFillKernel spirvOnTileExtent: VGTileGrid defaultTileExtent.
+	self deny: second identicalTo: first.
+	self assert: second equals: first.
+	self assert: VGTiledFillKernel cachedTileExtents size equals: 1
 ]
 
 { #category : 'tests' }
@@ -175,6 +201,58 @@ VGTiledFillKernelTest >> testTheKernelSharesNothingAndSynchronisesNothing [
 	self
 		assert: (validator countOfOpcode: SpvOpcode opControlBarrier)
 		equals: 0
+]
+
+{ #category : 'tests' }
+VGTiledFillKernelTest >> testTheModuleCacheTabListsOneRowForEveryTileExtentItHolds [
+	"The tab reads the cache itself, so it names what a session really holds and cannot drift
+	 from it. A column block only runs when a row is drawn, so every cell is asked for here."
+
+	| builder presenter titles |
+	VGTiledFillKernel clearSpirvCache.
+	VGTiledFillKernel spirvOnTileExtent: 8 @ 8.
+	VGTiledFillKernel spirvOnTileExtent: 16 @ 16.
+	builder := SpPresenterBuilder newApplication: SpApplication new.
+	presenter := VGTiledFillKernel inspectorModuleCache: builder.
+	self assert: presenter items size equals: VGTiledFillKernel cachedTileExtents size.
+	titles := presenter columns collect: [ :each | each title ].
+	self assert: (titles includes: 'Tile').
+	presenter items do: [ :item |
+		presenter columns do: [ :column | column evaluation value: item ] ].
+	self assert: ((presenter items collect: [ :each | each ]) includes: 8 @ 8)
+]
+
+{ #category : 'tests' }
+VGTiledFillKernelTest >> testTheSpirvCacheHoldsOneModuleForEveryTileExtentAskedFor [
+	"A kernel built for one tile size cannot dispatch a grid of another, because the tile extent
+	 is the shape of the workgroup, so the cache is keyed by the extent and the bytes of two
+	 extents differ."
+
+	| small large |
+	VGTiledFillKernel clearSpirvCache.
+	small := VGTiledFillKernel spirvOnTileExtent: 4 @ 4.
+	large := VGTiledFillKernel spirvOnTileExtent: 16 @ 16.
+	self
+		assert: VGTiledFillKernel cachedTileExtents asSet
+		equals: {
+				(4 @ 4).
+				(16 @ 16) } asSet.
+	self deny: small equals: large.
+	self assert: large equals: (VGTiledFillKernel onTileExtent: 16 @ 16) spirv
+]
+
+{ #category : 'tests' }
+VGTiledFillKernelTest >> testTheSpirvOfATileExtentIsAnsweredFromTheCacheTheSecondTime [
+	"Building the module costs one to four milliseconds of every frame and depends on the tile
+	 extent alone, so the bytes are built once a session and answered again. The same bytes here
+	 means the same object: a second serialisation would be the cost the cache is for."
+
+	| first second |
+	VGTiledFillKernel clearSpirvCache.
+	first := VGTiledFillKernel spirvOnTileExtent: 8 @ 8.
+	second := VGTiledFillKernel spirvOnTileExtent: 8 @ 8.
+	self assert: second identicalTo: first.
+	self assert: first equals: (VGTiledFillKernel onTileExtent: 8 @ 8) spirv
 ]
 
 { #category : 'tests' }

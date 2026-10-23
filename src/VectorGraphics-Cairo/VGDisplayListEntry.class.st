@@ -32,6 +32,16 @@ VGDisplayListEntry >> clip [
 	^ clip
 ]
 
+{ #category : 'testing' }
+VGDisplayListEntry >> coversEveryPixelOf: aRectangle [
+	"Whether every pixel of that rectangle takes my paint at full coverage, so a rasteriser may
+	 skip the walk over it and take the coverage of each of those pixels as one. I promise
+	 nothing: a blit paints the alpha a mask carries pixel by pixel, and only a fill knows a
+	 shape to answer from."
+
+	^ false
+]
+
 { #category : 'accessing' }
 VGDisplayListEntry >> operator [
 	^ operator

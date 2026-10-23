@@ -38,6 +38,22 @@ VGTileBinningExamples class >> binningOfTwoDistantShapes [
 ]
 
 { #category : 'examples' }
+VGTileBinningExamples class >> binningWithInteriorTilesMarked [
+	<sampleInstance>
+	"One large fill in a frame of sixty-four tiles, binned. The Binning tab names how many of the
+	 binned pairs are interior: a tile wholly inside the shape and its clip needs no coverage
+	 walked, and here the tiles along the edge of the square are the only ones that do."
+
+	| surface context |
+	surface := VGCairoImageSurface extent: 128 @ 128.
+	context := surface newContext.
+	context sourceColorR: 0.1 g: 0.6 b: 0.4 a: 1.0.
+	context rectangleX: 20 y: 20 width: 88 height: 88.
+	context fill.
+	^ VGTileBinning of: surface displayList extent: surface extent
+]
+
+{ #category : 'examples' }
 VGTileBinningExamples class >> censusOfTheReferenceFrame [
 	<sampleInstance>
 	"The frame the tile size is chosen for, binned at the default size: eight hundred by six

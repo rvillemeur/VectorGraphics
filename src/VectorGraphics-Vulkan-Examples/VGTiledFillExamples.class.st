@@ -114,6 +114,19 @@ VGTiledFillExamples class >> frameExtent [
 ]
 
 { #category : 'examples' }
+VGTiledFillExamples class >> kernelModuleCacheOfTwoTileExtents [
+	<sampleInstance>
+	"The kernel class with its module cache primed for two tile extents. The class-side Module
+	 cache tab shows what a session holds: a module depends on the tile extent alone, so a frame
+	 reads one from here instead of building one of its own."
+
+	VGTiledFillKernel clearSpirvCache.
+	VGTiledFillKernel spirvOnTileExtent: VGTileGrid defaultTileExtent.
+	VGTiledFillKernel spirvOnTileExtent: 8 @ 8.
+	^ VGTiledFillKernel
+]
+
+{ #category : 'examples' }
 VGTiledFillExamples class >> kernelOfTheDefaultGrid [
 	"The tiled fill kernel of the tile size every frame of this engine is binned over, built so
 	 that its module and the bytes of it are there to be read."

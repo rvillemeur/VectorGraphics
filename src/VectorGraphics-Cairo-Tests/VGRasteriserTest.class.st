@@ -107,6 +107,38 @@ VGRasteriserTest >> testASelfCrossingStarIsSolidUnderWindingAndHollowUnderEvenOd
 	self assert: (evenOdd at: 32 @ 20) equals: 1
 ]
 
+{ #category : 'tests' }
+VGRasteriserTest >> testASquareEnclosesARectangleInsideItAndNotOneThatCrossesItsEdge [
+	"What a tiled rasteriser asks before it walks a tile: a rectangle every point of which is
+	 inside the shape has coverage one at every pixel, so the walk can be skipped there. A
+	 rectangle the shape cuts cannot be answered that way."
+
+	| square |
+	square := VGSegments
+		          coordinates:
+		          (self segmentsOfAll: { { 8 @ 8. 40 @ 8. 40 @ 40. 8 @ 40 } })
+		          fillRule: #winding.
+	self assert: (square enclosesWholly: (16 @ 16 corner: 32 @ 32)).
+	self deny: (square enclosesWholly: (32 @ 32 corner: 48 @ 48)).
+	self deny: (square enclosesWholly: (0 @ 0 corner: 48 @ 48))
+]
+
+{ #category : 'tests' }
+VGRasteriserTest >> testASquareEnclosesNoRectangleItsOwnEdgeTouchesAndNoneOutsideIt [
+	"The answer is conservative, because a yes paints a pixel whole that the walk would have
+	 painted in part: a rectangle whose side lies exactly on an edge of the shape answers no,
+	 and so does one the shape never reaches."
+
+	| square |
+	square := VGSegments
+		          coordinates:
+		          (self segmentsOfAll: { { 8 @ 8. 40 @ 8. 40 @ 40. 8 @ 40 } })
+		          fillRule: #winding.
+	self deny: (square enclosesWholly: (8 @ 16 corner: 24 @ 32)).
+	self deny: (square enclosesWholly: (64 @ 64 corner: 72 @ 72)).
+	self deny: (VGSegments empty enclosesWholly: (16 @ 16 corner: 32 @ 32))
+]
+
 { #category : 'tests - coverage' }
 VGRasteriserTest >> testAnAlignedRectangleCoversWholePixelsAndNothingOutside [
 	| grid |
@@ -140,6 +172,23 @@ VGRasteriserTest >> testTheCoverageOfACircleSumsToItsArea [
 	total := grid values inject: 0 into: [ :sum :each | sum + each ].
 	expected := Float pi * 20 * 20.
 	self assert: (total - expected) abs / expected < 0.01
+]
+
+{ #category : 'tests' }
+VGRasteriserTest >> testTheHoleOfANestedSquareIsEnclosedUnderWindingAndNotUnderEvenOdd [
+	"The question is asked under the fill rule the shape carries, and not of its outline: the
+	 middle of two nested squares wound the same way is solid under the winding rule and hollow
+	 under the even-odd rule, which is what the coverage of that very pixel says above."
+
+	| coordinates winding evenOdd hole |
+	coordinates := self segmentsOfAll: {
+			               { 8 @ 8. 40 @ 8. 40 @ 40. 8 @ 40 }.
+			               { 16 @ 16. 32 @ 16. 32 @ 32. 16 @ 32 } }.
+	winding := VGSegments coordinates: coordinates fillRule: #winding.
+	evenOdd := VGSegments coordinates: coordinates fillRule: #evenOdd.
+	hole := 20 @ 20 corner: 28 @ 28.
+	self assert: (winding enclosesWholly: hole).
+	self deny: (evenOdd enclosesWholly: hole)
 ]
 
 { #category : 'tests - fill rules' }

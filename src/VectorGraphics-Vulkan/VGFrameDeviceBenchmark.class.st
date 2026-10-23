@@ -145,15 +145,17 @@ VGFrameDeviceBenchmark class >> onTheCardsFrame [
 	^ self frameName: #cards
 ]
 
-{ #category : 'constants' }
+{ #category : 'reporting' }
 VGFrameDeviceBenchmark class >> phaseLabels [
 	"The phases a frame is measured in, in the order a frame pays them, each with the label the
 	 report shows. A phase that was not measured is left out of the report, so this table is the
-	 only place that names one."
+	 only place that names one. The module build is paid once a session since the kernel cached
+	 it by tile extent, and the label says so, because a reader adding the rows up would
+	 otherwise count that build against every frame."
 
 	^ {
 		  (#encode -> 'encode').
-		  (#buildSpirv -> 'build SPIR-V').
+		  (#buildSpirv -> 'build SPIR-V, once a session').
 		  (#dispatch -> 'dispatch').
 		  (#software -> 'software frame') }
 ]
@@ -301,9 +303,10 @@ VGFrameDeviceBenchmark >> isAvailable [
 { #category : 'measuring' }
 VGFrameDeviceBenchmark >> measureEncoding [
 	"Everything a frame costs off the device: the encoding of its entries and the SPIR-V the
-	 kernel builds for the tile extent, which is built again for every frame today. The encoding
-	 itself is kept, so that a machine with no driver still reports what the frame weighs and
-	 what it would dispatch."
+	 kernel builds for the tile extent. The module is built here and not read from the cache,
+	 because what is worth reporting is the build a session pays once and a frame used to pay
+	 every time. The encoding itself is kept, so that a machine with no driver still reports what
+	 the frame weighs and what it would dispatch."
 
 	| surface |
 	surface := self newSurface.
