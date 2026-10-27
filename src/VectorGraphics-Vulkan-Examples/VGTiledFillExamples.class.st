@@ -58,6 +58,45 @@ VGTiledFillExamples class >> coverageOfACircle [
 ]
 
 { #category : 'examples' }
+VGTiledFillExamples class >> coverageOfAFillCutOutByTwoCircles [
+	"The coverage of a fill of the whole tile inside a clip of two overlapping circles, which is
+	 the shaped clip unit 2.7 draws on the device. The Shapes tab names the three walks the
+	 coverage sweeps together, and the Coverage tab shows the lens the three of them leave."
+	<sampleInstance>
+	| surface |
+	surface := VGCairoImageSurface extent: self frameExtent.
+	surface newContext
+		circleCenterX: 27.75 y: 32.25 radius: 18.5;
+		clip;
+		circleCenterX: 40.25 y: 32.25 radius: 18.5;
+		clip;
+		rectangleX: 0 y: 0 width: 64 height: 64;
+		fill.
+	^ VGTileCoverage of: surface displayList entries first
+]
+
+{ #category : 'examples' }
+VGTiledFillExamples class >> decoderOfAFillInTwoClipShapes [
+	"A fill cut out by two overlapping circles, read back out of the buffers a dispatch uploads.
+	 The Shapes tab lists the fill and both shapes of its clip as the one kind of record they
+	 are written as, which is what lets the kernel walk a clip shape with the code that walks a
+	 fill."
+	<sampleInstance>
+
+	| surface |
+	surface := VGCairoImageSurface extent: self frameExtent.
+	surface newContext
+		sourceColorR: 0.9 g: 0.3 b: 0.2 a: 1.0;
+		circleCenterX: 28 y: 32 radius: 18;
+		clip;
+		circleCenterX: 40 y: 32 radius: 18;
+		clip;
+		rectangleX: 0 y: 0 width: 64 height: 64;
+		fill.
+	^ (VGTiledFillEncoding of: surface displayList extent: self frameExtent) decoder
+]
+
+{ #category : 'examples' }
 VGTiledFillExamples class >> dispatchOfThreeShapesOnThisMachine [
 	<sampleInstance>
 	"One click: the three shapes of the frame above sent to a device, with the Buffers tab
@@ -185,6 +224,15 @@ VGTiledFillExamples class >> kernelOfTheDefaultGrid [
 	kernel := VGTiledFillKernel default.
 	kernel spirv.
 	^ kernel
+]
+
+{ #category : 'examples' }
+VGTiledFillExamples class >> layoutOfTheBuffers [
+	"The layout of the buffers one frame rides to the device in. A class holding no state is its
+	 own single instance, so the example answers the class and its Records tab explains it."
+
+	<sampleInstance>
+	^ VGTiledFillLayout
 ]
 
 { #category : 'examples' }

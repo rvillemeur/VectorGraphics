@@ -371,16 +371,15 @@ VGVulkanBackendTest >> testTheProbeAnswersTheBackendOrNothing [
 
 { #category : 'fixtures' }
 VGVulkanBackendTest >> unsupportedFrame [
-	"A frame the subset refuses: the clip is a circle, so the one entry it records is a fill the
-	 kernel cannot draw. The failover is held to this frame rather than to the fixture one,
-	 because the fixture frame is a solid fill inside a rectangular clip and the device draws
-	 that from unit 2.3 on."
+	"A frame the subset refuses: the paint is a surface pattern, so the one entry it records is a
+	 fill the kernel cannot draw. The failover is held to this frame rather than to the fixture
+	 one, because the fixture frame is a solid fill inside a rectangular clip and the device draws
+	 that from unit 2.3 on. A shaped clip stopped refusing a frame at unit 2.7, so the refusal
+	 here is the paint and not the clip."
 
 	^ [ :context |
 	  context
-		  circleCenterX: 20 y: 15 radius: 12;
-		  clip;
-		  sourceColorR: 0.0 g: 0.6 b: 0.3;
+		  sourceSurface: (VGCairoImageSurface extent: 4 @ 4) x: 0 y: 0;
 		  rectangleX: 2 y: 2 width: 36 height: 26;
 		  fill ]
 ]

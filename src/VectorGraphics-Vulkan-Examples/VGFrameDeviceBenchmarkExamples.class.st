@@ -39,6 +39,20 @@ VGFrameDeviceBenchmarkExamples class >> cardsFrameOnThisMachine [
 ]
 
 { #category : 'examples' }
+VGFrameDeviceBenchmarkExamples class >> referenceFrameOnThisMachine [
+	<sampleInstance>
+	"The frame unit 1.11 profiles, drawn whole on the device of this machine. Every one of its
+	 eighty eight entries is glyph blits and shaped clips, so until unit 2.7 the device drew none
+	 of it; it is the first real window frame the tiled path draws. The Benchmark tab names the
+	 tiles it touches and what the dispatch costs, and the Device frame tab shows the picture that
+	 came back."
+	"The software side is left out, as it is on the cards frame: this frame on the processor takes
+	 three and a half seconds and the example is opened to see the device."
+
+	^ VGFrameDeviceBenchmark onTheReferenceFrame run
+]
+
+{ #category : 'examples' }
 VGFrameDeviceBenchmarkExamples class >> supportOfTheReferenceFrame [
 	<sampleInstance>
 	"What the tiled rasteriser can and cannot draw of the frame unit 1.11 profiles, entry by

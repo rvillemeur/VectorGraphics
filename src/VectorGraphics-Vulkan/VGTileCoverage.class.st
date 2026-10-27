@@ -8,7 +8,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'entry',
-		'scanner'
+		'walks',
+		'swept'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -21,17 +22,6 @@ VGTileCoverage class >> of: anEntry [
 	 entry's segments, as they do everywhere else in this engine, and the clip is the entry's own."
 
 	^ self new setEntry: anEntry
-]
-
-{ #category : 'coverage' }
-VGTileCoverage >> aliasedSpanAtX: anX onSubRow: aSubRow do: aBlock [
-	"Antialiasing off is one sample at the centre of the pixel row, and a pixel is inside when its
-	 own centre is: the run is then the whole of the pixel the clip allows. Every sub-row of a row
-	 answers this same run, which is how VGRasteriser sums fifteen of them and reaches one."
-
-	(scanner isInside: (self windingUpTo: anX + 0.5 onSubRow: aSubRow floor + 0.5)) ifFalse: [
-		^ self ].
-	aBlock value: (self leftEdgeAtX: anX) value: (self rightEdgeAtX: anX)
 ]
 
 { #category : 'coverage' }
@@ -68,6 +58,13 @@ VGTileCoverage >> clip [
 	^ entry clip
 ]
 
+{ #category : 'accessing' }
+VGTileCoverage >> clipWalks [
+	"The walks of the shapes my clip holds, which is none where the clip is a rectangle."
+
+	^ walks allButFirst
+]
+
 { #category : 'inspector' }
 VGTileCoverage >> coverageDrawing [
 	"The coverage my walk really answers, one character a pixel over the whole pixels of my clip.
@@ -89,70 +86,16 @@ VGTileCoverage >> coverageDrawing [
 				  cr ] ]
 ]
 
-{ #category : 'winding' }
-VGTileCoverage >> crossingAfter: anX onSubRow: aSubRow [
-	"The nearest crossing strictly right of anX, or nil where my edges have none. One scan of the
-	 edges, which is what a run costs here instead of a sorted array of every crossing."
-
-	| coordinates nearest |
-	coordinates := scanner segments.
-	nearest := nil.
-	1 to: coordinates size by: 4 do: [ :index |
-		| crossing |
-		crossing := self crossingOfEdgeAt: index onSubRow: aSubRow.
-		(crossing notNil and: [
-			 crossing > anX and: [ nearest isNil or: [ crossing < nearest ] ] ]) ifTrue: [
-			nearest := crossing ] ].
-	^ nearest
-]
-
-{ #category : 'winding' }
-VGTileCoverage >> crossingOfEdgeAt: anIndex onSubRow: aSubRow [
-	"Where the edge stored at anIndex crosses that sub-row, or nil where it does not reach it. The
-	 edge is taken half open from its upper end, and the expression is VGSpanScanner's term for
-	 term, so the two classes answer the same float for the same edge."
-
-	| coordinates y0 y1 x0 x1 |
-	coordinates := scanner segments.
-	y0 := coordinates at: anIndex + 1.
-	y1 := coordinates at: anIndex + 3.
-	y0 = y1 ifTrue: [ ^ nil ].
-	(aSubRow >= (y0 min: y1) and: [ aSubRow < (y0 max: y1) ]) ifFalse: [ ^ nil ].
-	x0 := coordinates at: anIndex.
-	x1 := coordinates at: anIndex + 2.
-	^ x0 + ((x1 - x0) * (aSubRow - y0) / (y1 - y0))
-]
-
-{ #category : 'winding' }
-VGTileCoverage >> directionOfEdgeAt: anIndex [
-	"Down the page is one and up the page is minus one, as VGSpanScanner counts it."
-
-	| coordinates |
-	coordinates := scanner segments.
-	^ (coordinates at: anIndex + 3) > (coordinates at: anIndex + 1)
-		  ifTrue: [ 1 ]
-		  ifFalse: [ -1 ]
-]
-
-{ #category : 'coverage' }
-VGTileCoverage >> endOfRunFrom: aStart to: aRight onSubRow: aSubRow [
-	"Where the run that begins at aStart stops: the first crossing right of it that puts the walk
-	 outside the shape, or aRight where none does before the pixel ends."
-
-	| cursor winding |
-	cursor := aStart.
-	winding := self windingUpTo: aStart onSubRow: aSubRow.
-	[ cursor < aRight ] whileTrue: [
-		cursor := self crossingAfter: cursor onSubRow: aSubRow.
-		(cursor isNil or: [ cursor >= aRight ]) ifTrue: [ ^ aRight ].
-		winding := winding + (self windingStepAt: cursor onSubRow: aSubRow).
-		(scanner isInside: winding) ifFalse: [ ^ cursor ] ].
-	^ aRight
-]
-
 { #category : 'accessing' }
 VGTileCoverage >> entry [
 	^ entry
+]
+
+{ #category : 'accessing' }
+VGTileCoverage >> fill [
+	"The walk of the shape being filled."
+
+	^ walks first
 ]
 
 { #category : 'inspector' }
@@ -198,6 +141,50 @@ VGTileCoverage >> inspectorMiddleRowContext: aContext [
 	aContext active: (entry notNil and: [ self clip bounds hasPositiveExtent ])
 ]
 
+{ #category : 'inspector' }
+VGTileCoverage >> inspectorShapes: aBuilder [
+	<inspectorPresentationOrder: 12 title: 'Shapes'>
+	"The shapes a pixel of mine is covered by: the fill and every shape of my clip, walked
+	 alike. An aliased shape answers whole pixels and is asked about the centre of one; the
+	 swept ones are the shapes a sweep crosses, and the crossing named here is the first one
+	 right of the left edge of the middle pixel. Every cell asks the walk itself."
+
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn
+				   title: 'Of'
+				   evaluated: [ :each | each at: 2 ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Edges'
+				   evaluated: [ :each | (each at: 3) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Aliased'
+				   evaluated: [ :each | (each at: 4) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Swept'
+				   evaluated: [ :each | (each at: 5) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Centre inside'
+				   evaluated: [ :each | (each at: 6) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Next crossing'
+				   evaluated: [ :each | (each at: 7) printString ]);
+		  items: self shapeRows;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGTileCoverage >> inspectorShapesContext: aContext [
+	aContext active: (entry notNil and: [ self clip bounds hasPositiveExtent ])
+]
+
+{ #category : 'walking' }
+VGTileCoverage >> isInsideAt: anX onSubRow: aSubRow [
+	"A point is covered where every swept shape calls it inside. That is the geometric
+	 intersection Cairo performs: spans meet spans and coverages are never multiplied."
+
+	^ swept allSatisfy: [ :each | each isInsideAt: anX onSubRow: aSubRow ]
+]
+
 { #category : 'coverage' }
 VGTileCoverage >> leftEdgeAtX: anX [
 	"Where that pixel starts inside the clip. VGRasteriser trims a span to the clip's bounds and
@@ -224,15 +211,34 @@ VGTileCoverage >> middleRowReport [
 			  (format maskByteForCoverage: coverage) } ]
 ]
 
+{ #category : 'walking' }
+VGTileCoverage >> nextCrossingAfter: anX to: aRight onSubRow: aSubRow [
+	"The nearest crossing of any swept shape strictly right of anX, or aRight where none of them
+	 crosses inside the window."
+
+	| nearest |
+	nearest := aRight.
+	swept do: [ :each |
+		(each crossingAfter: anX onSubRow: aSubRow) ifNotNil: [ :crossing |
+			crossing < nearest ifTrue: [ nearest := crossing ] ] ].
+	^ nearest
+]
+
 { #category : 'printing' }
 VGTileCoverage >> printOn: aStream [
+
 	aStream
 		nextPutAll: self class name;
 		nextPut: $(;
-		print: scanner size;
+		print: self fill size;
 		nextPutAll: ' edges in ';
-		print: self clip bounds;
-		nextPut: $)
+		print: self clip bounds.
+	self clipWalks ifNotEmpty: [ :shapes |
+		aStream
+			nextPutAll: ' through ';
+			print: shapes size;
+			nextPutAll: ' clip shapes' ].
+	aStream nextPut: $)
 ]
 
 { #category : 'coverage' }
@@ -240,99 +246,88 @@ VGTileCoverage >> rightEdgeAtX: anX [
 	^ anX + 1 min: self clip bounds right
 ]
 
-{ #category : 'coverage' }
-VGTileCoverage >> runFrom: aCursor to: aRight onSubRow: aSubRow [
-	"The next inside run at or after aCursor, as its two bounds, or nil where none begins before
-	 aRight. Nothing is sorted and no crossing is kept: the winding where the walk stands is one
-	 scan of the edges, and the next crossing to the right of it is one more. A sort and a scratch
-	 array are what an invocation of the kernel cannot afford, so this walk does without both."
-
-	| cursor winding |
-	cursor := aCursor.
-	winding := self windingUpTo: cursor onSubRow: aSubRow.
-	[ scanner isInside: winding ] whileFalse: [
-		cursor := self crossingAfter: cursor onSubRow: aSubRow.
-		(cursor isNil or: [ cursor >= aRight ]) ifTrue: [ ^ nil ].
-		winding := winding + (self windingStepAt: cursor onSubRow: aSubRow) ].
-	^ cursor -> (self endOfRunFrom: cursor to: aRight onSubRow: aSubRow)
-]
-
-{ #category : 'coverage' }
-VGTileCoverage >> runsFrom: aLeft to: aRight onSubRow: aSubRow do: aBlock [
-	"The inside runs between those two bounds, left to right. A run ends where the walk steps out
-	 of the shape, and the next one is looked for from there."
-
-	| cursor |
-	cursor := aLeft.
-	[ cursor < aRight ] whileTrue: [
-		| run |
-		run := self runFrom: cursor to: aRight onSubRow: aSubRow.
-		run ifNil: [ ^ self ].
-		aBlock value: run key value: run value.
-		cursor := run value ]
-]
-
-{ #category : 'accessing' }
-VGTileCoverage >> scanner [
-	^ scanner
-]
-
 { #category : 'initialization' }
 VGTileCoverage >> setEntry: anEntry [
+	"The fill is one shape to walk and every shape of its clip is another, and they are walked
+	 alike: a pixel is covered by what all of them call inside. The antialiased ones are kept
+	 apart as well, because they are the ones a sweep runs over, and a sweep runs once a sub-row
+	 of every pixel of the tile."
+
 	entry := anEntry.
-	scanner := VGSpanScanner of: anEntry segments
+	walks := { (VGShapeWalk of: (VGSpanScanner of: anEntry segments)) }
+	         , (anEntry clip shapes collect: [ :each | VGShapeWalk of: each ]).
+	swept := walks reject: [ :each | each isAliased ]
 ]
 
-{ #category : 'coverage' }
+{ #category : 'inspector' }
+VGTileCoverage >> shapeRows [
+	"One row for every walk I built: whether it is the fill or a shape of the clip, how many
+	 edges it holds, whether it is aliased and therefore gates the pixel by its centre, whether
+	 it is swept, and what it answers in the middle of my clip. Each cell asks the walk, so a
+	 shape whose verdict changes shows a changed row."
+
+	| box row subRow x |
+	box := self clip bounds.
+	row := (box top + box bottom) // 2.
+	subRow := row + 0.5.
+	x := (box left + box right) // 2.
+	^ walks withIndexCollect: [ :each :index |
+		  {
+			  index.
+			  (index = 1
+				   ifTrue: [ 'Fill' ]
+				   ifFalse: [ 'Clip shape ' , (index - 1) printString ]).
+			  each size.
+			  each isAliased.
+			  (swept includes: each).
+			  (each isPixelCentreInsideAtX: x onSubRow: subRow).
+			  (each crossingAfter: (self leftEdgeAtX: x) onSubRow: subRow) } ]
+]
+
+{ #category : 'walking' }
 VGTileCoverage >> spansAtX: anX onSubRow: aSubRow do: aBlock [
-	"My fill's inside runs within that pixel on that sub-row, trimmed to the clip, left to right."
+	"The parts of that pixel my fill covers inside my clip, on that sub-row, left to right. An
+	 aliased shape answers whole pixels, so it is asked about the centre of this one and then
+	 leaves the window alone; the antialiased shapes are swept together."
 
 	| left right |
 	left := self leftEdgeAtX: anX.
 	right := self rightEdgeAtX: anX.
 	right <= left ifTrue: [ ^ self ].
-	scanner isAliased ifTrue: [ ^ self aliasedSpanAtX: anX onSubRow: aSubRow do: aBlock ].
-	self
-		runsFrom: left
-		to: right
-		onSubRow: aSubRow
-		do: aBlock
+	(walks allSatisfy: [ :each |
+		 each isAliased not or: [
+			 each isPixelCentreInsideAtX: anX onSubRow: aSubRow ] ]) ifFalse: [ ^ self ].
+	swept ifEmpty: [ ^ aBlock value: left value: right ].
+	self sweepFrom: left to: right onSubRow: aSubRow do: aBlock
 ]
 
-{ #category : 'winding' }
-VGTileCoverage >> windingOnSubRow: aSubRow crossing: aBlock [
-	"What the crossings aBlock accepts contribute to the winding. The even-odd rule counts a
-	 crossing and the winding rule counts the direction the edge runs in, which is what
-	 VGSpanScanner does as it walks its sorted crossings. The kernel inlines this scan at each of
-	 its two call sites, because it has no blocks."
+{ #category : 'walking' }
+VGTileCoverage >> sweepFrom: aLeft to: aRight onSubRow: aSubRow do: aBlock [
+	"The parts of that window every swept shape calls inside, left to right. A piece runs from
+	 where the last shape lets it in to where the first one shuts it out, so a crossing that
+	 leaves the verdict alone does not cut a piece in two and the sums are the same floats the
+	 rasteriser adds. Nothing is sorted and no crossing is kept: the verdict at a point is one
+	 scan of the edges of each shape and the next crossing right of it is one more, which is what
+	 one invocation of the kernel can afford."
 
-	| coordinates winding evenOdd |
-	coordinates := scanner segments.
-	evenOdd := scanner fillRule == #evenOdd.
-	winding := 0.
-	1 to: coordinates size by: 4 do: [ :index |
-		| crossing |
-		crossing := self crossingOfEdgeAt: index onSubRow: aSubRow.
-		(crossing notNil and: [ aBlock value: crossing ]) ifTrue: [
-			winding := winding
-			           + (evenOdd
-					            ifTrue: [ 1 ]
-					            ifFalse: [ self directionOfEdgeAt: index ]) ] ].
-	^ winding
-]
-
-{ #category : 'winding' }
-VGTileCoverage >> windingStepAt: anX onSubRow: aSubRow [
-	"What the crossings at exactly anX add to the winding. Two edges can cross one point, and a
-	 walk that took them one at a time would call the space between them a run of its own."
-
-	^ self windingOnSubRow: aSubRow crossing: [ :x | x = anX ]
-]
-
-{ #category : 'winding' }
-VGTileCoverage >> windingUpTo: anX onSubRow: aSubRow [
-	"The winding number just right of anX, in one scan of the edges. A crossing exactly at anX
-	 counts: a run that starts there is inside from there, and a run that ends there has ended."
-
-	^ self windingOnSubRow: aSubRow crossing: [ :x | x <= anX ]
+	| cursor start inside |
+	cursor := aLeft.
+	start := aLeft.
+	inside := self isInsideAt: aLeft onSubRow: aSubRow.
+	[ cursor < aRight ] whileTrue: [
+		| next |
+		next := self nextCrossingAfter: cursor to: aRight onSubRow: aSubRow.
+		next >= aRight
+			ifTrue: [
+				inside ifTrue: [ aBlock value: start value: aRight ].
+				cursor := aRight ]
+			ifFalse: [
+				| nextInside |
+				nextInside := self isInsideAt: next onSubRow: aSubRow.
+				nextInside = inside ifFalse: [
+					inside
+						ifTrue: [ aBlock value: start value: next ]
+						ifFalse: [ start := next ].
+					inside := nextInside ].
+				cursor := next ] ]
 ]

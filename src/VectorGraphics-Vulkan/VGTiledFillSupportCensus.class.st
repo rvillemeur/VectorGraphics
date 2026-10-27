@@ -42,14 +42,14 @@ VGTiledFillSupportCensus class >> onTheReferenceFrame [
 	^ census
 ]
 
-{ #category : 'accessing' }
+{ #category : 'constants' }
 VGTiledFillSupportCensus class >> refusalReasons [
 	"One reason for each clause of VGTiledFillRasteriser class >> supportsEntry:, in the order
 	 that predicate asks them. An entry is counted under the first clause it fails, so the
-	 reasons partition the entries and their counts add up to the frame."
+	 reasons partition the entries and their counts add up to the frame. A clip is not among
+	 them any more: unit 2.7 draws a clip cut out by shapes."
 
-	^ #( #notAFillOrABlit #paintNotSupported #clipNotRectangular
-	     #operatorNotSupported )
+	^ #( #notAFillOrABlit #paintNotSupported #operatorNotSupported )
 ]
 
 { #category : 'constants' }
@@ -218,7 +218,7 @@ VGTiledFillSupportCensus >> printOn: aStream [
 		nextPutAll: ' supported)'
 ]
 
-{ #category : 'accessing' }
+{ #category : 'reporting' }
 VGTiledFillSupportCensus >> reasonFor: anEntry [
 	"The clause of the rasteriser predicate this entry fails first, or the supported reason where
 	 it fails none. The clauses are asked here in the order supportsEntry: asks them, and each
@@ -229,7 +229,6 @@ VGTiledFillSupportCensus >> reasonFor: anEntry [
 		^ #notAFillOrABlit ].
 	(VGTiledFillRasteriser supportsPaint: anEntry paint) ifFalse: [
 		^ #paintNotSupported ].
-	anEntry clip isRectangular ifFalse: [ ^ #clipNotRectangular ].
 	(VGTiledFillRasteriser supportedOperators includes: anEntry operator)
 		ifFalse: [ ^ #operatorNotSupported ].
 	^ self class supportedReason

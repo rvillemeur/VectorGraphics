@@ -127,10 +127,10 @@ VGTiledFillPixelEmitter >> emitChannelsAt: anOffsetId [
 		         ifFalse: (kernel load: #beforeStop)
 		         type: self wordType.
 	keyBefore := self
-		             stopField: VGTiledFillEncoding stopPositionField
+		             stopField: VGTiledFillLayout stopPositionField
 		             at: before.
 	keyAfter := self
-		            stopField: VGTiledFillEncoding stopPositionField
+		            stopField: VGTiledFillLayout stopPositionField
 		            at: after.
 	spanning := self float: keyAfter above: keyBefore.
 	divisor := self
@@ -142,7 +142,7 @@ VGTiledFillPixelEmitter >> emitChannelsAt: anOffsetId [
 		            quotientOfFloat:
 		            (self differenceOfFloat: anOffsetId and: keyBefore)
 		            by: divisor.
-	^ VGTiledFillEncoding stopChannelFields collect: [ :field |
+	^ VGTiledFillLayout stopChannelFields collect: [ :field |
 		  | from to |
 		  from := self stopField: field at: before.
 		  to := self stopField: field at: after.
@@ -605,7 +605,7 @@ VGTiledFillPixelEmitter >> emitSource [
 	self
 		remember: (self
 				 productOfWord: (self valueNamed: #paintBlockOffset)
-				 and: (self constantWord: VGTiledFillEncoding paintBlockFloats))
+				 and: (self constantWord: VGTiledFillLayout paintBlockFloats))
 		as: #paintBase.
 	self emitPaintSpacePoint.
 	isLinear := self
@@ -682,7 +682,7 @@ VGTiledFillPixelEmitter >> emitStopSearchAt: anOffsetId [
 		do: [
 			| key |
 			key := self
-				       stopField: VGTiledFillEncoding stopPositionField
+				       stopField: VGTiledFillLayout stopPositionField
 				       at: (kernel load: #stop).
 			builder emitIf: (self float: key notAbove: anOffsetId) then: [
 				kernel store: (kernel load: #stop) into: #beforeStop.
@@ -786,6 +786,6 @@ VGTiledFillPixelEmitter >> stopField: aField at: aStopId [
 		  atBase: (self
 				   productOfWord:
 				   (self sumOfWord: (self valueNamed: #stopOffset) and: aStopId)
-				   and: (self constantWord: VGTiledFillEncoding stopFloats))
+				   and: (self constantWord: VGTiledFillLayout stopFloats))
 		  field: aField
 ]

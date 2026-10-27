@@ -68,6 +68,8 @@ VGFrameDeviceBenchmark class >> drawBlockNamed: aSymbol [
 	aSymbol = #background ifTrue: [
 		^ [ :context | self drawBackgroundOn: context ] ].
 	aSymbol = #cards ifTrue: [ ^ [ :context | self drawCardsOn: context ] ].
+	aSymbol = #reference ifTrue: [
+		^ [ :context | self drawReferenceOn: context ] ].
 	^ self error: 'no frame of that name'
 ]
 
@@ -101,6 +103,21 @@ VGFrameDeviceBenchmark class >> drawCardsOn: aContext [
 		aContext restoreState ]
 ]
 
+{ #category : 'frames' }
+VGFrameDeviceBenchmark class >> drawReferenceOn: aContext [
+	"The frame unit 1.11 profiles, drawn through the Bloc renderer onto the surface that context
+	 records on: eight hundred by six hundred, with gradients, strokes, glyphs and blits in it,
+	 which is the frame a backend is really asked to draw. A scene draws on a canvas and not on a
+	 context, so the canvas is built over the surface the context was made for and the entries
+	 reach the one display list either way."
+
+	| canvas |
+	canvas := VGCanvas newFor: aContext surface.
+	canvas clippingRectangle: (0 @ 0 extent: self extentOfItsFrames).
+	(VGFrameProfile new sceneForRendererClass: VGRenderer) aeFullDrawOn:
+		canvas
+]
+
 { #category : 'constants' }
 VGFrameDeviceBenchmark class >> extentOfItsFrames [
 	"The extent unit 1.11 profiles, so that the device, the software path and the numbers already
@@ -121,9 +138,10 @@ VGFrameDeviceBenchmark class >> frameName: aSymbol repeats: anInteger [
 
 { #category : 'constants' }
 VGFrameDeviceBenchmark class >> frameNames [
-	"The frames I measure, cheapest first."
+	"The frames I measure, cheapest first. The last of them is the scene unit 1.11 profiles
+	 itself, which unit 2.7 made drawable on the device."
 
-	^ #( #background #cards )
+	^ #( #background #cards #reference )
 ]
 
 { #category : 'instance creation' }
@@ -143,6 +161,15 @@ VGFrameDeviceBenchmark class >> onTheCardsFrame [
 	 and palettes is mostly made of."
 
 	^ self frameName: #cards
+]
+
+{ #category : 'instance creation' }
+VGFrameDeviceBenchmark class >> onTheReferenceFrame [
+	"The reference scene of unit 1.11 as it really is, with its rounded cards, its gradients and
+	 its labels: the first frame of a real window the device draws whole, which is what unit 2.7
+	 bought."
+
+	^ self frameName: #reference
 ]
 
 { #category : 'reporting' }

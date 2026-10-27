@@ -24,13 +24,13 @@ Class {
 	#tag : 'Tiles'
 }
 
-{ #category : 'contract' }
+{ #category : 'constants' }
 VGTiledFillKernel class >> bindingNames [
-	"The eleven buffers I read, in the order they are bound: the nine an encoding writes, the
+	"The twelve buffers I read, in the order they are bound: the ten an encoding writes, the
 	 pixels of the target and the size of the frame. A binding number is the position of the name
 	 here, counted from zero, so this one list states the whole contract."
 
-	^ #( #tileTable #entryRefs #headers #clips #edges #paints #stops
+	^ #( #tileTable #entryRefs #headers #clips #edges #shapes #paints #stops
 	     #maskRects #maskBytes #target #frame )
 ]
 
@@ -110,7 +110,7 @@ VGTiledFillKernel class >> floatBindingNames [
 
 { #category : 'constants' }
 VGTiledFillKernel class >> floatVariableNames [
-	^ #( #coverage #runCursor #runFromCursor #endCursor #endResult #nearest )
+	^ #( #coverage #nearest #nearestAll #cursor #start )
 ]
 
 { #category : 'constants' }
@@ -223,9 +223,10 @@ VGTiledFillKernel class >> shaderCapability [
 
 { #category : 'constants' }
 VGTiledFillKernel class >> signedVariableNames [
-	"The three winding numbers, which run negative under the winding rule."
+	"The winding number of one scan of the edges of one shape, which runs negative under the
+	 winding rule."
 
-	^ #( #runFromWinding #endWinding #scanWinding )
+	^ #( #scanWinding )
 ]
 
 { #category : 'module cache' }
@@ -271,16 +272,18 @@ VGTiledFillKernel class >> variableNames [
 	^ self wordVariableNames , self signedVariableNames , self floatVariableNames
 ]
 
-{ #category : 'contract' }
+{ #category : 'constants' }
 VGTiledFillKernel class >> wordVariableNames [
 	"The function variables that hold a word: the destination pixel, the source pixel of the
 	 fill and whether the fill lays one down at all, the byte the mask of the fill carries here,
-	 the three loop counters, the stop loop with the two stops it looks for and the flags that
+	 the three loop counters, the record of the shape the walk stands in and the verdicts of a
+	 sweep over the shapes, the stop loop with the two stops it looks for and the flags that
 	 stand where VGTileCoverage answers early."
 
-	^ #( #dest #source #hasSource #maskByte #reference #sample #runsMore
-	     #runFromSearching #runFromFound #endRunning #edge #nearestFound #stop
-	     #beforeStop #afterStop #beforeFound #afterFound )
+	^ #( #dest #source #hasSource #maskByte #reference #sample #edge #shape
+	     #shapeEdgeOffset #shapeEdgeCount #shapeFillRule #shapeAliased
+	     #hasAntialiased #allows #insideAll #inside #nextInside #nearestFound
+	     #stop #beforeStop #afterStop #beforeFound #afterFound )
 ]
 
 { #category : 'inspecting' }
@@ -396,24 +399,44 @@ VGTiledFillKernel >> elementTypeOf: aBindingName [
 ]
 
 { #category : 'emitting' }
-VGTiledFillKernel >> emitAliasedSpanFrom: aLeftId to: aRightId onSubRow: aSubRowId [
-	"Antialiasing off is one sample at the centre of the pixel row, and the run is then the
-	 whole of the pixel the clip allows: VGTileCoverage >> aliasedSpanAtX:onSubRow:do:."
+VGTiledFillKernel >> emitAddPieceFrom: aLeftId to: aRightId [
+	"That piece of the window added to the coverage, where the sweep stands inside the shapes.
+	 The verdict is read here and not at the call site, because SPIR-V has no answer out of a
+	 branch and both ends of the piece are in hand only here."
 
-	| winding |
-	winding := self
-		           emitWindingUpTo: (self
-				            sumOfFloat: (self valueNamed: #pixelLeft)
-				            and: (self constantFloat: self class halfUnit))
-		           onSubRow: (self
-				            sumOfFloat: (self floorOfFloat: aSubRowId)
-				            and: (self constantFloat: self class halfUnit)).
-	builder emitIf: (self emitIsInside: winding) then: [
-		self
-			store: (self
-					 sumOfFloat: (self load: #coverage)
-					 and: (self differenceOfFloat: aRightId and: aLeftId))
-			into: #coverage ]
+	builder
+		emitIf: (self word: (self load: #inside) equals: (self constantWord: 1))
+		then: [
+			self
+				store: (self
+						 sumOfFloat: (self load: #coverage)
+						 and: (self differenceOfFloat: aRightId and: aLeftId))
+				into: #coverage ]
+]
+
+{ #category : 'emitting' }
+VGTiledFillKernel >> emitAliasedShapesAllowPixelOnSubRow: aSubRowId [
+	"Whether every aliased shape of the entry calls the centre of this pixel inside, sampled at
+	 the centre of its own pixel row: VGShapeWalk >> isPixelCentreInsideAtX:onSubRow: asked of
+	 each of them, which is how an aliased shape answers whole pixels and answers the same ones
+	 on every sub-row of a row. The verdict rides in a variable while the loop runs and is
+	 answered as a condition, because that is what a branch of SPIR-V takes."
+
+	| centre row |
+	centre := self
+		          sumOfFloat: (self valueNamed: #pixelLeft)
+		          and: (self constantFloat: self class halfUnit).
+	row := self
+		       sumOfFloat: (self floorOfFloat: aSubRowId)
+		       and: (self constantFloat: self class halfUnit).
+	self store: (self constantWord: 1) into: #allows.
+	self emitShapesDo: [
+		builder emitIf: (self negation: self emitIsAntialiasedShape) then: [
+			builder
+				emitIf: (self negation:
+							 (self emitIsInside: (self emitWindingUpTo: centre onSubRow: row)))
+				then: [ self store: (self constantWord: 0) into: #allows ] ] ].
+	^ self word: (self load: #allows) equals: (self constantWord: 1)
 ]
 
 { #category : 'emitting' }
@@ -443,7 +466,7 @@ VGTiledFillKernel >> emitBody [
 			             componentOfBuiltIn: SpvBuiltIn workgroupId
 			             at: self class tileComponent)
 		            and:
-		            (self constantWord: VGTiledFillEncoding tileRecordWords).
+		            (self constantWord: VGTiledFillLayout tileRecordWords).
 	self
 		remember: (self
 				 elementOf: #frame
@@ -459,7 +482,7 @@ VGTiledFillKernel >> emitBody [
 				 sumOfWord: (self
 						  elementOf: #tileTable
 						  atBase: tileBase
-						  field: VGTiledFillEncoding tileLeftField)
+						  field: VGTiledFillLayout tileLeftField)
 				 and: (self
 						  componentOfBuiltIn: SpvBuiltIn localInvocationId
 						  at: self class columnComponent))
@@ -469,7 +492,7 @@ VGTiledFillKernel >> emitBody [
 				 sumOfWord: (self
 						  elementOf: #tileTable
 						  atBase: tileBase
-						  field: VGTiledFillEncoding tileTopField)
+						  field: VGTiledFillLayout tileTopField)
 				 and: (self
 						  componentOfBuiltIn: SpvBuiltIn localInvocationId
 						  at: self class rowComponent))
@@ -478,13 +501,13 @@ VGTiledFillKernel >> emitBody [
 		remember: (self
 				 elementOf: #tileTable
 				 atBase: tileBase
-				 field: VGTiledFillEncoding referenceOffsetField)
+				 field: VGTiledFillLayout referenceOffsetField)
 		as: #referenceOffset.
 	self
 		remember: (self
 				 elementOf: #tileTable
 				 atBase: tileBase
-				 field: VGTiledFillEncoding referenceCountField)
+				 field: VGTiledFillLayout referenceCountField)
 		as: #referenceCount.
 	inside := self
 		          both: (self
@@ -494,17 +517,19 @@ VGTiledFillKernel >> emitBody [
 	builder emitIf: inside then: [ self emitPixel ]
 ]
 
-{ #category : 'emission - entry' }
+{ #category : 'emitting' }
 VGTiledFillKernel >> emitCoverageGivenInterior: aBooleanId [
 	"The coverage of this pixel for this entry: one where the reference says the entry covers the
-	 whole of the tile, and the walk over the edges where it does not. The walk samples fifteen
-	 sub-rows of the pixel and scans the edges of the entry at each of them, so a tile deep
-	 inside a shape pays all of that for an answer that was one from the start."
+	 whole of the tile, and the walk over the shapes where it does not. The walk samples fifteen
+	 sub-rows of the pixel and scans the edges of every shape of the entry at each of them, so a
+	 tile deep inside a shape pays all of that for an answer that was one from the start. Which
+	 shapes are antialiased is read once a pixel and not once a sub-row."
 
 	self store: (self constantFloat: 0) into: #coverage.
 	builder emitIf: aBooleanId then: [
 		self store: (self constantFloat: 1) into: #coverage ].
 	builder emitIf: (self negation: aBooleanId) then: [
+		self emitHasAntialiasedShape.
 		builder emitIf: self emitAllowsRow then: [ self emitCoverageOfSubRows ] ]
 ]
 
@@ -542,16 +567,17 @@ VGTiledFillKernel >> emitCoverageOfSubRows [
 
 { #category : 'emitting' }
 VGTiledFillKernel >> emitCrossingAfter: aCursorId onSubRow: aSubRowId [
-	"The nearest crossing strictly right of that cursor, and whether my edges have one at all,
-	 left in nearestFound. One scan of the edges, which is what a run costs here instead of a
-	 sorted array of every crossing: VGTileCoverage >> crossingAfter:onSubRow:."
+	"The nearest crossing of the shape in hand strictly right of that cursor, and whether its
+	 edges have one at all, left in nearestFound. One scan of the edges, which is what a run
+	 costs here instead of a sorted array of every crossing:
+	 VGShapeWalk >> crossingAfter:onSubRow:."
 
 	self store: (self constantFloat: 0) into: #nearest.
 	self store: (self constantWord: 0) into: #nearestFound.
 	self store: (self constantWord: 0) into: #edge.
 	builder
 		emitWhile: [
-		self word: (self load: #edge) below: (self valueNamed: #edgeCount) ]
+		self word: (self load: #edge) below: (self load: #shapeEdgeCount) ]
 		do: [
 			| crossing better |
 			crossing := self
@@ -577,35 +603,35 @@ VGTiledFillKernel >> emitCrossingAfter: aCursorId onSubRow: aSubRowId [
 
 { #category : 'emitting' }
 VGTiledFillKernel >> emitCrossingOfEdgeAt: anEdgeId onSubRow: aSubRowId [
-	"Where the edge at that position of this entry crosses that sub-row, and whether it reaches
-	 it at all: VGTileCoverage >> crossingOfEdgeAt:onSubRow: term for term, with the two answers
-	 of nil carried as a flag beside the value. The edge is taken half open from its upper end.
-	 A horizontal edge divides by the difference of its own two ends, so the divisor is one
-	 where the edge does not reach the sub-row at all, which keeps an infinity out of a value
-	 the walk then discards."
+	"Where the edge at that position of the shape in hand crosses that sub-row, and whether it
+	 reaches it at all: VGShapeWalk >> crossingOfEdgeAt:onSubRow: term for term, with the two
+	 answers of nil carried as a flag beside the value. The edge is taken half open from its
+	 upper end. A horizontal edge divides by the difference of its own two ends, so the divisor
+	 is one where the edge does not reach the sub-row at all, which keeps an infinity out of a
+	 value the walk then discards."
 
 	| base x0 y0 x1 y1 reaches divisor |
 	base := self
 		        productOfWord: (self
-				         sumOfWord: (self valueNamed: #edgeOffset)
+				         sumOfWord: (self load: #shapeEdgeOffset)
 				         and: anEdgeId)
-		        and: (self constantWord: VGTiledFillEncoding edgeFloats).
+		        and: (self constantWord: VGTiledFillLayout edgeFloats).
 	x0 := self
 		      elementOf: #edges
 		      atBase: base
-		      field: VGTiledFillEncoding edgeStartXField.
+		      field: VGTiledFillLayout edgeStartXField.
 	y0 := self
 		      elementOf: #edges
 		      atBase: base
-		      field: VGTiledFillEncoding edgeStartYField.
+		      field: VGTiledFillLayout edgeStartYField.
 	x1 := self
 		      elementOf: #edges
 		      atBase: base
-		      field: VGTiledFillEncoding edgeEndXField.
+		      field: VGTiledFillLayout edgeEndXField.
 	y1 := self
 		      elementOf: #edges
 		      atBase: base
-		      field: VGTiledFillEncoding edgeEndYField.
+		      field: VGTiledFillLayout edgeEndYField.
 	reaches := self
 		           both: (self negation: (self float: y0 equals: y1))
 		           and: (self
@@ -636,68 +662,22 @@ VGTiledFillKernel >> emitDirectionOfEdgeAt: anEdgeId [
 	| base y0 y1 |
 	base := self
 		        productOfWord: (self
-				         sumOfWord: (self valueNamed: #edgeOffset)
+				         sumOfWord: (self load: #shapeEdgeOffset)
 				         and: anEdgeId)
-		        and: (self constantWord: VGTiledFillEncoding edgeFloats).
+		        and: (self constantWord: VGTiledFillLayout edgeFloats).
 	y0 := self
 		      elementOf: #edges
 		      atBase: base
-		      field: VGTiledFillEncoding edgeStartYField.
+		      field: VGTiledFillLayout edgeStartYField.
 	y1 := self
 		      elementOf: #edges
 		      atBase: base
-		      field: VGTiledFillEncoding edgeEndYField.
+		      field: VGTiledFillLayout edgeEndYField.
 	^ self
 		  select: (self float: y1 above: y0)
 		  ifTrue: (self constantSigned: 1)
 		  ifFalse: (self constantSigned: -1)
 		  type: self signedType
-]
-
-{ #category : 'emitting' }
-VGTiledFillKernel >> emitEndOfRunFrom: aStartId to: aRightId onSubRow: aSubRowId [
-	"Where the run that begins there stops, left in endResult: the first crossing right of it
-	 that puts the walk outside the shape, or the right bound where none does before the pixel
-	 ends, which is VGTileCoverage >> endOfRunFrom:to:onSubRow:. The right bound is stored
-	 first, because it is the answer of both paths that leave the loop without a crossing."
-
-	self store: aStartId into: #endCursor.
-	self
-		store: (self emitWindingUpTo: aStartId onSubRow: aSubRowId)
-		into: #endWinding.
-	self store: (self constantWord: 1) into: #endRunning.
-	self store: aRightId into: #endResult.
-	builder
-		emitWhile: [
-			self
-				both: (self word: (self load: #endRunning) equals: (self constantWord: 1))
-				and: (self float: (self load: #endCursor) below: aRightId) ]
-		do: [
-			| crossing stop |
-			crossing := self
-				            emitCrossingAfter: (self load: #endCursor)
-				            onSubRow: aSubRowId.
-			stop := self
-				        either: (self
-						         word: (self load: #nearestFound)
-						         equals: (self constantWord: 0))
-				        or: (self float: crossing atLeast: aRightId).
-			builder
-				emitIf: stop
-				then: [ self store: (self constantWord: 0) into: #endRunning ].
-			builder emitIf: (self negation: stop) then: [
-				self store: crossing into: #endCursor.
-				self
-					store: (self
-							 sumOfSigned: (self load: #endWinding)
-							 and: (self emitWindingStepAt: crossing onSubRow: aSubRowId))
-					into: #endWinding.
-				builder
-					emitIf:
-						(self negation: (self emitIsInside: (self load: #endWinding)))
-					then: [
-						self store: (self load: #endCursor) into: #endResult.
-						self store: (self constantWord: 0) into: #endRunning ] ] ]
 ]
 
 { #category : 'emission - entry' }
@@ -728,22 +708,22 @@ VGTiledFillKernel >> emitEntry [
 		              bitsOfWord: reference
 		              and:
 		              (self constantWord:
-				               VGTiledFillEncoding referenceIdentifierMask).
+				               VGTiledFillLayout referenceIdentifierMask).
 	previous := self
 		            differenceOfWord: identifier
 		            and: (self constantWord: 1).
 	self
 		rememberHeaderAt: (self
 				 productOfWord: previous
-				 and: (self constantWord: VGTiledFillEncoding entryHeaderWords)).
+				 and: (self constantWord: VGTiledFillLayout entryHeaderWords)).
 	self
 		rememberClipAt: (self
 				 productOfWord: previous
-				 and: (self constantWord: VGTiledFillEncoding clipFloats)).
+				 and: (self constantWord: VGTiledFillLayout clipFloats)).
 	self
 		rememberMaskRectAt: (self
 				 productOfWord: previous
-				 and: (self constantWord: VGTiledFillEncoding clipFloats)).
+				 and: (self constantWord: VGTiledFillLayout clipFloats)).
 	pixels emitSource.
 	self emitCoverageGivenInterior: (self emitIsInteriorReference: reference).
 	mask := pixels emitMaskForCoverage: (self load: #coverage).
@@ -756,14 +736,38 @@ VGTiledFillKernel >> emitEntry [
 ]
 
 { #category : 'emitting' }
+VGTiledFillKernel >> emitHasAntialiasedShape [
+	"Whether any shape of the entry is antialiased, read once for the whole pixel. Where none
+	 is, every shape answers whole pixels and the window of a sub-row is covered in full or not
+	 at all, which is the empty swept set of VGTileCoverage >> spansAtX:onSubRow:do:."
+
+	self store: (self constantWord: 0) into: #hasAntialiased.
+	self emitShapesDo: [
+		builder
+			emitIf: self emitIsAntialiasedShape
+			then: [ self store: (self constantWord: 1) into: #hasAntialiased ] ]
+]
+
+{ #category : 'emitting' }
+VGTiledFillKernel >> emitIsAntialiasedShape [
+	"Whether the shape in hand is antialiased, which is the one a sweep runs over. An aliased
+	 shape answers whole pixels instead, so it gates the pixel and leaves the window alone."
+
+	^ self
+		  word: (self load: #shapeAliased)
+		  equals:
+		  (self constantWord: (VGTiledFillEncoding flagForAliased: false))
+]
+
+{ #category : 'emitting' }
 VGTiledFillKernel >> emitIsInside: aWindingId [
-	"Whether that winding number stands inside the shape, under the fill rule the entry's
-	 header names: VGSpanScanner >> isInside:. An odd number is the lowest bit set, which holds
-	 for a negative winding as well, because a signed word is stored in two's complement."
+	"Whether that winding number stands inside the shape in hand, under the fill rule its own
+	 record names: VGSpanScanner >> isInside:. An odd number is the lowest bit set, which holds
+	 for a negative winding as well, because a signed word is stored in two''s complement."
 
 	| evenOdd odd nonZero |
 	evenOdd := self
-		           word: (self valueNamed: #fillRule)
+		           word: (self load: #shapeFillRule)
 		           equals:
 		           (self constantWord:
 			            (VGTiledFillEncoding codeForFillRule: #evenOdd)).
@@ -781,6 +785,23 @@ VGTiledFillKernel >> emitIsInside: aWindingId [
 		  type: self boolType
 ]
 
+{ #category : 'emitting' }
+VGTiledFillKernel >> emitIsInsideAllAt: anXId onSubRow: aSubRowId [
+	"Whether every antialiased shape of the entry calls that point inside, which is
+	 VGTileCoverage >> isInsideAt:onSubRow:. That is the geometric intersection Cairo performs:
+	 spans meet spans and no coverage is multiplied by another."
+
+	self store: (self constantWord: 1) into: #insideAll.
+	self emitShapesDo: [
+		builder emitIf: self emitIsAntialiasedShape then: [
+			builder
+				emitIf: (self negation:
+							 (self emitIsInside:
+									  (self emitWindingUpTo: anXId onSubRow: aSubRowId)))
+				then: [ self store: (self constantWord: 0) into: #insideAll ] ] ].
+	^ self load: #insideAll
+]
+
 { #category : 'emission - entry' }
 VGTiledFillKernel >> emitIsInteriorReference: aReferenceId [
 	"Whether that reference carries the mark of a tile the entry covers in full, which is
@@ -791,9 +812,9 @@ VGTiledFillKernel >> emitIsInteriorReference: aReferenceId [
 		  (self
 			   bitsOfWord: aReferenceId
 			   and:
-			   (self constantWord: VGTiledFillEncoding interiorReferenceFlag))
+			   (self constantWord: VGTiledFillLayout interiorReferenceFlag))
 		  equals:
-		  (self constantWord: VGTiledFillEncoding interiorReferenceFlag)
+		  (self constantWord: VGTiledFillLayout interiorReferenceFlag)
 ]
 
 { #category : 'building' }
@@ -866,15 +887,15 @@ VGTiledFillKernel >> emitMaskByte [
 		index := self
 			         word: position
 			         dividedBy:
-			         (self constantWord: VGTiledFillEncoding maskBytesPerWord).
+			         (self constantWord: VGTiledFillLayout maskBytesPerWord).
 		shift := self
 			         productOfWord: (self
 					          differenceOfWord: position
 					          and: (self
 							           productOfWord: index
 							           and: (self constantWord:
-									            VGTiledFillEncoding maskBytesPerWord)))
-			         and: (self constantWord: VGTiledFillEncoding maskByteBits).
+									            VGTiledFillLayout maskBytesPerWord)))
+			         and: (self constantWord: VGTiledFillLayout maskByteBits).
 		self
 			store: (self
 					 bitsOfWord: (self
@@ -883,6 +904,27 @@ VGTiledFillKernel >> emitMaskByte [
 					 and: (self constantWord: VGTiledFillEncoding fullAlphaByte))
 			into: #maskByte ].
 	^ self load: #maskByte
+]
+
+{ #category : 'emitting' }
+VGTiledFillKernel >> emitNearestCrossingAfter: aCursorId to: aRightId onSubRow: aSubRowId [
+	"The nearest crossing of any antialiased shape strictly right of that cursor, or the right
+	 bound where none of them crosses inside the window, which is
+	 VGTileCoverage >> nextCrossingAfter:to:onSubRow:."
+
+	self store: aRightId into: #nearestAll.
+	self emitShapesDo: [
+		builder emitIf: self emitIsAntialiasedShape then: [
+			| crossing |
+			crossing := self emitCrossingAfter: aCursorId onSubRow: aSubRowId.
+			builder
+				emitIf: (self
+						 both: (self
+								  word: (self load: #nearestFound)
+								  equals: (self constantWord: 1))
+						 and: (self float: crossing below: (self load: #nearestAll)))
+				then: [ self store: crossing into: #nearestAll ] ] ].
+	^ self load: #nearestAll
 ]
 
 { #category : 'emitting' }
@@ -919,99 +961,33 @@ VGTiledFillKernel >> emitPixel [
 ]
 
 { #category : 'emitting' }
-VGTiledFillKernel >> emitRunFrom: aCursorId to: aRightId onSubRow: aSubRowId [
-	"The next inside run at or after that cursor: its start in runFromCursor, its end in
-	 endResult, and whether there is one at all in the flag this answers. Nothing is sorted and
-	 no crossing is kept, as in VGTileCoverage >> runFrom:to:onSubRow:: the winding where the
-	 walk stands is one scan of the edges and the next crossing to the right of it is one more,
-	 because an invocation can afford neither a sort nor a scratch array."
+VGTiledFillKernel >> emitShapesDo: aBlock [
+	"That block once for every shape of the entry, the fill first and the shapes of its clip
+	 after it, with the record of the shape in hand. No shape loop of mine runs inside another,
+	 so one counter serves them all."
 
-	self store: aCursorId into: #runFromCursor.
-	self
-		store: (self emitWindingUpTo: aCursorId onSubRow: aSubRowId)
-		into: #runFromWinding.
-	self
-		store: (self searchingFlagFor: (self load: #runFromWinding))
-		into: #runFromSearching.
-	self store: (self constantWord: 1) into: #runFromFound.
+	self store: (self constantWord: 0) into: #shape.
 	builder
 		emitWhile: [
-		self word: (self load: #runFromSearching) equals: (self constantWord: 1) ]
+		self word: (self load: #shape) below: (self valueNamed: #shapeCount) ]
 		do: [
-			| crossing stop |
-			crossing := self
-				            emitCrossingAfter: (self load: #runFromCursor)
-				            onSubRow: aSubRowId.
-			stop := self
-				        either: (self
-						         word: (self load: #nearestFound)
-						         equals: (self constantWord: 0))
-				        or: (self float: crossing atLeast: aRightId).
-			builder emitIf: stop then: [
-				self store: (self constantWord: 0) into: #runFromFound.
-				self store: (self constantWord: 0) into: #runFromSearching ].
-			builder emitIf: (self negation: stop) then: [
-				self store: crossing into: #runFromCursor.
-				self
-					store: (self
-							 sumOfSigned: (self load: #runFromWinding)
-							 and: (self emitWindingStepAt: crossing onSubRow: aSubRowId))
-					into: #runFromWinding.
-				self
-					store: (self searchingFlagFor: (self load: #runFromWinding))
-					into: #runFromSearching ] ].
-	builder
-		emitIf:
-			(self word: (self load: #runFromFound) equals: (self constantWord: 1))
-		then: [
+			self rememberShapeAt: (self
+					 sumOfWord: (self valueNamed: #shapeOffset)
+					 and: (self load: #shape)).
+			aBlock value.
 			self
-				emitEndOfRunFrom: (self load: #runFromCursor)
-				to: aRightId
-				onSubRow: aSubRowId ].
-	^ self load: #runFromFound
-]
-
-{ #category : 'emitting' }
-VGTiledFillKernel >> emitRunsFrom: aLeftId to: aRightId onSubRow: aSubRowId [
-	"The inside runs between those two bounds, left to right, which is
-	 VGTileCoverage >> runsFrom:to:onSubRow:do:. The walk stops where no run begins before the
-	 right bound, and that answer of nil is the flag runsMore."
-
-	self store: aLeftId into: #runCursor.
-	self store: (self constantWord: 1) into: #runsMore.
-	builder
-		emitWhile: [
-			self
-				both: (self word: (self load: #runsMore) equals: (self constantWord: 1))
-				and: (self float: (self load: #runCursor) below: aRightId) ]
-		do: [
-			| found |
-			found := self
-				         emitRunFrom: (self load: #runCursor)
-				         to: aRightId
-				         onSubRow: aSubRowId.
-			builder
-				emitIf: (self word: found equals: (self constantWord: 0))
-				then: [ self store: (self constantWord: 0) into: #runsMore ].
-			builder
-				emitIf: (self word: found equals: (self constantWord: 1))
-				then: [
-					self
-						store: (self
-								 sumOfFloat: (self load: #coverage)
-								 and: (self
-										  differenceOfFloat: (self load: #endResult)
-										  and: (self load: #runFromCursor)))
-						into: #coverage.
-					self store: (self load: #endResult) into: #runCursor ] ]
+				store: (self sumOfWord: (self load: #shape) and: (self constantWord: 1))
+				into: #shape ]
 ]
 
 { #category : 'emitting' }
 VGTiledFillKernel >> emitSpansOnSubRow: aSubRowId [
-	"My fill's inside runs within this pixel on that sub-row, trimmed to the clip, which is
-	 VGTileCoverage >> spansAtX:onSubRow:do: and the two edges it trims to."
+	"The parts of this pixel the entry covers inside its clip on that sub-row, trimmed to the
+	 clip and to the pixel, which is VGTileCoverage >> spansAtX:onSubRow:do: and the two edges
+	 it trims to. The aliased shapes gate the pixel and then leave the window alone; the
+	 antialiased ones are swept together, and where there is none the whole window is covered."
 
-	| left right aliased |
+	| left right |
 	left := self
 		        largerFloatOf: (self valueNamed: #pixelLeft)
 		        and: (self valueNamed: #clipLeft).
@@ -1020,28 +996,75 @@ VGTiledFillKernel >> emitSpansOnSubRow: aSubRowId [
 				          sumOfFloat: (self valueNamed: #pixelLeft)
 				          and: (self constantFloat: 1))
 		         and: (self valueNamed: #clipRight).
-	aliased := self
-		           word: (self valueNamed: #aliased)
-		           equals:
-		           (self constantWord: (VGTiledFillEncoding flagForAliased: true)).
 	builder emitIf: (self float: right above: left) then: [
 		builder
-			emitIf: aliased
-			then: [ self emitAliasedSpanFrom: left to: right onSubRow: aSubRowId ].
-		builder
-			emitIf: (self negation: aliased)
-			then: [ self emitRunsFrom: left to: right onSubRow: aSubRowId ] ]
+			emitIf: (self emitAliasedShapesAllowPixelOnSubRow: aSubRowId)
+			then: [
+				| swept |
+				swept := self
+					         word: (self load: #hasAntialiased)
+					         equals: (self constantWord: 1).
+				builder emitIf: (self negation: swept) then: [
+					self
+						store: (self
+								 sumOfFloat: (self load: #coverage)
+								 and: (self differenceOfFloat: right and: left))
+						into: #coverage ].
+				builder
+					emitIf: swept
+					then: [ self emitSweepFrom: left to: right onSubRow: aSubRowId ] ] ]
+]
+
+{ #category : 'emitting' }
+VGTiledFillKernel >> emitSweepFrom: aLeftId to: aRightId onSubRow: aSubRowId [
+	"The parts of that window every antialiased shape calls inside, added to the coverage left
+	 to right: VGTileCoverage >> sweepFrom:to:onSubRow:do:. A piece runs from where the last
+	 shape lets it in to where the first one shuts it out, so a crossing that leaves the verdict
+	 alone does not cut a piece in two and the sums are the same floats the software rasteriser
+	 adds. Nothing is sorted and no crossing is kept: the verdict at a point is one scan of the
+	 edges of each shape and the next crossing right of it is one more."
+
+	self store: aLeftId into: #cursor.
+	self store: aLeftId into: #start.
+	self
+		store: (self emitIsInsideAllAt: aLeftId onSubRow: aSubRowId)
+		into: #inside.
+	builder
+		emitWhile: [ self float: (self load: #cursor) below: aRightId ]
+		do: [
+			| next ends |
+			next := self
+				        emitNearestCrossingAfter: (self load: #cursor)
+				        to: aRightId
+				        onSubRow: aSubRowId.
+			ends := self float: next atLeast: aRightId.
+			builder emitIf: ends then: [
+				self emitAddPieceFrom: (self load: #start) to: aRightId.
+				self store: aRightId into: #cursor ].
+			builder emitIf: (self negation: ends) then: [
+				self
+					store: (self emitIsInsideAllAt: next onSubRow: aSubRowId)
+					into: #nextInside.
+				builder emitIf: (self negation: (self
+							  word: (self load: #nextInside)
+							  equals: (self load: #inside))) then: [
+					self emitAddPieceFrom: (self load: #start) to: next.
+					builder
+						emitIf: (self word: (self load: #inside) equals: (self constantWord: 0))
+						then: [ self store: next into: #start ].
+					self store: (self load: #nextInside) into: #inside ].
+				self store: next into: #cursor ] ]
 ]
 
 { #category : 'emitting' }
 VGTiledFillKernel >> emitWindingOnSubRow: aSubRowId accepting: aBlock [
-	"What the crossings that block accepts contribute to the winding, which is
-	 VGTileCoverage >> windingOnSubRow:crossing: inlined at each of its call sites: the even-odd
+	"What the crossings that block accepts contribute to the winding of the shape in hand, which
+	 is VGShapeWalk >> windingOnSubRow:crossing: inlined at each of its call sites: the even-odd
 	 rule counts a crossing and the winding rule counts the direction the edge runs in."
 
 	| evenOdd |
 	evenOdd := self
-		           word: (self valueNamed: #fillRule)
+		           word: (self load: #shapeFillRule)
 		           equals:
 		           (self constantWord:
 			            (VGTiledFillEncoding codeForFillRule: #evenOdd)).
@@ -1049,7 +1072,7 @@ VGTiledFillKernel >> emitWindingOnSubRow: aSubRowId accepting: aBlock [
 	self store: (self constantWord: 0) into: #edge.
 	builder
 		emitWhile: [
-		self word: (self load: #edge) below: (self valueNamed: #edgeCount) ]
+		self word: (self load: #edge) below: (self load: #shapeEdgeCount) ]
 		do: [
 			| crossing step |
 			crossing := self
@@ -1071,17 +1094,6 @@ VGTiledFillKernel >> emitWindingOnSubRow: aSubRowId accepting: aBlock [
 				store: (self sumOfWord: (self load: #edge) and: (self constantWord: 1))
 				into: #edge ].
 	^ self load: #scanWinding
-]
-
-{ #category : 'emitting' }
-VGTiledFillKernel >> emitWindingStepAt: anX onSubRow: aSubRowId [
-	"What the crossings at exactly that coordinate add to the winding. Two edges can cross one
-	 point, and a walk that took them one at a time would call the space between them a run of
-	 its own."
-
-	^ self
-		  emitWindingOnSubRow: aSubRowId
-		  accepting: [ :crossing | self float: crossing equals: anX ]
 ]
 
 { #category : 'emitting' }
@@ -1311,23 +1323,24 @@ VGTiledFillKernel >> rememberClipAt: aBaseId [
 			remember: (self
 					 elementOf: #clips
 					 atBase: aBaseId
-					 field: (VGTiledFillEncoding perform: each))
+					 field: (VGTiledFillLayout perform: each))
 			as: (each copyUpToLast: $F) asSymbol ]
 ]
 
-{ #category : 'emission - entry' }
+{ #category : 'emitting' }
 VGTiledFillKernel >> rememberHeaderAt: aBaseId [
-	"The twelve words of the header of one entry, read once for the whole walk over it."
+	"The ten words of the header of one entry, read once for the whole walk over it. What a
+	 shape of the entry is read under is not among them: a fill and a shape of its clip each
+	 carry their own record, and the header says only where the run of them starts."
 
-	#( #sourcePixelField #operatorField #fillRuleField #aliasedField
-	   #alphaByteField #edgeOffsetField #edgeCountField #paintTagField
-	   #paintBlockOffsetField #stopOffsetField #stopCountField
-	   #maskOffsetField ) do: [ :each |
+	#( #sourcePixelField #operatorField #alphaByteField #shapeOffsetField
+	   #shapeCountField #paintTagField #paintBlockOffsetField #stopOffsetField
+	   #stopCountField #maskOffsetField ) do: [ :each |
 		self
 			remember: (self
 					 elementOf: #headers
 					 atBase: aBaseId
-					 field: (VGTiledFillEncoding perform: each))
+					 field: (VGTiledFillLayout perform: each))
 			as: (each copyUpToLast: $F) asSymbol ]
 ]
 
@@ -1344,21 +1357,28 @@ VGTiledFillKernel >> rememberMaskRectAt: aBaseId [
 				remember: (self
 						 elementOf: #maskRects
 						 atBase: aBaseId
-						 field: (VGTiledFillEncoding perform: field))
+						 field: (VGTiledFillLayout perform: field))
 				as: name ]
 ]
 
 { #category : 'emitting' }
-VGTiledFillKernel >> searchingFlagFor: aWindingId [
-	"One while the walk is still outside the shape and zero once it is inside, which is the
-	 condition of VGTileCoverage >> runFrom:to:onSubRow: read as a word, because a loop of
-	 SPIR-V branches on a value and not on a block."
+VGTiledFillKernel >> rememberShapeAt: aShapeId [
+	"The record of one shape of the entry, kept in variables and not as values, because the walk
+	 reads another shape at every turn of its shape loop. The fill is the first shape of an entry
+	 and a shape of its clip is read in exactly the same way."
 
-	^ self
-		  select: (self emitIsInside: aWindingId)
-		  ifTrue: (self constantWord: 0)
-		  ifFalse: (self constantWord: 1)
-		  type: self wordType
+	| base |
+	base := self
+		        productOfWord: aShapeId
+		        and: (self constantWord: VGTiledFillLayout shapeRecordWords).
+	#( #shapeEdgeOffsetField #shapeEdgeCountField #shapeFillRuleField
+	   #shapeAliasedField ) do: [ :each |
+		self
+			store: (self
+					 elementOf: #shapes
+					 atBase: base
+					 field: (VGTiledFillLayout perform: each))
+			into: (each copyUpToLast: $F) asSymbol ]
 ]
 
 { #category : 'initialization' }

@@ -7,15 +7,7 @@ Class {
 	#name : 'VGTiledFillBuffers',
 	#superclass : 'Object',
 	#instVars : [
-		'tileTable',
-		'entryRefs',
-		'headers',
-		'clips',
-		'edges',
-		'paints',
-		'stops',
-		'maskRects',
-		'maskBytes'
+		'arrays'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -30,15 +22,27 @@ VGTiledFillBuffers >> allocateForEntries: aCount edges: anEdgeCount stops: aStop
 	 storage buffer of the kernel holds, and a run of bytes that does not fill its last word
 	 leaves the rest of it alone."
 
-	headers := WordArray new: aCount * VGTiledFillEncoding entryHeaderWords.
-	clips := Float32Array new: aCount * VGTiledFillEncoding clipFloats.
-	maskRects := Float32Array new: aCount * VGTiledFillEncoding clipFloats.
-	paints := Float32Array new: aCount * VGTiledFillEncoding paintBlockFloats.
-	edges := Float32Array new: anEdgeCount * VGTiledFillEncoding edgeFloats.
-	stops := Float32Array new: aStopCount * VGTiledFillEncoding stopFloats.
-	maskBytes := WordArray new:
-		             aByteCount + VGTiledFillEncoding maskBytesPerWord - 1
-			             // VGTiledFillEncoding maskBytesPerWord
+	arrays at: #headers put: (WordArray new: aCount * VGTiledFillLayout entryHeaderWords).
+	arrays at: #clips put: (Float32Array new: aCount * VGTiledFillLayout clipFloats).
+	arrays at: #maskRects put: (Float32Array new: aCount * VGTiledFillLayout clipFloats).
+	arrays
+		at: #paints
+		put: (Float32Array new: aCount * VGTiledFillLayout paintBlockFloats).
+	arrays at: #edges put: (Float32Array new: anEdgeCount * VGTiledFillLayout edgeFloats).
+	arrays at: #stops put: (Float32Array new: aStopCount * VGTiledFillLayout stopFloats).
+	arrays at: #maskBytes put: (WordArray new:
+			 aByteCount + VGTiledFillLayout maskBytesPerWord - 1
+			 // VGTiledFillLayout maskBytesPerWord)
+]
+
+{ #category : 'allocating' }
+VGTiledFillBuffers >> allocateForShapes: aCount [
+	"The shape records of a frame, which are counted over the entries and not one an entry: an
+	 entry carries its fill and a record for every shape its clip was cut out with."
+
+	arrays
+		at: #shapes
+		put: (WordArray new: aCount * VGTiledFillLayout shapeRecordWords)
 ]
 
 { #category : 'allocating' }
@@ -46,9 +50,28 @@ VGTiledFillBuffers >> allocateForTiles: aTileCount references: aReferenceCount [
 	"The two buffers the tiles of a frame ride in, which are sized by the tiles the frame
 	 touches and not by the entries it holds, and so are allocated after them."
 
-	tileTable := WordArray new:
-		             aTileCount * VGTiledFillEncoding tileRecordWords.
-	entryRefs := WordArray new: aReferenceCount
+	arrays
+		at: #tileTable
+		put: (WordArray new: aTileCount * VGTiledFillLayout tileRecordWords).
+	arrays at: #entryRefs put: (WordArray new: aReferenceCount)
+]
+
+{ #category : 'accessing' }
+VGTiledFillBuffers >> bufferNamed: aName [
+	"The buffer of that binding, or nothing where no frame has been written out yet. The
+	 buffers are held by the name the kernel binds them under rather than one slot each,
+	 because a binding added to the contract is then a buffer added to this set and not a
+	 variable added to me."
+
+	^ arrays at: aName ifAbsent: [ nil ]
+]
+
+{ #category : 'accessing' }
+VGTiledFillBuffers >> bufferNames [
+	"The bindings I hold a buffer for, which after a frame is written out is every binding of
+	 the kernel an encoding answers."
+
+	^ arrays keys
 ]
 
 { #category : 'inspector' }
@@ -72,22 +95,28 @@ VGTiledFillBuffers >> bufferRows [
 
 { #category : 'accessing' }
 VGTiledFillBuffers >> clips [
-	^ clips
+	^ self bufferNamed: #clips
 ]
 
 { #category : 'accessing' }
 VGTiledFillBuffers >> edges [
-	^ edges
+	^ self bufferNamed: #edges
 ]
 
 { #category : 'accessing' }
 VGTiledFillBuffers >> entryRefs [
-	^ entryRefs
+	^ self bufferNamed: #entryRefs
 ]
 
 { #category : 'accessing' }
 VGTiledFillBuffers >> headers [
-	^ headers
+	^ self bufferNamed: #headers
+]
+
+{ #category : 'initialization' }
+VGTiledFillBuffers >> initialize [
+	super initialize.
+	arrays := Dictionary new
 ]
 
 { #category : 'inspector' }
@@ -114,27 +143,27 @@ VGTiledFillBuffers >> inspectorBuffers: aBuilder [
 		  yourself
 ]
 
-{ #category : 'inspector' }
+{ #category : 'inspecting' }
 VGTiledFillBuffers >> inspectorBuffersContext: aContext [
-	"Nothing has been allocated until a frame is written out, and a tab of nine empty rows says
+	"Nothing has been allocated until a frame is written out, and a tab of ten empty rows says
 	 less than no tab at all."
 
-	aContext active: headers isNotNil
+	aContext active: self headers isNotNil
 ]
 
 { #category : 'accessing' }
 VGTiledFillBuffers >> maskBytes [
-	^ maskBytes
+	^ self bufferNamed: #maskBytes
 ]
 
 { #category : 'accessing' }
 VGTiledFillBuffers >> maskRects [
-	^ maskRects
+	^ self bufferNamed: #maskRects
 ]
 
 { #category : 'accessing' }
 VGTiledFillBuffers >> paints [
-	^ paints
+	^ self bufferNamed: #paints
 ]
 
 { #category : 'printing' }
@@ -142,18 +171,23 @@ VGTiledFillBuffers >> printOn: aStream [
 	aStream
 		nextPutAll: self class name;
 		nextPut: $(;
-		print: (headers ifNil: [ 0 ] ifNotNil: [ headers size ]);
+		print: (self headers ifNil: [ 0 ] ifNotNil: [ :each | each size ]);
 		nextPutAll: ' header words, ';
-		print: (maskBytes ifNil: [ 0 ] ifNotNil: [ maskBytes size ]);
+		print: (self maskBytes ifNil: [ 0 ] ifNotNil: [ :each | each size ]);
 		nextPutAll: ' mask words)'
 ]
 
 { #category : 'accessing' }
+VGTiledFillBuffers >> shapes [
+	^ self bufferNamed: #shapes
+]
+
+{ #category : 'accessing' }
 VGTiledFillBuffers >> stops [
-	^ stops
+	^ self bufferNamed: #stops
 ]
 
 { #category : 'accessing' }
 VGTiledFillBuffers >> tileTable [
-	^ tileTable
+	^ self bufferNamed: #tileTable
 ]

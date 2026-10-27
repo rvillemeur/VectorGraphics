@@ -179,8 +179,8 @@ VGTiledFrameTestCase >> singleFloatEntryOf: anEntry [
 VGTiledFrameTestCase >> singleFloatFillOf: anEntry [
 	"The fill with its coordinates, its clip and the stops of its paint narrowed to single
 	 floats and everything else its own: the operator, the fill rule, the antialiasing mode, the
-	 alpha and the paint''s own coefficient block are carried by the encoding without arithmetic,
-	 so this gates the layout alone."
+	 alpha and the coefficient block of its own paint are carried by the encoding without
+	 arithmetic, so this gates the layout alone."
 
 	| segments |
 	segments := (VGSegments
@@ -193,7 +193,9 @@ VGTiledFrameTestCase >> singleFloatFillOf: anEntry [
 	^ VGFillEntry
 		  segments: segments
 		  paint: (self singleFloatPaintOf: anEntry paint)
-		  clip: (VGClip bounds: (self singleFloatRectangleOf: anEntry clip bounds))
+		  clip: (VGClip
+				   bounds: (self singleFloatRectangleOf: anEntry clip bounds)
+				   shapes: (self singleFloatShapesOf: anEntry clip))
 		  operator: anEntry operator
 ]
 
@@ -235,6 +237,20 @@ VGTiledFrameTestCase >> singleFloatRectangleOf: aRectangle [
 		  right: (self roundedToSingleFloat: aRectangle right)
 		  top: (self roundedToSingleFloat: aRectangle top)
 		  bottom: (self roundedToSingleFloat: aRectangle bottom)
+]
+
+{ #category : 'fixtures' }
+VGTiledFrameTestCase >> singleFloatShapesOf: aClip [
+	"The shapes of a clip with their coordinates narrowed to single floats, which is the only
+	 thing the buffers change about a shape: the fill rule and the antialiasing mode ride as
+	 codes and come back as they went."
+
+	^ aClip shapes collect: [ :shape |
+		  VGSpanScanner
+			  segments: (shape segments collect: [ :each |
+					   self roundedToSingleFloat: each ])
+			  fillRule: shape fillRule
+			  antialias: shape antialias ]
 ]
 
 { #category : 'fixtures' }

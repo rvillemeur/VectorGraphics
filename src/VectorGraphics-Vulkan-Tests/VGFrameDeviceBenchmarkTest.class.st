@@ -117,20 +117,22 @@ VGFrameDeviceBenchmarkTest >> testEveryFrameTheBenchmarkMeasuresIsDrawnEntirelyB
 ]
 
 { #category : 'tests' }
-VGFrameDeviceBenchmarkTest >> testEveryGlyphOfTheReferenceFrameIsNowRefusedForItsClipAlone [
-	"Sixty three of the eighty eight entries of the profiled frame are glyph blits. Unit 2.6 is
-	 worth nothing in pixels and everything in refusals, so what it owes is this: no entry of
-	 that frame is refused for being a blit, and each of those sixty three is now waiting on the
-	 shaped clip alone, which is the next unit and the last thing between this frame and the
-	 device."
+VGFrameDeviceBenchmarkTest >> testEveryGlyphOfTheReferenceFrameIsNowInTheSubset [
+	"Sixty three of the eighty eight entries of the profiled frame are glyph blits, and each of
+	 them is clipped to the rounded rectangle of its card. Unit 2.6 took the kind of an entry
+	 out of the refusals and unit 2.7 took the shape of a clip out of them, so these sixty three
+	 are the measure of both: a glyph of that frame is now drawn by the device through its own
+	 mask inside a clip that is not a rectangle."
 
 	| census blits |
 	census := VGTiledFillSupportCensus onTheReferenceFrame.
 	blits := census entries select: [ :each | each isKindOf: VGBlitEntry ].
 	self deny: blits isEmpty.
 	blits do: [ :each |
-		self assert: (VGTiledFillRasteriser supportsKindOf: each).
-		self assert: (census reasonFor: each) equals: #clipNotRectangular ]
+		self deny: each clip isRectangular.
+		self
+			assert: (census reasonFor: each)
+			equals: VGTiledFillSupportCensus supportedReason ]
 ]
 
 { #category : 'tests' }
@@ -164,18 +166,16 @@ VGFrameDeviceBenchmarkTest >> testTheCensusCountsThePixelsBehindEveryReasonItNam
 ]
 
 { #category : 'tests' }
-VGFrameDeviceBenchmarkTest >> testTheReferenceFrameIsNotYetDrawnByTheDeviceAtAll [
-	"A fact of today, and the reason the benchmark measures frames of its own. Failover is a
-	 whole frame at a time, so the reference frame goes to software for as long as one entry of
-	 it is refused. One capability refuses it now: the clip of a card is a rounded rectangle and
-	 not a rectangle, and that is unit 2.7. The kind of an entry refuses nothing any more, which
-	 unit 2.6 settled. When the clip arrives this test fails, and the plan is read again."
+VGFrameDeviceBenchmarkTest >> testTheReferenceFrameIsDrawnEntirelyByTheDeviceSubset [
+	"What unit 2.7 bought, and the one fact of this unit that is about a real picture rather
+	 than a corpus case: every one of the eighty eight entries of the profiled frame is in the
+	 subset, so the frame goes to the device whole. Failover is a whole frame at a time, and
+	 until this unit one refused entry sent all of it to software: the clip of a card is a
+	 rounded rectangle, and the glyphs of its label are clipped to the same shape."
 
 	| census |
 	census := VGTiledFillSupportCensus onTheReferenceFrame.
-	self deny: census isFrameSupported.
-	self assert: (census countByReason at: #clipNotRectangular ifAbsent: [ 0 ]) > 0.
-	self
-		assert: (census countByReason at: #notAFillOrABlit ifAbsent: [ 0 ])
-		equals: 0
+	self assert: census isFrameSupported.
+	self assert: census refusedCount equals: 0.
+	self assert: census supportedCount equals: census entries size
 ]

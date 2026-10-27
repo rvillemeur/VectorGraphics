@@ -183,12 +183,12 @@ VGTiledBlitTest >> testABlitDrawsTheSameBytesAsTheSoftwareBackend [
 		(self softwareFormOfExtent: self caseExtent drawnWith: self maskedFrame) bits
 ]
 
-{ #category : 'tests - subset' }
-VGTiledBlitTest >> testABlitInAShapedClipIsRefusedForItsClipAndNotForItsKind [
-	"The refusal a blit of the profiled frame meets: every glyph of it is clipped to the rounded
-	 rectangle of its card, which unit 2.7 answers. What this unit owes is that the reason named
-	 is the clip and not the kind, because a reason that names the kind sends a frame to the
-	 failover for something the device can now do."
+{ #category : 'tests' }
+VGTiledBlitTest >> testABlitInAShapedClipIsDrawnAndNotRefused [
+	"The refusal a blit of the profiled frame used to meet: every glyph of it is clipped to the
+	 rounded rectangle of its card. Unit 2.6 owed that the reason named was the clip and not the
+	 kind; unit 2.7 draws the clip, so the entry is refused for nothing at all and the census
+	 names no reason but the supported one."
 
 	| entry census |
 	entry := self blitEntryOfFrame: [ :context |
@@ -205,9 +205,12 @@ VGTiledBlitTest >> testABlitInAShapedClipIsRefusedForItsClipAndNotForItsKind [
 			         sourceColorR: 0.2 g: 0.4 b: 0.9 a: 1.0.
 		         context recordBlitOf: (self maskTileOfExtent: 21 @ 18) at: 7 @ 5 ].
 	census := VGTiledFillSupportCensus of: { entry } named: 'one shaped blit'.
+	self deny: entry clip isRectangular.
 	self assert: (VGTiledFillRasteriser supportsKindOf: entry).
-	self deny: (VGTiledFillRasteriser supportsEntry: entry).
-	self assert: (census reasonFor: entry) equals: #clipNotRectangular
+	self assert: (VGTiledFillRasteriser supportsEntry: entry).
+	self
+		assert: (census reasonFor: entry)
+		equals: VGTiledFillSupportCensus supportedReason
 ]
 
 { #category : 'tests' }
@@ -224,10 +227,10 @@ VGTiledBlitTest >> testAnEncodedBlitCarriesItsRectangleAndTheAlphaOfEveryPixelOf
 		            drawnWith: self maskedFrame.
 	self assert: encoding entryCount equals: 1.
 	self
-		assert: (encoding maskRectangleOfEntryAt: 1)
+		assert: (encoding decoder maskRectangleOfEntryAt: 1)
 		equals: fill tiledMaskRectangle.
 	self
-		assert: (encoding maskBytesOfEntryAt: 1)
+		assert: (encoding decoder maskBytesOfEntryAt: 1)
 		equals: fill tiledMaskBytes
 ]
 
@@ -244,12 +247,12 @@ VGTiledBlitTest >> testAnEncodedFillCarriesAnEmptyMaskRectangleAndNoBytesAtAll [
 		            drawnWith: self maskedFrameUnderSourceAndClear.
 	self assert: encoding entryCount equals: 3.
 	self
-		assert: (encoding maskRectangleOfEntryAt: 1)
-		equals: VGTiledFillEncoding emptyMaskRectangle.
-	self assert: (encoding maskBytesOfEntryAt: 1) isEmpty.
+		assert: (encoding decoder maskRectangleOfEntryAt: 1)
+		equals: VGTiledFillLayout emptyMaskRectangle.
+	self assert: (encoding decoder maskBytesOfEntryAt: 1) isEmpty.
 	self
-		deny: (encoding maskRectangleOfEntryAt: 2)
-		equals: VGTiledFillEncoding emptyMaskRectangle
+		deny: (encoding decoder maskRectangleOfEntryAt: 2)
+		equals: VGTiledFillLayout emptyMaskRectangle
 ]
 
 { #category : 'tests - subset' }

@@ -33,5 +33,5 @@ VGDisplayListEntry >> tiledMaskRectangle [
 	 here and not in VectorGraphics-Cairo because the mask buffers are the tiled rasteriser''s
 	 own layout."
 
-	^ VGTiledFillEncoding emptyMaskRectangle
+	^ VGTiledFillLayout emptyMaskRectangle
 ]

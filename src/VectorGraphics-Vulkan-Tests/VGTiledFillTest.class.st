@@ -26,12 +26,13 @@ VGTiledFillTest class >> degenerateGradientFrameNames [
 
 { #category : 'constants' }
 VGTiledFillTest class >> fillCaseCount [
-	"Counted over the corpus: twenty-four of the forty-one cases are fills of a solid colour or of
-	 a gradient inside a rectangular clip, which is the subset units 2.3 and 2.4 draw. Unit 2.3
-	 drew twenty-two of them and unit 2.4 added the two gradient cases. The other seventeen carry
-	 a surface or a mesh paint, a blit or a shaped clip, and wait for units 2.5 and 2.6."
+	"Counted over the corpus: twenty-five of the forty-one cases are fills of a solid colour or of
+	 a gradient, which is the subset units 2.3, 2.4 and 2.7 draw. Unit 2.3 drew twenty-two of
+	 them inside a rectangular clip, unit 2.4 added the two gradient cases and unit 2.7 added
+	 clip-circle by drawing a clip cut out by shapes. The other sixteen carry a surface or a mesh
+	 paint or record a blit, and wait for units 2.8 and after."
 
-	^ 24
+	^ 25
 ]
 
 { #category : 'constants' }
@@ -98,10 +99,10 @@ VGTiledFillTest >> referenceOfTileAt: anIndex in: anEncoding [
 
 	| base |
 	base := (anEncoding rowOfTileAt: anIndex) - 1
-	        * VGTiledFillEncoding tileRecordWords.
+	        * VGTiledFillLayout tileRecordWords.
 	^ anEncoding entryRefs at:
 		  (anEncoding tileTable
-			   at: base + VGTiledFillEncoding referenceOffsetField) + 1
+			   at: base + VGTiledFillLayout referenceOffsetField) + 1
 ]
 
 { #category : 'tests' }
@@ -234,15 +235,15 @@ VGTiledFillTest >> testAReferenceCarriesItsIdentifierUnchangedWhetherItIsMarkedO
 
 	| identifier marked plain |
 	identifier := 12345.
-	marked := VGTiledFillEncoding referenceFor: identifier interior: true.
-	plain := VGTiledFillEncoding referenceFor: identifier interior: false.
-	self assert: (VGTiledFillEncoding isInteriorReference: marked).
-	self deny: (VGTiledFillEncoding isInteriorReference: plain).
+	marked := VGTiledFillLayout referenceFor: identifier interior: true.
+	plain := VGTiledFillLayout referenceFor: identifier interior: false.
+	self assert: (VGTiledFillLayout isInteriorReference: marked).
+	self deny: (VGTiledFillLayout isInteriorReference: plain).
 	self
-		assert: (VGTiledFillEncoding identifierOfReference: marked)
+		assert: (VGTiledFillLayout identifierOfReference: marked)
 		equals: identifier.
 	self
-		assert: (VGTiledFillEncoding identifierOfReference: plain)
+		assert: (VGTiledFillLayout identifierOfReference: plain)
 		equals: identifier.
 	self assert: plain equals: identifier
 ]
@@ -492,13 +493,15 @@ VGTiledFillTest >> testCoverageIsTheSameFloatAsTheRasteriserAnswersForEveryPixel
 VGTiledFillTest >> testEveryBufferTheKernelBindsOutOfAnEncodingIsOneTheBuffersAnswer [
 	"The set holds one buffer a binding of the kernel that an encoding writes, and the encoding
 	 answers each of them by the name the binding carries. A binding added to the contract and
-	 not to the set would reach the device as nothing at all."
+	 not to the set would reach the device as nothing at all, and a buffer the set holds under a
+	 name no binding carries would never be read."
 
 	| buffers encoding names list |
 	names := VGTiledFillKernel bindingNames reject: [ :each |
 		         VGTiledFillDispatch bindingsNotOfAnEncoding includes: each ].
 	buffers := VGTiledFillBuffers new.
 	buffers allocateForEntries: 1 edges: 4 stops: 0 masks: 0.
+	buffers allocateForShapes: 1.
 	buffers allocateForTiles: 1 references: 1.
 	list := self
 		        displayListOfExtent: 64 @ 64
@@ -514,8 +517,36 @@ VGTiledFillTest >> testEveryBufferTheKernelBindsOutOfAnEncodingIsOneTheBuffersAn
 		self assert: (buffers perform: name) isNotNil.
 		self assert: (encoding perform: name) isNotNil ].
 	self
-		assert: VGTiledFillBuffers instVarNames asSortedCollection asArray
-		equals: (names collect: [ :each | each asString ]) asSortedCollection asArray
+		assert: buffers bufferNames asSortedCollection asArray
+		equals: names asSortedCollection asArray
+]
+
+{ #category : 'tests - layout' }
+VGTiledFillTest >> testEveryFieldOfARecordIsOneBasedWithinItsStrideAndNamedOnce [
+	"A field is an index into one record of one buffer, so it has to fit inside that record and
+	 mean one thing. A field past its own stride, or named in two records, would have the
+	 encoding write one word and the kernel read another."
+
+	| named |
+	named := OrderedCollection new.
+	VGTiledFillLayout recordFields keysAndValuesDo: [ :stride :fields |
+		| words values |
+		words := VGTiledFillLayout perform: stride.
+		values := fields collect: [ :each | VGTiledFillLayout perform: each ].
+		named addAll: fields.
+		values do: [ :each |
+			self assert: each >= 1.
+			self assert: each <= words ].
+		self
+			assert: values asSet size = fields size
+			description: 'two fields of ' , stride , ' share a number' ].
+	self
+		assert: named asSet size = named size
+		description: 'a field is named in two records'.
+	self
+		assertCollection: named asSet
+		hasSameElements:
+			(VGTiledFillLayout class selectors select: [ :each | each endsWith: 'Field' ])
 ]
 
 { #category : 'tests' }
@@ -690,7 +721,7 @@ VGTiledFillTest >> testTheBuffersAreSizedByTheFrameAndByNothingElse [
 		edges := list entries inject: 0 into: [ :sum :each |
 			         sum
 			         + (each segments coordinates size
-					          / VGTiledFillEncoding edgeFloats) ].
+					          / VGTiledFillLayout edgeFloats) ].
 		stopCount := list entries inject: 0 into: [ :sum :each |
 			             sum + (each paint hasStops
 					              ifTrue: [ each paint stops size ]
@@ -698,24 +729,24 @@ VGTiledFillTest >> testTheBuffersAreSizedByTheFrameAndByNothingElse [
 		self assert: encoding entryCount equals: list entries size.
 		self
 			assert: encoding headers size
-			equals: list entries size * VGTiledFillEncoding entryHeaderWords.
+			equals: list entries size * VGTiledFillLayout entryHeaderWords.
 		self
 			assert: encoding clips size
-			equals: list entries size * VGTiledFillEncoding clipFloats.
+			equals: list entries size * VGTiledFillLayout clipFloats.
 		self
 			assert: encoding paints size
-			equals: list entries size * VGTiledFillEncoding paintBlockFloats.
+			equals: list entries size * VGTiledFillLayout paintBlockFloats.
 		self assert: encoding edgeCount equals: edges.
 		self
 			assert: encoding edges size
-			equals: edges * VGTiledFillEncoding edgeFloats.
+			equals: edges * VGTiledFillLayout edgeFloats.
 		self assert: encoding stopCount equals: stopCount.
 		self
 			assert: encoding stops size
-			equals: stopCount * VGTiledFillEncoding stopFloats.
+			equals: stopCount * VGTiledFillLayout stopFloats.
 		self
 			assert: encoding tileTable size
-			equals: binning touchedTileCount * VGTiledFillEncoding tileRecordWords.
+			equals: binning touchedTileCount * VGTiledFillLayout tileRecordWords.
 		self assert: encoding entryRefs size equals: binning binnedEntryCount ]
 ]
 
@@ -730,20 +761,39 @@ VGTiledFillTest >> testTheBuffersOfAFrameAreSizedByTheCountsOfThatFrame [
 	buffers allocateForEntries: 2 edges: 8 stops: 3 masks: 9.
 	self
 		assert: buffers headers size
-		equals: 2 * VGTiledFillEncoding entryHeaderWords.
-	self assert: buffers clips size equals: 2 * VGTiledFillEncoding clipFloats.
-	self assert: buffers maskRects size equals: 2 * VGTiledFillEncoding clipFloats.
+		equals: 2 * VGTiledFillLayout entryHeaderWords.
+	self assert: buffers clips size equals: 2 * VGTiledFillLayout clipFloats.
+	self assert: buffers maskRects size equals: 2 * VGTiledFillLayout clipFloats.
 	self
 		assert: buffers paints size
-		equals: 2 * VGTiledFillEncoding paintBlockFloats.
-	self assert: buffers edges size equals: 8 * VGTiledFillEncoding edgeFloats.
-	self assert: buffers stops size equals: 3 * VGTiledFillEncoding stopFloats.
+		equals: 2 * VGTiledFillLayout paintBlockFloats.
+	self assert: buffers edges size equals: 8 * VGTiledFillLayout edgeFloats.
+	self assert: buffers stops size equals: 3 * VGTiledFillLayout stopFloats.
 	self assert: buffers maskBytes size equals: 3.
 	buffers allocateForTiles: 6 references: 9.
 	self
 		assert: buffers tileTable size
-		equals: 6 * VGTiledFillEncoding tileRecordWords.
+		equals: 6 * VGTiledFillLayout tileRecordWords.
 	self assert: buffers entryRefs size equals: 9
+]
+
+{ #category : 'tests - layout' }
+VGTiledFillTest >> testTheChannelsOfAStopFollowItsPositionAndFillTheRecord [
+	"A stop rides as its offset and then its four channels, and the kernel reads the channels as a
+	 run from one index. They have to be consecutive and reach the end of the record, or a ramp
+	 would read the position of the next stop as a colour."
+
+	self
+		assert: VGTiledFillLayout stopChannelFields first
+		equals: VGTiledFillLayout stopPositionField + 1.
+	self
+		assert: VGTiledFillLayout stopChannelFields last
+		equals: VGTiledFillLayout stopFloats.
+	self
+		assert: VGTiledFillLayout stopChannelFields asArray
+		equals:
+			(VGTiledFillLayout stopChannelFields first
+				 to: VGTiledFillLayout stopChannelFields last) asArray
 ]
 
 { #category : 'tests' }
@@ -807,7 +857,7 @@ VGTiledFillTest >> testTheFrameTheDeviceGateDrawsReallyCarriesMarkedReferences [
 				             drawnWith: self mixedFillFrame)
 		            extent: self caseExtent.
 	marked := (1 to: encoding entryRefs size) count: [ :index |
-		          VGTiledFillEncoding isInteriorReference:
+		          VGTiledFillLayout isInteriorReference:
 			          (encoding entryRefs at: index) ].
 	self assert: marked > 0
 ]
@@ -846,12 +896,12 @@ VGTiledFillTest >> testTheReferenceOfATileAFillCoversWhollyCarriesItsFlagAndItsI
 	encoding := VGTiledFillEncoding of: list grid: grid.
 	inside := (grid indexesIntersecting: (33 @ 33 corner: 34 @ 34)) anyOne.
 	onTheEdge := (grid indexesIntersecting: (0 @ 0 corner: 1 @ 1)) anyOne.
-	self assert: (VGTiledFillEncoding isInteriorReference:
+	self assert: (VGTiledFillLayout isInteriorReference:
 			 (self referenceOfTileAt: inside in: encoding)).
-	self deny: (VGTiledFillEncoding isInteriorReference:
+	self deny: (VGTiledFillLayout isInteriorReference:
 			 (self referenceOfTileAt: onTheEdge in: encoding)).
 	self
-		assert: (VGTiledFillEncoding identifierOfReference:
+		assert: (VGTiledFillLayout identifierOfReference:
 				 (self referenceOfTileAt: inside in: encoding))
 		equals: 1.
 	self assert: (encoding entriesOfTileAt: inside) size equals: 1
@@ -881,7 +931,8 @@ VGTiledFillTest >> testTheSourceOperatorDrawsTheSameBytesAsTheSoftwareBackend [
 VGTiledFillTest >> testTheSubsetHoldsAFillOfASolidColourOrAGradientAndNothingElse [
 	"What the kernel can draw, which unit 2.4 widened from a solid colour to a gradient. A frame
 	 outside the subset is not drawn wrongly: it is refused here, so that the backend can hand it
-	 to the failover whole."
+	 to the failover whole. A clip cut out by shapes is in the subset since unit 2.7, so
+	 the shaped frame here holds the fact that a shape in the clip refuses nothing on its own."
 
 	| solid gradient surfacePaint blit shaped |
 	solid := self
@@ -924,7 +975,7 @@ VGTiledFillTest >> testTheSubsetHoldsAFillOfASolidColourOrAGradientAndNothingEls
 	self assert: (VGTiledFillRasteriser supports: gradient).
 	self deny: (VGTiledFillRasteriser supports: surfacePaint).
 	self deny: (VGTiledFillRasteriser supports: blit).
-	self deny: (VGTiledFillRasteriser supports: shaped)
+	self assert: (VGTiledFillRasteriser supports: shaped)
 ]
 
 { #category : 'tests' }

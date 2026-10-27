@@ -25,6 +25,15 @@ VGClip class >> bounds: aRectangle [
 ]
 
 { #category : 'instance creation' }
+VGClip class >> bounds: aRectangle shapes: aCollection [
+	"The clip of an area cut out by those shapes. Only a reader of a written frame builds one
+	 this way: every other clip grows by clippedBy:, which decides for itself whether the edges
+	 it is given are a rectangle or a shape, and a decoder already knows which they were."
+
+	^ self new setBounds: aRectangle shapes: aCollection asArray
+]
+
+{ #category : 'instance creation' }
 VGClip class >> empty [
 	"The clip that allows nothing. Measured: clipping with an empty path leaves a successful
 	 status and clips everything away, and the extents collapse to the origin."

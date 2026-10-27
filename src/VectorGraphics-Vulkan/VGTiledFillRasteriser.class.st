@@ -47,23 +47,23 @@ VGTiledFillRasteriser class >> supportedOperators [
 		  VGCairoOperator clear }
 ]
 
-{ #category : 'subset' }
+{ #category : 'testing' }
 VGTiledFillRasteriser class >> supports: aDisplayList [
 	"The frames I can draw: a fill of a solid colour or of a gradient, and a blit of either
-	 through its mask, inside a rectangular clip under one of the three operators the fill cases
-	 of the conformance corpus ask for. Everything else — a surface or a mesh paint, a shaped
-	 clip, or an operator that writes where no source covers — belongs to a later unit, and a
+	 through its mask, inside any clip the engine can build, under one of the three operators the
+	 fill cases of the conformance corpus ask for. A clip cut out by shapes is drawn as the
+	 shapes of the entry are, which unit 2.7 settled. Everything else — a surface or a mesh
+	 paint, or an operator that writes where no source covers — belongs to a later unit, and a
 	 backend that meets one owes VGBackendFailure rather than a frame half drawn."
 
 	^ aDisplayList entries allSatisfy: [ :each | self supportsEntry: each ]
 ]
 
-{ #category : 'subset' }
+{ #category : 'testing' }
 VGTiledFillRasteriser class >> supportsEntry: anEntry [
 	^ (self supportsKindOf: anEntry) and: [
 		  (self supportsPaint: anEntry paint) and: [
-			  anEntry clip isRectangular and: [
-				  self supportedOperators includes: anEntry operator ] ] ]
+			  self supportedOperators includes: anEntry operator ] ]
 ]
 
 { #category : 'subset' }
