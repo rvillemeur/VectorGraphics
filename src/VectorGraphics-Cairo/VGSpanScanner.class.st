@@ -9,7 +9,9 @@ Class {
 	#instVars : [
 		'segments',
 		'fillRule',
-		'antialias'
+		'antialias',
+		'exactBounds',
+		'edgeIndex'
 	],
 	#category : 'VectorGraphics-Cairo-Rasterising',
 	#package : 'VectorGraphics-Cairo',
@@ -33,6 +35,14 @@ VGSpanScanner class >> segments: anArray fillRule: aSymbol antialias: anotherSym
 		  setSegments: anArray
 		  fillRule: aSymbol
 		  antialias: anotherSymbol
+]
+
+{ #category : 'private' }
+VGSpanScanner >> anEdgeMeets: aRectangle [
+	"Whether any of my edges touches that closed rectangle, asked of the index over my own
+	 edges so that only the edges near the rectangle are read."
+
+	^ self edgeIndex anEdgeMeets: aRectangle
 ]
 
 { #category : 'accessing' }
@@ -64,8 +74,116 @@ VGSpanScanner >> crossingsAt: aNumber [
 ]
 
 { #category : 'accessing' }
+VGSpanScanner >> edgeIndex [
+	"My edges indexed by band, remembered: a binning asks whether an edge of one shape meets a
+	 tile and what the winding is in the middle of it once a tile, and a scan over every edge at
+	 each of them is the cost of the question rather than of the answer."
+
+	^ edgeIndex ifNil: [
+		  edgeIndex := VGEdgeIndex
+			               coordinates: segments
+			               bounds:
+			               (self exactBoundingBox ifNil: [ 0 @ 0 corner: 0 @ 0 ]) ]
+]
+
+{ #category : 'testing' }
+VGSpanScanner >> enclosesWholly: aRectangle [
+	"Whether every point of that rectangle, its boundary included, is inside me under my own
+	 fill rule. A tiled rasteriser asks this of a tile before it walks it, of the fill and of
+	 every shape its clip was cut out by, because the coverage of every pixel of a rectangle
+	 they all enclose is one and the walk has nothing to find there.
+	 The answer is conservative, since a yes paints whole a pixel the walk would have painted in
+	 part: an edge that so much as touches the rectangle answers no, and that leaves one point to
+	 ask of the fill rule, the centre."
+
+	| box |
+	box := self exactBoundingBox.
+	box ifNil: [ ^ false ].
+	(box containsRect: aRectangle) ifFalse: [ ^ false ].
+	(self anEdgeMeets: aRectangle) ifTrue: [ ^ false ].
+	^ self isInsideAt: aRectangle center
+]
+
+{ #category : 'inspector' }
+VGSpanScanner >> enclosureSampleTiles [
+	"The rectangles the Enclosure tab asks about: my own box cut into a four by four grid, and my
+	 whole box last. A rectangle of a shape's inside is enclosed and one over an edge is not, so
+	 this grid shows both without naming a tile size, which lives in another package."
+
+	| box width height tiles |
+	box := self exactBoundingBox.
+	box ifNil: [ ^ #(  ) ].
+	width := box width / 4.
+	height := box height / 4.
+	tiles := OrderedCollection new.
+	0 to: 3 do: [ :row |
+		0 to: 3 do: [ :column |
+			| left top |
+			left := box left + (column * width).
+			top := box top + (row * height).
+			tiles add: (left @ top corner: left + width @ (top + height)) ] ].
+	tiles add: box.
+	^ tiles asArray
+]
+
+{ #category : 'accessing' }
+VGSpanScanner >> exactBoundingBox [
+	"The device rectangle my edges live in, fractions kept, or nil when I hold none. A clip needs
+	 the fraction: it is what pays for half of the pixel its edge runs through.
+	 The answer is remembered, because a binning asks it of one shape once a tile and my
+	 coordinates never change after I am built."
+
+	| left top right bottom |
+	exactBounds ifNotNil: [ ^ exactBounds ].
+	self isEmpty ifTrue: [ ^ nil ].
+	left := Float infinity.
+	top := Float infinity.
+	right := Float infinity negated.
+	bottom := Float infinity negated.
+	1 to: segments size by: 2 do: [ :index |
+		| x y |
+		x := segments at: index.
+		y := segments at: index + 1.
+		left := left min: x.
+		right := right max: x.
+		top := top min: y.
+		bottom := bottom max: y ].
+	^ exactBounds := left @ top corner: right @ bottom
+]
+
+{ #category : 'accessing' }
 VGSpanScanner >> fillRule [
 	^ fillRule
+]
+
+{ #category : 'inspector' }
+VGSpanScanner >> inspectorEnclosure: aBuilder [
+	<inspectorPresentationOrder: 2 title: 'Enclosure'>
+	"Whether I enclose a rectangle wholly, asked of every tile of a sixteen-pixel grid over my own
+	 box, with the three answers it is built from beside it. A tiled rasteriser takes the coverage
+	 of a tile I enclose as one without sampling it, so each column sends the real question: a
+	 tile whose answer says yes while an edge meets it would show here."
+
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn title: 'Tile' evaluated: [ :each |
+					   each printString ]);
+		  addColumn: (SpStringTableColumn title: 'Encloses wholly' evaluated: [ :each |
+					   (self enclosesWholly: each) printString ]);
+		  addColumn: (SpStringTableColumn title: 'My box holds it' evaluated: [ :each |
+					   (self exactBoundingBox containsRect: each) printString ]);
+		  addColumn: (SpStringTableColumn title: 'An edge meets it' evaluated: [ :each |
+					   (self anEdgeMeets: each) printString ]);
+		  addColumn: (SpStringTableColumn title: 'Inside at its centre' evaluated: [ :each |
+					   (self isInsideAt: each center) printString ]);
+		  items: self enclosureSampleTiles;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGSpanScanner >> inspectorEnclosureContext: aContext [
+	"A scanner with no edges has no box to cut into tiles, so there is nothing to ask about."
+
+	aContext active: self isEmpty not
 ]
 
 { #category : 'inspecting' }
@@ -124,6 +242,14 @@ VGSpanScanner >> isInside: anInteger [
 	^ fillRule == #evenOdd
 		  ifTrue: [ anInteger odd ]
 		  ifFalse: [ anInteger ~= 0 ]
+]
+
+{ #category : 'private' }
+VGSpanScanner >> isInsideAt: aPoint [
+	"Whether that point is inside me under my own fill rule. The winding is counted by the index
+	 over my own edges, which reads the band of the point''s row and no other edge of mine."
+
+	^ self isInside: (self edgeIndex windingAt: aPoint)
 ]
 
 { #category : 'printing' }

@@ -54,6 +54,29 @@ VGCairoDrawingTest >> squareMaskOfSide: anInteger [
 	^ mask
 ]
 
+{ #category : 'tests - drawing' }
+VGCairoDrawingTest >> testAFillCoversEveryPixelOfARectangleEveryShapeOfItsClipEnclosesWholly [
+	"The interior mark under a clip cut out by shapes, which is unit 2.7a. A clip holds its
+	 shapes as scanners, and a scanner answers the same predicate a fill answers of its own
+	 edges, so a rectangle the fill encloses and every shape of the clip encloses takes full
+	 coverage at every pixel. A rectangle one shape of the clip cuts is a no, and so is one
+	 outside the bounds the clip was narrowed to."
+
+	| shape clip entry |
+	shape := VGSegments rectangle: (0 @ 0 corner: 64 @ 64).
+	clip := (VGClip bounds: (0 @ 0 corner: 64 @ 64)) clippedBy:
+		        (VGPathExamples starPath segmentsWithFillRule: #winding).
+	entry := VGFillEntry
+		         segments: shape
+		         paint: Color black
+		         clip: clip
+		         operator: VGCairoOperator over.
+	self deny: clip isRectangular.
+	self assert: (entry coversEveryPixelOf: (28 @ 24 corner: 34 @ 28)).
+	self deny: (entry coversEveryPixelOf: (25 @ 25 corner: 30 @ 30)).
+	self deny: (entry coversEveryPixelOf: (0 @ 0 corner: 4 @ 4))
+]
+
 { #category : 'tests' }
 VGCairoDrawingTest >> testAFillCoversEveryPixelOfARectangleInsideBothItsShapeAndItsClip [
 	"What a tiled rasteriser asks of an entry before it walks a tile of it: a rectangle every
@@ -439,12 +462,12 @@ VGCairoDrawingTest >> testMaskingWithAGroupPaintsTheSourceWhereTheGroupDrew [
 	self assert: (target pixelAtX: 8 y: 20) equals: 0
 ]
 
-{ #category : 'tests' }
-VGCairoDrawingTest >> testNoFillCoversEveryPixelOfARectangleItsClipCutsOrCanOnlyCutByAShape [
-	"A clip cut out by a shape keeps a scanner rather than a rectangle, and what it allows at a
-	 pixel is then the coverage of that shape, so a fill under it can promise nothing about a
-	 whole pixel. A rectangular clip that leaves part of the rectangle out is a no as well. A
-	 blit is a no in every case: it paints the alpha of a mask and not a shape it fills."
+{ #category : 'tests - drawing' }
+VGCairoDrawingTest >> testNoFillCoversEveryPixelOfARectangleAShapeCutsItTheClipLeavesItOutOrItIsABlit [
+	"The three noes. A clip cut out by a shape promises nothing where that shape runs through the
+	 rectangle: the star here crosses it, so the coverage there is the coverage of the star and
+	 not one. A rectangular clip that leaves part of the rectangle out is a no as well. A blit is
+	 a no in every case: it paints the alpha of a mask and not a shape it fills."
 
 	| shape shaped narrow |
 	shape := VGSegments rectangle: (8 @ 8 corner: 40 @ 40).

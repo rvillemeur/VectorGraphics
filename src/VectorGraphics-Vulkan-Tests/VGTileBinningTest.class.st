@@ -51,13 +51,16 @@ VGTileBinningTest >> testADegenerateRectangleTouchesNoTileAtAll [
 ]
 
 { #category : 'tests' }
-VGTileBinningTest >> testAFillUnderAClipCutByAShapeMarksNoTileInterior [
-	"The clip allows a pixel only as far as its own shape covers it, so no tile under such a clip
-	 is covered in full, however far inside the fill it lies. The binning asks the entry, which
-	 is where that rule is kept."
+VGTileBinningTest >> testAFillUnderAClipCutByAShapeMarksTheTilesThatShapeEnclosesInterior [
+	"A clip cut out by a shape allows a pixel as far as that shape covers it, so a tile the shape
+	 encloses wholly is covered in full and a tile the shape runs through is not. The clip here is
+	 a circle of radius thirty about the middle of a sixty-four pixel frame: it encloses the four
+	 middle tiles of the grid, whose farthest corner is twenty-three pixels out, and it runs
+	 through the twelve around them. The binning asks the entry, which is where that rule is kept."
 
-	| binning grid |
+	| binning grid centre marked |
 	grid := VGTileGrid extent: 64 @ 64 tileExtent: 16 @ 16.
+	centre := 32 @ 32.
 	binning := VGTileBinning
 		           of: (self
 				            frameOfExtent: 64 @ 64
@@ -68,8 +71,19 @@ VGTileBinningTest >> testAFillUnderAClipCutByAShapeMarksNoTileInterior [
 						            rectangleX: 0 y: 0 width: 64 height: 64;
 						            fill ])
 		           grid: grid.
-	self assert: binning touchedTileCount > 0.
-	self assert: binning interiorReferenceCount equals: 0
+	self assert: binning touchedTileCount equals: grid tileCount.
+	self assert: binning interiorReferenceCount equals: 4.
+	marked := (1 to: grid tileCount) select: [ :index |
+		          binning
+			          isEntry: binning entries first
+			          interiorToTileAt: index ].
+	marked do: [ :index |
+		(grid boundsOfTileAt: index) corners do: [ :corner |
+			self assert: (corner distanceTo: centre) < 30 ] ].
+	((1 to: grid tileCount) reject: [ :index | marked includes: index ])
+		do: [ :index |
+			self assert: ((grid boundsOfTileAt: index) corners anySatisfy: [
+					 :corner | (corner distanceTo: centre) > 30 ]) ]
 ]
 
 { #category : 'tests - binning' }

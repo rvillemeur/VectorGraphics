@@ -47,6 +47,20 @@ VGRasteriserTest >> coverageOfAll: aCollectionOfPointArrays rule: aSymbol [
 	^ grid
 ]
 
+{ #category : 'fixtures' }
+VGRasteriserTest >> edgeIndexShapes [
+	"Three shapes whose edges are spread over their own bounding box, which is what an index over
+	 bands has to get right: a self-crossing star, two nested squares, which leave the middle of
+	 the box empty of edges, and a circle of many short edges."
+
+	^ {
+		  (self segmentsOfAll: { (self fivePointedStarOfRadius: 24 center: 32 @ 32) }).
+		  (self segmentsOfAll: {
+				   { 8 @ 8. 40 @ 8. 40 @ 40. 8 @ 40 }.
+				   { 16 @ 16. 32 @ 16. 32 @ 32. 16 @ 32 } }).
+		  (self segmentsOfAll: { (self circleOfRadius: 28 center: 32 @ 32) }) }
+]
+
 { #category : 'support' }
 VGRasteriserTest >> fivePointedStarOfRadius: aNumber center: aPoint [
 	"The points taken two apart, which is what makes the star one self-crossing path with a
@@ -148,6 +162,79 @@ VGRasteriserTest >> testAnAlignedRectangleCoversWholePixelsAndNothingOutside [
 	self assert: (grid at: 12 @ 4 ifAbsent: [ 0 ]) equals: 0.
 	self assert: (grid at: 3 @ 4 ifAbsent: [ 0 ]) equals: 0.
 	self assert: grid size equals: 8 * 5
+]
+
+{ #category : 'tests - edge index' }
+VGRasteriserTest >> testAnEdgeIndexAnswersWhatAScanOverEveryEdgeAnswers [
+	"The index may not change an answer: an index of one band is the scan over every edge, and an
+	 index of as many bands as it chooses for itself has to agree with it at every rectangle and
+	 at every point. The rectangles here walk the whole box of each shape, eight pixels at a
+	 time, so they fall inside the shape, across its edges and outside it. The shapes are not all
+	 cut into bands — eight edges fit in one — so the count is read afterwards and one shape at
+	 least has to be cut, or the test would prove nothing about reading a band."
+
+	| bounds counts |
+	bounds := 0 @ 0 corner: 64 @ 64.
+	counts := OrderedCollection new.
+	self edgeIndexShapes do: [ :coordinates |
+		| flat indexed |
+		flat := VGEdgeIndex
+			        coordinates: coordinates
+			        bounds: bounds
+			        bands: 1.
+		indexed := VGEdgeIndex coordinates: coordinates bounds: bounds.
+		counts add: indexed bandCount.
+		0 to: 64 by: 8 do: [ :x |
+			0 to: 64 by: 8 do: [ :y |
+				| rectangle |
+				rectangle := x @ y corner: x + 8 @ (y + 8).
+				self
+					assert: (indexed anEdgeMeets: rectangle)
+					equals: (flat anEdgeMeets: rectangle).
+				self
+					assert: (indexed windingAt: x @ y)
+					equals: (flat windingAt: x @ y) ] ] ].
+	self assert: (counts anySatisfy: [ :each | each > 1 ])
+]
+
+{ #category : 'tests - edge index' }
+VGRasteriserTest >> testAnEdgeIndexHoldsEveryEdgeOfItsShapeAndOnlyInBandsTheEdgeReaches [
+	"Every edge is in the index, or a rectangle could miss it, and no edge is in a band its own
+	 rows do not reach, or the index would be the scan it replaces. The reach is read closed, as
+	 an edge lying exactly on the floor of a band is in the bands on both sides of it."
+
+	| index coordinates seen |
+	coordinates := self edgeIndexShapes first.
+	index := VGEdgeIndex coordinates: coordinates bounds: (0 @ 0 corner: 64 @ 64).
+	seen := Set new.
+	1 to: index bandCount do: [ :band |
+		| bandBox |
+		bandBox := index boundsOfBandAt: band.
+		(index edgeIndexesInBandAt: band) do: [ :each |
+			| box |
+			box := index boxOfEdgeAt: each.
+			seen add: each.
+			self assert: box bottom >= bandBox top.
+			self assert: box top <= bandBox bottom ] ].
+	self assert: seen size equals: index edgeCount
+]
+
+{ #category : 'tests - edge index' }
+VGRasteriserTest >> testAnEdgeIndexOfADegenerateShapeAnswersWithoutDividingByNought [
+	"The degenerate shapes: no edge at all meets nothing and winds nowhere, and a shape whose
+	 edges all lie on one row has a box of no height, which may not be cut into bands."
+
+	| empty flat row |
+	empty := VGEdgeIndex coordinates: #(  ) bounds: (0 @ 0 corner: 64 @ 64).
+	self deny: (empty anEdgeMeets: (0 @ 0 corner: 64 @ 64)).
+	self assert: (empty windingAt: 32 @ 32) equals: 0.
+	self assert: empty bandCount equals: 1.
+	row := #( 8.0 20.0 40.0 20.0 40.0 20.0 8.0 20.0 ).
+	flat := VGEdgeIndex coordinates: row bounds: (8 @ 20 corner: 40 @ 20).
+	self assert: flat bandCount equals: 1.
+	self assert: (flat anEdgeMeets: (16 @ 16 corner: 24 @ 24)).
+	self deny: (flat anEdgeMeets: (16 @ 24 corner: 24 @ 32)).
+	self assert: (flat windingAt: 24 @ 20) equals: 0
 ]
 
 { #category : 'tests' }

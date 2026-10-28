@@ -16,7 +16,6 @@ Class {
 		'fillRule',
 		'antialias',
 		'alpha',
-		'exactBounds',
 		'spanScanner'
 	],
 	#category : 'VectorGraphics-Cairo-Path',
@@ -70,30 +69,6 @@ VGSegments >> alpha [
 	 to the fill rule and the antialiasing mode, because the backend's fill message carries the
 	 segments, the paint, the clip and the operator and nothing else."
 	^ alpha
-]
-
-{ #category : 'private' }
-VGSegments >> anEdgeMeets: aRectangle [
-	"Whether any of my edges touches that closed rectangle. The two axes of the rectangle answer
-	 most edges on their own, so they are asked first, and the line of the edge only for what is
-	 left. Nothing is allocated here, because a binning asks this of one entry once a tile."
-
-	| left right top bottom |
-	left := aRectangle left.
-	right := aRectangle right.
-	top := aRectangle top.
-	bottom := aRectangle bottom.
-	1 to: coordinates size by: 4 do: [ :index |
-		| x0 y0 x1 y1 |
-		x0 := coordinates at: index.
-		y0 := coordinates at: index + 1.
-		x1 := coordinates at: index + 2.
-		y1 := coordinates at: index + 3.
-		((x0 max: x1) < left or: [ (x0 min: x1) > right ]) ifFalse: [
-			((y0 max: y1) < top or: [ (y0 min: y1) > bottom ]) ifFalse: [
-				(self edgeAt: index hasEveryCornerOnOneSideOf: aRectangle)
-					ifFalse: [ ^ true ] ] ] ].
-	^ false
 ]
 
 { #category : 'accessing' }
@@ -152,73 +127,23 @@ VGSegments >> drawOn: aBackend paint: aPaint clip: aClip operator: anOperator in
 		into: aTarget
 ]
 
-{ #category : 'private' }
-VGSegments >> edgeAt: anIndex hasEveryCornerOnOneSideOf: aRectangle [
-	"Whether every corner of the rectangle lies strictly on one side of the line the edge at that
-	 coordinate runs along. The edge then cannot touch the rectangle, whatever the two axes of
-	 the rectangle say, and those three tests together are exact for a segment against a
-	 rectangle. An edge of no length puts every corner at distance nought on its own line and so
-	 answers false, which is the conservative way round."
-
-	| x0 y0 normalX normalY at topLeft topRight bottomRight bottomLeft |
-	x0 := coordinates at: anIndex.
-	y0 := coordinates at: anIndex + 1.
-	normalX := (coordinates at: anIndex + 3) - y0.
-	normalY := x0 - (coordinates at: anIndex + 2).
-	at := normalX * x0 + (normalY * y0).
-	topLeft := normalX * aRectangle left + (normalY * aRectangle top) - at.
-	topRight := normalX * aRectangle right + (normalY * aRectangle top) - at.
-	bottomRight := normalX * aRectangle right
-	               + (normalY * aRectangle bottom) - at.
-	bottomLeft := normalX * aRectangle left
-	              + (normalY * aRectangle bottom) - at.
-	(topLeft > 0 and: [
-		 topRight > 0 and: [ bottomRight > 0 and: [ bottomLeft > 0 ] ] ])
-		ifTrue: [ ^ true ].
-	^ topLeft < 0 and: [
-		  topRight < 0 and: [ bottomRight < 0 and: [ bottomLeft < 0 ] ] ]
-]
-
 { #category : 'testing' }
 VGSegments >> enclosesWholly: aRectangle [
 	"Whether every point of that rectangle, its boundary included, is inside me under my own
-	 fill rule. A tiled rasteriser asks this of a tile before it walks it, because the coverage
-	 of every pixel of a rectangle I enclose is one and the walk has nothing to find there.
-	 The answer is conservative, since a yes paints whole a pixel the walk would have painted in
-	 part: an edge that so much as touches the rectangle answers no, and that leaves one point to
-	 ask of the fill rule, the centre."
+	 fill rule. A tiled rasteriser asks this of a tile before it walks it, and it asks the same
+	 of every shape of the clip, which is why the predicate lives on the scanner the clip holds
+	 its shapes as."
 
-	| box |
-	box := self exactBoundingBox.
-	box ifNil: [ ^ false ].
-	(box containsRect: aRectangle) ifFalse: [ ^ false ].
-	(self anEdgeMeets: aRectangle) ifTrue: [ ^ false ].
-	^ self isInsideAt: aRectangle center
+	^ self scanner enclosesWholly: aRectangle
 ]
 
 { #category : 'accessing' }
 VGSegments >> exactBoundingBox [
-	"The device rectangle my edges live in, fractions kept, or nil when I hold none. A clip needs
-	 the fraction: it is what pays for half of the pixel its edge runs through.
-	 The answer is remembered, because a binning asks it of one entry once a tile and my
-	 coordinates never change after I am built."
+	"The device rectangle my edges live in, fractions kept, or nil when I hold none. The scanner
+	 of my own edges answers it, and it is the scanner a clip holds for a shape of its own, so
+	 one bounding box serves a fill and a clip shape alike."
 
-	| left top right bottom |
-	exactBounds ifNotNil: [ ^ exactBounds ].
-	self isEmpty ifTrue: [ ^ nil ].
-	left := Float infinity.
-	top := Float infinity.
-	right := Float infinity negated.
-	bottom := Float infinity negated.
-	1 to: coordinates size by: 2 do: [ :index |
-		| x y |
-		x := coordinates at: index.
-		y := coordinates at: index + 1.
-		left := left min: x.
-		right := right max: x.
-		top := top min: y.
-		bottom := bottom max: y ].
-	^ exactBounds := left @ top corner: right @ bottom
+	^ self scanner exactBoundingBox
 ]
 
 { #category : 'accessing' }
@@ -276,33 +201,6 @@ VGSegments >> isAliased [
 { #category : 'accessing' }
 VGSegments >> isEmpty [
 	^ coordinates isEmpty
-]
-
-{ #category : 'private' }
-VGSegments >> isInsideAt: aPoint [
-	"Whether that point is inside me under my own fill rule. The winding is one pass over my
-	 coordinates, counting the edges that cross the point's row at or to the left of it, and the
-	 rule itself is asked of the scanner rather than restated. Nothing is allocated here, because
-	 a binning asks this of one entry once a tile."
-
-	| x y winding |
-	x := aPoint x.
-	y := aPoint y.
-	winding := 0.
-	1 to: coordinates size by: 4 do: [ :index |
-		| y0 y1 |
-		y0 := coordinates at: index + 1.
-		y1 := coordinates at: index + 3.
-		(y0 ~= y1 and: [
-			 y >= (y0 min: y1) and: [ y < (y0 max: y1) ] ]) ifTrue: [
-			| x0 x1 |
-			x0 := coordinates at: index.
-			x1 := coordinates at: index + 2.
-			x0 + ((x1 - x0) * (y - y0) / (y1 - y0)) <= x ifTrue: [
-				winding := winding + (y1 > y0
-					            ifTrue: [ 1 ]
-					            ifFalse: [ -1 ]) ] ] ].
-	^ self scanner isInside: winding
 ]
 
 { #category : 'accessing' }

@@ -40,13 +40,18 @@ VGFillEntry >> boundingBox [
 
 { #category : 'testing' }
 VGFillEntry >> coversEveryPixelOf: aRectangle [
-	"Every pixel of that rectangle takes my paint at full coverage when my edges enclose the
-	 rectangle and my clip allows the whole of it. A clip cut out by a shape allows a pixel only
-	 as far as that shape covers it, so it answers no here however wide its bounds are."
+	"Whether every pixel of that device rectangle is painted whole by me: my clip must hold the
+	 rectangle, my own edges must enclose it wholly, and so must every shape my clip was cut out
+	 by. A tiled rasteriser asks this of a tile and takes the coverage as one where the answer is
+	 yes, so the answer must be conservative; each of the three questions is. My own edges are
+	 asked before the shapes of the clip because a fill that encloses no tile at all is the common
+	 case, and failing on it leaves the shapes of its clip unasked."
 
-	clip isRectangular ifFalse: [ ^ false ].
 	(clip bounds containsRect: aRectangle) ifFalse: [ ^ false ].
-	^ segments enclosesWholly: aRectangle
+	(segments enclosesWholly: aRectangle) ifFalse: [ ^ false ].
+	clip shapes do: [ :each |
+		(each enclosesWholly: aRectangle) ifFalse: [ ^ false ] ].
+	^ true
 ]
 
 { #category : 'accessing' }
