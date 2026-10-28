@@ -20,5 +20,6 @@ VGVulkanExamplesTest >> exampleHolders [
 		  VGVulkanRoundTripExamples.
 		  VGTileBinningExamples.
 		  VGTiledFillExamples.
+		  VGVulkanBlurExamples.
 		  VGFrameDeviceBenchmarkExamples }
 ]

@@ -238,11 +238,11 @@ VGVulkanRoundTrip >> measureOn: aContext [
 	kernel prepare.
 	self
 		recordUpload:
-		(self millisecondsPerRepeatOf: [ self upload: sent into: buffer ])
+		(self millisecondsPerRepeatOf: [ buffer uploadBytes: sent ])
 		fill:
 		(self millisecondsPerRepeatOf: [ kernel dispatch: groups y: 1 z: 1 ])
 		readback:
-			(self millisecondsPerRepeatOf: [ self readback: buffer into: received ]) ]
+			(self millisecondsPerRepeatOf: [ buffer readbackInto: received ]) ]
 		ensure: [
 			kernel destroy.
 			buffer destroy ]
@@ -316,16 +316,6 @@ VGVulkanRoundTrip >> printOn: aStream [
 		nextPutAll: ', ';
 		nextPutAll: self verdict;
 		nextPut: $)
-]
-
-{ #category : 'measuring' }
-VGVulkanRoundTrip >> readback: aBuffer into: aByteArray [
-	"The device-to-host step, which section 2.2 makes the known risk of the whole plan: the frame
-	 ends in host window memory, so every frame pays this copy."
-
-	| pointer |
-	pointer := aBuffer map.
-	[ LibC memCopy: pointer to: aByteArray size: aByteArray size ] ensure: [ aBuffer unmap ]
 ]
 
 { #category : 'rates' }
@@ -471,17 +461,6 @@ VGVulkanRoundTrip >> unavailableReason [
 	"Why there is no measurement, or nil where there is one."
 
 	^ unavailableReason
-]
-
-{ #category : 'measuring' }
-VGVulkanRoundTrip >> upload: aByteArray into: aBuffer [
-	"The host-to-device step: one memcpy into the mapped block. VkBuffer's own
-	 copyFromByteArray: writes the bytes one at a time from Smalltalk, which measures the
-	 interpreter rather than the bus, so the copy is made here through libc instead."
-
-	| pointer |
-	pointer := aBuffer map.
-	[ LibC memCopy: aByteArray to: pointer size: aByteArray size ] ensure: [ aBuffer unmap ]
 ]
 
 { #category : 'rates' }

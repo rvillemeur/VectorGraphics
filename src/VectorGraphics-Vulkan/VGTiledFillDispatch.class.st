@@ -164,12 +164,12 @@ VGTiledFillDispatch >> draw: anEncoding into: aByteArray [
 	buffers do: [ :each | kernel bindBuffer: each ].
 	kernel prepare.
 	names withIndexDo: [ :each :index |
-		self upload: (bytes at: each) into: (buffers at: index) ].
+		(buffers at: index) uploadBytes: (bytes at: each) ].
 	kernel
 		dispatch: anEncoding touchedTileCount
 		y: self class rowsPerDispatch
 		z: self class layersPerDispatch.
-	self readback: (buffers at: (names indexOf: #target)) into: aByteArray ]
+	(buffers at: (names indexOf: #target)) readbackInto: aByteArray ]
 		ensure: [
 			kernel destroy.
 			buffers do: [ :each | each destroy ] ].
@@ -244,32 +244,9 @@ VGTiledFillDispatch >> printOn: aStream [
 		nextPutAll: ' pixels'
 ]
 
-{ #category : 'copying' }
-VGTiledFillDispatch >> readback: aBuffer into: aByteArray [
-	"The device to host step, which section 2.2 of the plan makes the known risk of the whole
-	 phase: the frame ends in host memory, so every frame pays this copy."
-
-	| pointer |
-	pointer := aBuffer map.
-	[ LibC memCopy: pointer to: aByteArray size: aByteArray size ] ensure: [
-		aBuffer unmap ]
-]
-
 { #category : 'initialization' }
 VGTiledFillDispatch >> setContext: aContext [
 	context := aContext
-]
-
-{ #category : 'copying' }
-VGTiledFillDispatch >> upload: aByteArray into: aBuffer [
-	"The host to device step: one memcpy into the mapped block. The copyFromByteArray: of VkBuffer
-	 writes the bytes one at a time from Smalltalk, which costs an interpreted send a byte, so
-	 the copy is made through libc instead."
-
-	| pointer |
-	pointer := aBuffer map.
-	[ LibC memCopy: aByteArray to: pointer size: aByteArray size ] ensure: [
-		aBuffer unmap ]
 ]
 
 { #category : 'encoding' }

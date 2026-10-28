@@ -20,6 +20,15 @@ Class {
 	#tag : 'Backend'
 }
 
+{ #category : 'blurring' }
+VGVulkanBackend class >> blurFilterClass [
+	"The device filter, which falls back to the host path where no device answers or where the
+	 shape of the surface is one the host walk would overrun, so a caller never has to ask whether
+	 a device is there."
+
+	^ VGVulkanBlurFilter
+]
+
 { #category : 'selection - private' }
 VGVulkanBackend class >> computesTheProbeSumOn: aContext [
 	"Whether the device adds two vectors and gives the sums back. The kernel is the one the

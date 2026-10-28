@@ -60,10 +60,11 @@ VGConformanceCorpus class >> blurFilterFor: aContext [
 	"The Gaussian blur filter in the family of the context. This one cannot be reached by
 	 substituting a prefix the way classNamed:for: does: Alexandrie calls it
 	 AeCairoA8FastGaussianBlurFilter although it touches no Cairo call and has a slower sibling it
-	 shares every method with, and ours is named for what it is."
+	 shares every method with, and ours is the one the selected backend owns, which is the device
+	 filter where a device answers."
 
 	^ ((aContext isKindOf: VGCairoContext)
-		   ifTrue: [ Smalltalk at: #VGA8GaussianBlurFilter ]
+		   ifTrue: [ VGBackend preferredClass blurFilterClass ]
 		   ifFalse: [ Smalltalk at: #AeCairoA8FastGaussianBlurFilter ]) new
 ]
 
@@ -499,6 +500,31 @@ VGConformanceCorpus class >> shadowCaseColor [
 ]
 
 { #category : 'cases - shadow' }
+VGConformanceCorpus class >> shadowCaseGeometries [
+	"The geometry of each shadow case, in the order of the radii shadowCaseBlurRadii holds, so
+	 that what a case draws under its blur is named once and a test that blurs the same four masks
+	 by another route does not name it again."
+
+	^ {
+		  ('shadow-rounded-rectangle' -> [ :maskContext |
+		   maskContext
+			   roundedRectangleLeft: 14
+			   top: 14
+			   right: 50
+			   bottom: 50
+			   tl: 8
+			   tr: 8
+			   br: 8
+			   bl: 8 ]).
+		  ('shadow-circle'
+		   -> [ :maskContext | maskContext circleCenterX: 32 y: 32 radius: 16 ]).
+		  ('shadow-sharp-rectangle' -> [ :maskContext |
+		   maskContext rectangleX: 16 y: 20 width: 32 height: 24 ]).
+		  ('shadow-blurred-by-nothing' -> [ :maskContext |
+		   maskContext rectangleX: 16 y: 20 width: 32 height: 24 ]) }
+]
+
+{ #category : 'cases - shadow' }
 VGConformanceCorpus class >> shadowCaseNamed: aName geometry: aBlock blurRadius: aNumber [
 	"One shadow case: the geometry drawn opaque into an alpha surface, blurred by the radius, then
 	 masked onto the target at the shadow offset in the shadow colour, which is the path
@@ -523,6 +549,15 @@ VGConformanceCorpus class >> shadowCaseOffset [
 	^ 4 @ 4
 ]
 
+{ #category : 'cases - shadow' }
+VGConformanceCorpus class >> shadowCaseToleranceAt: anIndex [
+	"The tolerance the shadow case at that position carries against Alexandrie, or nil where it is
+	 held to the ordinary one. The two curved cases differ by the rasterisation of the curve under
+	 the blur; the two axis-aligned ones do not differ at all."
+
+	^ anIndex <= 2 ifTrue: [ self shadowBlurTolerance ]
+]
+
 { #category : 'cases' }
 VGConformanceCorpus class >> shadowCases [
 	"Unit 1.9: a Bloc shadow, which is the one thing the blur filter exists for. The two curved
@@ -530,38 +565,18 @@ VGConformanceCorpus class >> shadowCases [
 	 exact, because an axis-aligned edge is the same byte on both sides before the blur and the
 	 blur of it stays the same byte after."
 
-	| radii |
+	| radii geometries |
 	radii := self shadowCaseBlurRadii.
-	^ {
-		  ((self
-			    shadowCaseNamed: 'shadow-rounded-rectangle'
-			    geometry: [ :maskContext |
-				    maskContext
-					    roundedRectangleLeft: 14
-					    top: 14
-					    right: 50
-					    bottom: 50
-					    tl: 8
-					    tr: 8
-					    br: 8
-					    bl: 8 ]
-			    blurRadius: (radii at: 1))
-			   tolerance: self shadowBlurTolerance;
-			   yourself).
-		  ((self
-			    shadowCaseNamed: 'shadow-circle'
-			    geometry: [ :maskContext | maskContext circleCenterX: 32 y: 32 radius: 16 ]
-			    blurRadius: (radii at: 2))
-			   tolerance: self shadowBlurTolerance;
-			   yourself).
-		  (self
-			   shadowCaseNamed: 'shadow-sharp-rectangle'
-			   geometry: [ :maskContext | maskContext rectangleX: 16 y: 20 width: 32 height: 24 ]
-			   blurRadius: (radii at: 3)).
-		  (self
-			   shadowCaseNamed: 'shadow-blurred-by-nothing'
-			   geometry: [ :maskContext | maskContext rectangleX: 16 y: 20 width: 32 height: 24 ]
-			   blurRadius: (radii at: 4)) }
+	geometries := self shadowCaseGeometries.
+	^ geometries withIndexCollect: [ :each :index |
+		  | case |
+		  case := self
+			          shadowCaseNamed: each key
+			          geometry: each value
+			          blurRadius: (radii at: index).
+		  (self shadowCaseToleranceAt: index) ifNotNil: [ :tolerance |
+			  case tolerance: tolerance ].
+		  case ]
 ]
 
 { #category : 'cases - shadow' }

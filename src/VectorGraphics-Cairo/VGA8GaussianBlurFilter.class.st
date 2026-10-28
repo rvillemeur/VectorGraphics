@@ -22,6 +22,20 @@ Class {
 	#tag : 'Blur'
 }
 
+{ #category : 'arithmetic' }
+VGA8GaussianBlurFilter class >> averageOfSum: aSum overDiameter: aDiameter [
+	"The byte a box pass writes for a window whose bytes add up to that sum: the sum times the
+	 reciprocal of the diameter, floored. The two box loops below keep the expression inline rather
+	 than send this method a byte at a time, because that send adds more than half again to the cost
+	 of a blur — 40 ms of sends against 69 ms for the whole of a 400 by 400 field — and VGBlurTest
+	 holds those loops to this method so the two cannot drift. It is not always the whole quotient
+	 of the sum by the diameter: the reciprocal of some diameters is rounded down, the product of an
+	 exact multiple then falls just under the integer, and the floor loses one. A device that
+	 divides instead has to reproduce that, which is why the rule is named here."
+
+	^ (aSum * (1.0 / aDiameter)) floor
+]
+
 { #category : 'computing' }
 VGA8GaussianBlurFilter class >> boxRadiiForSigma: aSigma passes: aPassCount [
 	"The radius of each box pass, from the boxesForGauss function of the reference implementation.
@@ -81,6 +95,20 @@ VGA8GaussianBlurFilter class >> sigmaForRadius: aNumber [
 	^ (aNumber / self radiusToSigmaRatio) rounded
 ]
 
+{ #category : 'blurring' }
+VGA8GaussianBlurFilter >> applyBoxRadii: aCollection [
+	"Each pass runs the box once along the rows and once down the columns, which is what makes a
+	 separable approximation of a two-dimensional Gaussian. The passes alternate between the two
+	 buffers and end back in the first, so the surface is written once, at the end. A subclass that
+	 blurs somewhere else overrides this one method and falls back to it where it cannot."
+
+	self prepareBuffers.
+	aCollection do: [ :boxRadius |
+		self boxBlurAlongRowsFrom: bufferA to: bufferB boxRadius: boxRadius.
+		self boxBlurAlongColumnsFrom: bufferB to: bufferA boxRadius: boxRadius ].
+	self writeBufferBackToTheSurface
+]
+
 { #category : 'applying' }
 VGA8GaussianBlurFilter >> applyRadius: aRadius [
 	^ self applyRadius: aRadius passes: self class defaultPassCount
@@ -99,18 +127,11 @@ VGA8GaussianBlurFilter >> applySigma: aSigma [
 	^ self applySigma: aSigma passes: self class defaultPassCount
 ]
 
-{ #category : 'applying' }
+{ #category : 'blurring' }
 VGA8GaussianBlurFilter >> applySigma: aSigma passes: aPassCount [
-	"Each pass runs the box once along the rows and once along the columns, which is what makes a
-	 separable approximation of a two-dimensional Gaussian. The passes alternate between the two
-	 buffers and end back in the first, so the surface is written once, at the end."
-
 	aSigma isZero ifTrue: [ ^ self ].
-	self prepareBuffers.
-	(self class boxRadiiForSigma: aSigma passes: aPassCount) do: [ :boxRadius |
-		self boxBlurAlongRowsFrom: bufferA to: bufferB boxRadius: boxRadius.
-		self boxBlurAlongColumnsFrom: bufferB to: bufferA boxRadius: boxRadius ].
-	self writeBufferBackToTheSurface
+	self applyBoxRadii:
+		(self class boxRadiiForSigma: aSigma passes: aPassCount)
 ]
 
 { #category : 'private' }

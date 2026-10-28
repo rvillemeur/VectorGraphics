@@ -157,6 +157,7 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Cairo/Display list' -> #displayList).
 			  ('VectorGraphics-Vulkan/Backend' -> #displayList).
 			  ('VectorGraphics-Vulkan/Tiles' -> #displayList).
+			  ('VectorGraphics-Vulkan/Kernels' -> #displayList).
 			  ('VectorGraphics-Cairo/Rasterising' -> #coverage).
 			  ('VectorGraphics-Cairo/Paint' -> #paintSource).
 			  ('VectorGraphics-Cairo/Pattern' -> #paintSource).
@@ -165,6 +166,7 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Cairo/Text' -> #text).
 			  ('VectorGraphics/TrueType' -> #text).
 			  ('VectorGraphics-Cairo/Blur' -> #blur).
+			  ('VectorGraphics-Vulkan/Blur' -> #blur).
 			  ('VectorGraphics-Bloc/Hosts' -> #handover).
 			  ('VectorGraphics-Bloc/Profiling' -> #harness).
 			  ('VectorGraphics-Cairo/Export' -> #notInTheFrame).

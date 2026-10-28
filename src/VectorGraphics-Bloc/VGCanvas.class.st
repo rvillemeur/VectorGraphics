@@ -259,7 +259,9 @@ VGCanvas >> newCairoSurfaceExtent: aLogicalExtent [
 VGCanvas >> newSurfaceWithGaussianShadow: extent width: width canvasDo: aBlock [
 	"The shadow of an element is drawn once into an alpha surface, blurred, and then used as a
 	 mask. `AeCanvas` builds that intermediate canvas by naming its own class, so a subclass has to
-	 send `self class newFor:` here or the shadow would be drawn through Cairo."
+	 send `self class newFor:` here or the shadow would be drawn through Cairo. The filter is the
+	 one the selected backend owns, so a window on a machine with a device blurs on the device
+	 without this method naming a Vulkan class."
 
 	| alphaSurface alphaCanvas |
 	alphaSurface := cairoSurface
@@ -269,7 +271,7 @@ VGCanvas >> newSurfaceWithGaussianShadow: extent width: width canvasDo: aBlock [
 	alphaSurface status ensureIsSuccess.
 	alphaCanvas := self class newFor: alphaSurface.
 	aBlock value: alphaCanvas.
-	VGA8GaussianBlurFilter new
+	VGBackend preferredClass blurFilterClass new
 		surface: alphaSurface;
 		applyRadius: width.
 	^ alphaSurface

@@ -23,6 +23,16 @@ Class {
 	#tag : 'Backend'
 }
 
+{ #category : 'blurring' }
+VGBackend class >> blurFilterClass [
+	"The Gaussian blur filter a shadow drawn through me is blurred with. A blur is a pass over the
+	 alpha of a surface and not a drawing verb, so it is named here rather than recorded in a
+	 display list, and a backend that blurs elsewhere answers its own filter. The answer is the
+	 host filter, because a backend that says nothing about blurring blurs on the host."
+
+	^ VGA8GaussianBlurFilter
+]
+
 { #category : 'selection' }
 VGBackend class >> candidateClasses [
 	"Every backend that offers itself for selection, best first and the failover last. They are

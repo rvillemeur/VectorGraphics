@@ -25,6 +25,70 @@ VGBlurTest >> bytesOf: aSurface [
 	^ (1 to: aSurface byteSize) collect: [ :each | aSurface data unsignedByteAt: each ]
 ]
 
+{ #category : 'fixtures' }
+VGBlurTest >> filterClass [
+	"The filter every test of mine blurs with. A subclass answers the device filter here, so that
+	 the whole of this class, Alexandrie comparisons and all, is run against it as well."
+
+	^ VGA8GaussianBlurFilter
+]
+
+{ #category : 'oracles' }
+VGBlurTest >> naiveBlurOf: aByteArray columns: aColumnCount rows: aRowCount sigma: aSigma [
+	"The whole blur the slow way: each box radius of the sigma run once along the rows and once
+	 down the columns, in the order the filter runs them."
+
+	| source shape |
+	source := aByteArray copy.
+	shape := aColumnCount @ aRowCount.
+	(self filterClass
+		 boxRadiiForSigma: aSigma
+		 passes: self filterClass defaultPassCount) do: [ :radius |
+		source := self
+			          naiveBoxOf: source
+			          shape: shape
+			          radius: radius
+			          along: #rows.
+		source := self
+			          naiveBoxOf: source
+			          shape: shape
+			          radius: radius
+			          along: #columns ].
+	^ source
+]
+
+{ #category : 'oracles' }
+VGBlurTest >> naiveBoxOf: aByteArray shape: aPoint radius: aRadius along: anAxis [
+	"One box pass written the slow way: every pixel reads its own window, one byte at a time, with
+	 the first and the last byte of the row or the column repeated outside. The filter walks the
+	 same window as a running sum, which is cheaper and harder to read, so this is what holds it.
+	 The x of the shape is the stride of the field in bytes and not its width, because that is the
+	 row the bytes really sit in."
+
+	| target diameter columnCount rowCount |
+	columnCount := aPoint x.
+	rowCount := aPoint y.
+	target := aByteArray copy.
+	diameter := aRadius + aRadius + 1.
+	0 to: rowCount - 1 do: [ :row |
+		0 to: columnCount - 1 do: [ :column |
+			| sum |
+			sum := 0.
+			aRadius negated to: aRadius do: [ :offset |
+				| x y |
+				x := anAxis = #rows
+					     ifTrue: [ (column + offset max: 0) min: columnCount - 1 ]
+					     ifFalse: [ column ].
+				y := anAxis = #rows
+					     ifTrue: [ row ]
+					     ifFalse: [ (row + offset max: 0) min: rowCount - 1 ].
+				sum := sum + (aByteArray at: y * columnCount + x + 1) ].
+			target
+				at: row * columnCount + column + 1
+				put: (self filterClass averageOfSum: sum overDiameter: diameter) ] ].
+	^ target
+]
+
 { #category : 'private' }
 VGBlurTest >> ourSurfaceOfExtent: anExtent seededWith: aByteArray [
 	| surface |
@@ -46,7 +110,7 @@ VGBlurTest >> testARadiusOfZeroLeavesEveryByteAlone [
 	| surface seed |
 	seed := self seedBytesOfSize: 64.
 	surface := self ourSurfaceOfExtent: 13 @ 4 seededWith: seed.
-	VGA8GaussianBlurFilter new
+	self filterClass new
 		surface: surface;
 		applyRadius: 0.
 	self assert: (self bytesOf: surface) asArray equals: seed asArray
@@ -57,7 +121,7 @@ VGBlurTest >> testASigmaOfZeroLeavesEveryByteAlone [
 	| surface seed |
 	seed := self seedBytesOfSize: 64.
 	surface := self ourSurfaceOfExtent: 13 @ 4 seededWith: seed.
-	VGA8GaussianBlurFilter new
+	self filterClass new
 		surface: surface;
 		applySigma: 0.
 	self assert: (self bytesOf: surface) asArray equals: seed asArray
@@ -73,7 +137,7 @@ VGBlurTest >> testBlurringADotSpreadsItSymmetricallyAroundItself [
 	middle := 12.
 	surface := self ourSurfaceOfExtent: extent seededWith: (ByteArray new: 24 * 24).
 	surface data unsignedByteAt: middle * 24 + middle + 1 put: 255.
-	VGA8GaussianBlurFilter new
+	self filterClass new
 		surface: surface;
 		applySigma: 3.
 	bytes := self bytesOf: surface.
@@ -92,7 +156,7 @@ VGBlurTest >> testBlurringAFieldOfOneValueLeavesItAlone [
 
 	| surface bytes |
 	surface := self ourSurfaceOfExtent: 16 @ 12 seededWith: ((1 to: 16 * 12) collect: [ :each | 200 ]).
-	VGA8GaussianBlurFilter new
+	self filterClass new
 		surface: surface;
 		applyRadius: 5.
 	bytes := self bytesOf: surface.
@@ -112,7 +176,7 @@ VGBlurTest >> testBlurringAWidthWithStridePaddingAgreesWithAlexandrieToo [
 	ours := self ourSurfaceOfExtent: 13 @ 9 seededWith: seed.
 	theirs := self alexandrieSurfaceOfExtent: 13 @ 9 seededWith: seed.
 	self assert: ours stride equals: 16.
-	VGA8GaussianBlurFilter new
+	self filterClass new
 		surface: ours;
 		applyRadius: 6.
 	AeCairoA8FastGaussianBlurFilter new
@@ -131,13 +195,33 @@ VGBlurTest >> testBlurringAgreesWithAlexandrieByteForByte [
 	seed := self seedBytesOfSize: 16 * 12.
 	ours := self ourSurfaceOfExtent: 16 @ 12 seededWith: seed.
 	theirs := self alexandrieSurfaceOfExtent: 16 @ 12 seededWith: seed.
-	VGA8GaussianBlurFilter new
+	self filterClass new
 		surface: ours;
 		applyRadius: 8.
 	AeCairoA8FastGaussianBlurFilter new
 		surface: theirs;
 		applyRadius: 8.
 	self assert: (self bytesOf: ours) asArray equals: (self bytesOf: theirs) asArray
+]
+
+{ #category : 'tests' }
+VGBlurTest >> testTheBlurOfAFieldIsTheClampedWindowAverageOfEveryByte [
+	"What a box pass writes is the average of its own window, the first and the last byte of the
+	 row repeated outside it, and that average is a sum of bytes times the reciprocal of the
+	 diameter, floored. The filter walks the window as a running sum, which is the same arithmetic
+	 in a cheaper order. This test holds it to the window itself, computed one pixel at a time, and
+	 so also holds averageOfSum:overDiameter: to the bytes the filter really writes: the device
+	 reproduces that named arithmetic and must not be reading a rule nothing checks."
+
+	| seed surface |
+	seed := self seedBytesOfSize: 16 * 16.
+	surface := self ourSurfaceOfExtent: 16 @ 16 seededWith: seed.
+	self filterClass new
+		surface: surface;
+		applySigma: 4.
+	self
+		assert: (self bytesOf: surface) asArray
+		equals: (self naiveBlurOf: seed columns: 16 rows: 16 sigma: 4) asArray
 ]
 
 { #category : 'tests' }
@@ -150,7 +234,7 @@ VGBlurTest >> testTheBoxRadiiOfASigmaAreTheOnesAlexandrieUses [
 		| theirs |
 		theirs := (AeCairoA8GaussianBlurFilter new boxRadiusStreamForSigma: sigma n: 3) upToEnd.
 		self
-			assert: (VGA8GaussianBlurFilter boxRadiiForSigma: sigma passes: 3)
+			assert: (self filterClass boxRadiiForSigma: sigma passes: 3)
 			equals: theirs asArray ]
 ]
 
@@ -172,10 +256,10 @@ VGBlurTest >> testTheFilterDrawsWhatTheSurfaceStillOwesBeforeItReadsAnyByte [
 		rectangleX: 4 y: 3 width: 7 height: 5;
 		fill.
 	flushed flush.
-	VGA8GaussianBlurFilter new
+	self filterClass new
 		surface: drawn;
 		applyRadius: 4.
-	VGA8GaussianBlurFilter new
+	self filterClass new
 		surface: flushed;
 		applyRadius: 4.
 	self assert: (self bytesOf: drawn) asArray equals: (self bytesOf: flushed) asArray.
@@ -190,6 +274,6 @@ VGBlurTest >> testTheSigmaOfARadiusIsTheRatioAlexandrieShadowsUse [
 
 	#( 0 1 4 8 14 ) do: [ :radius |
 		self
-			assert: (VGA8GaussianBlurFilter sigmaForRadius: radius)
-			equals: (radius / VGA8GaussianBlurFilter radiusToSigmaRatio) rounded ]
+			assert: (self filterClass sigmaForRadius: radius)
+			equals: (radius / self filterClass radiusToSigmaRatio) rounded ]
 ]
