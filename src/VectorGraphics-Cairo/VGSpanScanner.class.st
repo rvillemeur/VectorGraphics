@@ -159,10 +159,10 @@ VGSpanScanner >> fillRule [
 { #category : 'inspector' }
 VGSpanScanner >> inspectorEnclosure: aBuilder [
 	<inspectorPresentationOrder: 2 title: 'Enclosure'>
-	"Whether I enclose a rectangle wholly, asked of every tile of a sixteen-pixel grid over my own
-	 box, with the three answers it is built from beside it. A tiled rasteriser takes the coverage
-	 of a tile I enclose as one without sampling it, so each column sends the real question: a
-	 tile whose answer says yes while an edge meets it would show here."
+	"Whether I enclose a rectangle wholly, asked of every rectangle of a four by four grid over my
+	 own box, with the three answers it is built from beside it. A tiled rasteriser takes the
+	 coverage of a tile I enclose as one without sampling it, so each column sends the real
+	 question: a rectangle whose answer says yes while an edge meets it would show here."
 
 	^ aBuilder newTable
 		  addColumn: (SpStringTableColumn title: 'Tile' evaluated: [ :each |
