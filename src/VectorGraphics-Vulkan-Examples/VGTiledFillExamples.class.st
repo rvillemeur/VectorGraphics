@@ -281,6 +281,26 @@ VGTiledFillExamples class >> maskTileOfTheFrame [
 ]
 
 { #category : 'examples' }
+VGTiledFillExamples class >> meshPatternOutsideTheSubset [
+	"The one paint the tiled rasteriser still refuses, which unit 2.9 left outside the subset: a
+	 mesh of one triangular patch, whose patches are in neither a coefficient block, a stop list
+	 nor a run of pixels. The tests of the subset read it, so that what the device cannot draw is
+	 written down in one place."
+
+	<sampleInstance>
+	^ VGCairoMeshPattern new
+		  beginPatch;
+		  moveToX: 8 y: 8;
+		  lineToX: 32 y: 8;
+		  lineToX: 8 y: 32;
+		  cornerAt: 0 putColorRGB: Color red;
+		  cornerAt: 1 putColorRGB: Color green;
+		  cornerAt: 2 putColorRGB: Color blue;
+		  endPatch;
+		  yourself
+]
+
+{ #category : 'examples' }
 VGTiledFillExamples class >> pixelEmitterOfTheDefaultKernel [
 	"The emitter of a kernel that has already built its module, which is the only state it has:
 	 the builder, the GLSL set and the value table of that module. The Composition tab reads the
@@ -304,6 +324,38 @@ VGTiledFillExamples class >> pixelPaintOfATranslucentOrange [
 		          b: 0.0
 		          alpha: 0.6) pixelIn: VGTiledFillEncoding targetFormat atX: 0 y: 0.
 	^ VGPixelPaint pixel: pixel
+]
+
+{ #category : 'examples' }
+VGTiledFillExamples class >> sourcesOfASurfacePaintAndASolidFill [
+	"The source runs of a frame that fills twice through one surface pattern with a solid fill
+	 between them, which is what unit 2.9 sends to the device: the Runs tab names where each run
+	 starts, how long it is and the pixels it holds, and shows the solid fill between them
+	 carrying no pixels at all and the offset of the entry after it."
+
+	<sampleInstance>
+	| surface tile |
+	tile := VGCairoImageSurface extent: 8 @ 6.
+	tile newContext
+		sourceColorR: 0.9 g: 0.3 b: 0.1 a: 1.0;
+		rectangleX: 0 y: 0 width: 8 height: 3;
+		fill;
+		sourceColorR: 0.1 g: 0.5 b: 0.8 a: 0.5;
+		rectangleX: 0 y: 3 width: 8 height: 3;
+		fill.
+	surface := VGCairoImageSurface extent: self frameExtent.
+	surface newContext
+		sourceSurface: tile x: 0 y: 0;
+		rectangleX: 0 y: 0 width: 16 height: 16;
+		fill;
+		sourceColorR: 0.1 g: 0.1 b: 0.1 a: 1.0;
+		rectangleX: 20 y: 20 width: 10 height: 10;
+		fill;
+		sourceSurface: tile x: 32 y: 32;
+		rectangleX: 32 y: 32 width: 16 height: 16;
+		fill.
+	^ VGTiledFillSources of:
+		  (surface displayList entries collect: [ :each | each asTiledFill ])
 ]
 
 { #category : 'examples' }

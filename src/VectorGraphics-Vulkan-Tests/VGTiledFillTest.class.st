@@ -26,13 +26,13 @@ VGTiledFillTest class >> degenerateGradientFrameNames [
 
 { #category : 'constants' }
 VGTiledFillTest class >> fillCaseCount [
-	"Counted over the corpus: twenty-five of the forty-one cases are fills of a solid colour or of
-	 a gradient, which is the subset units 2.3, 2.4 and 2.7 draw. Unit 2.3 drew twenty-two of
-	 them inside a rectangular clip, unit 2.4 added the two gradient cases and unit 2.7 added
-	 clip-circle by drawing a clip cut out by shapes. The other sixteen carry a surface or a mesh
-	 paint or record a blit, and wait for units 2.8 and after."
+	"Counted over the corpus: thirty of the forty-one cases are fills the subset draws. Unit 2.3
+	 drew twenty-two of them, fills of a solid colour inside a rectangular clip, unit 2.4 added
+	 the two gradient cases, unit 2.7 added clip-circle by drawing a clip cut out by shapes, and
+	 unit 2.9 added the five that fill through a surface paint. Of the eleven left, seven record a
+	 blit and are gated by VGTiledBlitTest, and four carry a mesh paint, which no unit draws yet."
 
-	^ 25
+	^ 30
 ]
 
 { #category : 'constants' }
@@ -502,6 +502,7 @@ VGTiledFillTest >> testEveryBufferTheKernelBindsOutOfAnEncodingIsOneTheBuffersAn
 	buffers := VGTiledFillBuffers new.
 	buffers allocateForEntries: 1 edges: 4 stops: 0 masks: 0.
 	buffers allocateForShapes: 1.
+	buffers allocateForPixels: 0.
 	buffers allocateForTiles: 1 references: 1.
 	list := self
 		        displayListOfExtent: 64 @ 64
@@ -1030,14 +1031,15 @@ VGTiledFillTest >> testTheSourceOperatorDrawsTheSameBytesAsTheSoftwareBackend [
 		equals: (self softwareFormOfExtent: self caseExtent drawnWith: draw) bits
 ]
 
-{ #category : 'tests - subset' }
-VGTiledFillTest >> testTheSubsetHoldsAFillOfASolidColourOrAGradientAndNothingElse [
-	"What the kernel can draw, which unit 2.4 widened from a solid colour to a gradient. A frame
-	 outside the subset is not drawn wrongly: it is refused here, so that the backend can hand it
-	 to the failover whole. A clip cut out by shapes is in the subset since unit 2.7, so
-	 the shaped frame here holds the fact that a shape in the clip refuses nothing on its own."
+{ #category : 'tests' }
+VGTiledFillTest >> testTheSubsetHoldsAFillOfASolidColourAGradientOrASurfaceAndNothingElse [
+	"What the kernel can draw, which unit 2.4 widened from a solid colour to a gradient and unit
+	 2.9 to a surface. A frame outside the subset is not drawn wrongly: it is refused here, so
+	 that the backend can hand it to the failover whole. A clip cut out by shapes is in the subset
+	 since unit 2.7, so the shaped frame here holds the fact that a shape in the clip refuses
+	 nothing on its own; a mesh paint is what is left outside it."
 
-	| solid gradient surfacePaint blit shaped |
+	| solid gradient surfacePaint mesh shaped |
 	solid := self
 		         displayListOfExtent: self caseExtent
 		         drawnWith: [ :context |
@@ -1060,12 +1062,13 @@ VGTiledFillTest >> testTheSubsetHoldsAFillOfASolidColourOrAGradientAndNothingEls
 				                y: 0;
 				                rectangleX: 1 y: 1 width: 10 height: 10;
 				                fill ].
-	blit := self
+	mesh := self
 		        displayListOfExtent: self caseExtent
 		        drawnWith: [ :context |
 			        context
-				        sourceSurface: (VGCairoImageSurface extent: 4 @ 4) x: 0 y: 0;
-				        paint ].
+				        sourcePattern: VGTiledFillExamples meshPatternOutsideTheSubset;
+				        rectangleX: 1 y: 1 width: 10 height: 10;
+				        fill ].
 	shaped := self
 		          displayListOfExtent: self caseExtent
 		          drawnWith: [ :context |
@@ -1076,8 +1079,8 @@ VGTiledFillTest >> testTheSubsetHoldsAFillOfASolidColourOrAGradientAndNothingEls
 				          fill ].
 	self assert: (VGTiledFillRasteriser supports: solid).
 	self assert: (VGTiledFillRasteriser supports: gradient).
-	self deny: (VGTiledFillRasteriser supports: surfacePaint).
-	self deny: (VGTiledFillRasteriser supports: blit).
+	self assert: (VGTiledFillRasteriser supports: surfacePaint).
+	self deny: (VGTiledFillRasteriser supports: mesh).
 	self assert: (VGTiledFillRasteriser supports: shaped)
 ]
 

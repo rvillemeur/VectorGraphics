@@ -78,12 +78,19 @@ VGTiledFillRasteriser class >> supportsKindOf: anEntry [
 
 { #category : 'subset' }
 VGTiledFillRasteriser class >> supportsPaint: aPaint [
-	"The paints I evaluate: a solid colour, which is one pixel wherever it is asked for, and a
-	 gradient, which is the matrix and the geometry of its own coefficient block together with its
-	 stops. A mesh paint carries patches and a surface paint carries the pixels of another surface;
-	 neither is in a block and a stop list, so both wait for a later unit."
+	"The paints I evaluate: a solid colour, which is one pixel wherever it is asked for; a
+	 gradient, which is the matrix and the geometry of its own coefficient block together with
+	 its stops; and a surface, whose pixels travel to the device as they stand and are sampled
+	 there under the matrix and the extend mode of the block. The pixels travel as they stand,
+	 so the source has to be of the one format a frame is encoded for; a target of any other
+	 format never reaches me at all. A mesh paint carries patches, which are in neither a block,
+	 a stop list nor a run of pixels, so it waits for a later unit."
 
-	^ aPaint isSolid or: [ aPaint isKindOf: VGGradientPaint ]
+	aPaint isSolid ifTrue: [ ^ true ].
+	(aPaint isKindOf: VGGradientPaint) ifTrue: [ ^ true ].
+	(aPaint isKindOf: VGSurfacePaint) ifTrue: [
+		^ aPaint surface format = VGTiledFillEncoding targetFormat ].
+	^ false
 ]
 
 { #category : 'drawing' }

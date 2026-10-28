@@ -196,8 +196,10 @@ VGTiledFillDecoder >> maskRectangleOfEntryAt: anIndex [
 { #category : 'decoding' }
 VGTiledFillDecoder >> paintOfEntryAt: anIndex [
 	"The paint the buffers describe. A solid paint is the one pixel the header carries, which is
-	 what the kernel reads of it; a gradient is rebuilt from its own block and then from its
-	 stops, so the decode and the kernel read the same coefficients."
+	 what the kernel reads of it; a surface paint is its own block over a surface rebuilt from
+	 the pixel buffer; a gradient is rebuilt from its own block and then from its stops. The
+	 block is read in every case but the solid one, so the decode and the kernel read the same
+	 coefficients."
 
 	| base tag paint |
 	base := (anIndex - 1) * VGTiledFillLayout entryHeaderWords.
@@ -205,6 +207,10 @@ VGTiledFillDecoder >> paintOfEntryAt: anIndex [
 	tag = VGPixelPaint paintTag ifTrue: [
 		^ VGPixelPaint pixel:
 			  (buffers headers at: base + VGTiledFillLayout sourcePixelField) ].
+	tag = VGSurfacePaint paintTag ifTrue: [
+		^ (VGSurfacePaint fromBlock: (self blockOfEntryAt: anIndex))
+			  surface: (self surfaceOfEntryAt: anIndex);
+			  yourself ].
 	paint := (VGTiledFillEncoding gradientClassAtTag: tag) fromBlock:
 		         (self blockOfEntryAt: anIndex).
 	(self stopsOfEntryAt: anIndex) do: [ :stop |
@@ -315,4 +321,31 @@ VGTiledFillDecoder >> stopsOfEntryAt: anIndex [
 		  (buffers stops at: stopBase + VGTiledFillLayout stopPositionField)
 		  -> (VGTiledFillLayout stopChannelFields collect: [ :field |
 			   buffers stops at: stopBase + field ]) ]
+]
+
+{ #category : 'decoding' }
+VGTiledFillDecoder >> surfaceOfEntryAt: anIndex [
+	"The source surface of that entry, rebuilt from the pixel buffer: the extent is the two
+	 fields of its own block that the paint ABI names for it, and the pixels are the run the
+	 header names, packed to that width. The bytes are the surface's to read and not to own, and
+	 its format is the one a frame is encoded for, which is what the subset holds a source to."
+
+	| base block width height bytes offset stride |
+	base := (anIndex - 1) * VGTiledFillLayout entryHeaderWords.
+	block := self blockOfEntryAt: anIndex.
+	width := (block at: VGPaint surfaceWidthFieldIndex) rounded.
+	height := (block at: VGPaint surfaceHeightFieldIndex) rounded.
+	offset := buffers headers at: base + VGTiledFillLayout pixelOffsetField.
+	stride := VGTiledFillEncoding targetFormat bytesPerPixel.
+	bytes := ByteArray new: width * height * stride.
+	1 to: width * height do: [ :index |
+		bytes
+			uint32AtOffset: index - 1 * stride
+			put: (buffers sourcePixels at: offset + index) ].
+	^ VGCairoImageSurface
+		  unownedNewForData: bytes
+		  format: VGTiledFillEncoding targetFormat
+		  width: width
+		  height: height
+		  stride: width * stride
 ]

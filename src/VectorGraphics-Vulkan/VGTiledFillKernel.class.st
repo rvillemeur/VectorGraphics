@@ -21,12 +21,12 @@ Class {
 
 { #category : 'constants' }
 VGTiledFillKernel class >> bindingNames [
-	"The thirteen buffers I read, in the order they are bound: the eleven an encoding writes,
+	"The fourteen buffers I read, in the order they are bound: the twelve an encoding writes,
 	 the pixels of the target and the size of the frame. A binding number is the position of the
 	 name here, counted from zero, so this one list states the whole contract."
 
 	^ #( #tileTable #entryRefs #refShapes #headers #clips #edges #shapes #paints
-	     #stops #maskRects #maskBytes #target #frame )
+	     #stops #maskRects #maskBytes #sourcePixels #target #frame )
 ]
 
 { #category : 'constants' }
@@ -212,13 +212,13 @@ VGTiledFillKernel class >> tileComponent [
 { #category : 'constants' }
 VGTiledFillKernel class >> wordVariableNames [
 	"The function variables that hold a word: the destination pixel, the source pixel of the
-	 fill and whether the fill lays one down at all, the byte the mask of the fill carries here,
-	 the three loop counters, the record of the shape the walk stands in and the verdicts of a
-	 sweep over the shapes, the stop loop with the two stops it looks for and the flags that
-	 stand where VGTileCoverage answers early."
+	 fill and whether the fill lays one down at all, the pixel a surface paint samples, the byte
+	 the mask of the fill carries here, the three loop counters, the record of the shape the walk
+	 stands in and the verdicts of a sweep over the shapes, the stop loop with the two stops it
+	 looks for and the flags that stand where VGTileCoverage answers early."
 
-	^ #( #dest #source #hasSource #maskByte #reference #sample #edge #shape
-	     #shapeEdgeOffset #shapeEdgeCount #shapeFillRule #shapeAliased
+	^ #( #dest #source #hasSource #sampledPixel #maskByte #reference #sample #edge
+	     #shape #shapeEdgeOffset #shapeEdgeCount #shapeFillRule #shapeAliased
 	     #hasAntialiased #allows #insideAll #inside #nextInside #nearestFound
 	     #stop #beforeStop #afterStop #beforeFound #afterFound )
 ]
@@ -974,7 +974,7 @@ VGTiledFillKernel >> rememberHeaderAt: aBaseId [
 
 	#( #sourcePixelField #operatorField #alphaByteField #shapeCountField
 	   #paintTagField #paintBlockOffsetField #stopOffsetField #stopCountField
-	   #maskOffsetField ) do: [ :each |
+	   #maskOffsetField #pixelOffsetField ) do: [ :each |
 		self
 			remember: (self
 					 elementOf: #headers

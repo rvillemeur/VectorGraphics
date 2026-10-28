@@ -36,6 +36,15 @@ VGTiledFillBuffers >> allocateForEntries: aCount edges: anEdgeCount stops: aStop
 ]
 
 { #category : 'allocating' }
+VGTiledFillBuffers >> allocateForPixels: aCount [
+	"The pixels of the source surfaces a frame paints out of, which are counted over the entries
+	 and not one an entry: only a fill whose paint is a surface carries any, and it carries one
+	 for every pixel of that surface."
+
+	arrays at: #sourcePixels put: (WordArray new: aCount)
+]
+
+{ #category : 'allocating' }
 VGTiledFillBuffers >> allocateForShapes: aCount [
 	"The shape records of a frame, which are counted over the entries and not one an entry: an
 	 entry carries its fill and a record for every shape its clip was cut out with."
@@ -188,6 +197,11 @@ VGTiledFillBuffers >> refShapes [
 { #category : 'accessing' }
 VGTiledFillBuffers >> shapes [
 	^ self bufferNamed: #shapes
+]
+
+{ #category : 'accessing' }
+VGTiledFillBuffers >> sourcePixels [
+	^ self bufferNamed: #sourcePixels
 ]
 
 { #category : 'accessing' }

@@ -250,6 +250,21 @@ VGTiledFillPixelEmitter >> emitExtendedOffset: anOffsetId [
 				    and: (self float: anOffsetId notAbove: (self constantFloat: 1))))
 ]
 
+{ #category : 'emitting' }
+VGTiledFillPixelEmitter >> emitLaysDownSolid: aSolidFlag surface: aSurfaceFlag painted: aPaintedFlag gradientFound: aFoundFlag [
+	"Whether the paint of the entry standing lays a pixel down here at all. A solid lays one
+	 down everywhere; a surface lays one down where both of its axes read a pixel, the alpha of
+	 that pixel notwithstanding, because a transparent pixel of a source is still a pixel and
+	 under source or clear it is what the destination becomes; a gradient lays one down where
+	 its geometry, its extend mode and its stops all answer."
+
+	^ self
+		  either: (self
+				   either: aSolidFlag
+				   or: (self both: aSurfaceFlag and: aPaintedFlag))
+		  or: (self both: (self negation: aSurfaceFlag) and: aFoundFlag)
+]
+
 { #category : 'paint' }
 VGTiledFillPixelEmitter >> emitLinearOffset [
 	"How far along its own line the point projects, which is VGLinearGradientPaint >>
@@ -568,6 +583,20 @@ VGTiledFillPixelEmitter >> emitRadialOffset [
 					    and: quadratic value))
 ]
 
+{ #category : 'emitting' }
+VGTiledFillPixelEmitter >> emitRemainderOf: aFloatId by: aDivisorId [
+	"The floored remainder of one float by another, which is what Pharo's \\ answers for a
+	 negative dividend and what a surface index needs: an index one to the left of a source of
+	 three reads the third pixel of it and not the first. The floats a source index holds are
+	 whole numbers, so the division and the floor under it are exact."
+
+	^ self
+		  differenceOfFloat: aFloatId
+		  and: (self
+				   productOfFloat: aDivisorId
+				   and: (self floorOfFloat: (self quotientOfFloat: aFloatId by: aDivisorId)))
+]
+
 { #category : 'paint' }
 VGTiledFillPixelEmitter >> emitRoundedWordOf: aFloatId [
 	"A float of zero or more rounded to a word the way Pharo''s rounded rounds it: a half added
@@ -578,6 +607,65 @@ VGTiledFillPixelEmitter >> emitRoundedWordOf: aFloatId [
 		  (self
 			   sumOfFloat: aFloatId
 			   and: (self constantFloat: kernel class halfUnit))
+]
+
+{ #category : 'emitting' }
+VGTiledFillPixelEmitter >> emitSampleOf: anIndexId along: anExtentId [
+	"The pixel index one axis of the source really reads, and whether it reads one at all, which
+	 is VGSurfacePaint >> sample:along: on the extend mode field seven of the block carries. All
+	 four modes are arithmetic, all four are emitted and the field picks one, as a gradient's
+	 extend mode is picked; only none leaves the surface unpainted, and it leaves it unpainted
+	 exactly where the index falls off the end of the axis. The other three answer the index
+	 itself wherever it is on the axis already, so the in-range arm the software paint takes
+	 first needs no instruction of its own. An axis of no extent has no pixel to read whatever
+	 the mode says."
+
+	| code isMode last folded modes value inside |
+	code := self wordOfFloat: (self coefficientOf: VGPaint extendFieldIndex).
+	isMode := [ :name |
+	          self
+		          word: code
+		          equals:
+		          (self constantWord: (VGPaint codeFor: name in: VGPaint extendNames)) ].
+	last := self differenceOfFloat: anExtentId and: (self constantFloat: 1).
+	folded := self
+		          emitRemainderOf: anIndexId
+		          by:
+		          (self productOfFloat: (self constantFloat: 2) and: anExtentId).
+	modes := Dictionary newFromPairs: {
+			         #none.
+			         anIndexId.
+			         #repeat.
+			         (self emitRemainderOf: anIndexId by: anExtentId).
+			         #reflect.
+			         (self
+				          select: (self float: folded below: anExtentId)
+				          ifTrue: folded
+				          ifFalse: (self differenceOfFloat: last and: (self
+							            differenceOfFloat: folded
+							            and: anExtentId))
+				          type: self floatType).
+			         #pad.
+			         (self
+				          smallerFloatOf: (self
+							           largerFloatOf: anIndexId
+							           and: (self constantFloat: 0))
+				          and: last) }.
+	value := modes at: #pad.
+	#( #reflect #repeat #none ) do: [ :name |
+		value := self
+			         select: (isMode value: name)
+			         ifTrue: (modes at: name)
+			         ifFalse: value
+			         type: self floatType ].
+	inside := self
+		          both: (self float: anIndexId atLeast: (self constantFloat: 0))
+		          and: (self float: anIndexId notAbove: last).
+	^ value -> (self
+		   both: (self float: anExtentId above: (self constantFloat: 0))
+		   and: (self
+				    either: (self negation: (isMode value: #none))
+				    or: inside))
 ]
 
 { #category : 'composition' }
@@ -592,16 +680,18 @@ VGTiledFillPixelEmitter >> emitScaleOfByte: aByteId by: aWeightId [
 		  dividedBy: (self constantWord: VGTiledFillEncoding fullAlphaByte)
 ]
 
-{ #category : 'paint' }
+{ #category : 'emitting' }
 VGTiledFillPixelEmitter >> emitSource [
 	"The pixel this fill lays down at this pixel of the target and whether it lays one down at
 	 all. A solid paint is the one word the header carries, because a solid answers the same
 	 pixel everywhere; a gradient is evaluated here out of its own block and its own stops, and
 	 lays nothing down where its geometry gives no offset, where its extend mode paints outside
-	 its ramp, or where it has no stop to read. Both geometries are emitted and the tag selects
-	 one, which is what the weights of the operators do a few instructions later."
+	 its ramp, or where it has no stop to read; a surface is sampled out of the run of pixels the
+	 encoding sent for it, and lays nothing down where its extend mode leaves it unpainted. All
+	 three are emitted and the tag selects one, which is what the weights of the operators do a
+	 few instructions later."
 
-	| isLinear linear radial offset reaches extended isSolid channels found |
+	| isLinear linear radial offset reaches extended isSolid isSurface channels found surface |
 	self
 		remember: (self
 				 productOfWord: (self valueNamed: #paintBlockOffset)
@@ -629,6 +719,10 @@ VGTiledFillPixelEmitter >> emitSource [
 	isSolid := self
 		           word: (self valueNamed: #paintTag)
 		           equals: (self constantWord: VGPixelPaint paintTag).
+	isSurface := self
+		             word: (self valueNamed: #paintTag)
+		             equals: (self constantWord: VGSurfacePaint paintTag).
+	surface := self emitSurfacePixel.
 	found := self
 		         both: (self both: reaches and: extended value)
 		         and: (self
@@ -642,12 +736,20 @@ VGTiledFillPixelEmitter >> emitSource [
 		store: (self
 				 select: isSolid
 				 ifTrue: (self valueNamed: #sourcePixel)
-				 ifFalse: (self emitPixelOfChannels: channels)
+				 ifFalse: (self
+						  select: isSurface
+						  ifTrue: surface key
+						  ifFalse: (self emitPixelOfChannels: channels)
+						  type: self wordType)
 				 type: self wordType)
 		into: #source.
 	kernel
 		store: (self
-				 select: (self either: isSolid or: found)
+				 select: (self
+						  emitLaysDownSolid: isSolid
+						  surface: isSurface
+						  painted: surface value
+						  gradientFound: found)
 				 ifTrue: (self constantWord: 1)
 				 ifFalse: (self constantWord: 0)
 				 type: self wordType)
@@ -699,6 +801,52 @@ VGTiledFillPixelEmitter >> emitStopSearchAt: anOffsetId [
 			kernel
 				store: (self sumOfWord: (kernel load: #stop) and: (self constantWord: 1))
 				into: #stop ]
+]
+
+{ #category : 'emitting' }
+VGTiledFillPixelEmitter >> emitSurfacePixel [
+	"The pixel of its own source surface a surface paint lays down at this pixel of the target,
+	 and whether it lays one down at all, which is VGSurfacePaint >> rgbaInPaintSpace: on the
+	 pixels the encoding sent: the paint-space point floored to a pixel of the source, each axis
+	 taken under the extend mode of the block, and the word of that pixel read as it stands. The
+	 word stands because the round trip the software paint makes through unpremultiplied channels
+	 is the identity for the one format a frame is encoded for — a colour is divided by the alpha
+	 byte and multiplied by it again — except at alpha nought, where it answers no colour at all
+	 and so the pixel nought, which is what the test on the alpha byte answers here.
+	 The load sits inside the test and not in a select, because a select evaluates both of its
+	 arms and the pixel offset of an entry with no source of its own is one pixel past the run of
+	 the entry before it, which for the last entry of a frame is one past the end of the buffer."
+
+	| width x y painted word |
+	kernel store: (self constantWord: 0) into: #sampledPixel.
+	width := self coefficientOf: VGPaint surfaceWidthFieldIndex.
+	x := self
+		     emitSampleOf: (self floorOfFloat: (self valueNamed: #paintX))
+		     along: width.
+	y := self
+		     emitSampleOf: (self floorOfFloat: (self valueNamed: #paintY))
+		     along: (self coefficientOf: VGPaint surfaceHeightFieldIndex).
+	painted := self both: x value and: y value.
+	builder emitIf: painted then: [
+		kernel
+			store: (kernel
+					 elementOf: #sourcePixels
+					 at: (self
+							  sumOfWord: (self valueNamed: #pixelOffset)
+							  and: (self wordOfFloat: (self
+										   sumOfFloat: (self productOfFloat: y key and: width)
+										   and: x key))))
+			into: #sampledPixel ].
+	word := kernel load: #sampledPixel.
+	^ (self
+		   select: (self
+				    word: (self constantWord: 0)
+				    below: (self
+						     emitByteOf: word
+						     atShift: VGTiledFillEncoding targetFormat channelShifts last))
+		   ifTrue: word
+		   ifFalse: (self constantWord: 0)
+		   type: self wordType) -> painted
 ]
 
 { #category : 'composition' }

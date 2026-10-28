@@ -18,13 +18,12 @@ Class {
 { #category : 'constants' }
 VGTiledClipTest class >> clipCaseCount [
 	"The cases of the conformance corpus that clip to a shape and that the subset draws: the
-	 circle a fill is clipped to. The one other case of the corpus that clips to a shape,
-	 figure-outskirts-outside-translucent-background, draws a second entry through a paint the
-	 subset refuses, and a frame is drawn on the device whole or not at all. The number is
-	 asserted wherever the corpus is walked, so a capability lost by a later change cannot pass
+	 circle a fill is clipped to, and figure-outskirts-outside-translucent-background, whose
+	 second entry fills through a surface paint and so joined the subset at unit 2.9. The number
+	 is asserted wherever the corpus is walked, so a capability lost by a later change cannot pass
 	 as a case quietly skipped."
 
-	^ 1
+	^ 2
 ]
 
 { #category : 'constants' }

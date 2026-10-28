@@ -193,6 +193,15 @@ VGTiledFillLayout class >> paintTagField [
 	^ 6
 ]
 
+{ #category : 'layout' }
+VGTiledFillLayout class >> pixelOffsetField [
+	"Where the pixels of the source surface of this fill's paint start, counted in pixels from
+	 the first pixel of the pixel buffer. A fill of any other paint leaves the field at zero and
+	 writes no pixel, which is what its tag already says."
+
+	^ 11
+]
+
 { #category : 'constants' }
 VGTiledFillLayout class >> recordFields [
 	"The fields of every record these buffers hold, by the selector that answers that records
@@ -202,7 +211,7 @@ VGTiledFillLayout class >> recordFields [
 	^ Dictionary newFrom: {
 		  (#entryHeaderWords -> #( #sourcePixelField #operatorField #alphaByteField
 		     #shapeOffsetField #shapeCountField #paintTagField #paintBlockOffsetField
-		     #stopOffsetField #stopCountField #maskOffsetField )).
+		     #stopOffsetField #stopCountField #maskOffsetField #pixelOffsetField )).
 		  (#shapeRecordWords
 		   -> #( #shapeEdgeOffsetField #shapeEdgeCountField #shapeFillRuleField
 		      #shapeAliasedField )).

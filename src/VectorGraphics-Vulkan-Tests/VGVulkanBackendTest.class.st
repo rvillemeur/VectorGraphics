@@ -96,17 +96,16 @@ VGVulkanBackendTest >> tearDown [
 
 { #category : 'tests' }
 VGVulkanBackendTest >> testABlitOutsideTheSubsetFailsTheFrame [
-	"A blit is refused for the same reasons a fill is, and for no other: here the paint carries the
-	 pixels of another surface, which no block and stop list describes, so the frame fails while it
-	 is recorded and the surface replays the whole of it on the failover."
+	"A blit is refused for the same reasons a fill is, and for no other: here the paint is a mesh
+	 pattern, which no block, stop list or run of pixels describes, so the frame fails while it is
+	 recorded and the surface replays the whole of it on the failover."
 
 	| backend raised |
 	backend := VGVulkanBackend new.
 	raised := [ backend
 		           blitSurface: (VGCairoImageSurface extent: 8 @ 6)
 		           at: 2 @ 3
-		           paint: (VGSurfacePaint surface:
-				            (VGCairoImageSurface extent: self frame extent))
+		           paint: VGTiledFillExamples meshPatternOutsideTheSubset paint
 		           clip: (VGClip bounds: (0 @ 0 corner: self frame extent))
 		           operator: VGCairoOperator over.
 	          nil ]
@@ -176,17 +175,16 @@ VGVulkanBackendTest >> testAGradientFillIsRecordedAndDrawnRatherThanRefused [
 
 { #category : 'tests' }
 VGVulkanBackendTest >> testAPaintTheKernelCannotEvaluateFailsTheFrame [
-	"The widening of unit 2.4 reaches a block and a stop list and no further. A surface paint
-	 carries the pixels of another surface, so a fill of one fails the frame while it is recorded,
-	 exactly as a shaped clip does, and the surface replays the whole frame on the failover."
-	| backend raised paint |
+	"The widening of unit 2.4 reaches a block and a stop list, and that of unit 2.9 a run of
+	 pixels. A mesh paint carries patches, which are none of the three, so a fill of one fails the
+	 frame while it is recorded, and the surface replays the whole frame on the failover."
+
+	| backend raised |
 	backend := VGVulkanBackend new.
-	paint := VGSurfacePaint surface:
-		         (VGCairoImageSurface extent: self frame extent).
 	raised := [
 	          backend
 		          fillSegments: self refusedEntry segments
-		          paint: paint
+		          paint: VGTiledFillExamples meshPatternOutsideTheSubset paint
 		          clip: (VGClip bounds: (0 @ 0 corner: self frame extent))
 		          operator: VGCairoOperator over.
 	          nil ]
@@ -371,15 +369,16 @@ VGVulkanBackendTest >> testTheProbeAnswersTheBackendOrNothing [
 
 { #category : 'fixtures' }
 VGVulkanBackendTest >> unsupportedFrame [
-	"A frame the subset refuses: the paint is a surface pattern, so the one entry it records is a
-	 fill the kernel cannot draw. The failover is held to this frame rather than to the fixture
-	 one, because the fixture frame is a solid fill inside a rectangular clip and the device draws
-	 that from unit 2.3 on. A shaped clip stopped refusing a frame at unit 2.7, so the refusal
-	 here is the paint and not the clip."
+	"A frame the subset refuses: the paint is a mesh pattern, whose patches are in neither a
+	 coefficient block, a stop list nor a run of pixels, so the one entry it records is a fill the
+	 kernel cannot draw. The failover is held to this frame rather than to the fixture one,
+	 because the fixture frame is a solid fill inside a rectangular clip and the device draws that
+	 from unit 2.3 on. A shaped clip stopped refusing a frame at unit 2.7 and a surface pattern at
+	 unit 2.9, so the refusal here is the mesh and nothing else."
 
 	^ [ :context |
 	  context
-		  sourceSurface: (VGCairoImageSurface extent: 4 @ 4) x: 0 y: 0;
+		  sourcePattern: VGTiledFillExamples meshPatternOutsideTheSubset;
 		  rectangleX: 2 y: 2 width: 36 height: 26;
 		  fill ]
 ]

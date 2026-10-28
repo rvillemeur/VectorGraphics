@@ -12,7 +12,8 @@ Class {
 		'grid',
 		'buffers',
 		'decoder',
-		'bands'
+		'bands',
+		'sources'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -132,7 +133,7 @@ VGTiledFillEncoding class >> targetFormat [
 	^ VGCairoSurfaceFormat argb32
 ]
 
-{ #category : 'private' }
+{ #category : 'writing' }
 VGTiledFillEncoding >> allocateBuffersFor: aCollection offsets: aDictionary [
 	"The buffers one frame rides to the device in, sized by the entries it holds and by the
 	 totals the offsets end in. How large each of them is for those counts belongs to
@@ -148,6 +149,7 @@ VGTiledFillEncoding >> allocateBuffersFor: aCollection offsets: aDictionary [
 		masks: (aDictionary at: #maskBytes) last.
 	buffers allocateForShapes:
 		(aDictionary at: #shapes) last + bands blockCount.
+	buffers allocateForPixels: (aDictionary at: #sourcePixels) last.
 	bands shapeBase: (aDictionary at: #shapes) last.
 	decoder := VGTiledFillDecoder on: buffers
 ]
@@ -461,9 +463,10 @@ VGTiledFillEncoding >> offsetsFor: aCollection by: aBlock [
 
 { #category : 'writing' }
 VGTiledFillEncoding >> offsetsOf: aCollection [
-	"Where every entry starts in each of the four buffers whose records are counted over the
-	 whole frame and not one an entry, by the name of that buffer. Each answer holds one number
-	 more than there are entries, the last being the total the buffer is allocated at."
+	"Where every entry starts in each of the buffers whose records are counted over the whole
+	 frame and not one an entry, by the name of that buffer. Each answer holds one number more
+	 than there are entries, the last being the total the buffer is allocated at. The pixels of
+	 the sources are counted by VGTiledFillSources, which writes them too."
 
 	^ Dictionary newFrom: {
 		  (#edges -> (self offsetsFor: aCollection by: [ :each |
@@ -473,7 +476,8 @@ VGTiledFillEncoding >> offsetsOf: aCollection [
 		  (#stops -> (self offsetsFor: aCollection by: [ :each |
 			    self stopCountOf: each ])).
 		  (#maskBytes -> (self offsetsFor: aCollection by: [ :each |
-			    self maskByteCountOf: each ])) }
+			    self maskByteCountOf: each ])).
+		  (#sourcePixels -> sources offsets) }
 ]
 
 { #category : 'inspecting' }
@@ -544,33 +548,35 @@ VGTiledFillEncoding >> rowOfTileAt: anIndex [
 	^ nil
 ]
 
-{ #category : 'private' }
+{ #category : 'initialization' }
 VGTiledFillEncoding >> setBinning: aBinning [
 	"Write the frame out: a header, a clip rectangle, a mask rectangle, a paint block, a run of
 	 shapes, a run of edges, a run of stops and a run of mask bytes for every entry, then the
-	 blocks of shape records its rows of tiles read, then the table of the tiles it touches and
-	 the references into it. Every entry is written as the fill it is drawn as, which for a blit
-	 is a fill of its own narrowed clip carrying the alpha of its mask, so the buffers describe
-	 one kind of entry and the kernel reads one kind. The entries are the binnings own copy of
-	 the display list, so nothing here reads a frame that has already drained, and the tiles are
-	 written from the binning itself, which knows the entries it binned and not the fills they
-	 became."
+	 pixels of every source the frame paints out of, then the blocks of shape records its rows of
+	 tiles read, then the table of the tiles it touches and the references into it. Every entry is
+	 written as the fill it is drawn as, which for a blit is a fill of its own narrowed clip
+	 carrying the alpha of its mask, so the buffers describe one kind of entry and the kernel
+	 reads one kind. The entries are the binnings own copy of the display list, so nothing here
+	 reads a frame that has already drained, and the tiles are written from the binning itself,
+	 which knows the entries it binned and not the fills they became."
 
 	| entries offsets |
 	grid := aBinning grid.
 	entries := aBinning entries collect: [ :each | each asTiledFill ].
 	bands := VGTiledFillBands binning: aBinning fills: entries.
+	sources := VGTiledFillSources of: entries.
 	offsets := self offsetsOf: entries.
 	self allocateBuffersFor: entries offsets: offsets.
 	entries withIndexDo: [ :each :index |
 		self writeEntry: each at: index offsets: offsets ].
+	sources writeInto: buffers sourcePixels.
 	self writeBandBlocksAt: offsets.
 	self writeTilesOf: aBinning
 ]
 
 { #category : 'writing' }
 VGTiledFillEncoding >> shapeCountOf: anEntry [
-	^ (self shapesOf: anEntry) size
+	^ (VGTiledFillBands shapesOf: anEntry) size
 ]
 
 { #category : 'accessing' }
@@ -578,13 +584,9 @@ VGTiledFillEncoding >> shapes [
 	^ buffers shapes
 ]
 
-{ #category : 'private' }
-VGTiledFillEncoding >> shapesOf: anEntry [
-	"The shapes of an entry, in the order its records are written in. VGTiledFillBands answers
-	 them, because the blocks it cuts into rows of tiles and the records written here must agree
-	 about which shape is which."
-
-	^ VGTiledFillBands shapesOf: anEntry
+{ #category : 'accessing' }
+VGTiledFillEncoding >> sourcePixels [
+	^ buffers sourcePixels
 ]
 
 { #category : 'accessing' }
@@ -649,7 +651,7 @@ VGTiledFillEncoding >> totalEdgeCountOf: anEntry [
 	"The edges of every shape of an entry, which is the room its run of the edge buffer takes.
 	 The edges of the fill come first, so the offset of the entry is the offset of its fill too."
 
-	^ (self shapesOf: anEntry) inject: 0 into: [ :total :shape |
+	^ (VGTiledFillBands shapesOf: anEntry) inject: 0 into: [ :total :shape |
 		  total + (shape segments size / VGTiledFillLayout edgeFloats) ]
 ]
 
@@ -720,7 +722,7 @@ VGTiledFillEncoding >> writeEdgesOf: anEntry at: anOffset [
 
 	| cursor |
 	cursor := anOffset * VGTiledFillLayout edgeFloats.
-	(self shapesOf: anEntry) do: [ :shape |
+	(VGTiledFillBands shapesOf: anEntry) do: [ :shape |
 		| coordinates |
 		coordinates := shape segments.
 		1 to: coordinates size do: [ :offset |
@@ -730,14 +732,17 @@ VGTiledFillEncoding >> writeEdgesOf: anEntry at: anOffset [
 
 { #category : 'writing' }
 VGTiledFillEncoding >> writeEntry: anEntry at: anIndex offsets: aDictionary [
-	"One entry into every buffer that holds a part of it, at the offsets the frame gave it."
+	"One entry into every buffer that holds a part of it, at the offsets the frame gave it. The
+	 pixels of its source are not among them: they are written in one pass of their own, because
+	 the runs are the frame's and not the entry's."
 
 	| edgeOffset |
 	edgeOffset := (aDictionary at: #edges) at: anIndex.
 	self
 		writeHeaderOf: anEntry
 		at: anIndex
-		stopOffset: ((aDictionary at: #stops) at: anIndex).
+		stopOffset: ((aDictionary at: #stops) at: anIndex)
+		pixelOffset: ((aDictionary at: #sourcePixels) at: anIndex).
 	self
 		writeShapesOf: anEntry
 		at: anIndex
@@ -753,7 +758,7 @@ VGTiledFillEncoding >> writeEntry: anEntry at: anIndex offsets: aDictionary [
 ]
 
 { #category : 'writing' }
-VGTiledFillEncoding >> writeHeaderOf: anEntry at: anIndex stopOffset: aStopOffset [
+VGTiledFillEncoding >> writeHeaderOf: anEntry at: anIndex stopOffset: aStopOffset pixelOffset: aPixelOffset [
 	"What a kernel needs of one entry and nothing more. What a shape of the entry is read under
 	 is not here: the fill and every shape of its clip carry their own record, and the header
 	 says only where the run of them starts. A solid paint is sampled at the origin, because it
@@ -781,7 +786,8 @@ VGTiledFillEncoding >> writeHeaderOf: anEntry at: anIndex stopOffset: aStopOffse
 	buffers headers at: base + VGTiledFillLayout stopOffsetField put: aStopOffset.
 	buffers headers
 		at: base + VGTiledFillLayout stopCountField
-		put: (self stopCountOf: anEntry)
+		put: (self stopCountOf: anEntry).
+	buffers headers at: base + VGTiledFillLayout pixelOffsetField put: aPixelOffset
 ]
 
 { #category : 'writing' }
@@ -882,7 +888,7 @@ VGTiledFillEncoding >> writeShapesOf: anEntry at: anIndex shapeOffset: aShapeOff
 		at: base + VGTiledFillLayout shapeCountField
 		put: (self shapeCountOf: anEntry).
 	cursor := anEdgeOffset.
-	(self shapesOf: anEntry) withIndexDo: [ :shape :ordinal |
+	(VGTiledFillBands shapesOf: anEntry) withIndexDo: [ :shape :ordinal |
 		| count |
 		count := shape segments size / VGTiledFillLayout edgeFloats.
 		self

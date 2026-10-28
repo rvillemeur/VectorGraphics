@@ -162,6 +162,20 @@ VGPaint class >> rgbaOf: aColor [
 		  aColor alpha asFloat }
 ]
 
+{ #category : 'abi' }
+VGPaint class >> surfaceHeightFieldIndex [
+	^ 16
+]
+
+{ #category : 'abi' }
+VGPaint class >> surfaceWidthFieldIndex [
+	"Where the width of the source surface of a surface paint sits in the block. Three readers
+	 now ask for it - the paint itself, the decoder of an encoding and the kernel - so the field
+	 is named here beside the two codes rather than written out at each of them."
+
+	^ 15
+]
+
 { #category : 'constants' }
 VGPaint class >> typeNames [
 	"The tag of a paint is cairo_pattern_type_t itself, so a paint and the pattern that built it

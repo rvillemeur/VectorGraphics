@@ -35,10 +35,9 @@ VGSurfacePaint class >> surface: aSurface [
 
 { #category : 'inspector' }
 VGSurfacePaint >> inspectorExtend: aBuilder [
-
 	<inspectorPresentationOrder: 21 title: 'Extend'>
 	| width |
-	width := (coefficients at: 15) rounded.
+	width := (coefficients at: self class surfaceWidthFieldIndex) rounded.
 	^ aBuilder newTable
 		  items: (-4 to: width * 2 + 3);
 		  addColumn: (SpStringTableColumn title: 'x' evaluated: [ :each | each printString ]);
@@ -72,9 +71,13 @@ VGSurfacePaint >> rgbaInPaintSpace: aPoint [
 	 a scaled surface pattern needs the real sampling rules and waits for the unit that scales one."
 
 	| x y |
-	x := self sample: aPoint x floor along: (coefficients at: 15) rounded.
+	x := self
+		     sample: aPoint x floor
+		     along: (coefficients at: self class surfaceWidthFieldIndex) rounded.
 	x ifNil: [ ^ nil ].
-	y := self sample: aPoint y floor along: (coefficients at: 16) rounded.
+	y := self
+		     sample: aPoint y floor
+		     along: (coefficients at: self class surfaceHeightFieldIndex) rounded.
 	y ifNil: [ ^ nil ].
 	^ surface format rgbaForPixel: (surface pixelAtX: x y: y)
 ]
@@ -105,9 +108,14 @@ VGSurfacePaint >> surface [
 { #category : 'accessing' }
 VGSurfacePaint >> surface: aSurface [
 	"The surface rides beside the block, because it is not a float. Its extent does go in the
-	 block, in fields 15 and 16, because that is what the extend mode is applied to."
+	 block, in the two fields the ABI names for it, because that is what the extend mode is
+	 applied to."
 
 	surface := aSurface.
-	coefficients at: 15 put: aSurface width asFloat.
-	coefficients at: 16 put: aSurface height asFloat
+	coefficients
+		at: self class surfaceWidthFieldIndex
+		put: aSurface width asFloat.
+	coefficients
+		at: self class surfaceHeightFieldIndex
+		put: aSurface height asFloat
 ]
