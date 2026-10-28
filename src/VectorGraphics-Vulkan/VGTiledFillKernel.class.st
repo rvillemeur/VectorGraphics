@@ -26,12 +26,12 @@ Class {
 
 { #category : 'constants' }
 VGTiledFillKernel class >> bindingNames [
-	"The twelve buffers I read, in the order they are bound: the ten an encoding writes, the
-	 pixels of the target and the size of the frame. A binding number is the position of the name
-	 here, counted from zero, so this one list states the whole contract."
+	"The thirteen buffers I read, in the order they are bound: the eleven an encoding writes,
+	 the pixels of the target and the size of the frame. A binding number is the position of the
+	 name here, counted from zero, so this one list states the whole contract."
 
-	^ #( #tileTable #entryRefs #headers #clips #edges #shapes #paints #stops
-	     #maskRects #maskBytes #target #frame )
+	^ #( #tileTable #entryRefs #refShapes #headers #clips #edges #shapes #paints
+	     #stops #maskRects #maskBytes #target #frame )
 ]
 
 { #category : 'constants' }
@@ -680,13 +680,17 @@ VGTiledFillKernel >> emitDirectionOfEdgeAt: anEdgeId [
 		  type: self signedType
 ]
 
-{ #category : 'emission - entry' }
+{ #category : 'emitting' }
 VGTiledFillKernel >> emitEntry [
 	"One fill of this tile at this pixel: its header, its clip, the rectangle of its mask, the
 	 pixel its paint lays down here, the coverage of the walk over it and the composition of the
 	 two into the destination.
 	 The reference holds the identifier of the entry, counting from one as VGTiledFillEncoding
 	 writes it, and in its top bit the mark that says the entry covers the whole of this tile.
+	 Beside it, under the same index, rides the block of shape records this tile is to read for
+	 that entry: the records of the row of tiles this tile lies in, each naming only the edges
+	 of its shape that reach the rows of that row. An edge whose own rows miss this tile cannot
+	 cross a sub-row of it, so the short run and the whole shape give the same coverage.
 	 A pixel the paint lays nothing down at is left alone, which the subset may do because every
 	 operator in it is bounded, and which is what the software rasteriser does with the nil a
 	 paint answers.
@@ -697,13 +701,15 @@ VGTiledFillKernel >> emitEntry [
 	 The paint and the composition are emitted by VGTiledFillPixelEmitter, which shares this
 	 module while I emit this entry; the walk over the edges between them is my own."
 
-	| reference identifier previous mask pixels |
+	| reference identifier previous mask pixels at |
 	pixels := VGTiledFillPixelEmitter on: self.
-	reference := self
-		             elementOf: #entryRefs
-		             at: (self
-				              sumOfWord: (self valueNamed: #referenceOffset)
-				              and: (self load: #reference)).
+	at := self
+		      sumOfWord: (self valueNamed: #referenceOffset)
+		      and: (self load: #reference).
+	reference := self elementOf: #entryRefs at: at.
+	self
+		remember: (self elementOf: #refShapes at: at)
+		as: #shapeOffset.
 	identifier := self
 		              bitsOfWord: reference
 		              and:
@@ -1329,13 +1335,15 @@ VGTiledFillKernel >> rememberClipAt: aBaseId [
 
 { #category : 'emitting' }
 VGTiledFillKernel >> rememberHeaderAt: aBaseId [
-	"The ten words of the header of one entry, read once for the whole walk over it. What a
-	 shape of the entry is read under is not among them: a fill and a shape of its clip each
-	 carry their own record, and the header says only where the run of them starts."
+	"The words of the header of one entry that I read, read once for the whole walk over it.
+	 What a shape of the entry is read under is not among them: a fill and a shape of its clip
+	 each carry their own record. Nor is the start of the whole-shape run of the entry, which
+	 the header does carry and which a backend replaying a frame off the buffers alone reads: a
+	 reference of this tile names the block of records of its own row of tiles instead."
 
-	#( #sourcePixelField #operatorField #alphaByteField #shapeOffsetField
-	   #shapeCountField #paintTagField #paintBlockOffsetField #stopOffsetField
-	   #stopCountField #maskOffsetField ) do: [ :each |
+	#( #sourcePixelField #operatorField #alphaByteField #shapeCountField
+	   #paintTagField #paintBlockOffsetField #stopOffsetField #stopCountField
+	   #maskOffsetField ) do: [ :each |
 		self
 			remember: (self
 					 elementOf: #headers

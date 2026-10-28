@@ -47,13 +47,16 @@ VGTiledFillBuffers >> allocateForShapes: aCount [
 
 { #category : 'allocating' }
 VGTiledFillBuffers >> allocateForTiles: aTileCount references: aReferenceCount [
-	"The two buffers the tiles of a frame ride in, which are sized by the tiles the frame
-	 touches and not by the entries it holds, and so are allocated after them."
+	"The three buffers the tiles of a frame ride in, which are sized by the tiles the frame
+	 touches and not by the entries it holds, and so are allocated after them. A reference
+	 carries a word of its own in refShapes: the shape records its tile is to read for that
+	 entry, which are the records of the row of tiles the tile is in and not of the whole shape."
 
 	arrays
 		at: #tileTable
 		put: (WordArray new: aTileCount * VGTiledFillLayout tileRecordWords).
-	arrays at: #entryRefs put: (WordArray new: aReferenceCount)
+	arrays at: #entryRefs put: (WordArray new: aReferenceCount).
+	arrays at: #refShapes put: (WordArray new: aReferenceCount)
 ]
 
 { #category : 'accessing' }
@@ -175,6 +178,11 @@ VGTiledFillBuffers >> printOn: aStream [
 		nextPutAll: ' header words, ';
 		print: (self maskBytes ifNil: [ 0 ] ifNotNil: [ :each | each size ]);
 		nextPutAll: ' mask words)'
+]
+
+{ #category : 'accessing' }
+VGTiledFillBuffers >> refShapes [
+	^ self bufferNamed: #refShapes
 ]
 
 { #category : 'accessing' }

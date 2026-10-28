@@ -14,6 +14,29 @@ Class {
 }
 
 { #category : 'examples' }
+VGTiledFillExamples class >> bandsOfACircleInACircularClipOverFourRowsOfTiles [
+	<sampleInstance>
+	"The shape records of one frame cut into rows of tiles: a circle that fills the frame, so
+	 that it reaches every one of the four rows of tiles, inside a circular clip, so that the
+	 entry carries two shapes and not one. The Blocks tab reads what the kernel is given for
+	 each row of tiles against what the whole shape holds, which is the saving the band blocks
+	 are for."
+
+	| surface binning |
+	surface := VGCairoImageSurface extent: self frameExtent.
+	surface newContext
+		circleCenterX: 32 y: 32 radius: 29;
+		clip;
+		sourceColorR: 0.2 g: 0.3 b: 0.8 a: 1.0;
+		circleCenterX: 32 y: 32 radius: 24;
+		fill.
+	binning := VGTileBinning of: surface displayList extent: self frameExtent.
+	^ VGTiledFillBands
+		  binning: binning
+		  fills: (binning entries collect: [ :each | each asTiledFill ])
+]
+
+{ #category : 'examples' }
 VGTiledFillExamples class >> blitRewrittenAsAFill [
 	"The fill the tiled rasteriser draws a blit as, which is what unit 2.6 added: a blit of a
 	 mask at an offset, asked for the fill it becomes. Its segments are the rectangle of its own

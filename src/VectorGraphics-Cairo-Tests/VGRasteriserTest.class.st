@@ -61,6 +61,31 @@ VGRasteriserTest >> edgeIndexShapes [
 		  (self segmentsOfAll: { (self circleOfRadius: 28 center: 32 @ 32) }) }
 ]
 
+{ #category : 'helpers' }
+VGRasteriserTest >> edgeReachOfBandsOf: coordinates bandHeight: aHeight [
+	"No edge may sit in a band whose rows it does not reach, which is the whole point of the
+	 index. The box is asked of the edges themselves, because an edge outside the box clamps into
+	 the nearest band and would reach nothing."
+
+	| scanner index |
+	scanner := VGSpanScanner
+		           segments: coordinates
+		           fillRule: #nonZero
+		           antialias: #default.
+	index := VGEdgeIndex
+		         coordinates: coordinates
+		         bounds: scanner exactBoundingBox
+		         bandHeight: aHeight.
+	1 to: index bandCount do: [ :band |
+		| rows |
+		rows := index boundsOfBandAt: band.
+		(index edgeIndexesInBandAt: band) do: [ :offset |
+			| edge |
+			edge := index boxOfEdgeAt: offset.
+			self assert: edge top <= rows bottom.
+			self assert: edge bottom >= rows top ] ]
+]
+
 { #category : 'support' }
 VGRasteriserTest >> fivePointedStarOfRadius: aNumber center: aPoint [
 	"The points taken two apart, which is what makes the star one self-crossing path with a
@@ -165,6 +190,48 @@ VGRasteriserTest >> testAnAlignedRectangleCoversWholePixelsAndNothingOutside [
 ]
 
 { #category : 'tests - edge index' }
+VGRasteriserTest >> testAnEdgeIndexAnswersNoEdgeForRowsItsShapeDoesNotReach [
+	"A run of rows the box of the shape does not reach holds no edge of it, rather than the
+	 edges of the nearest band: an edge that cannot cross a row cannot wind it, so a caller
+	 reading those rows owes a winding of nought and the edges would only cost it the reading.
+	 The rows asked for are the rows of one band, which is how the tiled encoding asks."
+
+	| height |
+	height := 16.
+	self edgeIndexShapes do: [ :coordinates |
+		| scanner index box |
+		scanner := VGSpanScanner
+			           segments: coordinates
+			           fillRule: #nonZero
+			           antialias: #default.
+		box := scanner exactBoundingBox.
+		index := VGEdgeIndex
+			         coordinates: coordinates
+			         bounds: box
+			         bandHeight: height.
+		self
+			assertEmpty:
+			(index edgeIndexesMeetingRowsFrom: box top - 1000 to: box top - 984).
+		self
+			assertEmpty:
+			(index
+				 edgeIndexesMeetingRowsFrom: box bottom + 1000
+				 to: box bottom + 1016).
+		1 to: index bandCount do: [ :band |
+			| rows found |
+			rows := index boundsOfBandAt: band.
+			found := index
+				         edgeIndexesMeetingRowsFrom: rows top
+				         to: rows bottom.
+			self assert: found equals: (index edgeIndexesInBandAt: band).
+			found do: [ :offset |
+				| edge |
+				edge := index boxOfEdgeAt: offset.
+				self assert: edge top <= rows bottom.
+				self assert: edge bottom >= rows top ] ] ]
+]
+
+{ #category : 'tests - edge index' }
 VGRasteriserTest >> testAnEdgeIndexAnswersWhatAScanOverEveryEdgeAnswers [
 	"The index may not change an answer: an index of one band is the scan over every edge, and an
 	 index of as many bands as it chooses for itself has to agree with it at every rectangle and
@@ -235,6 +302,42 @@ VGRasteriserTest >> testAnEdgeIndexOfADegenerateShapeAnswersWithoutDividingByNou
 	self assert: (flat anEdgeMeets: (16 @ 16 corner: 24 @ 24)).
 	self deny: (flat anEdgeMeets: (16 @ 24 corner: 24 @ 32)).
 	self assert: (flat windingAt: 24 @ 20) equals: 0
+]
+
+{ #category : 'tests - edge index' }
+VGRasteriserTest >> testAnEdgeIndexOfBandsOfAGivenHeightAlignsThemToThatHeight [
+	"The bands the tiled encoding needs are the rows of its tiles, so a band of a given height
+	 starts at a multiple of that height whatever the box of the shape is, and the band of a row
+	 is the band that row falls in. A row outside the box answers the nearest band, as it does
+	 for bands chosen by edge count."
+
+	| height boxes |
+	height := 16.
+	boxes := {
+		          (0 @ 0 corner: 64 @ 64).
+		          (5 @ 5 corner: 60 @ 63).
+		          (5 @ 20 corner: 60 @ 63).
+		          (7 @ 20 corner: 9 @ 20) }.
+	self edgeIndexShapes do: [ :coordinates |
+		boxes do: [ :box |
+			| index |
+			index := VGEdgeIndex
+				         coordinates: coordinates
+				         bounds: box
+				         bandHeight: height.
+			self
+				assert: index bandCount
+				equals: ((box bottom / height) ceiling - (box top / height) floor max: 1).
+			1 to: index bandCount do: [ :band |
+				| rows |
+				rows := index boundsOfBandAt: band.
+				self assert: rows height equals: height.
+				self assert: (rows top / height) fractionPart equals: 0.
+				self assert: (index bandOf: rows top) equals: band.
+				self assert: (index bandOf: rows bottom - 0.5) equals: band ].
+			self assert: (index bandOf: box top - 1000) equals: 1.
+			self assert: (index bandOf: box bottom + 1000) equals: index bandCount ].
+		self edgeReachOfBandsOf: coordinates bandHeight: height ]
 ]
 
 { #category : 'tests' }

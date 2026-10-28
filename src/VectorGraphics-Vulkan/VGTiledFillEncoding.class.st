@@ -11,7 +11,8 @@ Class {
 	#instVars : [
 		'grid',
 		'buffers',
-		'decoder'
+		'decoder',
+		'bands'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -131,20 +132,23 @@ VGTiledFillEncoding class >> targetFormat [
 	^ VGCairoSurfaceFormat argb32
 ]
 
-{ #category : 'writing' }
+{ #category : 'private' }
 VGTiledFillEncoding >> allocateBuffersFor: aCollection offsets: aDictionary [
 	"The buffers one frame rides to the device in, sized by the entries it holds and by the
 	 totals the offsets end in. How large each of them is for those counts belongs to
 	 VGTiledFillBuffers, which knows their sizes and nothing of what a record holds; what goes
-	 inside one is mine."
+	 inside one is mine. The shape and the edge buffer carry the band blocks after the whole
+	 shapes, so the bands are told where theirs begin."
 
 	buffers := VGTiledFillBuffers new.
 	buffers
 		allocateForEntries: aCollection size
-		edges: (aDictionary at: #edges) last
+		edges: (aDictionary at: #edges) last + bands edgeCount
 		stops: (aDictionary at: #stops) last
 		masks: (aDictionary at: #maskBytes) last.
-	buffers allocateForShapes: (aDictionary at: #shapes) last.
+	buffers allocateForShapes:
+		(aDictionary at: #shapes) last + bands blockCount.
+	bands shapeBase: (aDictionary at: #shapes) last.
 	decoder := VGTiledFillDecoder on: buffers
 ]
 
@@ -514,6 +518,11 @@ VGTiledFillEncoding >> printOn: aStream [
 		nextPutAll: ' tiles)'
 ]
 
+{ #category : 'accessing' }
+VGTiledFillEncoding >> refShapes [
+	^ buffers refShapes
+]
+
 { #category : 'tiles' }
 VGTiledFillEncoding >> rowOfTileAt: anIndex [
 	"The row of the table that owns that tile, or nil. The records are written in tile order, so
@@ -535,24 +544,27 @@ VGTiledFillEncoding >> rowOfTileAt: anIndex [
 	^ nil
 ]
 
-{ #category : 'writing' }
+{ #category : 'private' }
 VGTiledFillEncoding >> setBinning: aBinning [
 	"Write the frame out: a header, a clip rectangle, a mask rectangle, a paint block, a run of
 	 shapes, a run of edges, a run of stops and a run of mask bytes for every entry, then the
-	 table of the tiles it touches and the references into it. Every entry is written as the fill
-	 it is drawn as, which for a blit is a fill of its own narrowed clip carrying the alpha of
-	 its mask, so the buffers describe one kind of entry and the kernel reads one kind. The
-	 entries are the binnings own copy of the display list, so nothing here reads a frame that
-	 has already drained, and the tiles are written from the binning itself, which knows the
-	 entries it binned and not the fills they became."
+	 blocks of shape records its rows of tiles read, then the table of the tiles it touches and
+	 the references into it. Every entry is written as the fill it is drawn as, which for a blit
+	 is a fill of its own narrowed clip carrying the alpha of its mask, so the buffers describe
+	 one kind of entry and the kernel reads one kind. The entries are the binnings own copy of
+	 the display list, so nothing here reads a frame that has already drained, and the tiles are
+	 written from the binning itself, which knows the entries it binned and not the fills they
+	 became."
 
 	| entries offsets |
 	grid := aBinning grid.
 	entries := aBinning entries collect: [ :each | each asTiledFill ].
+	bands := VGTiledFillBands binning: aBinning fills: entries.
 	offsets := self offsetsOf: entries.
 	self allocateBuffersFor: entries offsets: offsets.
 	entries withIndexDo: [ :each :index |
 		self writeEntry: each at: index offsets: offsets ].
+	self writeBandBlocksAt: offsets.
 	self writeTilesOf: aBinning
 ]
 
@@ -566,13 +578,13 @@ VGTiledFillEncoding >> shapes [
 	^ buffers shapes
 ]
 
-{ #category : 'writing' }
+{ #category : 'private' }
 VGTiledFillEncoding >> shapesOf: anEntry [
-	"The shapes of an entry: the fill first and then every shape its clip was cut out with, all
-	 of them as scanners, so that one kind of record describes a fill and a clip shape alike and
-	 the kernel reads a shape without asking where it came from."
+	"The shapes of an entry, in the order its records are written in. VGTiledFillBands answers
+	 them, because the blocks it cuts into rows of tiles and the records written here must agree
+	 about which shape is which."
 
-	^ { (VGSpanScanner of: anEntry segments) } , anEntry clip shapes
+	^ VGTiledFillBands shapesOf: anEntry
 ]
 
 { #category : 'accessing' }
@@ -652,6 +664,40 @@ VGTiledFillEncoding >> touchedTileIndexes [
 	^ (1 to: self touchedTileCount) collect: [ :row |
 		  buffers tileTable at:
 			  (row - 1) * VGTiledFillLayout tileRecordWords + VGTiledFillLayout tileIndexField ]
+]
+
+{ #category : 'private' }
+VGTiledFillEncoding >> writeBandBlocksAt: aDictionary [
+	"The band blocks: one block of shape records for every row of tiles an entry reaches, each
+	 record naming only the edges of that shape which reach the rows of that row, and those
+	 edges copied after the whole shapes in the edge buffer. An edge lying in two rows of tiles
+	 is written in both of them, which is what buys the kernel a short run: an edge whose own
+	 rows miss the rows of a tile cannot cross a sub-row of it, so a tile reading its own row
+	 reads fewer edges for the same coverage. The blocks are written in the order
+	 VGTiledFillBands lays them out, so a reference finds one by arithmetic and not by a search."
+
+	| record cursor |
+	record := (aDictionary at: #shapes) last.
+	cursor := (aDictionary at: #edges) last.
+	bands blocksDo: [ :index :row |
+		(bands shapesOfEntry: index) withIndexDo: [ :shape :ordinal |
+			| indexes |
+			indexes := bands
+				           edgeIndexesOfEntry: index
+				           shape: ordinal
+				           inRow: row.
+			self
+				writeShapeRecordAt: record
+				for: shape
+				edgeOffset: cursor
+				count: indexes size.
+			indexes do: [ :offset |
+				1 to: VGTiledFillLayout edgeFloats do: [ :each |
+					buffers edges
+						at: cursor * VGTiledFillLayout edgeFloats + each
+						put: (shape segments at: offset + each - 1) ].
+				cursor := cursor + 1 ].
+			record := record + 1 ] ]
 ]
 
 { #category : 'initialization' }
@@ -801,11 +847,33 @@ VGTiledFillEncoding >> writePaintOf: anEntry at: anIndex stopOffset: aStopOffset
 			buffers stops at: stopBase + field put: (stop value at: channel) ] ]
 ]
 
-{ #category : 'writing' }
+{ #category : 'private' }
+VGTiledFillEncoding >> writeShapeRecordAt: aRecord for: aShape edgeOffset: anEdgeOffset count: aCount [
+	"One shape record: where its edges start, how many of them there are, the fill rule it is
+	 read under and whether it is aliased. A whole shape and a shape narrowed to one row of
+	 tiles are written by the same method, because the kernel reads one kind of record and the
+	 count is the only thing that differs."
+
+	| base |
+	base := aRecord * VGTiledFillLayout shapeRecordWords.
+	buffers shapes
+		at: base + VGTiledFillLayout shapeEdgeOffsetField
+		put: anEdgeOffset.
+	buffers shapes at: base + VGTiledFillLayout shapeEdgeCountField put: aCount.
+	buffers shapes
+		at: base + VGTiledFillLayout shapeFillRuleField
+		put: (self class codeForFillRule: aShape fillRule).
+	buffers shapes
+		at: base + VGTiledFillLayout shapeAliasedField
+		put: (self class flagForAliased: aShape isAliased)
+]
+
+{ #category : 'private' }
 VGTiledFillEncoding >> writeShapesOf: anEntry at: anIndex shapeOffset: aShapeOffset edgeOffset: anEdgeOffset [
-	"The shape run of one entry and the two header fields that find it. Each record says where
-	 the edges of that shape start, how many it has, the fill rule it is read under and whether
-	 it is aliased; the edges themselves ride in the edge buffer, in the same order."
+	"The whole-shape run of one entry and the two header fields that find it. The kernel does
+	 not read this run — a reference names a block of the entry's own row of tiles instead — but
+	 a backend replaying a frame off the buffers alone reads the whole of every shape, and so
+	 does the decoder, so it is written and it is where the edges of the entry lie."
 
 	| base cursor |
 	base := (anIndex - 1) * VGTiledFillLayout entryHeaderWords.
@@ -815,21 +883,14 @@ VGTiledFillEncoding >> writeShapesOf: anEntry at: anIndex shapeOffset: aShapeOff
 		put: (self shapeCountOf: anEntry).
 	cursor := anEdgeOffset.
 	(self shapesOf: anEntry) withIndexDo: [ :shape :ordinal |
-		| record |
-		record := (aShapeOffset + ordinal - 1) * VGTiledFillLayout shapeRecordWords.
-		buffers shapes
-			at: record + VGTiledFillLayout shapeEdgeOffsetField
-			put: cursor.
-		buffers shapes
-			at: record + VGTiledFillLayout shapeEdgeCountField
-			put: shape segments size / VGTiledFillLayout edgeFloats.
-		buffers shapes
-			at: record + VGTiledFillLayout shapeFillRuleField
-			put: (self class codeForFillRule: shape fillRule).
-		buffers shapes
-			at: record + VGTiledFillLayout shapeAliasedField
-			put: (self class flagForAliased: shape isAliased).
-		cursor := cursor + (shape segments size / VGTiledFillLayout edgeFloats) ]
+		| count |
+		count := shape segments size / VGTiledFillLayout edgeFloats.
+		self
+			writeShapeRecordAt: aShapeOffset + ordinal - 1
+			for: shape
+			edgeOffset: cursor
+			count: count.
+		cursor := cursor + count ]
 ]
 
 { #category : 'initialization' }
@@ -846,12 +907,14 @@ VGTiledFillEncoding >> writeTileRecordAt: aRow tile: aTileIndex offset: anOffset
 	buffers tileTable at: base + VGTiledFillLayout referenceCountField put: aCount
 ]
 
-{ #category : 'tiles' }
+{ #category : 'private' }
 VGTiledFillEncoding >> writeTilesOf: aBinning [
 	"One record a touched tile, in tile order so that a row can be found by a halving search,
 	 and the references of a tile in the order the entries were drawn, because compositing is
 	 not commutative. A reference also carries the mark the binning made of the pair: the entry
-	 covers the whole of this tile, so the kernel takes the coverage as one there."
+	 covers the whole of this tile, so the kernel takes the coverage as one there. Beside each
+	 reference goes the block of shape records that tile is to read for that entry, which is the
+	 block of the row of tiles the tile lies in."
 
 	| indexes identifiers offset |
 	identifiers := IdentityDictionary new.
@@ -869,10 +932,15 @@ VGTiledFillEncoding >> writeTilesOf: aBinning [
 			offset: offset
 			count: tileEntries size.
 		tileEntries withIndexDo: [ :each :position |
+			| identifier |
+			identifier := identifiers at: each.
 			buffers entryRefs
 				at: offset + position
 				put: (VGTiledFillLayout
-						 referenceFor: (identifiers at: each)
-						 interior: (aBinning isEntry: each interiorToTileAt: tileIndex)) ].
+						 referenceFor: identifier
+						 interior: (aBinning isEntry: each interiorToTileAt: tileIndex)).
+			buffers refShapes
+				at: offset + position
+				put: (bands blockOfEntry: identifier inRowOfTile: tileIndex) ].
 		offset := offset + tileEntries size ]
 ]

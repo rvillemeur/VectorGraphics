@@ -521,6 +521,47 @@ VGTiledFillTest >> testEveryBufferTheKernelBindsOutOfAnEncodingIsOneTheBuffersAn
 		equals: names asSortedCollection asArray
 ]
 
+{ #category : 'tests - bands' }
+VGTiledFillTest >> testEveryEdgeThatCanCrossARowOfTilesIsInTheBandOfThatRowAndNoEdgeThatCannot [
+	"The whole of the unit rests on this: an edge whose own rows miss the rows of a row of tiles
+	 cannot cross a sub-row inside it, and so cannot wind a pixel of it. A band that dropped an
+	 edge which does cross one of those rows would lose coverage, and a band holding an edge
+	 whose rows miss it entirely would cost the kernel the reading and tell it nothing. The
+	 first is asked of every edge that strictly crosses the rows and the second of every edge
+	 the band holds."
+
+	| list binning bands fills height |
+	list := self
+		        displayListOfExtent: self caseExtent
+		        drawnWith: self mixedFillFrame.
+	binning := VGTileBinning of: list extent: self caseExtent.
+	fills := binning entries collect: [ :each | each asTiledFill ].
+	bands := VGTiledFillBands binning: binning fills: fills.
+	height := binning grid tileExtent y.
+	fills withIndexDo: [ :fill :index |
+		(bands rowsOfEntry: index) do: [ :row |
+			| top bottom |
+			top := row * height.
+			bottom := top + height.
+			(bands shapesOfEntry: index) withIndexDo: [ :shape :ordinal |
+				| found |
+				found := bands
+					         edgeIndexesOfEntry: index
+					         shape: ordinal
+					         inRow: row.
+				1 to: shape segments size by: VGTiledFillLayout edgeFloats do: [
+					:offset |
+					| box |
+					box := shape edgeIndex boxOfEdgeAt: offset.
+					(box top < bottom and: [ box bottom > top ]) ifTrue: [
+						self assert: (found includes: offset) ] ].
+				found do: [ :offset |
+					| box |
+					box := shape edgeIndex boxOfEdgeAt: offset.
+					self assert: box top <= bottom.
+					self assert: box bottom >= top ] ] ] ]
+]
+
 { #category : 'tests - layout' }
 VGTiledFillTest >> testEveryFieldOfARecordIsOneBasedWithinItsStrideAndNamedOnce [
 	"A field is an index into one record of one buffer, so it has to fit inside that record and
@@ -703,25 +744,32 @@ VGTiledFillTest >> testEveryGradientFrameOfTheFixtureDrawsTheSameBytesAsTheSoftw
 			description: each key ]
 ]
 
-{ #category : 'tests - encoding' }
+{ #category : 'tests' }
 VGTiledFillTest >> testTheBuffersAreSizedByTheFrameAndByNothingElse [
 	"A header, a clip rectangle and a paint block an entry, four floats an edge, five floats a
-	 stop of a gradient, a record a tile the frame touches and a reference an entry binned into
-	 one. Nothing is reserved and nothing is rounded up, so a frame can be weighed from its own
+	 stop of a gradient, a record a tile the frame touches, and a reference and a shape block
+	 word an entry binned into one. The edges and the shape records carry the band blocks after
+	 the whole shapes, so a frame weighs its own edges plus the edges its rows of tiles name.
+	 Nothing is reserved and nothing is rounded up, so a frame can be weighed from its own
 	 counts. A frame of solid fills and a frame of a gradient are both weighed, because a solid
 	 paint contributes a block and no stop at all."
 
 	{
 		self mixedFillFrame.
 		VGGradientFrameFixture linearWithThreeStops } do: [ :draw |
-		| list encoding binning edges stopCount |
+		| list encoding binning edges stopCount bands shapes |
 		list := self displayListOfExtent: self caseExtent drawnWith: draw.
 		binning := VGTileBinning of: list extent: self caseExtent.
 		encoding := VGTiledFillEncoding of: list extent: self caseExtent.
+		bands := VGTiledFillBands
+			         binning: binning
+			         fills: (binning entries collect: [ :each | each asTiledFill ]).
 		edges := list entries inject: 0 into: [ :sum :each |
 			         sum
 			         + (each segments coordinates size
 					          / VGTiledFillLayout edgeFloats) ].
+		shapes := (1 to: encoding entryCount) inject: 0 into: [ :sum :index |
+			          sum + (encoding decoder shapesOfEntryAt: index) size ].
 		stopCount := list entries inject: 0 into: [ :sum :each |
 			             sum + (each paint hasStops
 					              ifTrue: [ each paint stops size ]
@@ -736,10 +784,14 @@ VGTiledFillTest >> testTheBuffersAreSizedByTheFrameAndByNothingElse [
 		self
 			assert: encoding paints size
 			equals: list entries size * VGTiledFillLayout paintBlockFloats.
-		self assert: encoding edgeCount equals: edges.
+		self assert: encoding edgeCount equals: edges + bands edgeCount.
 		self
 			assert: encoding edges size
-			equals: edges * VGTiledFillLayout edgeFloats.
+			equals: edges + bands edgeCount * VGTiledFillLayout edgeFloats.
+		self
+			assert: encoding shapes size
+			equals:
+			shapes + bands blockCount * VGTiledFillLayout shapeRecordWords.
 		self assert: encoding stopCount equals: stopCount.
 		self
 			assert: encoding stops size
@@ -747,7 +799,8 @@ VGTiledFillTest >> testTheBuffersAreSizedByTheFrameAndByNothingElse [
 		self
 			assert: encoding tileTable size
 			equals: binning touchedTileCount * VGTiledFillLayout tileRecordWords.
-		self assert: encoding entryRefs size equals: binning binnedEntryCount ]
+		self assert: encoding entryRefs size equals: binning binnedEntryCount.
+		self assert: encoding refShapes size equals: binning binnedEntryCount ]
 ]
 
 { #category : 'tests' }
@@ -905,6 +958,56 @@ VGTiledFillTest >> testTheReferenceOfATileAFillCoversWhollyCarriesItsFlagAndItsI
 				 (self referenceOfTileAt: inside in: encoding))
 		equals: 1.
 	self assert: (encoding entriesOfTileAt: inside) size equals: 1
+]
+
+{ #category : 'tests - bands' }
+VGTiledFillTest >> testTheShapeBlockAReferenceNamesHoldsTheEntrysShapesNarrowedToThatRowOfTiles [
+	"A reference of a tile names a block of shape records, one a shape of its entry and in the
+	 order the entry holds them, each naming only the edges of that shape that reach the rows of
+	 that tile. The records are read back as scanners, so a field written into the wrong word or
+	 a block named one record out shows as the wrong edges, the wrong fill rule or the wrong
+	 antialiasing."
+
+	| list encoding binning fills bands |
+	list := self
+		        displayListOfExtent: self caseExtent
+		        drawnWith: self mixedFillFrame.
+	binning := VGTileBinning of: list extent: self caseExtent.
+	fills := binning entries collect: [ :each | each asTiledFill ].
+	bands := VGTiledFillBands binning: binning fills: fills.
+	encoding := VGTiledFillEncoding of: list extent: self caseExtent.
+	binning touchedTileIndexes do: [ :tileIndex |
+		| base offset count |
+		base := (encoding rowOfTileAt: tileIndex) - 1
+		        * VGTiledFillLayout tileRecordWords.
+		offset := encoding tileTable
+			          at: base + VGTiledFillLayout referenceOffsetField.
+		count := encoding tileTable
+			         at: base + VGTiledFillLayout referenceCountField.
+		1 to: count do: [ :position |
+			| identifier block |
+			identifier := VGTiledFillLayout identifierOfReference:
+				              (encoding entryRefs at: offset + position).
+			block := encoding refShapes at: offset + position.
+			(bands shapesOfEntry: identifier) withIndexDo: [ :shape :ordinal |
+				| record expected |
+				record := encoding decoder shapeAtOffset: block + ordinal - 1.
+				expected := (bands
+					             edgeIndexesOfEntry: identifier
+					             shape: ordinal
+					             inRow: (bands rowOfTilesAt: tileIndex))
+					            inject: OrderedCollection new
+					            into: [ :acc :each |
+						            acc
+							            addAll:
+								            ((each to: each + VGTiledFillLayout edgeFloats - 1)
+									             collect: [ :coordinate |
+									             self roundedToSingleFloat:
+											             (shape segments at: coordinate) ]);
+							            yourself ].
+				self assert: record segments asArray equals: expected asArray.
+				self assert: record fillRule equals: shape fillRule.
+				self assert: record isAliased equals: shape isAliased ] ] ]
 ]
 
 { #category : 'tests' }

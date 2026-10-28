@@ -297,6 +297,33 @@ VGTileBinningTest >> testTheReferenceFrameDrawsNoPixelOutsideATouchedTile [
 	self assert: row tilesTouched > 0
 ]
 
+{ #category : 'tests' }
+VGTileBinningTest >> testTheRowsABoxIntersectsAreTheRowsOfTheTilesItIntersects [
+	"A caller that holds a run of rows of tiles rather than the tiles themselves asks for the
+	 rows, and must be told the same thing the tiles would have told it: a box off the frame, a
+	 box of no height and nothing at all touch no row, and every other box touches the rows of
+	 its own tiles and no more."
+
+	| grid boxes |
+	grid := VGTileGrid extent: 37 @ 23 tileExtent: 8 @ 8.
+	boxes := {
+		         nil.
+		         (0 @ 0 corner: 0 @ 0).
+		         (3 @ 4 corner: 9 @ 4).
+		         (0 @ 0 corner: 37 @ 23).
+		         (2.5 @ 7.25 corner: 30 @ 8.5).
+		         (100 @ 100 corner: 120 @ 120).
+		         (-40 @ -40 corner: 4 @ 4) }.
+	boxes do: [ :box |
+		| expected |
+		expected := ((grid indexesIntersecting: box) collect: [ :index |
+			             (index - 1) // grid columns ]) asSet asSortedCollection
+			            asArray.
+		self
+			assert: (grid rowsIntersecting: box) asArray
+			equals: expected ]
+]
+
 { #category : 'tests - grid' }
 VGTileBinningTest >> testTheTilesOfAGridAreDisjointAndCoverEveryPixelOfIt [
 	"Asked of the grid itself rather than written down: every pixel of the extent belongs to one

@@ -11,6 +11,7 @@ Class {
 	#instVars : [
 		'coordinates',
 		'bounds',
+		'bandTop',
 		'bandCount',
 		'bandHeight',
 		'bands'
@@ -32,6 +33,18 @@ VGEdgeIndex class >> coordinates: anArray bounds: aRectangle [
 		  coordinates: anArray
 		  bounds: aRectangle
 		  bands: ((count max: 1) min: self maximumBandCount)
+]
+
+{ #category : 'instance creation' }
+VGEdgeIndex class >> coordinates: anArray bounds: aRectangle bandHeight: aHeight [
+	"The index of those edges in bands of that height, each band starting at a multiple of it.
+	 The tiled encoding asks for these, because the band of a tile has to be the rows of that
+	 tile and no band may straddle two rows of tiles."
+
+	^ self new
+		  setCoordinates: anArray
+		  bounds: aRectangle
+		  bandHeight: aHeight
 ]
 
 { #category : 'instance creation' }
@@ -77,17 +90,17 @@ VGEdgeIndex >> bandCount [
 { #category : 'private' }
 VGEdgeIndex >> bandOf: aNumber [
 	"An index of one band never divides, because the box of a shape whose edges all lie on one
-	 row has no height. A row outside the box answers the nearest band, whose edges then fail
+	 row has no height. A row outside the bands answers the nearest one, whose edges then fail
 	 every test a caller makes of them, which is the answer such a row owes."
 
 	bandCount = 1 ifTrue: [ ^ 1 ].
-	^ ((aNumber - bounds top / bandHeight) floor + 1 max: 1) min: bandCount
+	^ ((aNumber - bandTop / bandHeight) floor + 1 max: 1) min: bandCount
 ]
 
 { #category : 'accessing' }
 VGEdgeIndex >> boundsOfBandAt: aBandIndex [
 	| top |
-	top := bounds top + (aBandIndex - 1 * bandHeight).
+	top := bandTop + (aBandIndex - 1 * bandHeight).
 	^ bounds left @ top corner: bounds right @ (top + bandHeight)
 ]
 
@@ -161,6 +174,19 @@ VGEdgeIndex >> edgeIndexesInBandAt: aBandIndex [
 	^ bands at: aBandIndex
 ]
 
+{ #category : 'accessing' }
+VGEdgeIndex >> edgeIndexesMeetingRowsFrom: aTop to: aBottom [
+	"The coordinate indexes of the edges that may cross the rows between those two numbers,
+	 which are the rows of one band of mine. Rows the box of the shape does not reach hold no
+	 edge at all: bandOf: answers the nearest band for a row outside the box, and the edges of
+	 that band cannot cross such a row, so answering them would cost a caller the reading and
+	 tell it nothing. The ends are read open, because a box that only touches a row along its
+	 own edge encloses no part of it."
+
+	(bounds top < aBottom and: [ bounds bottom > aTop ]) ifFalse: [ ^ #(  ) ].
+	^ self edgeIndexesInBandAt: (self bandOf: aTop)
+]
+
 { #category : 'initialization' }
 VGEdgeIndex >> fillBands [
 	"Every edge into every band its own rows reach. An edge is held as its index into the
@@ -228,12 +254,27 @@ VGEdgeIndex >> printOn: aStream [
 ]
 
 { #category : 'initialization' }
-VGEdgeIndex >> setCoordinates: anArray bounds: aRectangle bands: aBandCount [
-	"A box of no height would divide by nought, so such a box is one band however many were
-	 asked for."
+VGEdgeIndex >> setCoordinates: anArray bounds: aRectangle bandHeight: aHeight [
+	"Bands of a fixed height, each starting at a multiple of it, so that a band is the rows of a
+	 row of tiles and the caller may find the band of a tile from the tile alone. The box of a
+	 shape whose edges all lie on one row still falls in one band, which the ceiling gives."
 
 	coordinates := anArray.
 	bounds := aRectangle.
+	bandHeight := aHeight.
+	bandTop := (aRectangle top / aHeight) floor * aHeight.
+	bandCount := ((aRectangle bottom - bandTop / aHeight) ceiling max: 1).
+	self fillBands
+]
+
+{ #category : 'initialization' }
+VGEdgeIndex >> setCoordinates: anArray bounds: aRectangle bands: aBandCount [
+	"A box of no height would divide by nought, so such a box is one band however many were
+	 asked for. The bands cover the box exactly, so the first of them starts at its top."
+
+	coordinates := anArray.
+	bounds := aRectangle.
+	bandTop := aRectangle top.
 	bandCount := aRectangle height isZero
 		             ifTrue: [ 1 ]
 		             ifFalse: [ aBandCount ].

@@ -69,6 +69,19 @@ VGTileGrid >> columns [
 ]
 
 { #category : 'accessing' }
+VGTileGrid >> columnsIntersecting: aRectangle [
+	"The columns of tiles a rectangle can touch, counted from nought, as the interval between
+	 the first and the last of them. What touches no tile touches no column, which is an empty
+	 interval."
+
+	| box |
+	aRectangle ifNil: [ ^ 1 to: 0 ].
+	box := self wholePixelsOf: (aRectangle intersect: (0 @ 0 corner: extent)).
+	(box width > 0 and: [ box height > 0 ]) ifFalse: [ ^ 1 to: 0 ].
+	^ box origin x // tileExtent x to: box corner x - 1 // tileExtent x
+]
+
+{ #category : 'accessing' }
 VGTileGrid >> extent [
 	^ extent
 ]
@@ -80,25 +93,19 @@ VGTileGrid >> indexAtColumn: aColumn row: aRow [
 	^ aRow * self columns + aColumn + 1
 ]
 
-{ #category : 'binning' }
+{ #category : 'accessing' }
 VGTileGrid >> indexesIntersecting: aRectangle [
 	"The tiles a rectangle can touch, in dispatch order. Nothing, nothing outside the frame and
 	 nothing of no width or height touch no tile at all: a tile touched for one of those would be
-	 a dispatch over pixels no entry writes. A fractional box is widened to whole pixels first,
-	 because a shape that covers a pixel in part still writes it."
+	 a dispatch over pixels no entry writes. Which rows and which columns a box reaches is asked
+	 of the two methods that answer those, so a caller holding rows alone reads the same box."
 
-	| box firstColumn lastColumn firstRow lastRow indexes |
-	aRectangle ifNil: [ ^ #(  ) ].
-	box := self wholePixelsOf: (aRectangle intersect: (0 @ 0 corner: extent)).
-	(box width > 0 and: [ box height > 0 ]) ifFalse: [ ^ #(  ) ].
-	firstColumn := box origin x // tileExtent x.
-	lastColumn := (box corner x - 1) // tileExtent x.
-	firstRow := box origin y // tileExtent y.
-	lastRow := (box corner y - 1) // tileExtent y.
-	indexes := OrderedCollection new: (lastColumn - firstColumn + 1)
-		           * (lastRow - firstRow + 1).
-	firstRow to: lastRow do: [ :row |
-		firstColumn to: lastColumn do: [ :column |
+	| rows columns indexes |
+	rows := self rowsIntersecting: aRectangle.
+	columns := self columnsIntersecting: aRectangle.
+	indexes := OrderedCollection new: rows size * columns size.
+	rows do: [ :row |
+		columns do: [ :column |
 			indexes add: (self indexAtColumn: column row: row) ] ].
 	^ indexes
 ]
@@ -152,6 +159,20 @@ VGTileGrid >> printOn: aStream [
 { #category : 'accessing' }
 VGTileGrid >> rows [
 	^ (extent y / tileExtent y) ceiling
+]
+
+{ #category : 'accessing' }
+VGTileGrid >> rowsIntersecting: aRectangle [
+	"The rows of tiles a rectangle can touch, counted from nought, as the interval between the
+	 first and the last of them. What touches no tile touches no row, which is an empty
+	 interval; the box is read exactly as indexesIntersecting: reads it, so a caller that holds
+	 rows and a caller that holds tiles cannot disagree about which rows an entry reaches."
+
+	| box |
+	aRectangle ifNil: [ ^ 1 to: 0 ].
+	box := self wholePixelsOf: (aRectangle intersect: (0 @ 0 corner: extent)).
+	(box width > 0 and: [ box height > 0 ]) ifFalse: [ ^ 1 to: 0 ].
+	^ box origin y // tileExtent y to: box corner y - 1 // tileExtent y
 ]
 
 { #category : 'initialization' }
