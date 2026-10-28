@@ -13,7 +13,7 @@ Class {
 	#tag : 'Tests'
 }
 
-{ #category : 'layering' }
+{ #category : 'accessing' }
 VGArchitectureTest class >> allowedDependencies [
 	"The outgoing package references each package of this project may make, keyed by package
 	 name. This table is the agreement: a package missing from it is one nobody has placed in
@@ -43,8 +43,13 @@ VGArchitectureTest class >> allowedDependencies [
 			  "The device path reads the frame unit 1.11 profiles, which is drawn through the Bloc
 			   renderer, so binning and the budget name that package as well as the display list."
 			  'VectorGraphics-Vulkan' -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ).
+			  "The budget — the two benchmarks and the drawing kit — lives in the test package,
+			   because measuring this project against Cairo means naming Alexandrie's classes and
+			   a package the failover loads may name none. So the examples that open a benchmark
+			   name the test package, as the Cairo examples name theirs."
 			  'VectorGraphics-Vulkan-Examples'
-			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Vulkan' ).
+			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Vulkan'
+				    'VectorGraphics-Vulkan-Tests' ).
 			  "The edge to the Cairo tests is the one edge this project allows between two test
 			   packages: VGVulkanExamplesTest subclasses VGCairoExamplesTest and the backend tests
 			   draw the frame fixture the engine tests draw, rather than keeping a second copy of
@@ -88,16 +93,19 @@ VGArchitectureTest class >> edgesOf: aPackageName [
 	^ found copyWithout: aPackageName
 ]
 
-{ #category : 'layering' }
+{ #category : 'accessing' }
 VGArchitectureTest class >> edgesTheBaselineCannotDeclare [
 	"The edges of allowedDependencies that BaselineOfVectorGraphics may not state, because the
 	 reverse edge is stated and Metacello loads requires in order: a pair declared both ways is
-	 a cycle and no load order exists for it. Only this pair qualifies, and the two packages
-	 always load together, so nothing is lost by leaving one half out.
+	 a cycle and no load order exists for it. Only these two pairs qualify, both of them an
+	 examples package on the test package its subjects live in, and the two packages of each
+	 pair always load together, so nothing is lost by leaving one half out.
 	 Every entry is held by testEveryEdgeTheBaselineCannotDeclareIsOneHalfOfACycle, which reads
 	 the reverse from the baseline rather than taking this comment on trust."
 
-	^ {('VectorGraphics-Cairo-Examples' -> 'VectorGraphics-Cairo-Tests')}
+	^ {
+		  ('VectorGraphics-Cairo-Examples' -> 'VectorGraphics-Cairo-Tests').
+		  ('VectorGraphics-Vulkan-Examples' -> 'VectorGraphics-Vulkan-Tests') }
 ]
 
 { #category : 'inspecting' }

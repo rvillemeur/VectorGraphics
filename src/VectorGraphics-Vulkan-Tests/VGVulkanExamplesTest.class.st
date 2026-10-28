@@ -21,5 +21,24 @@ VGVulkanExamplesTest >> exampleHolders [
 		  VGTileBinningExamples.
 		  VGTiledFillExamples.
 		  VGVulkanBlurExamples.
-		  VGFrameDeviceBenchmarkExamples }
+		  VGFrameDeviceBenchmarkExamples.
+		  VGFrameDrawingKitExamples.
+		  VGFrameStageBenchmarkExamples.
+		  VGKernelVisitCensusExamples }
+]
+
+{ #category : 'private' }
+VGVulkanExamplesTest >> projectDefines: aCompiledMethod [
+	"As my superclass, and the test packages of this project as well. The budget lives in
+	 VectorGraphics-Vulkan-Tests, because measuring against Cairo means naming Alexandrie's
+	 classes and a package the failover loads may name none, and its views are views an example
+	 opens like any other. A test package of another project is still not ours to hold to these
+	 rules, so the name is read at both ends."
+
+	| package |
+	package := aCompiledMethod package.
+	^ (super projectDefines: aCompiledMethod) or: [
+		  package notNil and: [
+			  (package name beginsWith: 'VectorGraphics') and: [
+				  package name endsWith: '-Tests' ] ] ]
 ]

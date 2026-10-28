@@ -12,7 +12,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'context',
-		'bytes'
+		'bytes',
+		'stages'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -64,6 +65,19 @@ VGTiledFillDispatch class >> shownWordCount [
 	 and no statement about the buffer itself."
 
 	^ 6
+]
+
+{ #category : 'constants' }
+VGTiledFillDispatch class >> stageNames [
+	"The stages one frame on the device is paid in, in the order it pays them, which is the
+	 order draw:into: wraps them in and the order a report shows them in. This table is the
+	 only place that names a stage: a report reads it, and a test reads the source of draw:into:
+	 against it so that a stage cannot be timed under a name no report shows.
+	 The first of them writes the buffers of the already built encoding and is not the building
+	 of that encoding, which a frame pays before a dispatch is asked for anything."
+
+	^ #( #writeBuffers #module #allocate #prepare #upload #dispatch #readback
+	     #release )
 ]
 
 { #category : 'inspecting' }
@@ -139,40 +153,39 @@ VGTiledFillDispatch >> context [
 	^ context
 ]
 
-{ #category : 'drawing' }
+{ #category : 'dispatching' }
+VGTiledFillDispatch >> dispatch: aKernel over: anEncoding [
+	"One workgroup for every tile the frame touches."
+
+	self timeStage: #dispatch during: [
+		aKernel
+			dispatch: anEncoding touchedTileCount
+			y: self class rowsPerDispatch
+			z: self class layersPerDispatch ]
+]
+
+{ #category : 'dispatching' }
 VGTiledFillDispatch >> draw: anEncoding into: aByteArray [
 	"One frame on the device: a buffer for every binding, the bytes of each uploaded, one
 	 workgroup for every tile the frame touches, and the target read back into the bytes it came
-	 from. A frame that touches no tile has nothing to dispatch and leaves the pixels alone. The
-	 module comes from VGTiledFillKernel's cache, because it depends on the tile extent alone.
-	 The kernel is destroyed before the buffers, because a buffer freed under a live pipeline
-	 takes the image with it."
+	 from. A frame that touches no tile has nothing to dispatch and leaves the pixels alone.
+	 Each step is one stage of the frame, which a plain dispatch evaluates and does not time: the
+	 stages are what unit 3.0 measures a frame in, and measuring them anywhere but inside the
+	 frame a tool really draws would measure a different frame."
 
-	| kernel buffers names |
-	self encode: anEncoding target: aByteArray.
+	| kernel buffers |
+	self
+		timeStage: #writeBuffers
+		during: [ self encode: anEncoding target: aByteArray ].
 	anEncoding touchedTileCount = 0 ifTrue: [ ^ aByteArray ].
-	names := VGTiledFillKernel bindingNames.
-	kernel := PVComputeKernel
-		          on: context
-		          spirv:
-		          (VGTiledFillKernel spirvOnTileExtent: anEncoding grid tileExtent).
-	buffers := names collect: [ :each |
-		           VkBuffer
-			           storageBuffer: (self wordCountOf: (bytes at: each))
-			           on: context device ].
+	kernel := self kernelOf: anEncoding.
+	buffers := self newBuffers.
 	[
-	buffers do: [ :each | kernel bindBuffer: each ].
-	kernel prepare.
-	names withIndexDo: [ :each :index |
-		(buffers at: index) uploadBytes: (bytes at: each) ].
-	kernel
-		dispatch: anEncoding touchedTileCount
-		y: self class rowsPerDispatch
-		z: self class layersPerDispatch.
-	(buffers at: (names indexOf: #target)) readbackInto: aByteArray ]
-		ensure: [
-			kernel destroy.
-			buffers do: [ :each | each destroy ] ].
+	self prepare: kernel on: buffers.
+	self upload: buffers.
+	self dispatch: kernel over: anEncoding.
+	self readback: buffers into: aByteArray ] ensure: [
+		self release: kernel and: buffers ].
 	^ aByteArray
 ]
 
@@ -234,6 +247,54 @@ VGTiledFillDispatch >> inspectorBuffersContext: aContext [
 	aContext active: bytes isNotNil
 ]
 
+{ #category : 'measuring' }
+VGTiledFillDispatch >> isRecordingStages [
+	^ stages notNil
+]
+
+{ #category : 'dispatching' }
+VGTiledFillDispatch >> kernelOf: anEncoding [
+	"The compiled kernel for the tile extent of that encoding. The module comes from
+	 VGTiledFillKernel's cache, because it depends on the tile extent alone."
+
+	^ self
+		  timeStage: #module
+		  during: [
+			  PVComputeKernel
+				  on: context
+				  spirv:
+				  (VGTiledFillKernel spirvOnTileExtent: anEncoding grid tileExtent) ]
+]
+
+{ #category : 'measuring' }
+VGTiledFillDispatch >> microsecondsOfStage: aSymbol [
+	"What that stage cost over every frame I drew, or nil where it was never reached."
+
+	^ self stageMicroseconds at: aSymbol ifAbsent: [ nil ]
+]
+
+{ #category : 'dispatching' }
+VGTiledFillDispatch >> newBuffers [
+	"One device buffer for every binding of the kernel, sized by the bytes written for it."
+
+	^ self
+		  timeStage: #allocate
+		  during: [
+			  VGTiledFillKernel bindingNames collect: [ :each |
+				  VkBuffer
+					  storageBuffer: (self wordCountOf: (bytes at: each))
+					  on: context device ] ]
+]
+
+{ #category : 'dispatching' }
+VGTiledFillDispatch >> prepare: aKernel on: aCollectionOfBuffers [
+	"Every buffer bound in binding order, then the descriptor set and the pipeline built."
+
+	self timeStage: #prepare during: [
+		aCollectionOfBuffers do: [ :each | aKernel bindBuffer: each ].
+		aKernel prepare ]
+]
+
 { #category : 'printing' }
 VGTiledFillDispatch >> printOn: aStream [
 	aStream nextPutAll: self class name.
@@ -244,9 +305,75 @@ VGTiledFillDispatch >> printOn: aStream [
 		nextPutAll: ' pixels'
 ]
 
+{ #category : 'dispatching' }
+VGTiledFillDispatch >> readback: aCollectionOfBuffers into: aByteArray [
+	"The target buffer read back into the bytes it was written from."
+
+	self timeStage: #readback during: [
+		(aCollectionOfBuffers
+			 at: (VGTiledFillKernel bindingNames indexOf: #target))
+			readbackInto: aByteArray ]
+]
+
+{ #category : 'measuring' }
+VGTiledFillDispatch >> recordStages [
+	"Time every stage of the frames I draw from here on. A dispatch of a running tool does not,
+	 because the clock is read twice a stage and a stage can be shorter than the reading; the
+	 benchmark asks, and nothing else does."
+
+	stages := Dictionary new.
+	^ self
+]
+
+{ #category : 'dispatching' }
+VGTiledFillDispatch >> release: aKernel and: aCollectionOfBuffers [
+	"The kernel is destroyed before the buffers, because a buffer freed under a live pipeline
+	 takes the image with it."
+
+	self timeStage: #release during: [
+		aKernel destroy.
+		aCollectionOfBuffers do: [ :each | each destroy ] ]
+]
+
 { #category : 'initialization' }
 VGTiledFillDispatch >> setContext: aContext [
 	context := aContext
+]
+
+{ #category : 'measuring' }
+VGTiledFillDispatch >> stageMicroseconds [
+	"What each stage of the frames I drew cost, summed over every frame, keyed by stage name. A
+	 stage that was never reached is absent rather than nought, so that a frame which returned
+	 early can be told from one whose stage was too fast to measure."
+
+	^ stages ifNil: [ Dictionary new ]
+]
+
+{ #category : 'measuring' }
+VGTiledFillDispatch >> timeStage: aSymbol during: aBlock [
+	"The block, answering what it answers, with the microseconds it took added to that stage
+	 where a caller asked for the stages. A dispatch that was not asked evaluates the block and
+	 reads no clock at all, so the stages cost a running tool nothing."
+
+	| answer started |
+	stages ifNil: [ ^ aBlock value ].
+	started := Time microsecondClockValue.
+	answer := aBlock value.
+	stages
+		at: aSymbol
+		put: (stages at: aSymbol ifAbsent: [ 0 ])
+			+ (Time microsecondClockValue - started).
+	^ answer
+]
+
+{ #category : 'dispatching' }
+VGTiledFillDispatch >> upload: aCollectionOfBuffers [
+	"The bytes of each binding into the buffer that was sized for it, the two held together by
+	 the index of the binding name."
+
+	self timeStage: #upload during: [
+		VGTiledFillKernel bindingNames withIndexDo: [ :each :index |
+			(aCollectionOfBuffers at: index) uploadBytes: (bytes at: each) ] ]
 ]
 
 { #category : 'encoding' }

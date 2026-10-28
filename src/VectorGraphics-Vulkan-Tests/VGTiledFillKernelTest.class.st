@@ -48,10 +48,14 @@ VGTiledFillKernelTest >> kernelValidator [
 VGTiledFillKernelTest >> testADispatchAsksTheCacheForItsModuleAndBuildsNoneOfItsOwn [
 	"Measured in unit 2.4a: building the module was one to four milliseconds of every frame, and
 	 the frame carries nothing the module depends on. So the dispatch asks the cache, and a
-	 module built there would be that cost back."
+	 module built there would be that cost back.
+	 The whole class is read and not `draw:into:` alone, because unit 3.0 moved each step of a
+	 frame into a method of its own and the fact is about the dispatch, not about one method."
 
-	self assert: ((VGTiledFillDispatch >> #draw:into:) sendsSelector: #spirvOnTileExtent:).
-	self deny: ((VGTiledFillDispatch >> #draw:into:) sendsSelector: #onTileExtent:)
+	self assert: (VGTiledFillDispatch methods anySatisfy: [ :each |
+			 each sendsSelector: #spirvOnTileExtent: ]).
+	self deny: (VGTiledFillDispatch methods anySatisfy: [ :each |
+			 each sendsSelector: #onTileExtent: ])
 ]
 
 { #category : 'tests' }

@@ -18,8 +18,8 @@ Class {
 		'deviceName',
 		'unavailableReason'
 	],
-	#category : 'VectorGraphics-Vulkan-Budget',
-	#package : 'VectorGraphics-Vulkan',
+	#category : 'VectorGraphics-Vulkan-Tests-Budget',
+	#package : 'VectorGraphics-Vulkan-Tests',
 	#tag : 'Budget'
 }
 
@@ -50,9 +50,11 @@ VGFrameDeviceBenchmark class >> defaultRepeats [
 ]
 
 { #category : 'frames' }
-VGFrameDeviceBenchmark class >> drawBackgroundOn: aContext [
+VGFrameDeviceBenchmark class >> drawBackgroundOn: aContext using: aKit [
 	"The background of the reference scene in the colour it uses, filled as a rectangle and not
-	 painted, because a fill is what the subset holds."
+	 painted, because a fill is what the subset holds. The kit is not asked for anything here:
+	 a colour and a rectangle are verbs of either side's context, which is what makes this frame
+	 the cheapest one the budget measures."
 
 	aContext sourceColor: Color veryVeryLightGray.
 	aContext rectangle: (0 @ 0 extent: self extentOfItsFrames).
@@ -61,35 +63,45 @@ VGFrameDeviceBenchmark class >> drawBackgroundOn: aContext [
 
 { #category : 'frames' }
 VGFrameDeviceBenchmark class >> drawBlockNamed: aSymbol [
-	"A one argument block that draws the named frame on a context. A name no frame answers is an
-	 error and not an empty frame: an empty frame touches no tile, dispatches nothing, and would
-	 be reported as the fastest measurement of the set."
+	"The named frame drawn with this project's own classes, which is what a device measurement
+	 draws."
+
+	^ self drawBlockNamed: aSymbol using: VGFrameDrawingKit ours
+]
+
+{ #category : 'frames' }
+VGFrameDeviceBenchmark class >> drawBlockNamed: aSymbol using: aKit [
+	"A one argument block that draws the named frame on a context, with the classes of that kit.
+	 A name no frame answers is an error and not an empty frame: an empty frame touches no tile,
+	 dispatches nothing, and would be reported as the fastest measurement of the set."
 
 	aSymbol = #background ifTrue: [
-		^ [ :context | self drawBackgroundOn: context ] ].
-	aSymbol = #cards ifTrue: [ ^ [ :context | self drawCardsOn: context ] ].
+		^ [ :context | self drawBackgroundOn: context using: aKit ] ].
+	aSymbol = #cards ifTrue: [
+		^ [ :context | self drawCardsOn: context using: aKit ] ].
 	aSymbol = #reference ifTrue: [
-		^ [ :context | self drawReferenceOn: context ] ].
+		^ [ :context | self drawReferenceOn: context using: aKit ] ].
 	^ self error: 'no frame of that name'
 ]
 
 { #category : 'frames' }
-VGFrameDeviceBenchmark class >> drawCardsOn: aContext [
+VGFrameDeviceBenchmark class >> drawCardsOn: aContext using: aKit [
 	"The background, and then every card: clipped to itself, filled with a vertical gradient from
 	 white to light blue and bordered in grey, which are the colours and the width VGFrameProfile
 	 gives its own cards. The clip is kept although the fill is the shape of it, because a card
 	 of a real tool clips what it holds and the clip is what the encoding carries a rectangle
-	 for."
+	 for. The gradient is the one class of this frame that differs between the two sides, so the
+	 kit answers it."
 
-	self drawBackgroundOn: aContext.
+	self drawBackgroundOn: aContext using: aKit.
 	1 to: VGFrameProfile referenceCards do: [ :index |
 		| box |
 		box := self cardBoxAt: index.
 		aContext saveState.
 		aContext rectangle: box.
 		aContext clip.
-		aContext sourcePattern: (VGCairoLinearGradientPattern
-				 from: box topLeft
+		aContext sourcePattern: (aKit
+				 linearGradientFrom: box topLeft
 				 to: box bottomLeft
 				 addStopsFrom: {
 						 (0 -> Color white).
@@ -104,18 +116,20 @@ VGFrameDeviceBenchmark class >> drawCardsOn: aContext [
 ]
 
 { #category : 'frames' }
-VGFrameDeviceBenchmark class >> drawReferenceOn: aContext [
-	"The frame unit 1.11 profiles, drawn through the Bloc renderer onto the surface that context
+VGFrameDeviceBenchmark class >> drawReferenceOn: aContext using: aKit [
+	"The frame unit 1.11 profiles, drawn through the kit's renderer onto the surface that context
 	 records on: eight hundred by six hundred, with gradients, strokes, glyphs and blits in it,
 	 which is the frame a backend is really asked to draw. A scene draws on a canvas and not on a
 	 context, so the canvas is built over the surface the context was made for and the entries
-	 reach the one display list either way."
+	 reach the one display list either way.
+	 The scene is laid out through the kit's renderer class, because a text span measured on one
+	 backend keeps that backend's scaled font and the other backend cannot draw it."
 
 	| canvas |
-	canvas := VGCanvas newFor: aContext surface.
+	canvas := aKit canvasOn: aContext surface.
 	canvas clippingRectangle: (0 @ 0 extent: self extentOfItsFrames).
-	(VGFrameProfile new sceneForRendererClass: VGRenderer) aeFullDrawOn:
-		canvas
+	(VGFrameProfile new sceneForRendererClass: aKit rendererClass)
+		aeFullDrawOn: canvas
 ]
 
 { #category : 'constants' }
