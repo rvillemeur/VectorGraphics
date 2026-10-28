@@ -49,6 +49,35 @@ VGVulkanBlurExamples class >> passesOfAShadowBlur [
 ]
 
 { #category : 'examples' }
+VGVulkanBlurExamples class >> residentBlurOfThisMachine [
+	<sampleInstance>
+	"One click: the blur dispatch of this machine, warmed by two blurs of a 64 by 64 field at the
+	 radii a shadow of width ten asks for. The Residency tab names every buffer it keeps, the bytes
+	 each was grown to and the passes that read it, and the Passes tab the passes of the last blur.
+	 The second blur is run because the point of unit 3.1 is what the second blur does not pay: the
+	 six kernels, the descriptor sets, the command pool and the buffers of the first are all still
+	 there, and the whole of it goes to the device as one submission.
+	 The session is a fresh one and not the default, so a click neither releases the device the
+	 frames of this image draw on nor shows what another click left behind.
+	 Where no driver answers, a dispatch with no device is answered, planned as the same passes and
+	 never dispatched: an example may not raise on a machine with no device."
+	| session dispatch bytes radii |
+	session := VGVulkanDeviceSession new.
+	bytes := ByteArray new: 64 * 64.
+	radii := VGA8GaussianBlurFilter
+		         boxRadiiForSigma: (VGA8GaussianBlurFilter sigmaForRadius: 10)
+		         passes: VGA8GaussianBlurFilter defaultPassCount.
+	dispatch := session blurDispatch.
+	dispatch ifNil: [
+		dispatch := VGBlurDispatch new.
+		dispatch planPassesOfRadii: radii columns: 64 rows: 64.
+		^ dispatch ].
+	2 timesRepeat: [
+		dispatch blur: bytes columns: 64 rows: 64 boxRadii: radii ].
+	^ dispatch
+]
+
+{ #category : 'examples' }
 VGVulkanBlurExamples class >> roundingOfACorrectedDiameter [
 	<sampleInstance>
 	"The rounding of one of the twenty diameters where the host filter's Float64 reciprocal loses a

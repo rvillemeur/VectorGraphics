@@ -145,12 +145,12 @@ VGFrameStageBenchmark >> measureCairoFrame [
 	^ self
 ]
 
-{ #category : 'measuring' }
-VGFrameStageBenchmark >> measureStagesOn: aContext [
+{ #category : 'running' }
+VGFrameStageBenchmark >> measureStagesOn: aSession [
 	"Where the milliseconds of one frame go, measured in a pass of its own: the clock is read
 	 twice a stage and those readings would otherwise land inside the dispatch figure my
 	 superclass reports, which is the number the plan quotes. The frame is the same one — the
-	 same encoding, the same context, the same draw:into: — and only the clock differs.
+	 same encoding, the same session, the same draw:into: — and only the clock differs.
 	 A warm-up frame is drawn and its stages are thrown away, because the first dispatch of a
 	 session pays for the first touch of the pages and the warm-up of the pipeline, and that
 	 cost would be attributed to whichever stage happened to be first.
@@ -162,7 +162,7 @@ VGFrameStageBenchmark >> measureStagesOn: aContext [
 	target := ByteArray new:
 		          self extent x * self extent y
 		          * VGTiledFillEncoding targetFormat bytesPerPixel.
-	dispatch := (VGTiledFillDispatch on: aContext) recordStages.
+	dispatch := (aSession dispatchForEncoding: encoding) recordStages.
 	dispatch draw: encoding into: target.
 	dispatch recordStages.
 	milliseconds at: #stagedFrame put: (self millisecondsDuring: [
@@ -181,30 +181,33 @@ VGFrameStageBenchmark >> reportRows [
 		   'stage ' , each key asString -> (self millisecondStringFor: each value) ])
 ]
 
-{ #category : 'measuring' }
+{ #category : 'running' }
 VGFrameStageBenchmark >> run [
 	"Everything one call of unit 3.0 measures: what the frame costs off the device, what the
 	 context of a session costs, the frame on the device, its stages apart, the same frame
 	 through Cairo and the same frame through the software path. The Cairo and the software
 	 frames are measured whether a device answered or not, because the gap between them is the
-	 reason phase 3 exists and a machine with no driver can still report it."
+	 reason phase 3 exists and a machine with no driver can still report it.
+	 The context row is the cost of opening the device of a session, measured on a session of my
+	 own: unit 3.1 made it a cost a tool pays once and not once a frame, which is only visible
+	 where the opening is timed apart from the frames."
 
-	| context |
+	| session |
 	self measureEncoding.
-	context := nil.
+	session := nil.
 	milliseconds
 		at: #context
-		put: (self millisecondsDuring: [ context := self newContext ]).
-	context
+		put: (self millisecondsDuring: [ session := self newSession ]).
+	session
 		ifNil: [ milliseconds removeKey: #context ]
 		ifNotNil: [
 			[
 			[
-			self measureOn: context.
-			self measureStagesOn: context ]
+			self measureOn: session.
+			self measureStagesOn: session ]
 				on: Error
 				do: [ :each | unavailableReason := self reasonFrom: each ] ] ensure: [
-				context destroy ] ].
+				session releaseDevice ] ].
 	self measureCairoFrame.
 	self measureSoftwareFrame.
 	^ self

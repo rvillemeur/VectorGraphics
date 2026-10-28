@@ -259,10 +259,13 @@ VGFrameStageBenchmarkTest >> testTheKitOfThisProjectNamesTheCounterpartOfEveryCl
 { #category : 'tests' }
 VGFrameStageBenchmarkTest >> testTheReportOfAFrameNamesEveryStageAndEveryCountOfItsCensus [
 	"One frame's whole report, which is a third of what the class answers in one call: every
-	 stage of the dispatch, the Cairo figure, and the counts of the census beneath them. A
+	 stage the frame reached, the Cairo figure, and the counts of the census beneath them. A
 	 machine with no device reports no stage and still reports the census, which is counted
-	 without a device."
-
+	 without a device.
+	 Every stage the frame reached is named, and not every stage the dispatch can name: unit 3.1
+	 made the kernel and the buffers of a tile extent last a session, so the pass these stages
+	 are read from is a warm one and pays no prepare at all. The rows are still the rows of the
+	 stage table in the order a frame pays them, which is what the table is for."
 	| benchmark rows labels |
 	benchmark := VGFrameStageBenchmark onTheBackgroundFrame run.
 	rows := benchmark reportRows , benchmark census reportRows.
@@ -271,10 +274,15 @@ VGFrameStageBenchmarkTest >> testTheReportOfAFrameNamesEveryStageAndEveryCountOf
 	self assert: (labels includes: 'sub-row sweeps').
 	self assert: (labels includes: 'record reads over').
 	benchmark isAvailable ifTrue: [
-		VGTiledFillDispatch stageNames do: [ :each |
+		benchmark stageRows do: [ :each |
 			self
-				assert: (labels includes: 'stage ' , each asString)
-				description: each ] ]
+				assert: (labels includes: 'stage ' , each key asString)
+				description: each key ].
+		self
+			assert: (benchmark stageRows collect: [ :each | each key ]) asArray
+			equals: (VGTiledFillDispatch stageNames select: [ :each |
+					 benchmark stageMilliseconds includesKey: each ]).
+		self assert: (benchmark stageRows anySatisfy: [ :each | each key = #dispatch ]) ]
 ]
 
 { #category : 'tests' }

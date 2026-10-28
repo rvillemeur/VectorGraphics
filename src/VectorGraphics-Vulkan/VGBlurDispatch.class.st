@@ -12,7 +12,11 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'context',
-		'passes'
+		'passes',
+		'buffers',
+		'kernels',
+		'commandPool',
+		'submissions'
 	],
 	#category : 'VectorGraphics-Vulkan-Blur',
 	#package : 'VectorGraphics-Vulkan',
@@ -20,10 +24,35 @@ Class {
 }
 
 { #category : 'constants' }
+VGBlurDispatch class >> axisOfPass: anIndex [
+	"The axis the pass at that index runs along. The passes of a blur always alternate, the first
+	 along the rows, so the axis is the parity of the index; a kernel kept from a longer blur than
+	 the one being planned is still the kernel of its own axis, which is what lets every kernel I
+	 hold be rebound when a field buffer grows."
+	^ anIndex odd
+		  ifTrue: [ self rowsAxis ]
+		  ifFalse: [ self columnsAxis ]
+]
+
+{ #category : 'constants' }
 VGBlurDispatch class >> columnsAxis [
 	"The name of a pass that runs down the columns."
 
 	^ #columns
+]
+
+{ #category : 'constants' }
+VGBlurDispatch class >> correctionsNameAt: anIndex [
+	"The name of the rounding table of the pass at that index. One a pass for the reason
+	 paramsNameAt: gives."
+	^ ('corrections' , anIndex printString) asSymbol
+]
+
+{ #category : 'constants' }
+VGBlurDispatch class >> fieldBufferNames [
+	"The two buffers of the size of the field, which the passes alternate between. They are named
+	 and not positional because the direction of a pass is which of the two a kernel reads."
+	^ #( #fieldA #fieldB )
 ]
 
 { #category : 'constants' }
@@ -42,6 +71,14 @@ VGBlurDispatch class >> on: aContext [
 ]
 
 { #category : 'constants' }
+VGBlurDispatch class >> paramsNameAt: anIndex [
+	"The name of the buffer that describes the pass at that index. Every pass of a blur has its
+	 own, because a descriptor set is read when the device runs the command buffer and not when it
+	 is recorded, so two passes of one submission cannot share one description."
+	^ ('params' , anIndex printString) asSymbol
+]
+
+{ #category : 'constants' }
 VGBlurDispatch class >> rowsAxis [
 	"The name of a pass that runs along the rows."
 
@@ -51,37 +88,60 @@ VGBlurDispatch class >> rowsAxis [
 { #category : 'blurring' }
 VGBlurDispatch >> blur: aByteArray columns: aColumnCount rows: aRowCount boxRadii: aCollection [
 	"Those bytes blurred by every box radius in turn, answered in the array they came in. The field
-	 goes out to the device once and comes back once, however many passes there are."
-
-	| buffers |
+	 goes out to the device once and comes back once, and every pass runs in one submission,
+	 however many passes there are. Neither the kernels nor the buffers are built here if an
+	 earlier blur already built them: they belong to me and are let go of only when whoever holds
+	 me releases the device."
+	submissions := 0.
 	self
 		planPassesOfRadii: aCollection
 		columns: aColumnCount
 		rows: aRowCount.
-	buffers := self buffersForWords:
-		           aByteArray size / VGBlurBoxKernel bytesPerWord.
-	[ self runPassesOn: buffers bytes: aByteArray ] ensure: [
-		buffers valuesDo: [ :each | each destroy ] ].
+	self growBuffersForWords: aByteArray size / VGBlurBoxKernel bytesPerWord.
+	self prepareKernelsForPasses.
+	self runPassesOnBytes: aByteArray.
 	^ aByteArray
 ]
 
-{ #category : 'blurring' }
-VGBlurDispatch >> buffersForWords: aWordCount [
-	"The buffers a blur needs, answered by name: two of the size of the field, which the passes
-	 alternate between, and the two small ones every pass is described by. They are named and not
-	 positional because the direction of a pass is which of the two fields it reads."
+{ #category : 'accessing' }
+VGBlurDispatch >> bufferNamesHeld [
+	"Every buffer I hold, in the order a reading of my residency shows them: the two of the size of
+	 the field first, then the pair every pass I have ever been planned as is described by. The
+	 names are read off what I hold rather than written down, because the count of passes grows
+	 with the largest blur the session has seen."
+	| answer |
+	answer := self class fieldBufferNames select: [ :each |
+		          buffers includesKey: each ].
+	^ answer
+	  , ((1 to: buffers size) inject: OrderedCollection new into: [ :acc :index |
+			   (buffers includesKey: (self class paramsNameAt: index)) ifTrue: [
+				   acc
+					   add: (self class paramsNameAt: index);
+					   add: (self class correctionsNameAt: index) ].
+			   acc ]) asArray
+]
 
+{ #category : 'device' }
+VGBlurDispatch >> buffersOfPass: anIndex [
+	"My buffers named as the kernel of that pass names its bindings. The pass along the rows reads
+	 the first field and writes the second, the pass down the columns reads the second and writes
+	 the first, so an axis is a pair of names swapped; the pair of small buffers is the pass's own.
+	 The axis is the parity of the index and not what the plan I hold says, so a kernel kept from a
+	 longer blur can be rebound too."
+	| source target |
+	(self class axisOfPass: anIndex) = self class rowsAxis
+		ifTrue: [
+			source := #fieldA.
+			target := #fieldB ]
+		ifFalse: [
+			source := #fieldB.
+			target := #fieldA ].
 	^ Dictionary new
-		  at: #fieldA put: (VkBuffer storageBuffer: aWordCount on: context device);
-		  at: #fieldB put: (VkBuffer storageBuffer: aWordCount on: context device);
-		  at: #params
-		  put: (VkBuffer
-				   storageBuffer: VGBlurBoxKernel paramWords
-				   on: context device);
+		  at: #source put: (buffers at: source);
+		  at: #target put: (buffers at: target);
+		  at: #params put: (buffers at: (self class paramsNameAt: anIndex));
 		  at: #corrections
-		  put: (VkBuffer
-				   storageBuffer: VGBlurRounding correctionWordCount
-				   on: context device);
+		  put: (buffers at: (self class correctionsNameAt: anIndex));
 		  yourself
 ]
 
@@ -114,9 +174,44 @@ VGBlurDispatch >> bytesOfParams: aDictionary [
 	^ answer
 ]
 
+{ #category : 'device' }
+VGBlurDispatch >> commandPoolOnce [
+	"The pool every submission of mine cuts its command buffer from, created on the first blur and
+	 kept afterwards. It is mine and not a kernel's, because the command buffer carries the passes
+	 of several kernels."
+	^ commandPool ifNil: [
+		  commandPool := VkCommandPool
+			                 on: context device
+			                 queueFamilyIndex: context computeQueueFamily ]
+]
+
 { #category : 'accessing' }
 VGBlurDispatch >> context [
 	^ context
+]
+
+{ #category : 'accessing' }
+VGBlurDispatch >> deviceBuffers [
+	"The buffers I hold, by name, so that a test and an inspection can read what is resident
+	 without opening anything."
+	^ buffers
+]
+
+{ #category : 'accessing' }
+VGBlurDispatch >> deviceKernels [
+	"The prepared kernels I hold, by axis, so that a test and an inspection can read what is
+	 resident without opening anything."
+	^ kernels
+]
+
+{ #category : 'residency' }
+VGBlurDispatch >> ensureBuffersOfEveryPass [
+	1 to: passes size do: [ :index |
+		buffers at: (self class paramsNameAt: index) ifAbsentPut: [
+			VkBuffer storageBuffer: VGBlurBoxKernel paramWords on: context device ].
+		buffers at: (self class correctionsNameAt: index) ifAbsentPut: [
+			VkBuffer storageBuffer: VGBlurRounding correctionWordCount on: context device ] ].
+	^ buffers
 ]
 
 { #category : 'blurring' }
@@ -133,6 +228,47 @@ VGBlurDispatch >> groupsAcrossWordsOf: aDictionary [
 { #category : 'blurring' }
 VGBlurDispatch >> groupsDownRowsOf: aDictionary [
 	^ ((aDictionary at: #rowCount) / VGBlurBoxKernel workgroupHeight) ceiling
+]
+
+{ #category : 'residency' }
+VGBlurDispatch >> growBuffersForWords: aWordCount [
+	"The buffers of one blur, held for the session: a params and a corrections buffer for every
+	 pass, which never change size, and the two fields, which grow with the field of the largest
+	 blur asked for and never shrink."
+
+	self ensureBuffersOfEveryPass.
+	^ self growFieldBuffersToWords: aWordCount
+]
+
+{ #category : 'residency' }
+VGBlurDispatch >> growFieldBuffersToWords: aWordCount [
+	"A grown field is rebound into every kernel that reads it before the buffer it replaces is
+	 destroyed, because a descriptor set that still names a destroyed buffer is read by the device
+	 on the next submission."
+
+	| replaced bytes |
+	bytes := aWordCount * VGBlurBoxKernel bytesPerWord.
+	replaced := OrderedCollection new.
+	self class fieldBufferNames do: [ :name |
+		| held |
+		held := buffers at: name ifAbsent: [ nil ].
+		(held isNil or: [ held size < bytes ]) ifTrue: [
+			buffers at: name put: (VkBuffer storageBuffer: aWordCount on: context device).
+			held ifNotNil: [ replaced add: held ] ] ].
+	replaced ifEmpty: [ ^ buffers ].
+	self rebindKernels.
+	replaced do: [ :each | each destroy ].
+	^ buffers
+]
+
+{ #category : 'initialization' }
+VGBlurDispatch >> initialize [
+	"The buffers and the kernels I hold for as long as whoever holds me holds me, both empty until
+	 a first blur asks the device for them."
+	super initialize.
+	buffers := Dictionary new.
+	kernels := Dictionary new.
+	submissions := 0
 ]
 
 { #category : 'inspector' }
@@ -167,50 +303,50 @@ VGBlurDispatch >> inspectorPassesContext: aContext [
 	aContext active: passes notNil
 ]
 
-{ #category : 'blurring' }
-VGBlurDispatch >> kernelFrom: aSourceBuffer to: aTargetBuffer params: aParamsBuffer corrections: aCorrectionsBuffer [
-	"A kernel over the shared module that reads that buffer and writes that one. The direction of a
-	 pass is the order the pair of field buffers is bound in and nothing else, which is why the two
-	 directions are two kernels over one set of bytes. The buffers are bound in the order the kernel
-	 names its bindings in, so the contract is read and never restated here."
-
-	| answer buffers |
-	answer := PVComputeKernel on: context spirv: VGBlurBoxKernel spirv.
-	buffers := Dictionary new
-		           at: #source put: aSourceBuffer;
-		           at: #target put: aTargetBuffer;
-		           at: #params put: aParamsBuffer;
-		           at: #corrections put: aCorrectionsBuffer;
-		           yourself.
-	VGBlurBoxKernel bindingNames do: [ :each |
-		answer bindBuffer: (buffers at: each) ].
-	answer prepare.
-	^ answer
+{ #category : 'inspecting' }
+VGBlurDispatch >> inspectorResidency: aBuilder [
+	<inspectorPresentationOrder: 20 title: 'Residency'>
+	"Every buffer I hold, the bytes it has been grown to and the passes that read or write it. The
+	 passes are asked of buffersOfPass: itself rather than restated here, so the view cannot
+	 disagree with what is really bound, and the names come from what I hold rather than from a
+	 list, because the count of passes grows with the largest blur the session has seen."
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn
+				   title: 'Buffer'
+				   evaluated: [ :each | each asString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Bytes'
+				   evaluated: [ :each | (buffers at: each) size printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Passes'
+				   evaluated: [ :each |
+					   (kernels keys asSortedCollection select: [ :index |
+							    (self buffersOfPass: index) values includes:
+								    (buffers at: each) ]) asArray printString ]);
+		  items: self bufferNamesHeld;
+		  yourself
 ]
 
-{ #category : 'blurring' }
-VGBlurDispatch >> kernelsOver: aDictionary [
-	"One kernel for each axis, over the same module: the pass along the rows binds the first field
-	 as its source and the second as its target, and the pass down the columns binds them the other
-	 way about, so a pass chooses its direction by choosing its kernel."
+{ #category : 'inspector' }
+VGBlurDispatch >> inspectorResidencyContext: aContext [
 
-	| params corrections |
-	params := aDictionary at: #params.
-	corrections := aDictionary at: #corrections.
-	^ Dictionary new
-		  at: self class rowsAxis
-		  put: (self
-				   kernelFrom: (aDictionary at: #fieldA)
-				   to: (aDictionary at: #fieldB)
-				   params: params
-				   corrections: corrections);
-		  at: self class columnsAxis
-		  put: (self
-				   kernelFrom: (aDictionary at: #fieldB)
-				   to: (aDictionary at: #fieldA)
-				   params: params
-				   corrections: corrections);
-		  yourself
+	"The rows read buffers and kernels, so a dispatch that has planned no pass yet holds neither
+	 and would show a tab of nothing."
+
+	aContext active: buffers notEmpty
+]
+
+{ #category : 'device' }
+VGBlurDispatch >> kernelOfPass: anIndex [
+	"A prepared kernel that runs the pass at that index. The buffers are bound in the order the
+	 kernel names its bindings in, so the contract is read and never restated here."
+	| answer held |
+	answer := PVComputeKernel on: context spirv: VGBlurBoxKernel spirv.
+	held := self buffersOfPass: anIndex.
+	VGBlurBoxKernel bindingNames do: [ :each |
+		answer bindBuffer: (held at: each) ].
+	answer prepare.
+	^ answer
 ]
 
 { #category : 'accessing' }
@@ -243,47 +379,116 @@ VGBlurDispatch >> planPassesOfRadii: aCollection columns: aColumnCount rows: aRo
 	^ passes
 ]
 
-{ #category : 'blurring' }
-VGBlurDispatch >> run: aKernel words: aDictionary params: aParamsBuffer corrections: aCorrectionsBuffer [
-	"One box pass: the words that describe it and the rounding table of its diameter written, then
-	 one invocation for every word of every row of the field. The two small buffers are written
-	 again before every pass, which is safe because a dispatch waits for the device before it
-	 answers, so no pass reads what the next one wrote."
+{ #category : 'device' }
+VGBlurDispatch >> prepareKernelsForPasses [
+	"One prepared kernel a pass, built as a blur first needs it and kept for every blur after it.
+	 Preparing a kernel compiles its module and builds its pipeline, which unit 3.1 pays once a
+	 session rather than once a blur. A blur of fewer passes than an earlier one runs the first of
+	 the kernels and keeps the rest: the passes of a blur always alternate, the first along the
+	 rows, so the kernel at an index always reads the field that index's axis reads."
+	1 to: passes size do: [ :index |
+		kernels at: index ifAbsentPut: [ self kernelOfPass: index ] ].
+	^ kernels
+]
 
-	aParamsBuffer uploadBytes: (self bytesOfParams: aDictionary).
-	aCorrectionsBuffer uploadBytes:
-		(self bytesOfCorrectionsOfDiameter: (aDictionary at: #diameter)).
-	aKernel
-		dispatch: (self groupsAcrossWordsOf: aDictionary)
-		y: (self groupsDownRowsOf: aDictionary)
-		z: self class layersPerDispatch
+{ #category : 'printing' }
+VGBlurDispatch >> printOn: aStream [
+	super printOn: aStream.
+	kernels ifEmpty: [
+		aStream nextPutAll: ' (no device asked for yet)'.
+		^ self ].
+	aStream
+		nextPutAll: ' (';
+		print: kernels size;
+		nextPutAll: (kernels size = 1
+				 ifTrue: [ ' pass resident, ' ]
+				 ifFalse: [ ' passes resident, ' ]);
+		print: submissions;
+		nextPutAll: (submissions = 1
+				 ifTrue: [ ' submission in the last blur)' ]
+				 ifFalse: [ ' submissions in the last blur)' ])
+]
+
+{ #category : 'device' }
+VGBlurDispatch >> rebindKernels [
+	"Every kernel I hold made to point at the buffers I hold now, which is what a grown field
+	 buffer needs: the descriptor set is written again and the pipeline is not built again. The
+	 binding index is the position of the name in the kernel's own contract, so the two cannot
+	 disagree."
+	kernels keysAndValuesDo: [ :index :kernel |
+		| held |
+		held := self buffersOfPass: index.
+		VGBlurBoxKernel bindingNames doWithIndex: [ :name :binding |
+			kernel rebindBuffer: (held at: name) atBinding: binding - 1 ] ]
+]
+
+{ #category : 'device' }
+VGBlurDispatch >> releaseDevice [
+	"Everything of the device I hold let go of, the kernels before the buffers, because a buffer
+	 freed under a live pipeline takes the image with it. The context is not mine and is not
+	 destroyed here: whoever opened it closes it."
+	kernels valuesDo: [ :each | each destroy ].
+	kernels := Dictionary new.
+	commandPool ifNotNil: [ commandPool destroy ].
+	commandPool := nil.
+	buffers valuesDo: [ :each | each destroy ].
+	buffers := Dictionary new
 ]
 
 { #category : 'blurring' }
-VGBlurDispatch >> runPassesOn: aDictionary bytes: aByteArray [
-	"Every planned pass run over those buffers, the field uploaded before the first and read back
-	 after the last. A pass along the rows reads the first field and writes the second, a pass down
-	 the columns reads the second and writes the first, so the answer is in the first field whatever
-	 the count of passes. The kernels are destroyed before the buffers, because a buffer freed under
-	 a live pipeline takes the image with it."
-
-	| kernels |
-	kernels := self kernelsOver: aDictionary.
-	[
-	(aDictionary at: #fieldA) uploadBytes: aByteArray.
-	passes do: [ :each |
-		self
-			run: (kernels at: each key)
-			words: each value
-			params: (aDictionary at: #params)
-			corrections: (aDictionary at: #corrections) ].
-	(aDictionary at: #fieldA) readbackInto: aByteArray ] ensure: [
-		kernels valuesDo: [ :each | each destroy ] ]
+VGBlurDispatch >> runPassesOnBytes: aByteArray [
+	"Every planned pass run over my buffers in one submission, the field uploaded before it and
+	 read back after it. A pass along the rows reads the first field and writes the second, a pass
+	 down the columns reads the second and writes the first, so the answer is in the first field
+	 whatever the count of passes. Every pass is described before anything is submitted, which is
+	 what one submission needs: the device reads a description when it runs the dispatch that reads
+	 it, and the passes of one submission run one after another."
+	(buffers at: #fieldA) uploadBytes: aByteArray.
+	passes doWithIndex: [ :each :index |
+		(buffers at: (self class paramsNameAt: index)) uploadBytes:
+			(self bytesOfParams: each value).
+		(buffers at: (self class correctionsNameAt: index)) uploadBytes:
+			(self bytesOfCorrectionsOfDiameter: (each value at: #diameter)) ].
+	self submitPasses.
+	(buffers at: #fieldA) readbackInto: aByteArray
 ]
 
 { #category : 'initialization' }
 VGBlurDispatch >> setContext: aContext [
 	context := aContext
+]
+
+{ #category : 'accessing' }
+VGBlurDispatch >> submissionsOfLastBlur [
+	"How many times the last blur submitted work to the device. It is one, whatever the count of
+	 passes, and a test holds that: a submission costs about 0.43 ms of the host, so the count is
+	 what makes the device path of a small shadow cheaper than the host walk rather than dearer."
+	^ submissions
+]
+
+{ #category : 'device' }
+VGBlurDispatch >> submitPasses [
+	"Every pass of the blur recorded into one command buffer and submitted once, with a barrier
+	 between neighbours because dispatches of one command buffer are not ordered against each other
+	 on their own and every pass reads the field the pass before it wrote. One submission and not
+	 one a pass: a submission costs about 0.43 ms of host time whatever it carries, which is most
+	 of what the device path of a small shadow costs at all. The pool is reset first, so the one
+	 command buffer a blur cuts from it is the same memory every time."
+	| cmd pool |
+	pool := self commandPoolOnce.
+	pool reset.
+	cmd := pool allocateBuffer.
+	cmd do: [ :recording |
+		passes doWithIndex: [ :each :index |
+			(kernels at: index)
+				recordComputeInto: recording
+				groupsAcross: (self groupsAcrossWordsOf: each value)
+				down: (self groupsDownRowsOf: each value)
+				layers: self class layersPerDispatch.
+			index < passes size ifTrue: [
+				recording recordComputeToComputeBarrier ] ] ].
+	submissions := submissions + 1.
+	context computeQueue submit: cmd andWait: true
 ]
 
 { #category : 'blurring' }

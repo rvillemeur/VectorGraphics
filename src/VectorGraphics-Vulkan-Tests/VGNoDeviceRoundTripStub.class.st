@@ -18,10 +18,9 @@ VGNoDeviceRoundTripStub class >> reason [
 	^ 'no device, by construction'
 ]
 
-{ #category : 'measuring' }
-VGNoDeviceRoundTripStub >> newContext [
+{ #category : 'running' }
+VGNoDeviceRoundTripStub >> newSession [
 	"No device ever, and the reason recorded as the real one records a driver fault."
-
 	unavailableReason := self class reason.
 	^ nil
 ]

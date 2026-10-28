@@ -315,7 +315,7 @@ VGTiledSurfacePaintTest >> testAnEncodedSurfacePaintCarriesEveryPixelOfItsSource
 		equals: 0
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests - device' }
 VGTiledSurfacePaintTest >> testEveryFrameOfMineDrawsOnTheDeviceWhatTheSoftwareBackendDraws [
 	"The same gate over the frames of my own, which carry what the corpus does not: a source at
 	 an offset, the four extend modes, a source inside a shaped clip and the source and clear
@@ -323,30 +323,25 @@ VGTiledSurfacePaintTest >> testEveryFrameOfMineDrawsOnTheDeviceWhatTheSoftwareBa
 	 are the frames that say whether a pixel index off the end of a source reads the pixel the
 	 oracle reads, or no pixel at all."
 
-	| context |
-	context := [ VkContext computeContext ]
-		           on: Error
-		           do: [ :failure | nil ].
-	context ifNil: [ ^ self ].
-	[ self surfacePaintFrameNames do: [ :name |
-		  | draw comparison |
-		  draw := self perform: name.
-		  comparison := VGFormComparison
-			                between: (self
-					                 deviceFormOfExtent: self caseExtent
-					                 drawnWith: draw
-					                 on: context)
-			                and: (self
-					                 softwareFormOfExtent: self caseExtent
-					                 drawnWith: draw).
-		  self
-			  assert:
-			  (comparison pixelsFartherThan: self class deviceChannelTolerance) = 0
-			  description: name.
-		  self
-			  assert: comparison differingPixelCount
-				      <= self class devicePixelsAllowedToDifferPerCase
-			  description: name ] ] ensure: [ context destroy ]
+	self hasDevice ifFalse: [ ^ self ].
+	self surfacePaintFrameNames do: [ :name |
+		| draw comparison |
+		draw := self perform: name.
+		comparison := VGFormComparison
+			              between: (self
+					               deviceFormOfExtent: self caseExtent
+					               drawnWith: draw)
+			              and: (self
+					               softwareFormOfExtent: self caseExtent
+					               drawnWith: draw).
+		self
+			assert:
+			(comparison pixelsFartherThan: self class deviceChannelTolerance) = 0
+			description: name.
+		self
+			assert: comparison differingPixelCount
+				    <= self class devicePixelsAllowedToDifferPerCase
+			description: name ]
 ]
 
 { #category : 'tests' }
@@ -381,23 +376,18 @@ VGTiledSurfacePaintTest >> testEveryFrameOfMineDrawsTheSameBytesFromTheBuffersAs
 			description: name ]
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests - device' }
 VGTiledSurfacePaintTest >> testEverySurfaceCaseOfTheCorpusDrawsOnTheDeviceWhatTheSoftwareBackendDraws [
-	"The gate of this unit over the corpus: every case the subset draws that fills through a
+	"The gate of unit 2.9 over the corpus: every case the subset draws that fills through a
 	 surface paint, drawn on the device and by the software backend on the same frame, holds to
 	 the tolerance the fill cases set. The pixels of the source travel to the device as the words
 	 they are and are sampled there, so these are the cases that say whether the kernel reads the
-	 pixel the oracle reads. One context draws all of them. A machine with no device holds
-	 nothing."
+	 pixel the oracle reads. One context draws all of them, which is the session's. A machine
+	 with no device holds nothing."
 
-	| context |
-	context := [ VkContext computeContext ]
-		           on: Error
-		           do: [ :failure | nil ].
-	context ifNil: [ ^ self ].
-	[ self surfaceCasesDo: [ :case :draw |
-		  self assertDeviceDrawsCase: case with: draw on: context ] ]
-		ensure: [ context destroy ]
+	self hasDevice ifFalse: [ ^ self ].
+	self surfaceCasesDo: [ :case :draw |
+		self assertDeviceDrawsCase: case with: draw ]
 ]
 
 { #category : 'tests' }

@@ -21,6 +21,7 @@ VGVulkanExamplesTest >> exampleHolders [
 		  VGTileBinningExamples.
 		  VGTiledFillExamples.
 		  VGVulkanBlurExamples.
+		  VGVulkanDeviceSessionExamples.
 		  VGFrameDeviceBenchmarkExamples.
 		  VGFrameDrawingKitExamples.
 		  VGFrameStageBenchmarkExamples.

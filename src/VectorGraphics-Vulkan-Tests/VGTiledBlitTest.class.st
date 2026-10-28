@@ -275,22 +275,18 @@ VGTiledBlitTest >> testAnEntryOfNeitherKindIsRefusedForItsKindAndNamedSo [
 		(VGTiledFillSupportCensus refusalReasons includes: #notAFillOrABlit)
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests - device' }
 VGTiledBlitTest >> testEveryBlitCaseOfTheCorpusDrawsOnTheDeviceWhatTheSoftwareBackendDraws [
 	"The gate of unit 2.6 over the corpus: every case the subset draws that records a blit, drawn
 	 on the device and by the software backend on the same frame, holds to the tolerance the fill
 	 cases set. A glyph run is such a case, which is the half of the stated gate the corpus can
 	 answer; the surface patterns of the corpus are refused for their paint and wait on unit 2.9.
-	 One context draws all of them. A machine with no device holds nothing."
+	 One context draws all of them, which is the session's. A machine with no device holds
+	 nothing."
 
-	| context |
-	context := [ VkContext computeContext ]
-		           on: Error
-		           do: [ :failure | nil ].
-	context ifNil: [ ^ self ].
-	[ self blitCasesDo: [ :case :draw |
-		  self assertDeviceDrawsCase: case with: draw on: context ] ]
-		ensure: [ context destroy ]
+	self hasDevice ifFalse: [ ^ self ].
+	self blitCasesDo: [ :case :draw |
+		self assertDeviceDrawsCase: case with: draw ]
 ]
 
 { #category : 'tests' }
@@ -317,7 +313,7 @@ VGTiledBlitTest >> testEveryBlitCaseOfTheCorpusDrawsTheSameBytesFromTheBuffersAs
 			description: case name ]
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests - device' }
 VGTiledBlitTest >> testEveryFrameOfMineDrawsOnTheDeviceWhatTheSoftwareBackendDraws [
 	"The same gate over the frames of my own, which is where the degenerate masks are: one that
 	 hangs off the corner of the frame, one in a clip whose sides fall between pixels, one that
@@ -326,30 +322,25 @@ VGTiledBlitTest >> testEveryFrameOfMineDrawsOnTheDeviceWhatTheSoftwareBackendDra
 	 mask buffer, so these are the cases that say whether the kernel reads a byte where there is
 	 one and full alpha where there is none."
 
-	| context |
-	context := [ VkContext computeContext ]
-		           on: Error
-		           do: [ :failure | nil ].
-	context ifNil: [ ^ self ].
-	[ self blitFrameNames do: [ :name |
-		  | draw comparison |
-		  draw := self perform: name.
-		  comparison := VGFormComparison
-			                between: (self
-					                 deviceFormOfExtent: self caseExtent
-					                 drawnWith: draw
-					                 on: context)
-			                and: (self
-					                 softwareFormOfExtent: self caseExtent
-					                 drawnWith: draw).
-		  self
-			  assert:
-			  (comparison pixelsFartherThan: self class deviceChannelTolerance) = 0
-			  description: name.
-		  self
-			  assert: comparison differingPixelCount
-				      <= self class devicePixelsAllowedToDifferPerCase
-			  description: name ] ] ensure: [ context destroy ]
+	self hasDevice ifFalse: [ ^ self ].
+	self blitFrameNames do: [ :name |
+		| draw comparison |
+		draw := self perform: name.
+		comparison := VGFormComparison
+			              between: (self
+					               deviceFormOfExtent: self caseExtent
+					               drawnWith: draw)
+			              and: (self
+					               softwareFormOfExtent: self caseExtent
+					               drawnWith: draw).
+		self
+			assert:
+			(comparison pixelsFartherThan: self class deviceChannelTolerance) = 0
+			description: name.
+		self
+			assert: comparison differingPixelCount
+				    <= self class devicePixelsAllowedToDifferPerCase
+			description: name ]
 ]
 
 { #category : 'tests' }

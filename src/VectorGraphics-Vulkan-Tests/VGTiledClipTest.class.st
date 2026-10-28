@@ -243,27 +243,21 @@ VGTiledClipTest >> testAnEncodedClipCarriesEveryShapeItWasCutOutWith [
 		self assert: read isAliased equals: written isAliased ]
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests - device' }
 VGTiledClipTest >> testEveryClippedFrameOfMineDrawsOnTheDeviceWhatTheSoftwareBackendDraws [
 	"The gate of unit 2.7 over the frames of my own, which is where the degenerate clips are:
 	 two shapes at once, an even-odd shape, an aliased shape, a clip no fill reaches and the
-	 other two operators of the subset. One context draws all of them. A machine with no device
-	 holds nothing."
+	 other two operators of the subset. One context draws all of them, which is the session's. A
+	 machine with no device holds nothing."
 
-	| context |
-	context := [ VkContext computeContext ]
-		           on: Error
-		           do: [ :failure | nil ].
-	context ifNil: [ ^ self ].
-	[
+	self hasDevice ifFalse: [ ^ self ].
 	self class clipFrameNames do: [ :name |
 		| draw comparison |
 		draw := self perform: name.
 		comparison := VGFormComparison
 			              between: (self
 					               deviceFormOfExtent: self caseExtent
-					               drawnWith: draw
-					               on: context)
+					               drawnWith: draw)
 			              and: (self
 					               softwareFormOfExtent: self caseExtent
 					               drawnWith: draw).
@@ -274,7 +268,7 @@ VGTiledClipTest >> testEveryClippedFrameOfMineDrawsOnTheDeviceWhatTheSoftwareBac
 		self
 			assert: comparison differingPixelCount
 				      <= self class devicePixelsAllowedToDifferPerCase
-			description: name ] ] ensure: [ context destroy ]
+			description: name ]
 ]
 
 { #category : 'tests' }
@@ -311,22 +305,16 @@ VGTiledClipTest >> testEveryClippedFrameOfMineDrawsTheSameBytesThroughTheTilesAs
 			description: name printString , ' draws other bytes through the tiles' ]
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests - device' }
 VGTiledClipTest >> testEveryShapedClipCaseOfTheCorpusDrawsOnTheDeviceWhatTheSoftwareBackendDraws [
 	"The gate of unit 2.7 over the corpus: every case the subset draws that clips to a shape,
 	 drawn on the device and by the software backend on the same frame, holds to the tolerance
-	 the fill cases of unit 2.4 set. One context draws all of them. A machine with no device
-	 holds nothing."
+	 the fill cases of unit 2.4 set. One context draws all of them, which is the session's. A
+	 machine with no device holds nothing."
 
-	| context |
-	context := [ VkContext computeContext ]
-		           on: Error
-		           do: [ :failure | nil ].
-	context ifNil: [ ^ self ].
-	[
+	self hasDevice ifFalse: [ ^ self ].
 	self clipCasesDo: [ :case :draw |
-		self assertDeviceDrawsCase: case with: draw on: context ] ]
-		ensure: [ context destroy ]
+		self assertDeviceDrawsCase: case with: draw ]
 ]
 
 { #category : 'tests - views' }

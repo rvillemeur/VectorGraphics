@@ -363,23 +363,26 @@ VGFrameDeviceBenchmark >> measureEncoding [
 	^ self
 ]
 
-{ #category : 'measuring' }
-VGFrameDeviceBenchmark >> measureOn: aContext [
+{ #category : 'running' }
+VGFrameDeviceBenchmark >> measureOn: aSession [
 	"One frame through the dispatch, averaged over the repeats. Everything draw:into: does is
-	 inside the number — the kernel built, every binding uploaded, one workgroup dispatched a
-	 tile, the wait, and the target read back — because that is what a frame really costs and no
-	 part of it can be skipped by a caller.
+	 inside the number — every binding uploaded, one workgroup dispatched a tile, the wait, and
+	 the target read back — because that is what a frame really costs and no part of it can be
+	 skipped by a caller. The module, the pipeline and the buffers are the session's and are
+	 built on the first of the repeats, which is why a warm-up frame is drawn before the clock
+	 starts: a resident frame is what a tool really pays after the first.
 	 The pixels are packed by the backend itself, which is how a drained surface hands a frame to
 	 one, and the form is kept so that the software measurement has something to compare."
 
 	| surface pixels backend dispatch |
-	deviceName := aContext chosenDeviceName.
+	deviceName := aSession contextOrNil chosenDeviceName.
 	surface := self newSurface.
 	encoding := VGTiledFillEncoding of: surface displayList extent: self extent.
 	surface displayList reset.
 	backend := VGVulkanBackend new.
 	pixels := backend pixelsOf: surface.
-	dispatch := VGTiledFillDispatch on: aContext.
+	dispatch := aSession dispatchForEncoding: encoding.
+	dispatch draw: encoding into: pixels.
 	milliseconds
 		at: #dispatch
 		put: (self millisecondsPerRepeatOf: [ dispatch draw: encoding into: pixels ]).
@@ -453,17 +456,20 @@ VGFrameDeviceBenchmark >> millisecondsPerRepeatOf: aBlock [
 	   / VGVulkanRoundTrip microsecondsPerMillisecond) asFloat
 ]
 
-{ #category : 'measuring' }
-VGFrameDeviceBenchmark >> newContext [
-	"A compute context, or nil with the reason recorded. A machine with no driver, no device, or
-	 a device that refuses what this project asks for raises here, and the benchmark reports the
-	 machine rather than failing."
+{ #category : 'running' }
+VGFrameDeviceBenchmark >> newSession [
+	"A device session of my own, or nil with the reason recorded. A machine with no driver, no
+	 device or a device that refuses the features this project asks for records the reason here,
+	 and the gate reports the machine rather than failing.
+	 The session is mine and not VGVulkanDeviceSession default, because what I measure includes
+	 the cost of opening a device and the first frame of a session: a benchmark that borrowed the
+	 image's own session would measure a device somebody else had already opened."
 
-	^ [ VkContext computeContext ]
-		  on: Error
-		  do: [ :each |
-			  unavailableReason := self reasonFrom: each.
-			  nil ]
+	| session |
+	session := VGVulkanDeviceSession new.
+	session contextOrNil ifNotNil: [ ^ session ].
+	unavailableReason := session unavailableReason.
+	^ nil
 ]
 
 { #category : 'measuring' }
@@ -533,21 +539,21 @@ VGFrameDeviceBenchmark >> reportRows [
 	^ self countRows , self timeRows , self deviceRows
 ]
 
-{ #category : 'measuring' }
+{ #category : 'running' }
 VGFrameDeviceBenchmark >> run [
 	"Measure the frame off the device and then on it, or record why the device cannot be
 	 measured. Answers self in both cases, because a machine with no device still has a report to
 	 give and that report is not a failure."
 
-	| context |
+	| session |
 	self measureEncoding.
-	context := self newContext.
-	context ifNil: [ ^ self ].
+	session := self newSession.
+	session ifNil: [ ^ self ].
 	[
-	[ self measureOn: context ]
+	[ self measureOn: session ]
 		on: Error
 		do: [ :each | unavailableReason := self reasonFrom: each ] ] ensure: [
-		context destroy ].
+		session releaseDevice ].
 	^ self
 ]
 

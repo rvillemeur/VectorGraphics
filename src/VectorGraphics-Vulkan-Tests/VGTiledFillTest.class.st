@@ -591,25 +591,17 @@ VGTiledFillTest >> testEveryFieldOfARecordIsOneBasedWithinItsStrideAndNamedOnce 
 			(VGTiledFillLayout class selectors select: [ :each | each endsWith: 'Field' ])
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests - device' }
 VGTiledFillTest >> testEveryFillCaseOfTheCorpusDrawsOnTheDeviceWhatTheSoftwareBackendDraws [
 	"The gate of unit 2.3. Every case of the corpus the subset draws, drawn on the device and by
 	 the software backend on the same frame and compared premultiplied: no pixel farther than the
 	 tolerance in any channel, and at most the measured count of pixels differing at all.
-	 One context draws all of them, because a device costs 72 ms to open and a frame does not. A
-	 machine with no device has nothing to compare and holds nothing."
+	 One context draws all of them, and it is the session's: a device costs 37 to 52 ms to open
+	 and a frame does not. A machine with no device has nothing to compare and holds nothing."
 
-	| context |
-	context := [ VkContext computeContext ]
-		           on: Error
-		           do: [ :failure | nil ].
-	context ifNil: [ ^ self ].
-	[
+	self hasDevice ifFalse: [ ^ self ].
 	self fillCasesDo: [ :case :draw |
-		self
-			assertDeviceDrawsCase: case
-			with: draw
-			on: context ] ] ensure: [ context destroy ]
+		self assertDeviceDrawsCase: case with: draw ]
 ]
 
 { #category : 'tests' }
@@ -688,22 +680,17 @@ VGTiledFillTest >> testEveryGradientFrameOfTheFixtureDrawsOnTheDeviceWhatTheSoft
 	 for byte identical, which is the sharper half of the gate: the kernel evaluates a paint and
 	 searches a stop list to the same bytes as the rasteriser, and what the loose half allows is
 	 the narrowing of the stop and not the evaluation.
-	 One context draws all of them. A machine with no device holds nothing."
-	| context drawn |
-	context := [ VkContext computeContext ]
-		           on: Error
-		           do: [ :failure | nil ].
-	context ifNil: [ ^ self ].
+	 One context draws all of them, which is the session's. A machine with no device holds
+	 nothing."
+
+	| drawn |
+	self hasDevice ifFalse: [ ^ self ].
 	drawn := 0.
-	[
 	self gradientFrames do: [ :each |
 		| extent device comparison |
 		extent := VGGradientFrameFixture extent.
 		drawn := drawn + 1.
-		device := self
-			          deviceFormOfExtent: extent
-			          drawnWith: each value
-			          on: context.
+		device := self deviceFormOfExtent: extent drawnWith: each value.
 		comparison := VGFormComparison
 			              between: device
 			              and: (self
@@ -719,7 +706,7 @@ VGTiledFillTest >> testEveryGradientFrameOfTheFixtureDrawsOnTheDeviceWhatTheSoft
 		self
 			assert: device bits
 			= (self singleFloatFormOfExtent: extent drawnWith: each value) bits
-			description: each key ] ] ensure: [ context destroy ].
+			description: each key ].
 	self assert: drawn equals: self class gradientFrameCount
 ]
 

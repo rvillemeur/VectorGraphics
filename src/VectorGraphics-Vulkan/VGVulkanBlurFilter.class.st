@@ -40,21 +40,24 @@ VGVulkanBlurFilter >> applyBoxRadii: aCollection [
 { #category : 'blurring' }
 VGVulkanBlurFilter >> blurOnTheDeviceWithBoxRadii: aCollection [
 	"The passes on the device: the field read out of the surface as the host path reads it, blurred
-	 in the buffers the device owns, and written back once at the end. The context is opened for the
-	 blur and destroyed after it, because a filter is built for one blur and a device held past it
-	 would be a device held for nothing."
-
-	| device |
-	device := VkContext computeContext.
-	[
+	 in the buffers the device owns, and written back once at the end. The dispatch is the
+	 session's and is neither built nor released here, which is what makes a small shadow cheaper
+	 on the device than on the host: unit 2.8 paid 37 to 52 ms to open a context a blur, and unit
+	 3.0 still paid two kernels prepared and four buffers created and destroyed a blur. A machine
+	 with no device raises here, naming the fault, and my caller takes the host walk."
+	| dispatch |
+	dispatch := VGVulkanDeviceSession default blurDispatch ifNil: [
+		            VkError signal:
+			            VGVulkanDeviceSession noDeviceErrorMessage
+			            , VGVulkanDeviceSession default unavailableReason ].
 	self prepareBuffers.
-	(VGBlurDispatch on: device)
+	dispatch
 		blur: bufferA
 		columns: columnCount
 		rows: rowCount
 		boxRadii: aCollection.
 	self writeBufferBackToTheSurface.
-	ranOnTheDevice := true ] ensure: [ device destroy ]
+	ranOnTheDevice := true
 ]
 
 { #category : 'accessing' }

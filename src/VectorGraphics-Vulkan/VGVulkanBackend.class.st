@@ -81,17 +81,18 @@ VGVulkanBackend class >> probe [
 	 of a driver is caught, whatever class it arrives as: a missing library, a device that refuses
 	 a queue and a dispatch that answers rubbish are one answer here, which is that I am not
 	 available. The handler answers nil rather than swallowing the fault, because a candidate is
-	 probed by selection without a handler of its own."
+	 probed by selection without a handler of its own.
+	 The device is the session's and is kept: the probe is the first ask of a session and the
+	 frames after it find the context already open. A device that fails the probe is released,
+	 because nothing is to be drawn on it."
 
-	| context |
-	context := [ VkContext computeContext ]
-		           on: Error
-		           do: [ :failure | nil ].
+	| session context |
+	session := VGVulkanDeviceSession default.
+	context := session contextOrNil.
 	context ifNil: [ ^ nil ].
-	^ [
-	  [ (self computesTheProbeSumOn: context) ifTrue: [ self new ] ]
+	^ [ (self computesTheProbeSumOn: context) ifTrue: [ self new ] ]
 		  on: Error
-		  do: [ :failure | nil ] ] ensure: [ context destroy ]
+		  do: [ :failure | nil ]
 ]
 
 { #category : 'selection - private' }
@@ -138,24 +139,28 @@ VGVulkanBackend >> blitSurface: aSurface at: aPoint paint: aPaint clip: aClip op
 	recordedFrame add: entry
 ]
 
-{ #category : 'draining' }
+{ #category : 'drawing' }
 VGVulkanBackend >> dispatch: anEncoding into: aByteArray [
 	"The device trip, with every fault of a driver answered as a refusal: a missing library, a
 	 device that refuses a queue and a dispatch that raises are one answer here, which is that
-	 this frame belongs to the software backend. The context is created and destroyed around the
-	 one frame; a later unit keeps a device between frames, which is where the 72 ms of a context
-	 stop being paid once a frame."
+	 this frame belongs to the software backend.
+	 The device comes from VGVulkanDeviceSession and is not opened here: it is held for the whole
+	 image session, as are the kernel, the pipeline and the buffers of the dispatch. A frame that
+	 fails releases the session, because a driver that has failed once may hold nothing worth
+	 keeping and the next frame is to probe again rather than inherit it."
 
-	| context |
-	context := nil.
-	^ [
-	  [
-	  context := VkContext computeContext.
-	  (VGTiledFillDispatch on: context) draw: anEncoding into: aByteArray ]
+	| session |
+	session := VGVulkanDeviceSession default.
+	^ [ (session dispatchForEncoding: anEncoding)
+		  ifNil: [
+			  self refuseBecause:
+				  'no device computes here: ' , session unavailableReason ]
+		  ifNotNil: [ :dispatch | dispatch draw: anEncoding into: aByteArray ] ]
 		  on: Error
 		  do: [ :failure |
-			  self refuseBecause: 'the device failed the frame: ' , failure description ] ]
-		  ensure: [ context ifNotNil: [ context destroy ] ]
+			  session releaseDevice.
+			  self refuseBecause:
+				  'the device failed the frame: ' , failure description ]
 ]
 
 { #category : 'draining' }

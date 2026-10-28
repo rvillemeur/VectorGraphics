@@ -71,18 +71,76 @@ VGVulkanBlurTest >> testABoxWiderThanTheFieldItWalksIsLeftToTheHostPath [
 ]
 
 { #category : 'tests' }
+VGVulkanBlurTest >> testADeviceBlurIsOneSubmissionWhateverTheCountOfPasses [
+	"Every pass of a blur is recorded into one command buffer and submitted once. It matters
+	 because a submission costs about 0.43 ms of the host whatever it carries, so six of them cost
+	 more than the host walk the device path is meant to beat. The kernels are one a pass and are
+	 kept for the largest blur the session has seen, which is what lets a shorter blur reuse the
+	 first of them."
+
+	| session dispatch bytes |
+	session := VGVulkanDeviceSession new.
+	session contextOrNil ifNil: [ ^ self ].
+	bytes := ByteArray new: 64 * 64.
+	dispatch := session blurDispatch.
+	[
+	dispatch blur: bytes columns: 64 rows: 64 boxRadii: #( 2 2 2 ).
+	self assert: dispatch passes size equals: 6.
+	self assert: dispatch submissionsOfLastBlur equals: 1.
+	self assert: dispatch deviceKernels size equals: dispatch passes size.
+	dispatch blur: bytes columns: 64 rows: 64 boxRadii: #( 2 ).
+	self assert: dispatch passes size equals: 2.
+	self assert: dispatch submissionsOfLastBlur equals: 1.
+	self assert: dispatch deviceKernels size equals: 6 ] ensure: [
+		session releaseDevice ]
+]
+
+{ #category : 'tests' }
+VGVulkanBlurTest >> testADeviceBlurKeepsItsKernelsAndItsBuffersBetweenBlurs [
+	"The kernels and the buffers of a blur last as long as the session, a field buffer grows for a
+	 larger blur and never shrinks for a smaller one, and the pair of buffers a pass is described
+	 by is the same size for every blur and so is never replaced. Releasing the session lets go of
+	 all of it."
+
+	| session dispatch small large held kernels grown paramsName |
+	session := VGVulkanDeviceSession new.
+	session contextOrNil ifNil: [ ^ self ].
+	small := ByteArray new: 64 * 64.
+	large := ByteArray new: 256 * 256.
+	paramsName := VGBlurDispatch paramsNameAt: 1.
+	dispatch := session blurDispatch.
+	[
+	self assert: session blurDispatch == dispatch.
+	dispatch blur: small columns: 64 rows: 64 boxRadii: #( 2 2 ).
+	held := dispatch deviceBuffers copy.
+	kernels := dispatch deviceKernels copy.
+	dispatch blur: small columns: 64 rows: 64 boxRadii: #( 2 2 ).
+	held keysAndValuesDo: [ :name :buffer |
+		self assert: (dispatch deviceBuffers at: name) == buffer ].
+	kernels keysAndValuesDo: [ :index :kernel |
+		self assert: (dispatch deviceKernels at: index) == kernel ].
+	dispatch blur: large columns: 256 rows: 256 boxRadii: #( 2 2 ).
+	self deny: (dispatch deviceBuffers at: #fieldA) == (held at: #fieldA).
+	self deny: (dispatch deviceBuffers at: #fieldB) == (held at: #fieldB).
+	self assert:
+		(dispatch deviceBuffers at: paramsName) == (held at: paramsName).
+	grown := dispatch deviceBuffers at: #fieldA.
+	dispatch blur: small columns: 64 rows: 64 boxRadii: #( 2 2 ).
+	self assert: (dispatch deviceBuffers at: #fieldA) == grown ] ensure: [
+		session releaseDevice ].
+	self assert: dispatch deviceBuffers isEmpty.
+	self assert: dispatch deviceKernels isEmpty
+]
+
+{ #category : 'tests' }
 VGVulkanBlurTest >> testADeviceBlurReallyRunsOnTheDeviceWhenThereIsOne [
 	"Every other test of mine passes on a machine with no driver, because the filter falls back to
 	 the host path. This one says what the unit is for: where a device computes, the bytes above
-	 came from it. The context opened here is destroyed before the blur, which opens one of its
-	 own: it is asked for to find out whether there is a device at all."
+	 came from it. The session is asked whether there is a device at all, and the filter draws on
+	 the one it holds."
 
-	| filter surface context |
-	context := [ VkContext computeContext ]
-		           on: Error
-		           do: [ :failure | nil ].
-	context ifNil: [ ^ self ].
-	context destroy.
+	| filter surface |
+	VGVulkanDeviceSession default contextOrNil ifNil: [ ^ self ].
 	surface := self
 		           ourSurfaceOfExtent: 16 @ 16
 		           seededWith: (self seedBytesOfSize: 16 * 16).

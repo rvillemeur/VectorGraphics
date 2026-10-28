@@ -13,7 +13,11 @@ Class {
 	#instVars : [
 		'context',
 		'bytes',
-		'stages'
+		'stages',
+		'kernel',
+		'buffers',
+		'tileExtent',
+		'prepared'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -74,10 +78,11 @@ VGTiledFillDispatch class >> stageNames [
 	 only place that names a stage: a report reads it, and a test reads the source of draw:into:
 	 against it so that a stage cannot be timed under a name no report shows.
 	 The first of them writes the buffers of the already built encoding and is not the building
-	 of that encoding, which a frame pays before a dispatch is asked for anything."
+	 of that encoding, which a frame pays before a dispatch is asked for anything. There is no
+	 release among them, because unit 3.1 keeps the device objects of a frame for the session and
+	 a frame pays nothing to let go of them."
 
-	^ #( #writeBuffers #module #allocate #prepare #upload #dispatch #readback
-	     #release )
+	^ #( #writeBuffers #module #allocate #prepare #upload #dispatch #readback )
 ]
 
 { #category : 'inspecting' }
@@ -153,39 +158,47 @@ VGTiledFillDispatch >> context [
 	^ context
 ]
 
+{ #category : 'accessing' }
+VGTiledFillDispatch >> deviceBuffers [
+	"The device buffer of every binding, keyed by the name of the binding. Empty where no frame
+	 has been drawn since I was last released."
+
+	^ buffers
+]
+
 { #category : 'dispatching' }
-VGTiledFillDispatch >> dispatch: aKernel over: anEncoding [
+VGTiledFillDispatch >> dispatchOver: anEncoding [
 	"One workgroup for every tile the frame touches."
 
 	self timeStage: #dispatch during: [
-		aKernel
+		kernel
 			dispatch: anEncoding touchedTileCount
 			y: self class rowsPerDispatch
 			z: self class layersPerDispatch ]
 ]
 
-{ #category : 'dispatching' }
+{ #category : 'drawing' }
 VGTiledFillDispatch >> draw: anEncoding into: aByteArray [
-	"One frame on the device: a buffer for every binding, the bytes of each uploaded, one
-	 workgroup for every tile the frame touches, and the target read back into the bytes it came
-	 from. A frame that touches no tile has nothing to dispatch and leaves the pixels alone.
+	"One frame on the device: the bytes of the frame written, a buffer for every binding large
+	 enough to hold them, the kernel of this tile extent prepared, one workgroup for every tile
+	 the frame touches, and the target read back into the bytes it came from. A frame that touches
+	 no tile has nothing to dispatch and leaves the pixels alone.
+	 Nothing of the device is destroyed at the end of a frame: the kernel, the pipeline and the
+	 buffers are what unit 3.1 keeps for the session, and releaseDevice is what lets go of them.
 	 Each step is one stage of the frame, which a plain dispatch evaluates and does not time: the
 	 stages are what unit 3.0 measures a frame in, and measuring them anywhere but inside the
 	 frame a tool really draws would measure a different frame."
 
-	| kernel buffers |
 	self
 		timeStage: #writeBuffers
 		during: [ self encode: anEncoding target: aByteArray ].
 	anEncoding touchedTileCount = 0 ifTrue: [ ^ aByteArray ].
-	kernel := self kernelOf: anEncoding.
-	buffers := self newBuffers.
-	[
-	self prepare: kernel on: buffers.
-	self upload: buffers.
-	self dispatch: kernel over: anEncoding.
-	self readback: buffers into: aByteArray ] ensure: [
-		self release: kernel and: buffers ].
+	self residentKernelFor: anEncoding.
+	self growBuffers.
+	self prepareOnce.
+	self upload.
+	self dispatchOver: anEncoding.
+	self readbackInto: aByteArray.
 	^ aByteArray
 ]
 
@@ -214,6 +227,40 @@ VGTiledFillDispatch >> frameRecordOf: anEncoding [
 		uint32AtOffset: VGTiledFillKernel frameHeightField - 1 * stride
 		put: extent y.
 	^ answer
+]
+
+{ #category : 'dispatching' }
+VGTiledFillDispatch >> growBuffers [
+	"Every binding holding a buffer large enough for the bytes of this frame. A buffer is made
+	 when there is none and when the frame needs one larger than the last did, and it is never
+	 made smaller: a frame that shrinks would otherwise pay an allocation for shrinking and
+	 another for growing back. A grown buffer is pointed at by the descriptor set before the one
+	 it replaces is destroyed, because a descriptor left pointing at freed memory takes the image
+	 with it on the next dispatch."
+
+	self timeStage: #allocate during: [
+		VGTiledFillKernel bindingNames withIndexDo: [ :name :index |
+			| needed held |
+			needed := (self wordCountOf: (bytes at: name))
+			          * VGTiledFillKernel elementStride.
+			held := buffers at: name ifAbsent: [ nil ].
+			(held isNil or: [ held size < needed ]) ifTrue: [
+				| grown |
+				grown := VkBuffer
+					         on: context device
+					         size: needed
+					         usage: VkBuffer storageBufferUsage.
+				buffers at: name put: grown.
+				prepared ifTrue: [
+					kernel rebindBuffer: grown atBinding: index - 1 ].
+				held ifNotNil: [ held destroy ] ] ] ]
+]
+
+{ #category : 'initialization' }
+VGTiledFillDispatch >> initialize [
+	super initialize.
+	buffers := Dictionary new.
+	prepared := false
 ]
 
 { #category : 'inspecting' }
@@ -252,18 +299,12 @@ VGTiledFillDispatch >> isRecordingStages [
 	^ stages notNil
 ]
 
-{ #category : 'dispatching' }
-VGTiledFillDispatch >> kernelOf: anEncoding [
-	"The compiled kernel for the tile extent of that encoding. The module comes from
-	 VGTiledFillKernel's cache, because it depends on the tile extent alone."
+{ #category : 'accessing' }
+VGTiledFillDispatch >> kernel [
+	"The kernel I keep prepared for my tile extent, or nil where no frame has been drawn since I
+	 was last released."
 
-	^ self
-		  timeStage: #module
-		  during: [
-			  PVComputeKernel
-				  on: context
-				  spirv:
-				  (VGTiledFillKernel spirvOnTileExtent: anEncoding grid tileExtent) ]
+	^ kernel
 ]
 
 { #category : 'measuring' }
@@ -274,25 +315,17 @@ VGTiledFillDispatch >> microsecondsOfStage: aSymbol [
 ]
 
 { #category : 'dispatching' }
-VGTiledFillDispatch >> newBuffers [
-	"One device buffer for every binding of the kernel, sized by the bytes written for it."
+VGTiledFillDispatch >> prepareOnce [
+	"The descriptor set, the pipeline and the command pool of my kernel, built on the first frame
+	 of my tile extent and kept afterwards. A buffer grown later is pointed at by the set itself,
+	 so a frame never prepares twice."
 
-	^ self
-		  timeStage: #allocate
-		  during: [
-			  VGTiledFillKernel bindingNames collect: [ :each |
-				  VkBuffer
-					  storageBuffer: (self wordCountOf: (bytes at: each))
-					  on: context device ] ]
-]
-
-{ #category : 'dispatching' }
-VGTiledFillDispatch >> prepare: aKernel on: aCollectionOfBuffers [
-	"Every buffer bound in binding order, then the descriptor set and the pipeline built."
-
+	prepared ifTrue: [ ^ self ].
 	self timeStage: #prepare during: [
-		aCollectionOfBuffers do: [ :each | aKernel bindBuffer: each ].
-		aKernel prepare ]
+		VGTiledFillKernel bindingNames do: [ :name |
+			kernel bindBuffer: (buffers at: name) ].
+		kernel prepare.
+		prepared := true ]
 ]
 
 { #category : 'printing' }
@@ -306,13 +339,11 @@ VGTiledFillDispatch >> printOn: aStream [
 ]
 
 { #category : 'dispatching' }
-VGTiledFillDispatch >> readback: aCollectionOfBuffers into: aByteArray [
+VGTiledFillDispatch >> readbackInto: aByteArray [
 	"The target buffer read back into the bytes it was written from."
 
 	self timeStage: #readback during: [
-		(aCollectionOfBuffers
-			 at: (VGTiledFillKernel bindingNames indexOf: #target))
-			readbackInto: aByteArray ]
+		(buffers at: #target) readbackInto: aByteArray ]
 ]
 
 { #category : 'measuring' }
@@ -325,14 +356,39 @@ VGTiledFillDispatch >> recordStages [
 	^ self
 ]
 
-{ #category : 'dispatching' }
-VGTiledFillDispatch >> release: aKernel and: aCollectionOfBuffers [
-	"The kernel is destroyed before the buffers, because a buffer freed under a live pipeline
-	 takes the image with it."
+{ #category : 'releasing' }
+VGTiledFillDispatch >> releaseDevice [
+	"Everything of the device I hold destroyed, the kernel before the buffers, because a buffer
+	 freed under a live pipeline takes the image with it. I am drawable again afterwards and build
+	 what the next frame needs: the session that holds me releases me when the device goes, and a
+	 frame of another tile extent releases me for itself."
 
-	self timeStage: #release during: [
-		aKernel destroy.
-		aCollectionOfBuffers do: [ :each | each destroy ] ]
+	kernel ifNotNil: [
+		kernel destroy.
+		kernel := nil ].
+	buffers valuesDo: [ :each | each destroy ].
+	buffers removeAll.
+	prepared := false.
+	tileExtent := nil
+]
+
+{ #category : 'dispatching' }
+VGTiledFillDispatch >> residentKernelFor: anEncoding [
+	"The kernel of my tile extent, compiled on the first frame and kept for every frame after it.
+	 A frame of another tile extent needs another module and another pipeline, so it releases what
+	 I hold first: the device objects of a tile extent are of no use to any other."
+
+	^ self timeStage: #module during: [
+		  | extent |
+		  extent := anEncoding grid tileExtent.
+		  extent = tileExtent ifFalse: [
+			  self releaseDevice.
+			  tileExtent := extent ].
+		  kernel ifNil: [
+			  kernel := PVComputeKernel
+				            on: context
+				            spirv: (VGTiledFillKernel spirvOnTileExtent: extent) ].
+		  kernel ]
 ]
 
 { #category : 'initialization' }
@@ -367,13 +423,13 @@ VGTiledFillDispatch >> timeStage: aSymbol during: aBlock [
 ]
 
 { #category : 'dispatching' }
-VGTiledFillDispatch >> upload: aCollectionOfBuffers [
-	"The bytes of each binding into the buffer that was sized for it, the two held together by
-	 the index of the binding name."
+VGTiledFillDispatch >> upload [
+	"The bytes of each binding into the buffer kept for it, the two held together by the name of
+	 the binding."
 
 	self timeStage: #upload during: [
-		VGTiledFillKernel bindingNames withIndexDo: [ :each :index |
-			(aCollectionOfBuffers at: index) uploadBytes: (bytes at: each) ] ]
+		VGTiledFillKernel bindingNames do: [ :name |
+			(buffers at: name) uploadBytes: (bytes at: name) ] ]
 ]
 
 { #category : 'encoding' }

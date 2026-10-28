@@ -127,25 +127,24 @@ VGTiledFillExamples class >> dispatchOfThreeShapesOnThisMachine [
 	 Where no device computes, the frame is encoded and nothing is dispatched: an example may not
 	 raise on a machine with no driver, and the bytes it would have uploaded are worth reading
 	 there too.
-	 The context is destroyed before the dispatch is answered, because the bytes a dispatch keeps
-	 are in object memory and a device held open by an example would outlive the click."
-
-	| encoding target context dispatch |
+	 The dispatch is one of my own and not the session's, because an example answers a fresh
+	 object every call and the session answers the one dispatch of a tile extent to every frame
+	 the image draws. The context is the session's, so the click opens no device of its own, and
+	 the dispatch is still live when the click is over: its kernel and its buffers are what the
+	 Buffers tab reads."
+	| encoding target session dispatch |
 	encoding := self encodingOfThreeShapes.
 	target := ByteArray new:
 		          self frameExtent x * self frameExtent y
 		          * VGTiledFillEncoding targetFormat bytesPerPixel.
-	context := [ VkContext computeContext ]
-		           on: Error
-		           do: [ :failure | nil ].
-	context ifNil: [
+	session := VGVulkanDeviceSession default.
+	session contextOrNil ifNil: [
 		dispatch := VGTiledFillDispatch new.
 		dispatch encode: encoding target: target.
 		^ dispatch ].
-	dispatch := VGTiledFillDispatch on: context.
-	^ [
-	  dispatch draw: encoding into: target.
-	  dispatch ] ensure: [ context destroy ]
+	dispatch := VGTiledFillDispatch on: session context.
+	dispatch draw: encoding into: target.
+	^ dispatch
 ]
 
 { #category : 'examples' }

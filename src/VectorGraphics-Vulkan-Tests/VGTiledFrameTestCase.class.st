@@ -43,8 +43,8 @@ VGTiledFrameTestCase class >> isAbstract [
 	^ self = VGTiledFrameTestCase
 ]
 
-{ #category : 'fixtures' }
-VGTiledFrameTestCase >> assertDeviceDrawsCase: aCase with: aBlock on: aContext [
+{ #category : 'private' }
+VGTiledFrameTestCase >> assertDeviceDrawsCase: aCase with: aBlock [
 	"One case drawn on the device and by the software backend on the same frame and compared
 	 premultiplied: no pixel farther than the tolerance in any channel, and at most the measured
 	 count of pixels differing at all. The case is named in the description, because a gate that
@@ -52,8 +52,7 @@ VGTiledFrameTestCase >> assertDeviceDrawsCase: aCase with: aBlock on: aContext [
 
 	| comparison |
 	comparison := VGFormComparison
-		              between:
-		              (self deviceFormOfExtent: aCase extent drawnWith: aBlock on: aContext)
+		              between: (self deviceFormOfExtent: aCase extent drawnWith: aBlock)
 		              and: (self softwareFormOfExtent: aCase extent drawnWith: aBlock).
 	self
 		assert:
@@ -72,12 +71,14 @@ VGTiledFrameTestCase >> caseExtent [
 	^ VGConformanceCorpus caseExtent
 ]
 
-{ #category : 'fixtures' }
-VGTiledFrameTestCase >> deviceFormOfExtent: anExtent drawnWith: aBlock on: aContext [
+{ #category : 'private' }
+VGTiledFrameTestCase >> deviceFormOfExtent: anExtent drawnWith: aBlock [
 	"The same frame drawn on the device: encoded, dispatched over one workgroup a tile and the
 	 pixels written back. The pixels are packed by the backend itself, because the frame has to
-	 reach the device the way a drained surface sends it. Nothing here goes through the failover,
-	 so a device that fails raises rather than quietly answering the software picture."
+	 reach the device the way a drained surface sends it. The device, the kernel and the buffers
+	 are the session's and are kept between frames, so a suite of cases opens one context and
+	 grows each buffer to the largest frame it draws. Nothing here goes through the failover, so a
+	 device that fails raises rather than quietly answering the software picture."
 
 	| surface encoding pixels backend |
 	surface := VGCairoImageSurface extent: anExtent.
@@ -86,7 +87,9 @@ VGTiledFrameTestCase >> deviceFormOfExtent: anExtent drawnWith: aBlock on: aCont
 	surface displayList reset.
 	backend := VGVulkanBackend new.
 	pixels := backend pixelsOf: surface.
-	(VGTiledFillDispatch on: aContext) draw: encoding into: pixels.
+	(VGVulkanDeviceSession default dispatchForEncoding: encoding)
+		draw: encoding
+		into: pixels.
 	backend write: pixels into: surface.
 	^ surface asForm
 ]
@@ -127,6 +130,15 @@ VGTiledFrameTestCase >> encodingOfExtent: anExtent drawnWith: aBlock [
 	encoding := VGTiledFillEncoding of: surface displayList extent: anExtent.
 	surface displayList reset.
 	^ encoding
+]
+
+{ #category : 'private' }
+VGTiledFrameTestCase >> hasDevice [
+	"Whether a device on this machine computes, asked of the session that holds it. A test of mine
+	 that needs one answers early where there is none: a machine with no driver has nothing to
+	 compare and that is not a failure."
+
+	^ VGVulkanDeviceSession default contextOrNil isNotNil
 ]
 
 { #category : 'fixtures' }

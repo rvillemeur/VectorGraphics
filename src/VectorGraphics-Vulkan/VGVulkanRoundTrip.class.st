@@ -284,17 +284,18 @@ VGVulkanRoundTrip >> millisecondsPerRepeatOf: aBlock [
 		  asFloat
 ]
 
-{ #category : 'measuring' }
-VGVulkanRoundTrip >> newContext [
-	"A compute context, or nil with the reason recorded. A machine with no driver, no device or a
-	 device that refuses the features this project asks for raises here, and the gate reports the
-	 machine rather than failing."
+{ #category : 'running' }
+VGVulkanRoundTrip >> newSession [
+	"A device session of my own, or nil with the reason recorded. A machine with no driver, no
+	 device or a device that refuses the features this project asks for records the reason here,
+	 and the gate reports the machine rather than failing. The session is mine, because what I
+	 measure is a device opened for the measurement and released after it."
 
-	^ [ VkContext computeContext ]
-		  on: Error
-		  do: [ :each |
-			  unavailableReason := self reasonFrom: each.
-			  nil ]
+	| session |
+	session := VGVulkanDeviceSession new.
+	session contextOrNil ifNotNil: [ ^ session ].
+	unavailableReason := session unavailableReason.
+	^ nil
 ]
 
 { #category : 'accessing' }
@@ -397,20 +398,20 @@ VGVulkanRoundTrip >> roundTripMilliseconds [
 	^ uploadMilliseconds + fillMilliseconds + readbackMilliseconds
 ]
 
-{ #category : 'measuring' }
+{ #category : 'running' }
 VGVulkanRoundTrip >> run [
 	"Measure the three numbers on this machine, or record why they cannot be measured. Answers
 	 self in both cases, because a machine with no device still has a report to give, and that
 	 report is a pass of the gate and not a failure of it."
 
-	| context |
-	context := self newContext.
-	context ifNil: [ ^ self ].
+	| session |
+	session := self newSession.
+	session ifNil: [ ^ self ].
 	[
-	[ self measureOn: context ]
+	[ self measureOn: session contextOrNil ]
 		on: Error
 		do: [ :each | unavailableReason := self reasonFrom: each ] ]
-		ensure: [ context destroy ].
+		ensure: [ session releaseDevice ].
 	^ self
 ]
 
