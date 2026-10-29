@@ -23,13 +23,12 @@ VGKernelVisitCensus class >> of: anEncoding [
 	^ self new setEncoding: anEncoding
 ]
 
-{ #category : 'accessing' }
+{ #category : 'counting' }
 VGKernelVisitCensus >> edgeReads [
-	"How many times an edge is read: every sweep walks the whole run of its block, and every
-	 invocation of the tile runs that sweep again."
+	"How many times an edge is read: a sweep walks the whole run of its block, and a sub-row of
+	 the tile is swept once for the whole workgroup."
 
-	^ self edgeVisits * self invocationsPerTile
-	  * VGTiledFillKernel subRowCount
+	^ self edgeVisits * self subRowsPerTile
 ]
 
 { #category : 'accessing' }
@@ -168,6 +167,19 @@ VGKernelVisitCensus >> references [
 	^ counts at: #references
 ]
 
+{ #category : 'accessing' }
+VGKernelVisitCensus >> referencesThatMayOverflowASubRow [
+	"How many swept references carry enough edges that one sub-row of them could find more
+	 spans than the block of workgroup storage holds. This is a bound and not a count: a
+	 straight edge crosses a horizontal sub-row at most once, two crossings bound a span, and
+	 the runs of an intersection of shapes are at most the runs of all of them together, so a
+	 reference below the bound cannot overflow while one above it usually does not either — a
+	 circle of a hundred edges crosses a sub-row twice. A sub-row that does overflow sweeps
+	 again, once a pixel of it, which is the only sweeping this census cannot see."
+
+	^ counts at: #overflowRiskReferences
+]
+
 { #category : 'reporting' }
 VGKernelVisitCensus >> reportRows [
 	"The census as rows: what the frame is, what the kernel does to it, what the same picture
@@ -182,6 +194,8 @@ VGKernelVisitCensus >> reportRows [
 	rows add: 'invocations a tile' -> self invocationsPerTile printString.
 	rows add: 'sub-rows a tile' -> self subRowsPerTile printString.
 	rows add: 'edge and tile pairs' -> self edgeVisits printString.
+	rows add: 'references that may overflow a sub-row'
+		-> self referencesThatMayOverflowASubRow printString.
 	self ratioRowsInto: rows.
 	^ rows asArray
 ]
@@ -215,14 +229,16 @@ VGKernelVisitCensus >> stagedRecordReads [
 	^ counts at: #stagedRecordReads
 ]
 
-{ #category : 'accessing' }
+{ #category : 'counting' }
 VGKernelVisitCensus >> subRowSweeps [
-	"The sweeps the kernel runs: every invocation of a tile sweeps the sub-rows of its own pixel
-	 row for every reference it is not given as interior, so a sub-row is swept once for each
-	 pixel of it."
+	"The sweeps the kernel runs: the invocations of a workgroup divide the sub-rows of their
+	 tile between them and each sweeps its own once for every reference the tile is not given
+	 as interior, so a sub-row is swept once however many pixels read it. A sub-row that finds
+	 more spans than the block of workgroup storage holds sweeps again, once a pixel of it, and
+	 that is a cost this count cannot see: it is bounded above by
+	 referencesThatMayOverflowASubRow."
 
-	^ self sweptReferences * self invocationsPerTile
-	  * VGTiledFillKernel subRowCount
+	^ self sweptReferences * self subRowsPerTile
 ]
 
 { #category : 'accessing' }
@@ -258,7 +274,8 @@ VGKernelVisitCensus >> tallyOfWalk [
 	| tally |
 	tally := Dictionary new.
 	#( #references #interiorReferences #edgeVisits #stagedRecordReads
-	   #unstagedRecordReads ) do: [ :each | tally at: each put: 0 ].
+	   #unstagedRecordReads #overflowRiskReferences ) do: [ :each |
+		tally at: each put: 0 ].
 	encoding tileTableRows do: [ :row |
 		| offset |
 		offset := row third.
@@ -277,11 +294,16 @@ VGKernelVisitCensus >> tallyOfWalk [
 VGKernelVisitCensus >> tallyReferenceAt: anIndex into: aTally [
 	"One reference of one tile: the entry it names, whether the binning marked it interior to the
 	 tile, and the records this tile reads for it.
+
 	 A record is counted once a workgroup when it is staged in workgroup storage and once an
 	 invocation when it is not: a shape record past the capacity of VGTiledFillStagedBlock is read
-	 out of global memory by every invocation that walks it."
+	 out of global memory by every invocation that walks it.
 
-	| reference identifier shapes capacity |
+	 A swept reference of more edges than twice the span capacity of a sub-row is counted as one
+	 that may overflow the block the sweep writes into, which is the bound
+	 referencesThatMayOverflowASubRow reports."
+
+	| reference identifier shapes capacity edges |
 	reference := encoding entryRefs at: anIndex.
 	identifier := VGTiledFillLayout identifierOfReference: reference.
 	shapes := self shapeCountOfEntry: identifier.
@@ -295,12 +317,12 @@ VGKernelVisitCensus >> tallyReferenceAt: anIndex into: aTally [
 	(VGTiledFillLayout isInteriorReference: reference)
 		ifTrue: [ self tally: aTally add: 1 to: #interiorReferences ]
 		ifFalse: [
-			self
-				tally: aTally
-				add: (self
-						 edgesOfBlock: (encoding refShapes at: anIndex)
-						 shapes: shapes)
-				to: #edgeVisits ]
+			edges := self
+				         edgesOfBlock: (encoding refShapes at: anIndex)
+				         shapes: shapes.
+			self tally: aTally add: edges to: #edgeVisits.
+			edges > (2 * VGTiledFillSpanBlock spanCapacity) ifTrue: [
+				self tally: aTally add: 1 to: #overflowRiskReferences ] ]
 ]
 
 { #category : 'accessing' }

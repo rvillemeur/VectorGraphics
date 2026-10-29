@@ -133,6 +133,48 @@ VGTiledFillKernelTest >> testEveryCompositionSelectorOfThePixelEmitterIsAMethodO
 ]
 
 { #category : 'tests' }
+VGTiledFillKernelTest >> testEverySubRowOfATileIsSweptByOneInvocationOfItsWorkgroup [
+	"The point of the unit: a sub-row of the tile is swept once and not once a column. The
+	 invocations of the workgroup divide the sub-rows of the tile between them, so every
+	 sub-row is swept by exactly one invocation of exactly one round, and the rounds a tile
+	 needs follow from its own shape — a workgroup of a 16 by 16 tile has 256 invocations and
+	 240 sub-rows and sweeps them in one round, where a workgroup of an 8 by 8 tile has 64
+	 invocations and 120 sub-rows and needs two. The sweeps of the last round that fall past
+	 the end are the ones the kernel's own guard drops."
+
+	#( 16 8 ) do: [ :side |
+		| block swept |
+		block := VGTiledFillSpanBlock onTileExtent: side @ side.
+		swept := OrderedCollection new.
+		0 to: block invocationCount - 1 do: [ :invocation |
+			0 to: block sweepsPerInvocation - 1 do: [ :round |
+				swept add: (block subRowSweptBy: invocation inRound: round) ] ].
+		self
+			assert:
+			(swept select: [ :each | each < block subRowCount ]) asSortedCollection
+				asArray
+			equals: (0 to: block subRowCount - 1) asArray.
+		self
+			assert: (swept reject: [ :each | each < block subRowCount ]) size
+			equals:
+			block invocationCount * block sweepsPerInvocation - block subRowCount ]
+]
+
+{ #category : 'tests' }
+VGTiledFillKernelTest >> testTheBlocksOfAWorkgroupFitTheSharedMemoryEveryDeviceGuarantees [
+	"Workgroup storage is declared when the module is built, so a block larger than the device
+	 allows is a pipeline a driver refuses and not a frame drawn slowly. Vulkan guarantees
+	 16 KB of it to every conformant device, which is the budget this engine builds for: the
+	 staged records and the spans of every sub-row of a tile have to fit inside it together,
+	 and the span capacity is what gives way if they do not."
+
+	self
+		assert:
+		VGTiledFillStagedBlock default bytes + VGTiledFillSpanBlock default bytes
+		<= VGTiledFillKernel sharedMemoryBudget
+]
+
+{ #category : 'tests' }
 VGTiledFillKernelTest >> testTheKernelBindsOneBufferForEveryBufferItReads [
 	"The seven buffers of the binding contract: the five VGTiledFillEncoding writes, the target
 	 pixels and the size of the frame. They stand at one descriptor set, numbered from zero in
@@ -225,16 +267,21 @@ VGTiledFillKernelTest >> testTheKernelRefusesAnOperatorWithNoArithmeticOfItsOwn 
 		raise: Error
 ]
 
-{ #category : 'tests - staged block' }
+{ #category : 'tests' }
 VGTiledFillKernelTest >> testTheKernelStagesTheRecordsOfATileAndOfOneEntryInWorkgroupStorage [
-	"Two blocks of workgroup storage, one of words and one of floats, because a block holds one
-	 type.
-	 Five barriers. One once the frame record and the tile record are staged, before any
-	 invocation reads a value out of them. Four about the records of the entry standing, inside
-	 the loop over the references: one at the top of the loop, so that no invocation overwrites a
-	 record a neighbour still reads; two between the three rounds of the staging, because a
-	 writer of a later round needs a word an earlier round staged; and one after the last round,
-	 so that no invocation reads a record not yet written.
+	"Four blocks of workgroup storage. Two for the records the tile and the entry standing
+	 need, one of words and one of floats, because a block holds one type; and two for the spans
+	 the workgroup sweeps, the count of each sub-row in words and the bounds of its spans in
+	 floats.
+
+	 Six barriers. One once the frame record and the tile record are staged, before any
+	 invocation reads a value out of them. Five about the entry standing, inside the loop over
+	 the references: one at the top of the loop, so that no invocation overwrites a record or a
+	 span a neighbour still reads; two between the three rounds of the staging, because a writer
+	 of a later round needs a word an earlier round staged; one once the last round is written,
+	 so that no invocation sweeps against a record not yet there; and one once the sweep of the
+	 sub-rows is written, so that no invocation reads a span not yet swept.
+
 	 Every one of them stands in control flow the whole workgroup runs — outside the test of
 	 whether an invocation has a pixel of the frame at all, and inside a loop whose count comes
 	 out of the tile record every invocation shares — because a barrier one invocation of a
@@ -244,10 +291,10 @@ VGTiledFillKernelTest >> testTheKernelStagesTheRecordsOfATileAndOfOneEntryInWork
 	validator := self kernelValidator.
 	self
 		assert: (validator variableCountInStorageClass: SpvStorageClass workgroup)
-		equals: 2.
+		equals: 4.
 	self
 		assert: (validator countOfOpcode: SpvOpcode opControlBarrier)
-		equals: 5
+		equals: 6
 ]
 
 { #category : 'tests' }
@@ -267,6 +314,31 @@ VGTiledFillKernelTest >> testTheModuleCacheTabListsOneRowForEveryTileExtentItHol
 	presenter items do: [ :item |
 		presenter columns do: [ :column | column evaluation value: item ] ].
 	self assert: ((presenter items collect: [ :each | each ]) includes: 8 @ 8)
+]
+
+{ #category : 'tests' }
+VGTiledFillKernelTest >> testTheSpanBlockGivesEverySubRowOfATileItsOwnCountAndItsOwnSpanSlots [
+	"The spans a sub-row of the tile was found to cover are written into workgroup storage by
+	 the one invocation that swept it and read by the sixteen invocations of its pixel row, so
+	 every sub-row needs a count slot of its own and a run of bound slots of its own: two slots
+	 a span, its left and its right. Two sub-rows sharing a slot would be one row of pixels
+	 reading another row's coverage, which no byte of a frame could be traced back to."
+
+	| block counts bounds |
+	block := VGTiledFillSpanBlock default.
+	counts := (0 to: block subRowCount - 1) collect: [ :each |
+		          block countSlotOfSubRow: each ].
+	bounds := OrderedCollection new.
+	0 to: block subRowCount - 1 do: [ :subRow |
+		0 to: VGTiledFillSpanBlock spanCapacity - 1 do: [ :span |
+			bounds add: (block startSlotOfSubRow: subRow span: span).
+			bounds add: (block endSlotOfSubRow: subRow span: span) ] ].
+	self
+		assert: counts asSortedCollection asArray
+		equals: (0 to: block wordCount - 1) asArray.
+	self
+		assert: bounds asSortedCollection asArray
+		equals: (0 to: block floatCount - 1) asArray
 ]
 
 { #category : 'tests' }

@@ -12,7 +12,10 @@ Class {
 		'tileExtent',
 		'stagedBlock',
 		'stagedWords',
-		'stagedFloats'
+		'stagedFloats',
+		'spanBlock',
+		'spanCounts',
+		'spanBounds'
 	],
 	#classInstVars : [
 		'spirvByTileExtent'
@@ -169,6 +172,18 @@ VGTiledFillKernel class >> roundingAddend [
 ]
 
 { #category : 'constants' }
+VGTiledFillKernel class >> sharedMemoryBudget [
+	"The workgroup storage a module of this kernel may declare, in bytes. Vulkan guarantees
+	 16 KB of it to every conformant device — maxComputeSharedMemorySize is at least that —
+	 and a block larger than the device allows is a pipeline a driver refuses rather than a
+	 frame drawn slowly, so this engine builds for the guarantee and not for the device in
+	 the machine. The staged records and the spans of every sub-row of a tile fit inside it
+	 together."
+
+	^ 16 * 1024
+]
+
+{ #category : 'constants' }
 VGTiledFillKernel class >> signedVariableNames [
 	"The winding number of one scan of the edges of one shape, which runs negative under the
 	 winding rule."
@@ -218,19 +233,24 @@ VGTiledFillKernel class >> wordVariableNames [
 	 fill and whether the fill lays one down at all, the pixel a surface paint samples, the byte
 	 the mask of the fill carries here, the three loop counters, the record of the shape the walk
 	 stands in and the verdicts of a sweep over the shapes, the stop loop with the two stops it
-	 looks for and the flags that stand where VGTileCoverage answers early."
+	 looks for and the flags that stand where VGTileCoverage answers early, and the five the
+	 cooperative sweep of the sub-rows needs: the round of the sweep, the spans the sub-row it
+	 sweeps has found, whether it found more than the block holds, the count a pixel reads back
+	 and the span of that count it stands on."
 
 	^ #( #dest #source #hasSource #sampledPixel #maskByte #reference #sample #edge
 	     #shape #shapeEdgeOffset #shapeEdgeCount #shapeFillRule #shapeAliased
 	     #hasAntialiased #allows #insideAll #inside #nextInside #nearestFound
-	     #stop #beforeStop #afterStop #beforeFound #afterFound )
+	     #stop #beforeStop #afterStop #beforeFound #afterFound #sweepRound
+	     #spanIndex #spanOverflow #spanCount #span )
 ]
 
 { #category : 'building' }
 VGTiledFillKernel >> declareSharedStorage [
-	"Two blocks of workgroup storage, laid out by VGTiledFillStagedBlock: the words of the
-	 records this workgroup's tile and the entry standing need, and their floats. One block a
-	 type, because an array holds one type."
+	"Four blocks of workgroup storage, two laid out by VGTiledFillStagedBlock and two by
+	 VGTiledFillSpanBlock: the words of the records this workgroup's tile and the entry standing
+	 need and their floats, then the count of the spans of every sub-row of the tile and the
+	 bounds of those spans. One block a type, because an array holds one type."
 
 	stagedBlock := VGTiledFillStagedBlock onTileExtent: tileExtent.
 	stagedWords := self
@@ -238,7 +258,14 @@ VGTiledFillKernel >> declareSharedStorage [
 		               length: stagedBlock wordCount.
 	stagedFloats := self
 		                newSharedArrayOfType: self floatType
-		                length: stagedBlock floatCount
+		                length: stagedBlock floatCount.
+	spanBlock := VGTiledFillSpanBlock onTileExtent: tileExtent.
+	spanCounts := self
+		              newSharedArrayOfType: self wordType
+		              length: spanBlock wordCount.
+	spanBounds := self
+		              newSharedArrayOfType: self floatType
+		              length: spanBlock floatCount
 ]
 
 { #category : 'emitting' }
@@ -283,16 +310,18 @@ VGTiledFillKernel >> emitAliasedShapesAllowPixelOnSubRow: aSubRowId [
 ]
 
 { #category : 'emitting' }
-VGTiledFillKernel >> emitAllowsRow [
+VGTiledFillKernel >> emitAllowsRowAt: aRowId [
 	"The rows the walk visits at all: whole pixel rows, from the floor of the clip's top to the
-	 ceiling of its bottom, which is VGTileCoverage >> allowsRowAt:."
+	 ceiling of its bottom, which is VGTileCoverage >> allowsRowAt:. A pixel asks it of its own
+	 row and the sweep of a sub-row asks it of the row that sub-row samples, which is the same
+	 test of the same clip."
 
 	^ self
 		  both: (self
-				   float: (self valueNamed: #pixelRow)
+				   float: aRowId
 				   atLeast: (self floorOfFloat: (self valueNamed: #clipTop)))
 		  and: (self
-				   float: (self valueNamed: #pixelRow)
+				   float: aRowId
 				   below: (self ceilingOfFloat: (self valueNamed: #clipBottom)))
 ]
 
@@ -307,7 +336,7 @@ VGTiledFillKernel >> emitBarrier [
 	builder currentBlock addInstruction: builder workgroupBarrier
 ]
 
-{ #category : 'emitting' }
+{ #category : 'emitting - staging' }
 VGTiledFillKernel >> emitBody [
 	"Which tile this workgroup owns and which pixel of it this invocation owns. The records of
 	 the tile are staged in workgroup storage before anything else, because every value below is
@@ -315,8 +344,17 @@ VGTiledFillKernel >> emitBody [
 	 the tile record between them, the barrier makes those writes visible to all of them, and
 	 each invocation then reads what it needs out of shared memory. A header, a corner and a
 	 count say the same thing to the pixel at one corner of a tile as to the pixel at the other,
-	 which is why one read a workgroup serves them all."
+	 which is why one read a workgroup serves them all.
 
+	 The corner of the tile and the row of this invocation inside it are remembered beside the
+	 pixel they make, because the cooperative sweep of a sub-row needs the corner to know where
+	 the sub-row starts and a pixel needs its row to know which sub-rows of the tile are its
+	 own."
+
+	self
+		remember:
+		(self componentOfBuiltIn: SpvBuiltIn localInvocationId at: self class rowComponent)
+		as: #localRow.
 	self remember: self emitLocalIndex as: #localIndex.
 	self emitStageOfTile.
 	self emitBarrier.
@@ -331,20 +369,24 @@ VGTiledFillKernel >> emitBody [
 			 (stagedBlock frameSlotOfField: self class frameHeightField))
 		as: #frameHeight.
 	self
+		remember: (self stagedWordAt:
+				 (stagedBlock tileSlotOfField: VGTiledFillLayout tileLeftField))
+		as: #tileLeft.
+	self
+		remember: (self stagedWordAt:
+				 (stagedBlock tileSlotOfField: VGTiledFillLayout tileTopField))
+		as: #tileTop.
+	self
 		remember: (self
-				 sumOfWord: (self stagedWordAt:
-						  (stagedBlock tileSlotOfField: VGTiledFillLayout tileLeftField))
+				 sumOfWord: (self valueNamed: #tileLeft)
 				 and: (self
 						  componentOfBuiltIn: SpvBuiltIn localInvocationId
 						  at: self class columnComponent))
 		as: #pixelX.
 	self
 		remember: (self
-				 sumOfWord: (self stagedWordAt:
-						  (stagedBlock tileSlotOfField: VGTiledFillLayout tileTopField))
-				 and: (self
-						  componentOfBuiltIn: SpvBuiltIn localInvocationId
-						  at: self class rowComponent))
+				 sumOfWord: (self valueNamed: #tileTop)
+				 and: (self valueNamed: #localRow))
 		as: #pixelY.
 	self
 		remember: (self stagedWordAt: (stagedBlock tileSlotOfField:
@@ -360,25 +402,89 @@ VGTiledFillKernel >> emitBody [
 { #category : 'emitting' }
 VGTiledFillKernel >> emitCoverageGivenInterior: aBooleanId [
 	"The coverage of this pixel for this entry: one where the reference says the entry covers the
-	 whole of the tile, and the walk over the shapes where it does not. The walk samples fifteen
-	 sub-rows of the pixel and scans the edges of every shape of the entry at each of them, so a
-	 tile deep inside a shape pays all of that for an answer that was one from the start. Which
-	 shapes are antialiased is read once a pixel and not once a sub-row."
+	 whole of the tile, and the spans of the sub-rows of its row where it does not. Which shapes
+	 are antialiased was read before the sweep, because the whole workgroup turns on it."
 
 	self store: (self constantFloat: 0) into: #coverage.
 	builder emitIf: aBooleanId then: [
 		self store: (self constantFloat: 1) into: #coverage ].
 	builder emitIf: (self negation: aBooleanId) then: [
-		self emitHasAntialiasedShape.
-		builder emitIf: self emitAllowsRow then: [ self emitCoverageOfSubRows ] ]
+		builder
+			emitIf: (self emitAllowsRowAt: (self valueNamed: #pixelRow))
+			then: [ self emitCoverageOfSubRows ] ]
+]
+
+{ #category : 'emitting' }
+VGTiledFillKernel >> emitCoverageOfSubRowOfTile: aSubRowId onSubRow: aYId allowed: aConditionId [
+	"The parts of this pixel the entry covers inside its clip on that sub-row, trimmed to the
+	 clip and to the pixel, which is VGTileCoverage >> spansAtX:onSubRow:do: and the two edges
+	 it trims to. The aliased shapes gate the pixel and then leave the window alone; where no
+	 shape is antialiased the whole window is covered.
+
+	 Where a shape is antialiased the spans of that sub-row of the tile are read back out of
+	 workgroup storage and each is clipped to this pixel's window: a maximal run of the points
+	 every antialiased shape calls inside is a function of x alone, so the runs inside a window
+	 are the runs of the tile cut to that window, and a bound inside it is the same float the
+	 sweep computed while a bound outside it is the edge of the window itself. A sub-row that
+	 found more spans than its block holds carries the mark of an overflow instead of a count,
+	 and is swept here from this pixel's own window as the kernel swept every sub-row before
+	 this unit."
+
+	| left right swept overflowed |
+	left := self
+		        largerFloatOf: (self valueNamed: #pixelLeft)
+		        and: (self valueNamed: #clipLeft).
+	right := self
+		         smallerFloatOf: (self
+				          sumOfFloat: (self valueNamed: #pixelLeft)
+				          and: (self constantFloat: 1))
+		         and: (self valueNamed: #clipRight).
+	builder emitIf: (self float: right above: left) then: [
+		builder emitIf: aConditionId then: [
+			swept := self
+				         word: (self load: #hasAntialiased)
+				         equals: (self constantWord: 1).
+			builder emitIf: (self negation: swept) then: [
+				self
+					store: (self
+							 sumOfFloat: (self load: #coverage)
+							 and: (self differenceOfFloat: right and: left))
+					into: #coverage ].
+			builder emitIf: swept then: [
+				self
+					store: (self spanCountOfSubRowOfTile: aSubRowId)
+					into: #spanCount.
+				overflowed := self
+					              word: (self load: #spanCount)
+					              equals:
+					              (self constantWord: VGTiledFillSpanBlock overflowMark).
+				builder
+					emitIf: overflowed
+					then: [ self emitSweepFrom: left to: right onSubRow: aYId ].
+				builder emitIf: (self negation: overflowed) then: [
+					self
+						emitSumOfSpansOfSubRowOfTile: aSubRowId
+						from: left
+						to: right ] ] ] ]
 ]
 
 { #category : 'emitting' }
 VGTiledFillKernel >> emitCoverageOfSubRows [
 	"The part of this pixel the fill covers, summed over the sub-rows of its row and capped at
 	 one, which is VGTileCoverage >> atX:row:. The terms arrive in the order they arrive there,
-	 so the sum is the same arithmetic in a narrower float."
+	 so the sum is the same arithmetic in a narrower float.
 
+	 Whether the aliased shapes of the entry let this pixel through is asked once for the whole
+	 row and not once a sub-row: an aliased shape is sampled at the centre of its own pixel row,
+	 so it answers the same for the fifteen sub-rows of a row.
+
+	 The sub-rows of the tile were swept by the invocations of the workgroup between them, so
+	 each of the fifteen is a short list of spans here; a sub-row that found more spans than its
+	 block holds is swept again, by this invocation for its own column."
+
+	| allows |
+	allows := self emitAliasedShapesAllowPixelOnSubRow:
+		          (self valueNamed: #pixelRow).
 	self store: (self constantWord: 0) into: #sample.
 	builder
 		emitWhile: [
@@ -386,13 +492,20 @@ VGTiledFillKernel >> emitCoverageOfSubRows [
 				word: (self load: #sample)
 				below: (self constantWord: self class subRowCount) ]
 		do: [
-			self emitSpansOnSubRow: (self
-					 sumOfFloat: (self valueNamed: #pixelRow)
-					 and: (self
-							  quotientOfFloat: (self
-									   sumOfFloat: (self floatOfWord: (self load: #sample))
-									   and: (self constantFloat: self class halfUnit))
-							  by: (self constantFloat: self class subRowCount))).
+			self
+				emitCoverageOfSubRowOfTile: (self
+						 sumOfWord: (self
+								  productOfWord: (self valueNamed: #localRow)
+								  and: (self constantWord: self class subRowCount))
+						 and: (self load: #sample))
+				onSubRow: (self
+						 sumOfFloat: (self valueNamed: #pixelRow)
+						 and: (self
+								  quotientOfFloat: (self
+										   sumOfFloat: (self floatOfWord: (self load: #sample))
+										   and: (self constantFloat: self class halfUnit))
+								  by: (self constantFloat: self class subRowCount)))
+				allowed: allows.
 			self
 				store: (self sumOfWord: (self load: #sample) and: (self constantWord: 1))
 				into: #sample ].
@@ -521,36 +634,36 @@ VGTiledFillKernel >> emitDirectionOfEdgeAt: anEdgeId [
 ]
 
 { #category : 'emitting - entry' }
-VGTiledFillKernel >> emitEntry [
-	"One fill of this tile at this pixel: its header, its clip, the rectangle of its mask, the
-	 pixel its paint lays down here, the coverage of the walk over it and the composition of the
-	 two into the destination.
-	 Every record of the entry has already been staged in workgroup storage by the invocations of
-	 this workgroup between them, so this reads them out of shared memory and not out of global
-	 memory: the reference, which holds the identifier of the entry and in its top bit the mark
-	 that says the entry covers the whole of this tile, the header, the clip, the mask rectangle,
-	 the paint block and the shape records of the block this tile is to read — the records of the
-	 row of tiles this tile lies in, each naming only the edges of its shape that reach the rows
-	 of that row. An edge whose own rows miss this tile cannot cross a sub-row of it, so the
-	 short run and the whole shape give the same coverage.
+VGTiledFillKernel >> emitEntryGivenInterior: aBooleanId [
+	"One fill of this tile at this pixel: the pixel its paint lays down here, the coverage of
+	 the walk over it and the composition of the two into the destination. Whether the entry
+	 covers the whole of this tile is answered before this, because the sweep of the sub-rows
+	 the whole workgroup runs turns on the same answer.
+
+	 Every record of the entry has already been staged in workgroup storage by the invocations
+	 of this workgroup between them and read back out of it by every one of them, so the header,
+	 the clip, the mask rectangle, the paint block and the shape records of the block this tile
+	 is to read are all in hand here: the records of the row of tiles this tile lies in, each
+	 naming only the edges of its shape that reach the rows of that row. An edge whose own rows
+	 miss this tile cannot cross a sub-row of it, so the short run and the whole shape give the
+	 same coverage.
+
 	 A pixel the paint lays nothing down at is left alone, which the subset may do because every
 	 operator in it is bounded, and which is what the software rasteriser does with the nil a
 	 paint answers.
+
 	 The mask scales the coverage after the alpha of the fill does, which is the order
 	 VGTiledFillRasteriser scales them in and the order the software backend scales a blit in;
 	 an entry that carries no mask answers full alpha and scaling by that leaves a byte as it
 	 was, so one path serves a fill and a blit alike.
+
 	 The paint and the composition are emitted by VGTiledFillPixelEmitter, which shares this
 	 module while I emit this entry; the walk over the edges between them is my own."
 
-	| reference mask pixels |
+	| mask pixels |
 	pixels := VGTiledFillPixelEmitter on: self.
-	reference := self stagedWordAt: stagedBlock referenceSlot.
-	self rememberStagedHeader.
-	self rememberStagedClip.
-	self rememberStagedMaskRect.
 	pixels emitSource.
-	self emitCoverageGivenInterior: (self emitIsInteriorReference: reference).
+	self emitCoverageGivenInterior: aBooleanId.
 	mask := pixels emitMaskForCoverage: (self load: #coverage).
 	mask := pixels emitScaleOfByte: mask by: self emitMaskByte.
 	builder
@@ -672,11 +785,10 @@ VGTiledFillKernel >> emitLocalIndex [
 	 whose number is that slot's own, so an invocation needs one number to compare."
 
 	^ self
-		  sumOfWord: (self
-				   productOfWord: (self
-						    componentOfBuiltIn: SpvBuiltIn localInvocationId
-						    at: self class rowComponent)
-				   and: (self constantWord: tileExtent x))
+		  sumOfWord:
+		  (self
+			   productOfWord: (self valueNamed: #localRow)
+			   and: (self constantWord: tileExtent x))
 		  and: (self
 				   componentOfBuiltIn: SpvBuiltIn localInvocationId
 				   at: self class columnComponent)
@@ -770,20 +882,28 @@ VGTiledFillKernel >> emitNearestCrossingAfter: aCursorId to: aRightId onSubRow: 
 	^ self load: #nearestAll
 ]
 
-{ #category : 'emitting' }
+{ #category : 'emitting - entry' }
 VGTiledFillKernel >> emitPixel [
 	"The pixel of this invocation: the destination word read once, every entry of the tile
 	 composited into it in the order the references hold them, and the word written back. One
 	 invocation owns this pixel alone, so nothing else can have written it in between, which is
 	 what lets the read stand outside the loop.
+
 	 The loop over the references is run by every invocation of the workgroup and not only by
 	 those with a pixel of the frame to draw, because the records of each entry are staged in
-	 workgroup storage inside it and a barrier one invocation reaches and another does not is
+	 workgroup storage inside it and the sub-rows of the tile are swept there between the
+	 invocations of the workgroup, and a barrier one invocation reaches and another does not is
 	 undefined behaviour. A tile of the last column or the last row is short, so the invocations
 	 past its edge have no pixel of their own: what that test guards is the reading of the
-	 destination, the drawing of the entry and the writing back, and not the loop and not the
-	 staging. The count the loop turns on comes out of the tile record, which the whole workgroup
-	 shares, so every invocation turns it the same number of times."
+	 destination, the drawing of the entry and the writing back, and not the loop, not the
+	 staging and not the sweep. The count the loop turns on comes out of the tile record, which
+	 the whole workgroup shares, so every invocation turns it the same number of times.
+
+	 Three of the five barriers an entry stands between are mine — one at the top of the loop, so
+	 that no invocation overwrites a record or a span a neighbour still reads, one once the
+	 staging is written, so that the sweep reads the records of the entry standing, and one once
+	 the sweep is written, so that each pixel reads the spans of its own sub-rows and not the
+	 spans of the entry before — and the two others are the staging's own, between its rounds."
 
 	| inside index |
 	inside := self
@@ -811,18 +931,90 @@ VGTiledFillKernel >> emitPixel [
 		emitWhile: [
 		self word: (self load: #reference) below: (self valueNamed: #referenceCount) ]
 		do: [
+			| interior |
 			self emitBarrier.
 			self emitStageOfEntryAt: (self
 					 sumOfWord: (self valueNamed: #referenceOffset)
 					 and: (self load: #reference)).
 			self emitBarrier.
-			builder emitIf: inside then: [ self emitEntry ].
+			interior := self emitRecordsAndSweepOfEntry.
+			self emitBarrier.
+			builder emitIf: inside then: [
+				self emitEntryGivenInterior: interior ].
 			self
 				store:
 					(self sumOfWord: (self load: #reference) and: (self constantWord: 1))
 				into: #reference ].
 	builder emitIf: inside then: [
 		self storeWord: (self load: #dest) into: #target at: index ]
+]
+
+{ #category : 'emitting - sweep' }
+VGTiledFillKernel >> emitRecordSpanFrom: aLeftId to: aRightId forSubRowOfTile: aSubRowId [
+	"One run of the sweep written into the block of spans of its sub-row, where the sweep stands
+	 inside the shapes. The verdict is read here and not at the call site, as
+	 emitAddPieceFrom:to: reads it, because SPIR-V has no answer out of a branch.
+
+	 A sub-row of more runs than the block holds is marked as overflowed and the runs past the
+	 capacity are dropped: no pixel reads a span of such a sub-row, because the mark sends every
+	 one of them back to sweeping its own window."
+
+	builder
+		emitIf: (self word: (self load: #inside) equals: (self constantWord: 1))
+		then: [
+			| room slot |
+			room := self
+				        word: (self load: #spanIndex)
+				        below:
+				        (self constantWord: VGTiledFillSpanBlock spanCapacity).
+			builder emitIf: room then: [
+				slot := self
+					        spanBoundSlotOfSubRowOfTile: aSubRowId
+					        span: (self load: #spanIndex).
+				self storeSpanBound: aLeftId atSlot: slot.
+				self
+					storeSpanBound: aRightId
+					atSlot: (self sumOfWord: slot and: (self constantWord: 1)).
+				self
+					store:
+						(self sumOfWord: (self load: #spanIndex) and: (self constantWord: 1))
+					into: #spanIndex ].
+			builder emitIf: (self negation: room) then: [
+				self store: (self constantWord: 1) into: #spanOverflow ] ]
+]
+
+{ #category : 'emitting - entry' }
+VGTiledFillKernel >> emitRecordsAndSweepOfEntry [
+	"The records of the entry standing read back out of workgroup storage by every invocation
+	 of the workgroup, and the sub-rows of the tile swept between them. Answers whether the
+	 reference says the entry covers the whole of this tile, which both the sweep and the
+	 coverage of a pixel turn on.
+
+	 Every invocation reads the records and not only a drawing one, because an invocation with
+	 no pixel of the frame may still own a sub-row of the tile to sweep, and the sweep reads the
+	 clip and the shape records as a pixel does.
+
+	 Whether the entry covers the whole tile and whether any shape of it is antialiased are the
+	 same answer for the whole workgroup, so the sweep stands in control flow every invocation
+	 runs alike: an interior entry has no sweep to do, an entry of aliased shapes alone covers
+	 whole pixels and needs none, and anything else has its sub-rows divided between the
+	 invocations and swept once each."
+
+	| interior |
+	self rememberStagedHeader.
+	self rememberStagedClip.
+	self rememberStagedMaskRect.
+	interior := self emitIsInteriorReference:
+		            (self stagedWordAt: stagedBlock referenceSlot).
+	self emitHasAntialiasedShape.
+	builder
+		emitIf: (self
+				 both: (self negation: interior)
+				 and: (self
+						  word: (self load: #hasAntialiased)
+						  equals: (self constantWord: 1)))
+		then: [ self emitSweepOfTileSubRows ].
+	^ interior
 ]
 
 { #category : 'emitting - entry' }
@@ -843,41 +1035,6 @@ VGTiledFillKernel >> emitShapesDo: aBlock [
 			self
 				store: (self sumOfWord: (self load: #shape) and: (self constantWord: 1))
 				into: #shape ]
-]
-
-{ #category : 'emitting' }
-VGTiledFillKernel >> emitSpansOnSubRow: aSubRowId [
-	"The parts of this pixel the entry covers inside its clip on that sub-row, trimmed to the
-	 clip and to the pixel, which is VGTileCoverage >> spansAtX:onSubRow:do: and the two edges
-	 it trims to. The aliased shapes gate the pixel and then leave the window alone; the
-	 antialiased ones are swept together, and where there is none the whole window is covered."
-
-	| left right |
-	left := self
-		        largerFloatOf: (self valueNamed: #pixelLeft)
-		        and: (self valueNamed: #clipLeft).
-	right := self
-		         smallerFloatOf: (self
-				          sumOfFloat: (self valueNamed: #pixelLeft)
-				          and: (self constantFloat: 1))
-		         and: (self valueNamed: #clipRight).
-	builder emitIf: (self float: right above: left) then: [
-		builder
-			emitIf: (self emitAliasedShapesAllowPixelOnSubRow: aSubRowId)
-			then: [
-				| swept |
-				swept := self
-					         word: (self load: #hasAntialiased)
-					         equals: (self constantWord: 1).
-				builder emitIf: (self negation: swept) then: [
-					self
-						store: (self
-								 sumOfFloat: (self load: #coverage)
-								 and: (self differenceOfFloat: right and: left))
-						into: #coverage ].
-				builder
-					emitIf: swept
-					then: [ self emitSweepFrom: left to: right onSubRow: aSubRowId ] ] ]
 ]
 
 { #category : 'emitting - staging' }
@@ -1004,14 +1161,64 @@ VGTiledFillKernel >> emitStageOfTile [
 				 and: (self constantWord: VGTiledFillLayout tileRecordWords))
 ]
 
+{ #category : 'emitting - sweep' }
+VGTiledFillKernel >> emitSumOfSpansOfSubRowOfTile: aSubRowId from: aLeftId to: aRightId [
+	"The spans that sub-row of the tile found, each cut to this pixel's window and added to the
+	 coverage left to right. The spans were written left to right by the sweep, so the terms
+	 arrive in the order VGTileCoverage adds them, and a span that misses the window adds
+	 nothing rather than a zero."
+
+	self store: (self constantWord: 0) into: #span.
+	builder
+		emitWhile: [
+		self word: (self load: #span) below: (self load: #spanCount) ]
+		do: [
+			| slot low high |
+			slot := self
+				        spanBoundSlotOfSubRowOfTile: aSubRowId
+				        span: (self load: #span).
+			low := self
+				       largerFloatOf: (self spanBoundAtSlot: slot)
+				       and: aLeftId.
+			high := self
+				        smallerFloatOf: (self spanBoundAtSlot:
+						         (self sumOfWord: slot and: (self constantWord: 1)))
+				        and: aRightId.
+			builder emitIf: (self float: high above: low) then: [
+				self
+					store: (self
+							 sumOfFloat: (self load: #coverage)
+							 and: (self differenceOfFloat: high and: low))
+					into: #coverage ].
+			self
+				store: (self sumOfWord: (self load: #span) and: (self constantWord: 1))
+				into: #span ]
+]
+
 { #category : 'emitting' }
 VGTiledFillKernel >> emitSweepFrom: aLeftId to: aRightId onSubRow: aSubRowId [
-	"The parts of that window every antialiased shape calls inside, added to the coverage left
-	 to right: VGTileCoverage >> sweepFrom:to:onSubRow:do:. A piece runs from where the last
-	 shape lets it in to where the first one shuts it out, so a crossing that leaves the verdict
-	 alone does not cut a piece in two and the sums are the same floats the software rasteriser
-	 adds. Nothing is sorted and no crossing is kept: the verdict at a point is one scan of the
-	 edges of each shape and the next crossing right of it is one more."
+	"The sweep of that window added to the coverage of this pixel, which is what a sub-row whose
+	 spans overflowed its block falls back to."
+
+	self
+		emitSweepFrom: aLeftId
+		to: aRightId
+		onSubRow: aSubRowId
+		piece: [ :start :end | self emitAddPieceFrom: start to: end ]
+]
+
+{ #category : 'emitting' }
+VGTiledFillKernel >> emitSweepFrom: aLeftId to: aRightId onSubRow: aSubRowId piece: aBlock [
+	"The parts of that window every antialiased shape calls inside, found left to right and
+	 handed to that block one by one: VGTileCoverage >> sweepFrom:to:onSubRow:do:. A piece runs
+	 from where the last shape lets it in to where the first one shuts it out, so a crossing
+	 that leaves the verdict alone does not cut a piece in two and the sums are the same floats
+	 the software rasteriser adds. Nothing is sorted and no crossing is kept: the verdict at a
+	 point is one scan of the edges of each shape and the next crossing right of it is one more.
+
+	 The block is sent the two ends of the piece and reads the verdict for itself: a pixel adds
+	 the piece to its coverage and the cooperative sweep writes it into the spans of its
+	 sub-row, and both of them are the same walk over the same crossings."
 
 	self store: aLeftId into: #cursor.
 	self store: aLeftId into: #start.
@@ -1028,7 +1235,7 @@ VGTiledFillKernel >> emitSweepFrom: aLeftId to: aRightId onSubRow: aSubRowId [
 				        onSubRow: aSubRowId.
 			ends := self float: next atLeast: aRightId.
 			builder emitIf: ends then: [
-				self emitAddPieceFrom: (self load: #start) to: aRightId.
+				aBlock value: (self load: #start) value: aRightId.
 				self store: aRightId into: #cursor ].
 			builder emitIf: (self negation: ends) then: [
 				self
@@ -1037,12 +1244,118 @@ VGTiledFillKernel >> emitSweepFrom: aLeftId to: aRightId onSubRow: aSubRowId [
 				builder emitIf: (self negation: (self
 							  word: (self load: #nextInside)
 							  equals: (self load: #inside))) then: [
-					self emitAddPieceFrom: (self load: #start) to: next.
+					aBlock value: (self load: #start) value: next.
 					builder
 						emitIf: (self word: (self load: #inside) equals: (self constantWord: 0))
 						then: [ self store: next into: #start ].
 					self store: (self load: #nextInside) into: #inside ].
 				self store: next into: #cursor ] ]
+]
+
+{ #category : 'emitting - sweep' }
+VGTiledFillKernel >> emitSweepOfSubRowOfTile: aSubRowId [
+	"One sub-row of the tile swept once, left to right, over the whole width of the tile cut to
+	 the clip of the entry: the crossings of every edge of every antialiased shape of it, with
+	 the verdict read at the start and at each crossing, and the maximal runs it finds written
+	 into workgroup storage where the pixels of that sub-row read them.
+
+	 The sub-row names its own row of the tile and its own sample of that row, so the sampling
+	 line is the float the pixel of that row computes for the same sample, and the window is the
+	 window of that row of pixels taken whole. A row outside the rows the clip allows and a
+	 window the clip leaves empty find no span at all, which is what the pixels of such a row
+	 add.
+
+	 The count is written last and says how many spans the pixels are to read, or carries the
+	 mark of an overflow where the sub-row found more than the block holds."
+
+	| rowOfTile row sample left right |
+	rowOfTile := self
+		             word: aSubRowId
+		             dividedBy: (self constantWord: self class subRowCount).
+	sample := self
+		          differenceOfWord: aSubRowId
+		          and: (self
+				           productOfWord: rowOfTile
+				           and: (self constantWord: self class subRowCount)).
+	row := self floatOfWord:
+		       (self sumOfWord: (self valueNamed: #tileTop) and: rowOfTile).
+	left := self
+		        largerFloatOf: (self floatOfWord: (self valueNamed: #tileLeft))
+		        and: (self valueNamed: #clipLeft).
+	right := self
+		         smallerFloatOf: (self floatOfWord: (self
+					           sumOfWord: (self valueNamed: #tileLeft)
+					           and: (self constantWord: tileExtent x)))
+		         and: (self valueNamed: #clipRight).
+	self store: (self constantWord: 0) into: #spanIndex.
+	self store: (self constantWord: 0) into: #spanOverflow.
+	builder
+		emitIf: (self
+				 both: (self emitAllowsRowAt: row)
+				 and: (self float: right above: left))
+		then: [
+			self
+				emitSweepFrom: left
+				to: right
+				onSubRow: (self
+						 sumOfFloat: row
+						 and: (self
+								  quotientOfFloat: (self
+										   sumOfFloat: (self floatOfWord: sample)
+										   and: (self constantFloat: self class halfUnit))
+								  by: (self constantFloat: self class subRowCount)))
+				piece: [ :start :end |
+					self
+						emitRecordSpanFrom: start
+						to: end
+						forSubRowOfTile: aSubRowId ] ].
+	self
+		storeSpanCount: (self
+				 select: (self
+						  word: (self load: #spanOverflow)
+						  equals: (self constantWord: 1))
+				 ifTrue:
+				 (self constantWord: VGTiledFillSpanBlock overflowMark)
+				 ifFalse: (self load: #spanIndex)
+				 type: self wordType)
+		ofSubRowOfTile: aSubRowId
+]
+
+{ #category : 'emitting - sweep' }
+VGTiledFillKernel >> emitSweepOfTileSubRows [
+	"The sub-rows of this tile swept between the invocations of the workgroup, one sweep a
+	 sub-row, for the entry standing. A tile of sixteen rows sampled fifteen times a row is two
+	 hundred and forty sub-rows and a workgroup of a tile is two hundred and fifty-six
+	 invocations, so one round gives every sub-row a sweeper of its own and the invocations past
+	 the last sub-row sweep nothing; a smaller tile turns the round more than once, as
+	 VGTiledFillSpanBlock >> sweepsPerInvocation says.
+
+	 This runs in control flow the whole workgroup shares — the entry is interior or it is not,
+	 and a shape of it is antialiased or none is, for every invocation alike — and it holds no
+	 barrier of its own, so an invocation with no sub-row to sweep may leave it at once."
+
+	self store: (self constantWord: 0) into: #sweepRound.
+	builder
+		emitWhile: [
+			self
+				word: (self load: #sweepRound)
+				below: (self constantWord: spanBlock sweepsPerInvocation) ]
+		do: [
+			| subRow |
+			subRow := self
+				          sumOfWord: (self
+						           productOfWord: (self load: #sweepRound)
+						           and: (self constantWord: spanBlock invocationCount))
+				          and: (self valueNamed: #localIndex).
+			builder
+				emitIf: (self
+						 word: subRow
+						 below: (self constantWord: spanBlock subRowCount))
+				then: [ self emitSweepOfSubRowOfTile: subRow ].
+			self
+				store:
+					(self sumOfWord: (self load: #sweepRound) and: (self constantWord: 1))
+				into: #sweepRound ]
 ]
 
 { #category : 'emitting' }
@@ -1316,7 +1629,50 @@ VGTiledFillKernel >> sharedPointerTo: aVariable ofType: aType atId: aSlotId [
 VGTiledFillKernel >> sharedVariables [
 	^ {
 		  stagedWords.
-		  stagedFloats }
+		  stagedFloats.
+		  spanCounts.
+		  spanBounds }
+]
+
+{ #category : 'emitting - sweep' }
+VGTiledFillKernel >> spanBoundAtSlot: aSlotId [
+	"One bound of one span out of workgroup storage, where the invocation that swept its
+	 sub-row left it."
+
+	^ builder
+		  emitLoad:
+			  (self sharedPointerTo: spanBounds ofType: self floatType atId: aSlotId)
+		  type: self floatType
+]
+
+{ #category : 'emitting - sweep' }
+VGTiledFillKernel >> spanBoundSlotOfSubRowOfTile: aSubRowId span: aSpanId [
+	"The slot of the first bound of one span of one sub-row of the tile, the end of that span
+	 standing in the slot after it. This is VGTiledFillSpanBlock >> startSlotOfSubRow:span:
+	 computed here and not asked of the block, because a sub-row of the sweep and a span of it
+	 are both ids of the walk and not integers; the block's own method is what the test of the
+	 layout reads."
+
+	^ self
+		  productOfWord: (self constantWord: 2)
+		  and: (self
+				   sumOfWord: (self
+						    productOfWord: aSubRowId
+						    and:
+						    (self constantWord: VGTiledFillSpanBlock spanCapacity))
+				   and: aSpanId)
+]
+
+{ #category : 'emitting - sweep' }
+VGTiledFillKernel >> spanCountOfSubRowOfTile: aSubRowId [
+	"How many spans the sweep of that sub-row of the tile found, or the mark of an overflow
+	 where it found more than the block holds. The slot is the sub-row's own, as
+	 VGTiledFillSpanBlock >> countSlotOfSubRow: numbers it."
+
+	^ builder
+		  emitLoad:
+			  (self sharedPointerTo: spanCounts ofType: self wordType atId: aSubRowId)
+		  type: self wordType
 ]
 
 { #category : 'emitting - staging' }
@@ -1352,6 +1708,27 @@ VGTiledFillKernel >> stagedWordAtId: aSlotId [
 				   ofType: self wordType
 				   atId: aSlotId)
 		  type: self wordType
+]
+
+{ #category : 'emitting - sweep' }
+VGTiledFillKernel >> storeSpanBound: aValueId atSlot: aSlotId [
+	"One bound of one span into workgroup storage, written by the one invocation that swept its
+	 sub-row."
+
+	builder
+		emitStore: aValueId
+		at:
+		(self sharedPointerTo: spanBounds ofType: self floatType atId: aSlotId)
+]
+
+{ #category : 'emitting - sweep' }
+VGTiledFillKernel >> storeSpanCount: aValueId ofSubRowOfTile: aSubRowId [
+	"The count of one sub-row, written by the one invocation that swept it."
+
+	builder
+		emitStore: aValueId
+		at:
+		(self sharedPointerTo: spanCounts ofType: self wordType atId: aSubRowId)
 ]
 
 { #category : 'accessing' }

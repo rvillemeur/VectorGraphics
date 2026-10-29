@@ -54,6 +54,40 @@ VGKernelVisitCensusTest >> testAFrameThatTouchesNoTileIsVisitedNotAtAll [
 ]
 
 { #category : 'tests' }
+VGKernelVisitCensusTest >> testAReferenceWithMoreEdgesThanASubRowHoldsSpansIsCountedAsOneThatMayOverflow [
+	"The spans of a sub-row are written into a block of workgroup storage of a fixed size, so a
+	 sub-row that finds more spans than the block holds falls back to the sweep the kernel ran
+	 before this unit, which keeps the answer right and makes the overflow a cost rather than a
+	 defect. Whether a reference can overflow is bounded by its edges: a straight edge crosses
+	 a horizontal sub-row at most once, two crossings bound a span, and the runs of an
+	 intersection of shapes are at most the runs of all of them, so a reference of no more than
+	 twice the capacity in edges cannot overflow a sub-row at all. The census reports that
+	 bound and not a count: a circle of many edges crosses a sub-row twice."
+
+	| plain many |
+	plain := VGKernelVisitCensus of: (self
+			         encodingOfExtent: 64 @ 64
+			         drawnWith: [ :context |
+				         context
+					         sourceColor: Color blue;
+					         rectangleX: 8 y: 8 width: 40 height: 40;
+					         fill ]).
+	many := VGKernelVisitCensus of: (self
+			        encodingOfExtent: 64 @ 64
+			        drawnWith: [ :context |
+				        context
+					        sourceColor: Color blue;
+					        circleCenterX: 32 y: 32 radius: 24;
+					        fill ]).
+	self assert: plain sweptReferences > 0.
+	self assert: plain referencesThatMayOverflowASubRow equals: 0.
+	self assert: many referencesThatMayOverflowASubRow > 0.
+	self
+		assert: many referencesThatMayOverflowASubRow
+		    <= many sweptReferences
+]
+
+{ #category : 'tests' }
 VGKernelVisitCensusTest >> testAShapeRecordPastTheStagedBlockIsReadByEveryInvocationForItself [
 	"The staged block holds a fixed number of shape records, because workgroup storage is
 	 declared when the module is built and an entry may carry any number of clip shapes. A shape
@@ -85,12 +119,14 @@ VGKernelVisitCensusTest >> testAShapeRecordPastTheStagedBlockIsReadByEveryInvoca
 ]
 
 { #category : 'tests' }
-VGKernelVisitCensusTest >> testASubRowIsSweptOnceAColumnOfATileWhereOnceWouldDo [
-	"The finding phase 3 is built on. A sub-row of a tile is swept by every invocation of its
-	 row, which is one invocation a column, and every one of those sweeps walks the same edges
-	 over the same sub-row and answers the coverage of its own pixel out of it. So the sweeps
-	 the kernel runs are the sweeps it needs times the width of a tile, and that width is asked
-	 of the grid rather than written here."
+VGKernelVisitCensusTest >> testASubRowOfATileIsSweptOnceForTheWholeWorkgroup [
+	"The gate of unit 3.3, and the finding phase 3 was built on answered. A sub-row of a tile
+	 was swept by every invocation of its row, which is one invocation a column, and every one
+	 of those sweeps walked the same edges over the same sub-row to answer the coverage of one
+	 pixel out of it. The invocations of a workgroup now divide the sub-rows of their tile
+	 between them, each sweeps its own once and writes the spans it finds where the pixels of
+	 that sub-row read them, so the sweeps the kernel runs are the sweeps the picture needs and
+	 the edges it reads are the edges the picture needs."
 
 	| encoding census |
 	encoding := self
@@ -102,12 +138,8 @@ VGKernelVisitCensusTest >> testASubRowIsSweptOnceAColumnOfATileWhereOnceWouldDo 
 				            fill ].
 	census := VGKernelVisitCensus of: encoding.
 	self assert: census neededSubRowSweeps > 0.
-	self
-		assert: census subRowSweeps
-		equals: census neededSubRowSweeps * encoding grid tileExtent x.
-	self
-		assert: census edgeReads
-		equals: census neededEdgeReads * encoding grid tileExtent x
+	self assert: census subRowSweeps equals: census neededSubRowSweeps.
+	self assert: census edgeReads equals: census neededEdgeReads
 ]
 
 { #category : 'tests' }

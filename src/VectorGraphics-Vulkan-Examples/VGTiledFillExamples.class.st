@@ -358,6 +358,20 @@ VGTiledFillExamples class >> sourcesOfASurfacePaintAndASolidFill [
 ]
 
 { #category : 'examples - kernel' }
+VGTiledFillExamples class >> spanBlockOfTheDefaultTile [
+	<sampleInstance>
+	"The block of workgroup storage one workgroup of the tiled fill kernel writes the spans of
+	 the sub-rows of its tile into, at the default tile extent. The Sub-rows tab names every
+	 sub-row of the tile: the pixel row it belongs to and the sample of that row it is, the slot
+	 its count of spans stands in, the slot of the first bound of its first span and the one
+	 invocation of the workgroup that sweeps it. Two hundred and forty sub-rows and two hundred
+	 and fifty-six invocations, so one round of the sweep gives every sub-row a sweeper of its
+	 own."
+
+	^ VGTiledFillSpanBlock default
+]
+
+{ #category : 'examples - kernel' }
 VGTiledFillExamples class >> stagedBlockOfTheDefaultTile [
 	<sampleInstance>
 	"The block of workgroup storage one workgroup of the tiled fill kernel stages the records of
