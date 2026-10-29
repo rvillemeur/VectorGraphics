@@ -16,6 +16,33 @@ Class {
 	#tag : 'Tests'
 }
 
+{ #category : 'asserting' }
+VGTiledFillKernelTest >> assertSlotsAndWritersOf: aStagedBlock [
+	"The rows of that block name every slot of it exactly once, name every word, and give the
+	 words of each run the writers nought upwards, which is the cooperative load the kernel
+	 emits. No run is longer than the workgroup, because an invocation stages one word of a run
+	 and not two."
+
+	| rows |
+	rows := aStagedBlock rows.
+	self
+		assert: (rows
+				 select: [ :each | each first = #word ]
+				 thenCollect: [ :each | each second ]) asSortedCollection asArray
+		equals: (0 to: aStagedBlock wordCount - 1) asArray.
+	self
+		assert: (rows
+				 select: [ :each | each first = #float ]
+				 thenCollect: [ :each | each second ]) asSortedCollection asArray
+		equals: (0 to: aStagedBlock floatCount - 1) asArray.
+	self deny: (rows anySatisfy: [ :each | each fourth isEmpty ]).
+	aStagedBlock runs do: [ :run |
+		self assert: run fourth size <= aStagedBlock invocationCount.
+		self
+			assert: (self writersOfRun: run in: rows)
+			equals: (0 to: run fourth size - 1) asArray ]
+]
+
 { #category : 'private' }
 VGTiledFillKernelTest >> classesNamedBy: aMethod [
 	"Every class that method names, read from its literals, so a rule about what a method may
@@ -142,13 +169,18 @@ VGTiledFillKernelTest >> testTheKernelModuleIsValidSpirv [
 
 { #category : 'tests' }
 VGTiledFillKernelTest >> testTheKernelNamesEveryBufferAndBuiltInInItsInterface [
-	"Under SPIR-V 1.5 an entry point names every module-scope variable it touches, so a buffer
-	 or a built-in left out of the interface is a module a driver may refuse."
+	"Under SPIR-V 1.5 an entry point names every module-scope variable it touches, so a buffer,
+	 a built-in or a block of workgroup storage left out of the interface is a module a driver
+	 may refuse. The count of the workgroup blocks is read off the module rather than written
+	 here, so the interface is checked against what the kernel really declares."
 
+	| validator |
+	validator := self kernelValidator.
 	self
-		assert: self kernelValidator entryPointInterfaceIds size
+		assert: validator entryPointInterfaceIds size
 		equals: VGTiledFillKernel bindingNames size
 			+ VGTiledFillKernel builtInNumbers size
+			+ (validator variableCountInStorageClass: SpvStorageClass workgroup)
 ]
 
 { #category : 'tests' }
@@ -193,18 +225,29 @@ VGTiledFillKernelTest >> testTheKernelRefusesAnOperatorWithNoArithmeticOfItsOwn 
 		raise: Error
 ]
 
-{ #category : 'tests' }
-VGTiledFillKernelTest >> testTheKernelSharesNothingAndSynchronisesNothing [
-	"A pixel belongs to one invocation alone: the kernel declares no workgroup storage and
-	 holds no barrier, which is what lets the tiles be dispatched in any order at all."
+{ #category : 'tests - staged block' }
+VGTiledFillKernelTest >> testTheKernelStagesTheRecordsOfATileAndOfOneEntryInWorkgroupStorage [
+	"Two blocks of workgroup storage, one of words and one of floats, because a block holds one
+	 type.
+	 Five barriers. One once the frame record and the tile record are staged, before any
+	 invocation reads a value out of them. Four about the records of the entry standing, inside
+	 the loop over the references: one at the top of the loop, so that no invocation overwrites a
+	 record a neighbour still reads; two between the three rounds of the staging, because a
+	 writer of a later round needs a word an earlier round staged; and one after the last round,
+	 so that no invocation reads a record not yet written.
+	 Every one of them stands in control flow the whole workgroup runs — outside the test of
+	 whether an invocation has a pixel of the frame at all, and inside a loop whose count comes
+	 out of the tile record every invocation shares — because a barrier one invocation of a
+	 workgroup reaches and another does not is undefined behaviour."
 
 	| validator |
 	validator := self kernelValidator.
-	self assert:
-		(validator variableIdsInStorageClass: SpvStorageClass workgroup) isEmpty.
+	self
+		assert: (validator variableCountInStorageClass: SpvStorageClass workgroup)
+		equals: 2.
 	self
 		assert: (validator countOfOpcode: SpvOpcode opControlBarrier)
-		equals: 0
+		equals: 5
 ]
 
 { #category : 'tests' }
@@ -260,6 +303,65 @@ VGTiledFillKernelTest >> testTheSpirvOfATileExtentIsAnsweredFromTheCacheTheSecon
 ]
 
 { #category : 'tests' }
+VGTiledFillKernelTest >> testTheStagedBlockGivesEverySlotOneWriterAndNamesThemAll [
+	"A run of the block is loaded cooperatively: the invocations of the workgroup take one word
+	 each of it, by their own number, so the writer of a slot is its position in its own run. No
+	 two words of one run share a writer, which is what keeps a word from being written twice,
+	 and a run is no longer than the workgroup, which is what lets one step stage it with no
+	 loop. The narrowest tile the kernel builds for is the measure of that, because the longest
+	 run is the sixty-four words of the shape records.
+	 Two slots of different runs do share a writer, and that writes no word twice: a run is a
+	 place of its own, so an invocation writing one word of each writes two slots.
+	 The rows are what the inspector reads, so they must name every slot and nothing else."
+
+	| wide |
+	wide := VGTiledFillStagedBlock onTileExtent: 16 @ 16.
+	self assertSlotsAndWritersOf: wide.
+	self
+		assertSlotsAndWritersOf: (VGTiledFillStagedBlock onTileExtent: 8 @ 8).
+	self assert: (wide writerOfWordSlot: wide shapeSlotBase) equals: 0.
+	self assert: (wide writerOfFloatSlot: 0) equals: 0
+]
+
+{ #category : 'tests' }
+VGTiledFillKernelTest >> testTheStagedBlockGivesEveryWordOfTheRecordsItHoldsOneSlotOfItsOwn [
+	"The block is addressed by slot and a slot holds one word, so the slots of the records it
+	 stages have to fill it exactly and may not overlap: the frame record, the tile record, the
+	 reference word, the offset of the shape block, the header of the entry and as many shape
+	 records as its capacity on the word side, and the clip, the mask rectangle and the paint
+	 block on the float side. Two words of one record in one slot would be a record read wrong
+	 by every invocation of the workgroup, which no byte of a frame could be traced back to."
+
+	| block words floats |
+	block := VGTiledFillStagedBlock default.
+	words := ((1 to: VGTiledFillKernel frameRecordWords) collect: [ :each |
+		          block frameSlotOfField: each ])
+	         , ((1 to: VGTiledFillLayout tileRecordWords) collect: [ :each |
+			          block tileSlotOfField: each ])
+	         , {
+			         block referenceSlot.
+			         block shapeOffsetSlot }
+	         , ((1 to: VGTiledFillLayout entryHeaderWords) collect: [ :each |
+			          block headerSlotOfField: each ]).
+	0 to: VGTiledFillStagedBlock shapeCapacity - 1 do: [ :ordinal |
+		words := words
+		         , ((1 to: VGTiledFillLayout shapeRecordWords) collect: [ :each |
+				          block shapeSlotOfOrdinal: ordinal field: each ]) ].
+	floats := ((1 to: VGTiledFillLayout clipFloats) collect: [ :each |
+		           block clipSlotOfField: each ])
+	          , ((1 to: VGTiledFillLayout clipFloats) collect: [ :each |
+			           block maskRectSlotOfField: each ])
+	          , ((1 to: VGTiledFillLayout paintBlockFloats) collect: [ :each |
+			           block paintSlotOfField: each ]).
+	self
+		assert: words asSortedCollection asArray
+		equals: (0 to: block wordCount - 1) asArray.
+	self
+		assert: floats asSortedCollection asArray
+		equals: (0 to: block floatCount - 1) asArray
+]
+
+{ #category : 'tests' }
 VGTiledFillKernelTest >> testTheVocabularyNamesNothingOfThisRasteriser [
 	"The vocabulary is the SPIR-V a hand-built module is written in and nothing of this
 	 rasteriser: a layout, a constant or a format named there would be a fact kept in two
@@ -270,4 +372,18 @@ VGTiledFillKernelTest >> testTheVocabularyNamesNothingOfThisRasteriser [
 			self
 				deny: (class name beginsWith: 'VG')
 				description: each printString , ' names ' , class name ] ]
+]
+
+{ #category : 'asserting' }
+VGTiledFillKernelTest >> writersOfRun: aRun in: aCollection [
+	"The invocation that writes each word of that run, in slot order, read off the rows of the
+	 block. A row carries the storage it is in as well as its slot, because a word slot and a
+	 float slot of one number are two places."
+
+	^ (aCollection
+		   select: [ :each |
+			   each first = aRun first and: [
+				   each second >= aRun second and: [
+					   each second < (aRun second + aRun fourth size) ] ] ]
+		   thenCollect: [ :each | each fifth ]) asSortedCollection asArray
 ]

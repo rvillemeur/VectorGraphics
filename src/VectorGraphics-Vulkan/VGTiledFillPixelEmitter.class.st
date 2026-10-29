@@ -49,14 +49,14 @@ VGTiledFillPixelEmitter class >> on: aKernel [
 	^ self new setKernel: aKernel
 ]
 
-{ #category : 'paint' }
+{ #category : 'emitting - paint' }
 VGTiledFillPixelEmitter >> coefficientOf: aField [
 	"One field of the coefficient block of the entry standing, numbered as the paint ABI of
-	 rule 2 numbers it."
-	^ kernel
-		  elementOf: #paints
-		  atBase: (self valueNamed: #paintBase)
-		  field: aField
+	 rule 2 numbers it. The block was staged in workgroup storage by the invocations of this
+	 workgroup between them, so this reads a slot of shared memory and not a word of the paint
+	 buffer."
+
+	^ kernel stagedPaintCoefficient: aField
 ]
 
 { #category : 'inspecting' }
@@ -692,11 +692,6 @@ VGTiledFillPixelEmitter >> emitSource [
 	 few instructions later."
 
 	| isLinear linear radial offset reaches extended isSolid isSurface channels found surface |
-	self
-		remember: (self
-				 productOfWord: (self valueNamed: #paintBlockOffset)
-				 and: (self constantWord: VGTiledFillLayout paintBlockFloats))
-		as: #paintBase.
 	self emitPaintSpacePoint.
 	isLinear := self
 		            word: (self valueNamed: #paintTag)

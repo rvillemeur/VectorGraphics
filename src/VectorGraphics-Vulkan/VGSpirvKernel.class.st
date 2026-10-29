@@ -150,15 +150,16 @@ VGSpirvKernel >> bindingRows [
 
 { #category : 'building' }
 VGSpirvKernel >> buildModule [
-	"Assemble the module. The built-ins and the buffers are declared before the function,
-	 because a definition has to precede every use of its id, and the GLSL set is imported
-	 because the walk takes a floor, a ceiling and three minima the core instruction set has
-	 none of."
+	"Assemble the module. The built-ins, the buffers and the workgroup storage are declared
+	 before the function, because a definition has to precede every use of its id, and the GLSL
+	 set is imported because the walk takes a floor, a ceiling and three minima the core
+	 instruction set has none of."
 
 	builder := SpvBuilder new.
 	builder addCapability: self class shaderCapability.
 	self declareBuiltIns.
 	self declareBuffers.
+	self declareSharedStorage.
 	glsl := builder importGLSL.
 	values := Dictionary new.
 	self emitMain.
@@ -217,6 +218,15 @@ VGSpirvKernel >> declareFunctionVariables [
 		variables
 			at: each
 			put: (builder emitVariableOfType: (self typeOfVariableNamed: each)) ]
+]
+
+{ #category : 'building' }
+VGSpirvKernel >> declareSharedStorage [
+	"The blocks of workgroup storage this kernel shares between the invocations of a workgroup,
+	 declared with the buffers because a module-scope variable has to precede every use of it.
+	 A kernel that shares nothing declares nothing."
+
+	
 ]
 
 { #category : 'buffers' }
@@ -332,11 +342,13 @@ VGSpirvKernel >> inspectorModuleContext: aContext [
 
 { #category : 'building' }
 VGSpirvKernel >> interfaceVariables [
-	"Under SPIR-V 1.5 an entry point names every module-scope variable it touches, so a buffer
-	 or a built-in left out of this list is a module a driver may refuse."
+	"Under SPIR-V 1.5 an entry point names every module-scope variable it touches, so a buffer,
+	 a built-in or a block of workgroup storage left out of this list is a module a driver may
+	 refuse."
 
 	^ (self class builtInNumbers collect: [ :each | builtIns at: each ])
 	  , (self class bindingNames collect: [ :each | bindings at: each ])
+	  , self sharedVariables
 ]
 
 { #category : 'testing' }
@@ -479,6 +491,14 @@ VGSpirvKernel >> pointerTo: aBindingName at: anIndexId [
 		  indices: {
 				  (self constantWord: PVSPIRVEmitter bufferMemberIndex).
 				  anIndexId }
+]
+
+{ #category : 'building' }
+VGSpirvKernel >> sharedVariables [
+	"The workgroup-storage variables this kernel declared, which the entry point has to name
+	 beside its buffers and its built-ins."
+
+	^ #( )
 ]
 
 { #category : 'accessing' }

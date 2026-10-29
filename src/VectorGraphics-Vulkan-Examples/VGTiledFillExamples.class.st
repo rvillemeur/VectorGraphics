@@ -357,6 +357,17 @@ VGTiledFillExamples class >> sourcesOfASurfacePaintAndASolidFill [
 		  (surface displayList entries collect: [ :each | each asTiledFill ])
 ]
 
+{ #category : 'examples - kernel' }
+VGTiledFillExamples class >> stagedBlockOfTheDefaultTile [
+	<sampleInstance>
+	"The block of workgroup storage one workgroup of the tiled fill kernel stages the records of
+	 its tile in, at the default tile extent. The Slots tab names every slot of it: the storage
+	 the slot is in, the record it stages, the word of that record and the one invocation of the
+	 workgroup that reads that word out of global memory and writes it here for the rest."
+
+	^ VGTiledFillStagedBlock default
+]
+
 { #category : 'examples' }
 VGTiledFillExamples class >> tiledFillOfThreeShapes [
 	"A frame of three fills under three operators, binned over the default grid and not yet drawn:

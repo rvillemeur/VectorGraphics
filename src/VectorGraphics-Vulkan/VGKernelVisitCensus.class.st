@@ -152,12 +152,15 @@ VGKernelVisitCensus >> ratioRowsInto: aCollection [
 						 , ' times') ] ]
 ]
 
-{ #category : 'accessing' }
+{ #category : 'counting' }
 VGKernelVisitCensus >> recordReads [
-	"How many records the kernel reads: every invocation of a tile reads the header of every
-	 entry of that tile and the shape records of its block for itself."
+	"How many records the kernel reads. A record staged in workgroup storage is read once a
+	 workgroup, by the one invocation that writes its slot; a shape record past the capacity of
+	 the staged block is read by every invocation of the tile for itself, which is what the
+	 kernel did with every record before unit 3.2."
 
-	^ self neededRecordReads * self invocationsPerTile
+	^ (counts at: #stagedRecordReads)
+	  + ((counts at: #unstagedRecordReads) * self invocationsPerTile)
 ]
 
 { #category : 'accessing' }
@@ -183,7 +186,7 @@ VGKernelVisitCensus >> reportRows [
 	^ rows asArray
 ]
 
-{ #category : 'initialization' }
+{ #category : 'building' }
 VGKernelVisitCensus >> setEncoding: anEncoding [
 	"Walk the tile table as a workgroup walks it: every touched tile, every reference of that
 	 tile, and for each the entry it names, whether the binning marked it interior to the tile,
@@ -191,34 +194,8 @@ VGKernelVisitCensus >> setEncoding: anEncoding [
 	 so an interior reference is counted as a visit and as records read and as no sweep at all,
 	 which is what the kernel does with one."
 
-	| references interior edges records |
 	encoding := anEncoding.
-	references := 0.
-	interior := 0.
-	edges := 0.
-	records := 0.
-	encoding tileTableRows do: [ :row |
-		| offset |
-		offset := row third.
-		1 to: row fourth do: [ :position |
-			| reference identifier |
-			reference := encoding entryRefs at: offset + position.
-			identifier := VGTiledFillLayout identifierOfReference: reference.
-			references := references + 1.
-			records := records + 1 + (self shapeCountOfEntry: identifier).
-			(VGTiledFillLayout isInteriorReference: reference)
-				ifTrue: [ interior := interior + 1 ]
-				ifFalse: [
-					edges := edges + (self
-							          edgesOfBlock: (encoding refShapes at: offset + position)
-							          shapes: (self shapeCountOfEntry: identifier)) ] ] ].
-	counts := Dictionary newFrom: {
-			          (#tiles -> encoding touchedTileCount).
-			          (#references -> references).
-			          (#interiorReferences -> interior).
-			          (#edgeVisits -> edges).
-			          (#neededRecordReads -> records).
-			          (#sweptReferences -> (references - interior)) }
+	counts := self tallyOfWalk
 ]
 
 { #category : 'reading' }
@@ -229,6 +206,13 @@ VGKernelVisitCensus >> shapeCountOfEntry: anIdentifier [
 	^ encoding headers at:
 		  (anIdentifier - 1) * VGTiledFillLayout entryHeaderWords
 		  + VGTiledFillLayout shapeCountField
+]
+
+{ #category : 'counting' }
+VGKernelVisitCensus >> stagedRecordReads [
+	"The records the workgroup stages in shared memory, each read out of global memory once."
+
+	^ counts at: #stagedRecordReads
 ]
 
 { #category : 'accessing' }
@@ -257,7 +241,76 @@ VGKernelVisitCensus >> sweptReferences [
 	^ counts at: #sweptReferences
 ]
 
+{ #category : 'building' }
+VGKernelVisitCensus >> tally: aTally add: anInteger to: aKey [
+	"Every counter of the walk starts at nought and is only ever added to, so one place reads one
+	 back and no counter of mine can be left unset."
+
+	aTally at: aKey put: (aTally at: aKey) + anInteger
+]
+
+{ #category : 'building' }
+VGKernelVisitCensus >> tallyOfWalk [
+	"One pass over the tile table, every reference of every touched tile tallied as the kernel
+	 reads it. The counters that are sums of others are worked out once the pass is over, so no
+	 reference has to know about them."
+
+	| tally |
+	tally := Dictionary new.
+	#( #references #interiorReferences #edgeVisits #stagedRecordReads
+	   #unstagedRecordReads ) do: [ :each | tally at: each put: 0 ].
+	encoding tileTableRows do: [ :row |
+		| offset |
+		offset := row third.
+		1 to: row fourth do: [ :position |
+			self tallyReferenceAt: offset + position into: tally ] ].
+	tally
+		at: #tiles put: encoding touchedTileCount;
+		at: #neededRecordReads
+		put: (tally at: #stagedRecordReads) + (tally at: #unstagedRecordReads);
+		at: #sweptReferences
+		put: (tally at: #references) - (tally at: #interiorReferences).
+	^ tally
+]
+
+{ #category : 'building' }
+VGKernelVisitCensus >> tallyReferenceAt: anIndex into: aTally [
+	"One reference of one tile: the entry it names, whether the binning marked it interior to the
+	 tile, and the records this tile reads for it.
+	 A record is counted once a workgroup when it is staged in workgroup storage and once an
+	 invocation when it is not: a shape record past the capacity of VGTiledFillStagedBlock is read
+	 out of global memory by every invocation that walks it."
+
+	| reference identifier shapes capacity |
+	reference := encoding entryRefs at: anIndex.
+	identifier := VGTiledFillLayout identifierOfReference: reference.
+	shapes := self shapeCountOfEntry: identifier.
+	capacity := VGTiledFillStagedBlock shapeCapacity.
+	self tally: aTally add: 1 to: #references.
+	self tally: aTally add: 1 + (shapes min: capacity) to: #stagedRecordReads.
+	self
+		tally: aTally
+		add: (shapes - capacity max: 0)
+		to: #unstagedRecordReads.
+	(VGTiledFillLayout isInteriorReference: reference)
+		ifTrue: [ self tally: aTally add: 1 to: #interiorReferences ]
+		ifFalse: [
+			self
+				tally: aTally
+				add: (self
+						 edgesOfBlock: (encoding refShapes at: anIndex)
+						 shapes: shapes)
+				to: #edgeVisits ]
+]
+
 { #category : 'accessing' }
 VGKernelVisitCensus >> tiles [
 	^ counts at: #tiles
+]
+
+{ #category : 'counting' }
+VGKernelVisitCensus >> unstagedRecordReads [
+	"The records the staged block has no room for, each read by every invocation of the tile."
+
+	^ counts at: #unstagedRecordReads
 ]

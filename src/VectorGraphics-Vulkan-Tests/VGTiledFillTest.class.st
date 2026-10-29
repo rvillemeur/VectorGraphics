@@ -200,6 +200,35 @@ VGTiledFillTest >> testAFillBeyondTheSurfaceLeavesEverySurfacePixelAlone [
 ]
 
 { #category : 'tests' }
+VGTiledFillTest >> testAFrameThatIsNotAWholeNumberOfTilesDrawsOnTheDeviceWhatTheSoftwareBackendDraws [
+	"A frame whose extent is not a multiple of the tile size leaves the tiles of its last column
+	 and of its last row short, and the invocations of such a workgroup that fall past the frame
+	 have no pixel of their own to draw. They run the entry loop and reach its barriers all the
+	 same, because a barrier one invocation of a workgroup reaches and another does not is
+	 undefined behaviour, and the records every invocation reads out of workgroup storage are
+	 only there once those barriers have been passed. So this frame is what says the staging of
+	 unit 3.2 is synchronised in control flow the whole workgroup runs."
+
+	| draw extent comparison |
+	self hasDevice ifFalse: [ ^ self ].
+	extent := 70 @ 54.
+	draw := [ :context |
+	         context
+		         sourceColorR: 0.2 g: 0.6 b: 0.9 a: 0.75;
+		         circleCenterX: 35 y: 27 radius: 24;
+		         fill ].
+	comparison := VGFormComparison
+		              between: (self deviceFormOfExtent: extent drawnWith: draw)
+		              and: (self softwareFormOfExtent: extent drawnWith: draw).
+	self
+		assert: (comparison pixelsFartherThan: self class deviceChannelTolerance)
+		equals: 0.
+	self
+		assert: comparison differingPixelCount
+		    <= self class devicePixelsAllowedToDifferPerCase
+]
+
+{ #category : 'tests' }
 VGTiledFillTest >> testAFrameThatTouchesNoTileIsDispatchedOnNoDeviceAtAll [
 	"A fill wholly beyond the surface is binned into no tile, so there is no workgroup to
 	 dispatch and no pixel to write. The dispatch answers the pixels it was given as they were,

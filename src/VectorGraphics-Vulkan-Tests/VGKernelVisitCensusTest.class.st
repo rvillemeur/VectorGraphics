@@ -54,6 +54,37 @@ VGKernelVisitCensusTest >> testAFrameThatTouchesNoTileIsVisitedNotAtAll [
 ]
 
 { #category : 'tests' }
+VGKernelVisitCensusTest >> testAShapeRecordPastTheStagedBlockIsReadByEveryInvocationForItself [
+	"The staged block holds a fixed number of shape records, because workgroup storage is
+	 declared when the module is built and an entry may carry any number of clip shapes. A shape
+	 record past that capacity is read out of global memory by every invocation that walks it,
+	 as every record was before this unit, so a frame of twenty stacked clips still reads most
+	 of its shape records once an invocation."
+
+	| encoding census staged spilled |
+	encoding := self
+		            encodingOfExtent: 64 @ 64
+		            drawnWith: [ :context |
+			            context sourceColor: Color green.
+			            1 to: 20 do: [ :each |
+				            context
+					            circleCenterX: 32 y: 32 radius: 30 - each;
+					            clip ].
+			            context
+				            rectangleX: 0 y: 0 width: 64 height: 64;
+				            fill ].
+	census := VGKernelVisitCensus of: encoding.
+	self
+		assert: (census shapeCountOfEntry: 1) > VGTiledFillStagedBlock shapeCapacity.
+	staged := census references * (1 + VGTiledFillStagedBlock shapeCapacity).
+	spilled := census neededRecordReads - staged.
+	self assert: spilled > 0.
+	self
+		assert: census recordReads
+		equals: staged + (spilled * census invocationsPerTile)
+]
+
+{ #category : 'tests' }
 VGKernelVisitCensusTest >> testASubRowIsSweptOnceAColumnOfATileWhereOnceWouldDo [
 	"The finding phase 3 is built on. A sub-row of a tile is swept by every invocation of its
 	 row, which is one invocation a column, and every one of those sweeps walks the same edges
@@ -83,9 +114,9 @@ VGKernelVisitCensusTest >> testASubRowIsSweptOnceAColumnOfATileWhereOnceWouldDo 
 VGKernelVisitCensusTest >> testAnInteriorReferenceIsVisitedAndSweptNotAtAll [
 	"A fill that covers the whole of a tile is marked interior when it is binned, and the kernel
 	 takes the coverage of such a pixel as one without reading an edge. So a frame of one fill
-	 over the whole surface is all visits and no sweeps: the records are still read by every
-	 invocation, which is what unit 3.2 is about, and no edge is read at all, which is what unit
-	 3.3 is about.
+	 over the whole surface is all visits and no sweeps: the records of its one entry are read
+	 once a workgroup, which is what unit 3.2 did, and no edge is read at all, which is what
+	 unit 3.3 is about.
 	 The fill reaches past every side of the frame, because a tile the border of a fill runs
 	 through is not interior to it and the tiles of the outer ring would otherwise be swept."
 
@@ -103,31 +134,6 @@ VGKernelVisitCensusTest >> testAnInteriorReferenceIsVisitedAndSweptNotAtAll [
 	self assert: census edgeReads equals: 0.
 	self assert: census edgeVisits equals: 0.
 	self assert: census recordReads > 0
-]
-
-{ #category : 'tests' }
-VGKernelVisitCensusTest >> testEveryInvocationOfATileReadsTheRecordsOfItsTileAgain [
-	"The second finding. A record of an entry — its header, its clip, its mask rectangle and the
-	 shape records of its block — says the same thing to every pixel of the tile, and every
-	 invocation reads it for itself. So the record reads of a frame are the reads it needs times
-	 the invocations of a tile, which is asked of the kernel's own local size."
-
-	| encoding census |
-	encoding := self
-		            encodingOfExtent: 64 @ 64
-		            drawnWith: [ :context |
-			            context
-				            sourceColor: Color blue;
-				            circleCenterX: 32 y: 32 radius: 10;
-				            fill ].
-	census := VGKernelVisitCensus of: encoding.
-	self assert: census neededRecordReads > 0.
-	self
-		assert: census recordReads
-		equals: census neededRecordReads * census invocationsPerTile.
-	self
-		assert: census invocationsPerTile
-		equals: encoding grid tileExtent x * encoding grid tileExtent y
 ]
 
 { #category : 'tests' }
@@ -189,4 +195,29 @@ VGKernelVisitCensusTest >> testTheEdgesTheCensusCountsAreTheEdgesOfTheBlocksTheR
 			                   :each | total + each ]) ].
 	self assert: expected > 0.
 	self assert: census edgeVisits equals: expected
+]
+
+{ #category : 'tests' }
+VGKernelVisitCensusTest >> testTheRecordsOfATileAreReadOnceAWorkgroup [
+	"The gate of unit 3.2. A record of an entry — its header, its clip, its mask rectangle and
+	 the shape records of its block — says the same thing to every pixel of the tile, so the
+	 workgroup stages the records in shared memory once and every invocation reads them from
+	 there. The record reads of a frame whose entries fit the staged block are therefore the
+	 reads the frame needs, one a workgroup, where they were that many times the invocations of
+	 a tile before."
+
+	| encoding census |
+	encoding := self
+		            encodingOfExtent: 64 @ 64
+		            drawnWith: [ :context |
+			            context
+				            sourceColor: Color blue;
+				            circleCenterX: 32 y: 32 radius: 10;
+				            fill ].
+	census := VGKernelVisitCensus of: encoding.
+	self assert: census neededRecordReads > 0.
+	self assert: census recordReads equals: census neededRecordReads.
+	self
+		assert: census invocationsPerTile
+		equals: encoding grid tileExtent x * encoding grid tileExtent y
 ]
