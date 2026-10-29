@@ -144,13 +144,14 @@ VGTiledFillTest >> testADecodedTileAnswersItsEntriesInTheOrderTheyWereDrawn [
 ]
 
 { #category : 'tests' }
-VGTiledFillTest >> testADispatchSendsOneRunOfBytesForEveryBindingTheKernelReads [
-	"What a dispatch uploads: one run of bytes for every binding the kernel declares, each as
-	 wide as the words behind it, and a frame record holding the extent the kernel indexes a
-	 pixel by. None of this needs a device, so it is held on every machine."
+VGTiledFillTest >> testADispatchSendsOneBlockOfWordsForEveryBindingTheKernelReads [
+	"What a dispatch uploads: one block for every binding the kernel declares, and every block
+	 that an encoding answers is the encoding's own array and not a run of bytes packed from it.
+	 The words of a WordArray and the floats of a Float32Array already lie in object memory in
+	 the order and the width a storage buffer reads them, so a copy between the two would be a
+	 copy of a frame for nothing. None of this needs a device, so it is held on every machine."
 
-	| encoding target bytes word |
-	word := VGTiledFillKernel elementStride.
+	| encoding target blocks dispatch |
 	encoding := VGTiledFillEncoding
 		            of: (self
 				             displayListOfExtent: self caseExtent
@@ -159,29 +160,27 @@ VGTiledFillTest >> testADispatchSendsOneRunOfBytesForEveryBindingTheKernelReads 
 	target := ByteArray new:
 		          self caseExtent x * self caseExtent y
 		          * VGTiledFillEncoding targetFormat bytesPerPixel.
-	bytes := VGTiledFillDispatch new bytesOf: encoding target: target.
+	dispatch := VGTiledFillDispatch new.
+	blocks := dispatch blocksOf: encoding target: target.
 	self
-		assert: bytes keys asSortedCollection asArray
+		assert: blocks keys asSortedCollection asArray
 		equals: VGTiledFillKernel bindingNames asSortedCollection asArray.
+	(VGTiledFillKernel bindingNames
+		 reject: [ :each | VGTiledFillDispatch bindingsNotOfAnEncoding includes: each ])
+		do: [ :each |
+			self
+				assert: (blocks at: each)
+				identicalTo: (encoding perform: each) ].
+	self assert: (blocks at: #target) identicalTo: target.
 	self
-		assert: (bytes at: #tileTable) size
-		equals: encoding tileTable size * word.
-	self assert: (bytes at: #edges) size equals: encoding edges size * word.
-	self assert: (bytes at: #target) identicalTo: target.
-	self
-		assert: ((bytes at: #frame) uint32AtOffset:
-				 VGTiledFillKernel frameWidthField - 1 * word)
+		assert: ((blocks at: #frame) at: VGTiledFillKernel frameWidthField)
 		equals: self caseExtent x.
 	self
-		assert: ((bytes at: #frame) uint32AtOffset:
-				 VGTiledFillKernel frameHeightField - 1 * word)
+		assert: ((blocks at: #frame) at: VGTiledFillKernel frameHeightField)
 		equals: self caseExtent y.
 	self
-		assert: ((bytes at: #edges) float32AtOffset: 0)
-		equals: (encoding edges at: 1).
-	self
-		assert: ((bytes at: #tileTable) uint32AtOffset: 0)
-		equals: (encoding tileTable at: 1)
+		assert: (dispatch byteCountOfBlock: (blocks at: #edges))
+		equals: encoding edges size * VGTiledFillKernel elementStride
 ]
 
 { #category : 'tests' }
@@ -197,6 +196,30 @@ VGTiledFillTest >> testAFillBeyondTheSurfaceLeavesEverySurfacePixelAlone [
 	self
 		assert: (self tiledFormOfExtent: self caseExtent drawnWith: draw) bits
 		equals: (self softwareFormOfExtent: self caseExtent drawnWith: draw) bits
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testAFrameNotReadBackAtOnceHasOnTheDeviceThePixelsAFrameReadBackHasInTheHost [
+	"Asking for the pixels later is asking for the same pixels: the request decides when the
+	 target buffer is copied into the host and nothing about what the device writes into it. So
+	 the frame is drawn twice from the same zeroed target, once read back by the frame itself and
+	 once read back afterwards, and the two runs of pixels are the same bytes."
+
+	| encoding pixelCount dispatch atOnce later |
+	self hasDevice ifFalse: [ ^ self ].
+	encoding := self
+		            encodingOfExtent: self caseExtent
+		            drawnWith: self mixedFillFrame.
+	pixelCount := self caseExtent x * self caseExtent y
+	              * VGTiledFillEncoding targetFormat bytesPerPixel.
+	atOnce := ByteArray new: pixelCount.
+	later := ByteArray new: pixelCount.
+	dispatch := VGVulkanDeviceSession default dispatchForEncoding: encoding.
+	dispatch draw: encoding into: atOnce.
+	dispatch draw: encoding into: later readBack: false.
+	self assert: later equals: (ByteArray new: pixelCount).
+	dispatch readbackInto: later.
+	self assert: later equals: atOnce
 ]
 
 { #category : 'tests' }
@@ -229,6 +252,31 @@ VGTiledFillTest >> testAFrameThatIsNotAWholeNumberOfTilesDrawsOnTheDeviceWhatThe
 ]
 
 { #category : 'tests' }
+VGTiledFillTest >> testAFrameThatIsNotReadBackPaysNoReadbackAndLeavesTheTargetAlone [
+	"The readback is a request and not a step of every frame. A frame whose pixels the host will
+	 read asks for them; a frame that ends on the device does not, and then it pays no readback
+	 at all and the array it was given is as it was. A dispatch of its own is used, so that the
+	 session's dispatch is not left reading the clock for every later frame."
+
+	| encoding target dispatch |
+	self hasDevice ifFalse: [ ^ self ].
+	encoding := self
+		            encodingOfExtent: self caseExtent
+		            drawnWith: self mixedFillFrame.
+	target := ByteArray new:
+		          self caseExtent x * self caseExtent y
+		          * VGTiledFillEncoding targetFormat bytesPerPixel.
+	dispatch := (VGTiledFillDispatch on: VGVulkanDeviceSession default context)
+		            recordStages.
+	[
+	dispatch draw: encoding into: target readBack: false.
+	self assert: (dispatch stageMicroseconds includesKey: #dispatch).
+	self deny: (dispatch stageMicroseconds includesKey: #readback).
+	self assert: target equals: (ByteArray new: target size) ] ensure: [
+		dispatch releaseDevice ]
+]
+
+{ #category : 'tests' }
 VGTiledFillTest >> testAFrameThatTouchesNoTileIsDispatchedOnNoDeviceAtAll [
 	"A fill wholly beyond the surface is binned into no tile, so there is no workgroup to
 	 dispatch and no pixel to write. The dispatch answers the pixels it was given as they were,
@@ -253,7 +301,7 @@ VGTiledFillTest >> testAFrameThatTouchesNoTileIsDispatchedOnNoDeviceAtAll [
 	self assert: encoding touchedTileCount equals: 0.
 	self assert: (dispatch draw: encoding into: target) identicalTo: target.
 	self assert: (target allSatisfy: [ :each | each = 0 ]).
-	self assert: dispatch bytes notNil
+	self assert: dispatch blocks notNil
 ]
 
 { #category : 'tests' }
@@ -519,6 +567,42 @@ VGTiledFillTest >> testCoverageIsTheSameFloatAsTheRasteriserAnswersForEveryPixel
 ]
 
 { #category : 'tests' }
+VGTiledFillTest >> testEveryBufferOfAFrameHoldsTheWordsOfTheBlockItWasUploadedFrom [
+	"The device is given the words of the encoding's own arrays, copied out of object memory in
+	 one call of libc, so every buffer has to hold exactly what a run of bytes packed word by
+	 word from that array would have held. Read back and compared here, because a copy at the
+	 wrong width or in the wrong order would not fail: it would draw a frame whose every pixel is
+	 wrong for a reason no pixel shows."
+
+	| encoding target dispatch stride |
+	self hasDevice ifFalse: [ ^ self ].
+	stride := VGTiledFillKernel elementStride.
+	encoding := self
+		            encodingOfExtent: self caseExtent
+		            drawnWith: self mixedFillFrame.
+	target := ByteArray new:
+		          self caseExtent x * self caseExtent y
+		          * VGTiledFillEncoding targetFormat bytesPerPixel.
+	dispatch := VGVulkanDeviceSession default dispatchForEncoding: encoding.
+	dispatch draw: encoding into: target.
+	(VGTiledFillKernel bindingNames
+		 reject: [ :each | VGTiledFillDispatch bindingsNotOfAnEncoding includes: each ])
+		do: [ :name |
+			| block count read packed |
+			block := dispatch blocks at: name.
+			count := dispatch byteCountOfBlock: block.
+			count > 0 ifTrue: [
+				read := ByteArray new: count.
+				(dispatch deviceBuffers at: name) readbackInto: read.
+				packed := ByteArray new: count.
+				1 to: block size do: [ :index |
+					packed
+						uint32AtOffset: index - 1 * stride
+						put: (block basicAt: index) ].
+				self assert: read equals: packed ] ]
+]
+
+{ #category : 'tests' }
 VGTiledFillTest >> testEveryBufferTheKernelBindsOutOfAnEncodingIsOneTheBuffersAnswer [
 	"The set holds one buffer a binding of the kernel that an encoding writes, and the encoding
 	 answers each of them by the name the binding carries. A binding added to the contract and
@@ -762,6 +846,32 @@ VGTiledFillTest >> testEveryGradientFrameOfTheFixtureDrawsTheSameBytesAsTheSoftw
 ]
 
 { #category : 'tests' }
+VGTiledFillTest >> testTheBufferOfABindingIsMappedOnceAndStaysMappedForTheSession [
+	"A frame uploads fourteen buffers and reads one back, and the address of a buffer's memory
+	 does not move while the buffer lives. So the mapping is made on the first ask and kept: the
+	 memory is host coherent, which is what lets a write through a kept pointer reach the device
+	 with no flush. Asked of the buffer itself here, because the pointer it hands out is the one
+	 the copy really writes through."
+
+	| encoding target dispatch buffer pointer |
+	self hasDevice ifFalse: [ ^ self ].
+	encoding := self
+		            encodingOfExtent: self caseExtent
+		            drawnWith: self mixedFillFrame.
+	target := ByteArray new:
+		          self caseExtent x * self caseExtent y
+		          * VGTiledFillEncoding targetFormat bytesPerPixel.
+	dispatch := VGVulkanDeviceSession default dispatchForEncoding: encoding.
+	dispatch draw: encoding into: target.
+	buffer := dispatch deviceBuffers at: #edges.
+	pointer := buffer mappingOrNil.
+	self assert: pointer notNil.
+	self assert: buffer sessionPointer equals: pointer.
+	dispatch draw: encoding into: target.
+	self assert: buffer mappingOrNil equals: pointer
+]
+
+{ #category : 'tests' }
 VGTiledFillTest >> testTheBuffersAreSizedByTheFrameAndByNothingElse [
 	"A header, a clip rectangle and a paint block an entry, four floats an edge, five floats a
 	 stop of a gradient, a record a tile the frame touches, and a reference and a shape block
@@ -845,6 +955,29 @@ VGTiledFillTest >> testTheBuffersOfAFrameAreSizedByTheCountsOfThatFrame [
 		assert: buffers tileTable size
 		equals: 6 * VGTiledFillLayout tileRecordWords.
 	self assert: buffers entryRefs size equals: 9
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testTheBytesAndTheWordsOfABlockAreReadOffTheBlockItself [
+	"A block of a binding is a WordArray, a Float32Array or the run of pixels of the target, and
+	 the three count their elements differently while the device is given bytes. The bytes of a
+	 block are therefore asked of the block, which knows its own element width, and the words are
+	 those bytes over the stride of the kernel. An empty binding still owes the device a buffer,
+	 so its word count is the floor and not nought."
+
+	| dispatch |
+	dispatch := VGTiledFillDispatch new.
+	self
+		assert: (dispatch byteCountOfBlock: (WordArray new: 5))
+		equals: 5 * VGTiledFillKernel elementStride.
+	self
+		assert: (dispatch byteCountOfBlock: (Float32Array new: 5))
+		equals: 5 * VGTiledFillKernel elementStride.
+	self assert: (dispatch byteCountOfBlock: (ByteArray new: 5)) equals: 5.
+	self assert: (dispatch wordCountOfBlock: (WordArray new: 5)) equals: 5.
+	self
+		assert: (dispatch wordCountOfBlock: (WordArray new: 0))
+		equals: VGTiledFillDispatch emptyBufferWordCount
 ]
 
 { #category : 'tests - layout' }

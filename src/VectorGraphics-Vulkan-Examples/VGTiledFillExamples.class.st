@@ -119,19 +119,22 @@ VGTiledFillExamples class >> decoderOfAFillInTwoClipShapes [
 	^ (VGTiledFillEncoding of: surface displayList extent: self frameExtent) decoder
 ]
 
-{ #category : 'examples' }
+{ #category : 'examples - dispatch' }
 VGTiledFillExamples class >> dispatchOfThreeShapesOnThisMachine [
 	<sampleInstance>
 	"One click: the three shapes of the frame above sent to a device, with the Buffers tab
-	 holding what went out, binding by binding, and the target holding what came back.
+	 holding what went out, binding by binding, and the target holding what came back. The last
+	 column of that tab is the host address each buffer is mapped at, which is the one mapping
+	 the session keeps: a frame writes through it and never maps again.
 	 Where no device computes, the frame is encoded and nothing is dispatched: an example may not
-	 raise on a machine with no driver, and the bytes it would have uploaded are worth reading
-	 there too.
+	 raise on a machine with no driver, and the blocks it would have uploaded are worth reading
+	 there too, with no address beside them.
 	 The dispatch is one of my own and not the session's, because an example answers a fresh
 	 object every call and the session answers the one dispatch of a tile extent to every frame
 	 the image draws. The context is the session's, so the click opens no device of its own, and
 	 the dispatch is still live when the click is over: its kernel and its buffers are what the
 	 Buffers tab reads."
+
 	| encoding target session dispatch |
 	encoding := self encodingOfThreeShapes.
 	target := ByteArray new:
@@ -140,7 +143,7 @@ VGTiledFillExamples class >> dispatchOfThreeShapesOnThisMachine [
 	session := VGVulkanDeviceSession default.
 	session contextOrNil ifNil: [
 		dispatch := VGTiledFillDispatch new.
-		dispatch encode: encoding target: target.
+		dispatch packBlocksOf: encoding target: target.
 		^ dispatch ].
 	dispatch := VGTiledFillDispatch on: session context.
 	dispatch draw: encoding into: target.

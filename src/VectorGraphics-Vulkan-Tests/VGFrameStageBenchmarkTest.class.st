@@ -149,13 +149,14 @@ VGFrameStageBenchmarkTest >> testEveryStageTheDispatchTimesIsOneItNames [
 	"The table of stage names and the dispatch cannot drift: every stage the dispatch wraps a
 	 block in is read out of its own source here, in the order a frame pays them, and a stage
 	 named in the table and timed nowhere would be a row of the report that no code fills.
-	 A stage is timed either in `draw:into:` itself or in the one method of the dispatch that
-	 `draw:into:` sends for that step, so the order is the order of the steps and not of the
-	 method dictionary."
+	 A stage is timed either in `draw:into:readBack:` itself or in the one method of the dispatch
+	 that it sends for that step, so the order is the order of the steps and not of the method
+	 dictionary. The frame walked is the one that takes the readback as a request, because
+	 `draw:into:` is that frame with the request answered yes."
 
 	| timed |
 	timed := OrderedCollection new.
-	(VGTiledFillDispatch >> #draw:into:) ast sendNodes do: [ :each |
+	(VGTiledFillDispatch >> #draw:into:readBack:) ast sendNodes do: [ :each |
 		each selector = #timeStage:during:
 			ifTrue: [ timed add: each arguments first value ]
 			ifFalse: [

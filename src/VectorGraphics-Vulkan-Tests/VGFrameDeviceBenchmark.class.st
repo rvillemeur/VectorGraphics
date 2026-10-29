@@ -363,7 +363,7 @@ VGFrameDeviceBenchmark >> measureEncoding [
 	^ self
 ]
 
-{ #category : 'running' }
+{ #category : 'measuring' }
 VGFrameDeviceBenchmark >> measureOn: aSession [
 	"One frame through the dispatch, averaged over the repeats. Everything draw:into: does is
 	 inside the number — every binding uploaded, one workgroup dispatched a tile, the wait, and
@@ -386,8 +386,8 @@ VGFrameDeviceBenchmark >> measureOn: aSession [
 	milliseconds
 		at: #dispatch
 		put: (self millisecondsPerRepeatOf: [ dispatch draw: encoding into: pixels ]).
-	uploadedByteCount := dispatch bytes values inject: 0 into: [ :sum :each |
-		                     sum + each size ].
+	uploadedByteCount := dispatch blocks values inject: 0 into: [ :sum :each |
+		                     sum + (dispatch byteCountOfBlock: each) ].
 	backend write: pixels into: surface.
 	deviceForm := surface asForm
 ]
