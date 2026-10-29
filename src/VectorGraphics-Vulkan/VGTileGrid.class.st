@@ -17,7 +17,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'extent',
-		'tileExtent'
+		'tileExtent',
+		'bounds'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -51,13 +52,13 @@ VGTileGrid class >> extent: anExtent tileExtent: aTileExtent [
 { #category : 'accessing' }
 VGTileGrid >> boundsOfTileAt: anIndex [
 	"Clipped to the extent, so the short tiles of the last column and the last row answer the
-	 pixels they really hold and the tiles together cover the frame exactly once."
+	 pixels they really hold and the tiles together cover the frame exactly once.
+	 The rectangle is remembered: a binning asks for the bounds of a tile once for every entry
+	 and tile pair it marks, and nothing of mine changes after I am built."
 
-	| column row origin |
-	column := (anIndex - 1) \\ self columns.
-	row := (anIndex - 1) // self columns.
-	origin := column * tileExtent x @ (row * tileExtent y).
-	^ origin corner: ((origin + tileExtent) min: extent)
+	bounds ifNil: [ bounds := Array new: self tileCount ].
+	^ (bounds at: anIndex) ifNil: [
+		  bounds at: anIndex put: (self newBoundsOfTileAt: anIndex) ]
 ]
 
 { #category : 'accessing' }
@@ -142,6 +143,18 @@ VGTileGrid >> inspectorTiles: aBuilder [
 { #category : 'inspector' }
 VGTileGrid >> inspectorTilesContext: aContext [
 	aContext active: extent isNotNil
+]
+
+{ #category : 'private' }
+VGTileGrid >> newBoundsOfTileAt: anIndex [
+	"The pixels of that tile, worked out from the index. The column and the row come out of the
+	 index because a tile is numbered row-major, which is the order a dispatch walks."
+
+	| column row origin |
+	column := (anIndex - 1) \\ self columns.
+	row := (anIndex - 1) // self columns.
+	origin := column * tileExtent x @ (row * tileExtent y).
+	^ origin corner: ((origin + tileExtent) min: extent)
 ]
 
 { #category : 'printing' }

@@ -41,26 +41,28 @@ VGTileBinning class >> of: aDisplayList grid: aGrid [
 ]
 
 { #category : 'binning' }
-VGTileBinning >> bin: anEntry [
+VGTileBinning >> bin: anEntry at: anOrdinal [
 	"Where the entry says it can touch, and nowhere else. The entry answers its own bounding box,
 	 clip and operator included, so an operator that writes beyond its shape widens the box there
 	 and not here. A tile the entry covers in full is marked as it is binned, because the tile
-	 and the entry are both in hand here and nothing later holds the pair."
+	 and the entry are both in hand here and nothing later holds the pair.
+	 What a bin holds is the ordinal of the entry in the frame, and beside it the mark of the
+	 pair: that is what a reference of the device carries, and it is what spares the writer a
+	 search for an ordinal and a second question for the mark."
 
 	(grid indexesIntersecting: anEntry boundingBox) do: [ :index |
-		(bins at: index ifAbsentPut: [ OrderedCollection new ]) add: anEntry.
-		(anEntry coversEveryPixelOf: (grid boundsOfTileAt: index)) ifTrue: [
-			(interiors at: index ifAbsentPut: [ OrderedCollection new ]) add:
-				anEntry ] ]
+		(bins at: index) ifNil: [
+			bins at: index put: (OrderedCollection new: 4).
+			interiors at: index put: (OrderedCollection new: 4) ].
+		(bins at: index) add: anOrdinal.
+		(interiors at: index) add:
+			(anEntry coversEveryPixelOf: (grid boundsOfTileAt: index)) ]
 ]
 
 { #category : 'accessing' }
 VGTileBinning >> binnedEntryCount [
-	"Entries counted once per tile they reach, which is the total work the tiles hold. It is
-	 larger than the display list wherever an entry spans tiles, and that growth is the price of
-	 tiling."
-
-	^ bins inject: 0 into: [ :sum :each | sum + each size ]
+	^ bins inject: 0 into: [ :sum :each |
+		  sum + (each ifNil: [ 0 ] ifNotNil: [ :ordinals | ordinals size ]) ]
 ]
 
 { #category : 'accessing' }
@@ -70,9 +72,13 @@ VGTileBinning >> entries [
 
 { #category : 'accessing' }
 VGTileBinning >> entriesOfTileAt: anIndex [
-	"In the order they were drawn, because compositing is not commutative."
+	"The entries of that tile, in draw order. A bin holds ordinals, so the entries are read out
+	 of the frame's own list by them."
 
-	^ bins at: anIndex ifAbsent: [ #(  ) ]
+	^ (bins at: anIndex)
+		  ifNil: [ #(  ) ]
+		  ifNotNil: [ :ordinals |
+			  ordinals collect: [ :each | entries at: each ] ]
 ]
 
 { #category : 'accessing' }
@@ -125,33 +131,36 @@ VGTileBinning >> inspectorBusiestTilesContext: aContext [
 
 { #category : 'accessing' }
 VGTileBinning >> interiorEntriesOfTileAt: anIndex [
-	"The entries that cover the whole of that tile, in the order they were drawn. A rasteriser
-	 may take the coverage of every pixel of the tile as one for each of them and walk no edge."
+	"Those of the tile's entries that cover every pixel of it, in draw order."
 
-	^ interiors at: anIndex ifAbsent: [ #(  ) ]
+	| answer |
+	answer := OrderedCollection new.
+	self referencesOfTileAt: anIndex do: [ :ordinal :interior |
+		interior ifTrue: [ answer add: (entries at: ordinal) ] ].
+	^ answer
 ]
 
 { #category : 'accessing' }
 VGTileBinning >> interiorReferenceCount [
-	"How many of the binned pairs are marked interior. Against binnedEntryCount it is the share
-	 of the frame that needs no walk at all."
-
-	^ interiors inject: 0 into: [ :sum :each | sum + each size ]
+	^ interiors inject: 0 into: [ :sum :each |
+		  sum + (each ifNil: [ 0 ] ifNotNil: [ :marks |
+			    marks count: [ :mark | mark ] ]) ]
 ]
 
 { #category : 'accessing' }
 VGTileBinning >> isEntry: anEntry interiorToTileAt: anIndex [
-	"Whether that pair was marked when it was binned. The identity of the entry is what counts,
-	 because one entry may be drawn twice with the same edges."
+	"Whether that pair was marked when it was binned. The mark sits beside the ordinal, so this
+	 reads it rather than ask the entry a second time."
 
-	^ (self interiorEntriesOfTileAt: anIndex) identityIncludes: anEntry
+	self referencesOfTileAt: anIndex do: [ :ordinal :interior |
+		(entries at: ordinal) == anEntry ifTrue: [ ^ interior ] ].
+	^ false
 ]
 
 { #category : 'accessing' }
 VGTileBinning >> maxEntriesInATile [
-	"The depth of the busiest tile, which decides whether one dispatch can carry a tile's work."
-
-	^ bins inject: 0 into: [ :most :each | most max: each size ]
+	^ bins inject: 0 into: [ :most :each |
+		  most max: (each ifNil: [ 0 ] ifNotNil: [ :ordinals | ordinals size ]) ]
 ]
 
 { #category : 'printing' }
@@ -165,6 +174,28 @@ VGTileBinning >> printOn: aStream [
 		nextPutAll: ' of ';
 		print: grid tileCount;
 		nextPutAll: ' tiles'
+]
+
+{ #category : 'accessing' }
+VGTileBinning >> referenceCountOfTileAt: anIndex [
+	"How many references that tile holds, which is the count the tile record carries."
+
+	^ (bins at: anIndex) ifNil: [ 0 ] ifNotNil: [ :ordinals | ordinals size ]
+]
+
+{ #category : 'accessing' }
+VGTileBinning >> referencesOfTileAt: anIndex do: aBlock [
+	"Every reference of that tile, in the order the frame drew the entries: the ordinal of the
+	 entry and whether the entry covers every pixel of the tile. That is the pair the device
+	 writes as one reference, so the writer asks one question here and neither searches for an
+	 ordinal nor scans a second collection for the mark."
+
+	| ordinals marks |
+	ordinals := bins at: anIndex.
+	ordinals ifNil: [ ^ self ].
+	marks := interiors at: anIndex.
+	ordinals withIndexDo: [ :ordinal :each |
+		aBlock value: ordinal value: (marks at: each) ]
 ]
 
 { #category : 'reporting' }
@@ -188,34 +219,47 @@ VGTileBinning >> reportRows [
 { #category : 'initialization' }
 VGTileBinning >> setDisplayList: aDisplayList grid: aGrid [
 	"The entries are copied out, in order, because draining the frame resets the display list and
-	 a census reads its counts after the frame is drawn."
+	 a census reads its counts after the frame is drawn.
+	 A bin is held in a slot of its own tile rather than under a key, so a tile is found by
+	 arithmetic, the tiles come back in tile order with nothing sorted, and the frame pays no
+	 hashing: on the reference frame the dictionary was two of the ten milliseconds the binning
+	 cost."
 
 	grid := aGrid.
 	entries := aDisplayList entries asArray.
-	bins := Dictionary new.
-	interiors := Dictionary new.
-	entries do: [ :each | self bin: each ]
+	bins := Array new: grid tileCount.
+	interiors := Array new: grid tileCount.
+	entries withIndexDo: [ :each :ordinal | self bin: each at: ordinal ]
 ]
 
 { #category : 'accessing' }
 VGTileBinning >> tileIndexesOfEntry: anEntry [
-	"Read back out of the bins rather than measured again, so this answers where the entry really
-	 landed."
+	"The tiles that hold a reference to that entry. The entry is turned into its ordinal once,
+	 because a bin names an entry by its place in the frame."
 
-	^ (bins associations
-		   select: [ :each | each value identityIncludes: anEntry ]
-		   thenCollect: [ :each | each key ]) asSet
+	| ordinal answer |
+	ordinal := entries identityIndexOf: anEntry.
+	answer := Set new.
+	ordinal = 0 ifTrue: [ ^ answer ].
+	bins withIndexDo: [ :each :index |
+		(each notNil and: [ each includes: ordinal ]) ifTrue: [ answer add: index ] ].
+	^ answer
 ]
 
 { #category : 'accessing' }
 VGTileBinning >> touchedTileCount [
-	"The number of dispatches the GPU path would make for this frame, which is what the gate of
-	 unit 2.2 counts."
-
-	^ bins size
+	^ bins count: [ :each | each isNotNil ]
 ]
 
 { #category : 'accessing' }
 VGTileBinning >> touchedTileIndexes [
-	^ bins keys
+	"The tiles that hold at least one reference, in tile order. A bin lives in the slot of its own
+	 tile, so the order comes out of the walk and nothing is sorted: the encoding used to sort
+	 nineteen hundred keys a frame to get here."
+
+	| answer |
+	answer := OrderedCollection new: bins size.
+	bins withIndexDo: [ :each :index |
+		each ifNotNil: [ answer add: index ] ].
+	^ answer asArray
 ]

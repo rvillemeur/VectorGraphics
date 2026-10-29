@@ -566,6 +566,44 @@ VGTiledFillTest >> testCoverageIsTheSameFloatAsTheRasteriserAnswersForEveryPixel
 	self assert: (coverage atX: 32 row: self caseExtent y - 1) equals: 0.0
 ]
 
+{ #category : 'tests - encoding' }
+VGTiledFillTest >> testEveryBufferAnEncodingWritesIsFetchedOnceAndNotOncePerElement [
+	"A buffer of VGTiledFillBuffers is held under the name the kernel binds it by, so fetching
+	 one is a lookup in a dictionary and not a read of a slot. That is the right shape for the
+	 set of buffers — a binding added to the contract adds a buffer and not a variable — and it
+	 is the wrong thing to do a hundred thousand times a frame: measured on the reference frame,
+	 the lookups inside the write loops were better than a third of the encoding. So an encoding
+	 fetches a buffer at most once in a method and never inside a block, and a loop writes
+	 through a temporary fetched before it. The accessors are read off VGTiledFillBuffers itself,
+	 as the methods that answer one buffer by its literal name, so this test cannot miss a
+	 buffer added later."
+
+	| accessors inBlocks fetchedTwice |
+	accessors := (VGTiledFillBuffers selectors select: [ :each |
+		              | ast |
+		              ast := (VGTiledFillBuffers >> each) ast.
+		              ast sendNodes size = 1 and: [
+			              ast sendNodes first selector = #bufferNamed: and: [
+				              ast sendNodes first arguments first isLiteralNode ] ] ]) asSet.
+	self deny: accessors isEmpty.
+	inBlocks := OrderedCollection new.
+	fetchedTwice := OrderedCollection new.
+	VGTiledFillEncoding selectorsAndMethodsDo: [ :selector :method |
+		| fetches |
+		fetches := OrderedCollection new.
+		method ast sendNodes do: [ :send |
+			((accessors includes: send selector) and: [
+				 send receiver isVariable and: [ send receiver name = 'buffers' ] ])
+				ifTrue: [
+					fetches add: send selector.
+					(send allParents anySatisfy: [ :each | each isBlock ]) ifTrue: [
+						inBlocks add: selector -> send selector ] ] ].
+		fetches asSet size = fetches size ifFalse: [
+			fetchedTwice add: selector -> fetches asArray ] ].
+	self assertEmpty: inBlocks.
+	self assertEmpty: fetchedTwice
+]
+
 { #category : 'tests' }
 VGTiledFillTest >> testEveryBufferOfAFrameHoldsTheWordsOfTheBlockItWasUploadedFrom [
 	"The device is given the words of the encoding's own arrays, copied out of object memory in

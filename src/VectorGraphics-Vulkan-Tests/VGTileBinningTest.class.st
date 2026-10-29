@@ -102,6 +102,26 @@ VGTileBinningTest >> testAFillUnderAnUnboundedOperatorLandsInEveryTileOfTheClip 
 ]
 
 { #category : 'tests - grid' }
+VGTileBinningTest >> testAGridAnswersTheSameRectangleForATileHoweverOftenItIsAsked [
+	"A binning asks a grid for the bounds of a tile once for every entry and tile pair it marks,
+	 and the reference frame holds nearly four thousand of them; a rectangle built afresh each
+	 time was a measurable share of the binning. A grid cannot change after it is built, so the
+	 rectangle of a tile is remembered and the same object comes back, which is also what lets
+	 the encoding ask for the bounds of a tile it is writing without paying for them again."
+
+	| grid |
+	grid := VGTileGrid extent: 100 @ 60 tileExtent: 16 @ 16.
+	1 to: grid tileCount do: [ :index |
+		self
+			assert: (grid boundsOfTileAt: index)
+			identicalTo: (grid boundsOfTileAt: index) ].
+	self assert: (grid boundsOfTileAt: 1) equals: (0 @ 0 corner: 16 @ 16).
+	self
+		assert: (grid boundsOfTileAt: grid tileCount)
+		equals: (96 @ 48 corner: 100 @ 60)
+]
+
+{ #category : 'tests - grid' }
 VGTileBinningTest >> testAGridCoversItsExtentWithWholeTiles [
 	"The last column and the last row are short where the extent does not divide by the tile, and
 	 they still have to be there, or the right and bottom edges of a frame would never be drawn."
@@ -133,6 +153,65 @@ VGTileBinningTest >> testARectangleTouchesTheTilesItOverlapsAndNoOthers [
 	self
 		assert: (grid indexesIntersecting: (0 @ 0 corner: 64 @ 64)) size
 		equals: grid tileCount
+]
+
+{ #category : 'tests - binning' }
+VGTileBinningTest >> testATileAnswersTheOrdinalOfEveryEntryItHoldsAndTheMarkOfThatPair [
+	"The encoding writes a reference a pair: the ordinal of the entry in the display list and
+	 whether the pair was marked interior. Both are known when the pair is binned, so the binning
+	 answers them together and the writer neither searches a collection of entries for an ordinal
+	 nor asks a second question for the mark. The ordinals name the entries of the tile, in the
+	 order they were drawn, and the marks name the interior ones.
+	 The frame draws three fills: one that holds the middle tiles whole, one that covers the frame,
+	 and one small one that cuts the middle tile. The corner tile shows the conservative answer of
+	 the interior test: a shape whose own edge lies on the tile's border does not enclose the tile
+	 wholly, so even the frame-sized fill is not interior there."
+
+	| binning grid middle corner pairs |
+	grid := VGTileGrid extent: 64 @ 64 tileExtent: 16 @ 16.
+	binning := VGTileBinning
+		           of: (self
+				            frameOfExtent: 64 @ 64
+				            drawnWith: [ :context |
+					            context
+						            rectangleX: 8 y: 8 width: 48 height: 48;
+						            fill;
+						            rectangleX: 0 y: 0 width: 64 height: 64;
+						            fill;
+						            rectangleX: 20 y: 20 width: 20 height: 20;
+						            fill ])
+		           grid: grid.
+	middle := (grid indexesIntersecting: (17 @ 17 corner: 18 @ 18)) anyOne.
+	corner := (grid indexesIntersecting: (0 @ 0 corner: 1 @ 1)) anyOne.
+	pairs := OrderedCollection new.
+	binning referencesOfTileAt: middle do: [ :ordinal :isInterior |
+		pairs add: ordinal -> isInterior ].
+	self assert: pairs asArray equals: {
+			(1 -> true).
+			(2 -> true).
+			(3 -> false) }.
+	pairs := OrderedCollection new.
+	binning referencesOfTileAt: corner do: [ :ordinal :isInterior |
+		pairs add: ordinal -> isInterior ].
+	self assert: pairs asArray equals: {
+			(1 -> false).
+			(2 -> false) }.
+	binning touchedTileIndexes do: [ :index |
+		| ordinals marks |
+		ordinals := OrderedCollection new.
+		marks := OrderedCollection new.
+		binning referencesOfTileAt: index do: [ :ordinal :isInterior |
+			ordinals add: (binning entries at: ordinal).
+			isInterior ifTrue: [ marks add: (binning entries at: ordinal) ] ].
+		self
+			assert: ordinals asArray
+			equals: (binning entriesOfTileAt: index) asArray.
+		self
+			assert: marks asArray
+			equals: (binning interiorEntriesOfTileAt: index) asArray.
+		self
+			assert: (binning referenceCountOfTileAt: index)
+			equals: ordinals size ]
 ]
 
 { #category : 'tests' }
@@ -322,6 +401,31 @@ VGTileBinningTest >> testTheRowsABoxIntersectsAreTheRowsOfTheTilesItIntersects [
 		self
 			assert: (grid rowsIntersecting: box) asArray
 			equals: expected ]
+]
+
+{ #category : 'tests - binning' }
+VGTileBinningTest >> testTheTilesABinningTouchesComeBackInTileOrder [
+	"The tile table of a frame is written in tile order, so that a row of it can be found by a
+	 halving search. The binning holds its bins by tile index, so the tiles it touches are
+	 already in that order and the writer sorts nothing: on the reference frame that was a sort
+	 of nineteen hundred keys a frame."
+
+	| binning grid indexes |
+	grid := VGTileGrid extent: 64 @ 64 tileExtent: 16 @ 16.
+	binning := VGTileBinning
+		           of: (self
+				            frameOfExtent: 64 @ 64
+				            drawnWith: [ :context |
+					            context
+						            rectangleX: 40 y: 40 width: 20 height: 20;
+						            fill;
+						            rectangleX: 2 y: 2 width: 10 height: 10;
+						            fill ])
+		           grid: grid.
+	indexes := binning touchedTileIndexes asArray.
+	self assert: indexes equals: indexes asSortedCollection asArray.
+	self assert: indexes first equals: 1.
+	self assert: indexes equals: #( 1 11 12 15 16 )
 ]
 
 { #category : 'tests - grid' }
