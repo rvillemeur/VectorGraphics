@@ -70,6 +70,25 @@ VGTiledFillKernel class >> default [
 ]
 
 { #category : 'constants' }
+VGTiledFillKernel class >> destVariableNameOfPixel: anOrdinal [
+	"The function variable that holds the destination word of that pixel of the invocation's own
+	 word, counted from one. An invocation reads its four words once before the loop over the
+	 entries and writes them once after it, so each of them has to live across the loop; the
+	 working variable the composite of one pixel reads and writes is #dest, and these are where a
+	 pixel's word waits its turn."
+
+	^ ('dest' , anOrdinal printString) asSymbol
+]
+
+{ #category : 'constants' }
+VGTiledFillKernel class >> destVariableNames [
+	"One destination word a pixel of the invocation's own word, in the order the pixels lie."
+
+	^ (1 to: self pixelsPerInvocation) collect: [ :ordinal |
+		  self destVariableNameOfPixel: ordinal ]
+]
+
+{ #category : 'constants' }
 VGTiledFillKernel class >> floatBindingNames [
 	"The five buffers of single floats. A clip side, a mask side, an edge end, a coefficient of a
 	 paint and the offset and channels of a stop are all floating point; everything else a frame
@@ -151,6 +170,18 @@ VGTiledFillKernel class >> onTileExtent: anExtent [
 	^ self new setTileExtent: anExtent
 ]
 
+{ #category : 'constants' }
+VGTiledFillKernel class >> pixelsPerInvocation [
+	"How many horizontally adjacent pixels one invocation owns. Unit 3.9 measured one, two and
+	 four on the same device state, over the same buffers, alternating rounds: two is the fastest
+	 of the three on every frame the device draws, and four is a wash against one. Two is the
+	 figure the unit ships because halving the invocations halves the launch cost a workgroup
+	 pays and still leaves each invocation two words live across the entry loop; four spends more
+	 on the unrolled entry composite than it saves on the launch."
+
+	^ 2
+]
+
 { #category : 'contract' }
 VGTiledFillKernel class >> rgbaChannelShifts [
 	"Where each channel of an unpremultiplied quadruple sits in a pixel word of the one format a
@@ -229,7 +260,8 @@ VGTiledFillKernel class >> tileComponent [
 
 { #category : 'constants' }
 VGTiledFillKernel class >> wordVariableNames [
-	"The function variables that hold a word: the destination pixel, the source pixel of the
+	"The function variables that hold a word: the destination pixel the composite of one pixel
+	 works in and one more a pixel of the word an invocation owns, the source pixel of the
 	 fill and whether the fill lays one down at all, the pixel a surface paint samples, the byte
 	 the mask of the fill carries here, the three loop counters, the record of the shape the walk
 	 stands in and the verdicts of a sweep over the shapes, the stop loop with the two stops it
@@ -242,7 +274,7 @@ VGTiledFillKernel class >> wordVariableNames [
 	     #shape #shapeEdgeOffset #shapeEdgeCount #shapeFillRule #shapeAliased
 	     #hasAntialiased #allows #insideAll #inside #nextInside #nearestFound
 	     #stop #beforeStop #afterStop #beforeFound #afterFound #sweepRound
-	     #spanIndex #spanOverflow #spanCount #span )
+	     #spanIndex #spanOverflow #spanCount #span ) , self destVariableNames
 ]
 
 { #category : 'building' }
@@ -336,9 +368,9 @@ VGTiledFillKernel >> emitBarrier [
 	builder currentBlock addInstruction: builder workgroupBarrier
 ]
 
-{ #category : 'emitting - staging' }
+{ #category : 'emitting' }
 VGTiledFillKernel >> emitBody [
-	"Which tile this workgroup owns and which pixel of it this invocation owns. The records of
+	"Which tile this workgroup owns and which pixels of it this invocation owns. The records of
 	 the tile are staged in workgroup storage before anything else, because every value below is
 	 read out of them: the invocations of the workgroup divide the words of the frame record and
 	 the tile record between them, the barrier makes those writes visible to all of them, and
@@ -349,7 +381,11 @@ VGTiledFillKernel >> emitBody [
 	 The corner of the tile and the row of this invocation inside it are remembered beside the
 	 pixel they make, because the cooperative sweep of a sub-row needs the corner to know where
 	 the sub-row starts and a pixel needs its row to know which sub-rows of the tile are its
-	 own."
+	 own.
+
+	 Since unit 3.9 an invocation owns a word of four horizontally adjacent pixels, so the pixel
+	 remembered here is the first of them: its column is the invocation's own column times that
+	 factor, and emitPixel walks the four from it."
 
 	self
 		remember:
@@ -380,8 +416,10 @@ VGTiledFillKernel >> emitBody [
 		remember: (self
 				 sumOfWord: (self valueNamed: #tileLeft)
 				 and: (self
-						  componentOfBuiltIn: SpvBuiltIn localInvocationId
-						  at: self class columnComponent))
+						  productOfWord: (self
+								   componentOfBuiltIn: SpvBuiltIn localInvocationId
+								   at: self class columnComponent)
+						  and: (self constantWord: self class pixelsPerInvocation)))
 		as: #pixelX.
 	self
 		remember: (self
@@ -673,27 +711,46 @@ VGTiledFillKernel >> emitEntryGivenInterior: aBooleanId [
 		then: [ pixels emitCompositeWithMask: mask ]
 ]
 
+{ #category : 'emitting - pixel' }
+VGTiledFillKernel >> emitEntryIntoPixelWordsWhere: insides lefts: lefts given: interior [
+	"Composites the entry now standing in workgroup storage into each pixel this invocation
+	 owns. The row is the same for the pixels of one word, so the sub-rows a pixel sums and the
+	 sweep that filled them are read as they stand; the column is what differs, so each pixel
+	 rebinds the left edge of its own column and copies its own word through the working word
+	 the composite reads and writes."
+
+	insides doWithIndex: [ :inside :ordinal |
+		builder emitIf: inside then: [
+			| word |
+			word := self class destVariableNameOfPixel: ordinal.
+			self remember: (lefts at: ordinal) as: #pixelLeft.
+			self store: (self load: word) into: #dest.
+			self emitEntryGivenInterior: interior.
+			self store: (self load: #dest) into: word ] ]
+]
+
 { #category : 'emitting - staging' }
 VGTiledFillKernel >> emitFloatRun: aRun from: aBindingName base: aBaseId [
-	"One cooperative load of a run of floats, as emitWordRun:from:base: loads a run of words.
-	 Every float run of the block is as long as the names it carries, because a clip, a mask
-	 rectangle and a paint block are of one size whatever the entry is."
+	"One cooperative load of a run of floats, as emitWordRun:from:base: loads a run of words,
+	 rounds and all. Every float run of the block is as long as the names it carries, because a
+	 clip, a mask rectangle and a paint block are of one size whatever the entry is."
 
-	| index |
-	index := self valueNamed: #localIndex.
-	builder
-		emitIf:
-		(self word: index below: (self constantWord: aRun fourth size))
-		then: [
-			builder
-				emitStore:
-				(self elementOf: aBindingName at: (self sumOfWord: aBaseId and: index))
-				at: (self
-						 sharedPointerTo: stagedFloats
-						 ofType: self floatType
-						 atId: (self
-								  sumOfWord: (self constantWord: aRun second)
-								  and: index)) ]
+	0 to: (stagedBlock roundsOfRunLength: aRun fourth size) - 1 do: [ :round |
+		| index |
+		index := self emitStagingIndexOfRound: round.
+		builder
+			emitIf:
+			(self word: index below: (self constantWord: aRun fourth size))
+			then: [
+				builder
+					emitStore:
+					(self elementOf: aBindingName at: (self sumOfWord: aBaseId and: index))
+					at: (self
+							 sharedPointerTo: stagedFloats
+							 ofType: self floatType
+							 atId: (self
+									  sumOfWord: (self constantWord: aRun second)
+									  and: index)) ] ]
 ]
 
 { #category : 'emitting' }
@@ -707,6 +764,21 @@ VGTiledFillKernel >> emitHasAntialiasedShape [
 		builder
 			emitIf: self emitIsAntialiasedShape
 			then: [ self store: (self constantWord: 1) into: #hasAntialiased ] ]
+]
+
+{ #category : 'emitting - pixel' }
+VGTiledFillKernel >> emitInsideTestsOf: columns [
+	"One test per pixel this invocation owns: whether that pixel is a pixel of the frame. The
+	 test is per pixel and not per word, because the width of the frame can fall inside a word.
+	 The row is shared by the pixels of a word, so the height is tested once per pixel against
+	 the same row."
+
+	^ columns collect: [ :column |
+		  self
+			  both: (self word: column below: (self valueNamed: #frameWidth))
+			  and: (self
+					   word: (self valueNamed: #pixelY)
+					   below: (self valueNamed: #frameHeight)) ]
 ]
 
 { #category : 'emitting' }
@@ -778,17 +850,19 @@ VGTiledFillKernel >> emitIsInteriorReference: aReferenceId [
 		  (self constantWord: VGTiledFillLayout interiorReferenceFlag)
 ]
 
-{ #category : 'emitting - staging' }
+{ #category : 'emitting' }
 VGTiledFillKernel >> emitLocalIndex [
 	"Which invocation of its workgroup this is, as one number: the row of the tile times the
-	 width of the tile plus the column. A slot of workgroup storage is written by the invocation
-	 whose number is that slot's own, so an invocation needs one number to compare."
+	 width of the invocation grid plus the column. A slot of workgroup storage is written by the
+	 invocation whose number is that slot's own, so an invocation needs one number to compare.
+	 The width is the invocation grid's and not the tile's, because an invocation owns four
+	 pixels of a row and a workgroup is a quarter of the pixels of a tile."
 
 	^ self
 		  sumOfWord:
 		  (self
 			   productOfWord: (self valueNamed: #localRow)
-			   and: (self constantWord: tileExtent x))
+			   and: (self constantWord: self invocationExtent x))
 		  and: (self
 				   componentOfBuiltIn: SpvBuiltIn localInvocationId
 				   at: self class columnComponent)
@@ -882,50 +956,37 @@ VGTiledFillKernel >> emitNearestCrossingAfter: aCursorId to: aRightId onSubRow: 
 	^ self load: #nearestAll
 ]
 
-{ #category : 'emitting - entry' }
+{ #category : 'emitting - pixel' }
 VGTiledFillKernel >> emitPixel [
-	"The pixel of this invocation: the destination word read once, every entry of the tile
-	 composited into it in the order the references hold them, and the word written back. One
-	 invocation owns this pixel alone, so nothing else can have written it in between, which is
-	 what lets the read stand outside the loop.
-
+	"The word of horizontally adjacent pixels this invocation owns — two of them, as
+	 `pixelsPerInvocation` says: their destination words read once, every entry of the tile
+	 composited into each of them in the order the references hold them, and the words written
+	 back once.
 	 The loop over the references is run by every invocation of the workgroup and not only by
 	 those with a pixel of the frame to draw, because the records of each entry are staged in
 	 workgroup storage inside it and the sub-rows of the tile are swept there between the
 	 invocations of the workgroup, and a barrier one invocation reaches and another does not is
 	 undefined behaviour. A tile of the last column or the last row is short, so the invocations
-	 past its edge have no pixel of their own: what that test guards is the reading of the
+	 past its edge have no pixel of their own: what the inside test guards is the reading of the
 	 destination, the drawing of the entry and the writing back, and not the loop, not the
 	 staging and not the sweep. The count the loop turns on comes out of the tile record, which
 	 the whole workgroup shares, so every invocation turns it the same number of times.
+	 Three of the barriers an entry stands between are mine — one at the top of the loop, so that
+	 no invocation overwrites a record or a span a neighbour still reads, one once the staging is
+	 written, so that the sweep reads the records of the entry standing, and one once the sweep is
+	 written, so that each pixel reads the spans of its own sub-rows and not the spans of the
+	 entry before — and the others are the staging's own, between its rounds."
 
-	 Three of the five barriers an entry stands between are mine — one at the top of the loop, so
-	 that no invocation overwrites a record or a span a neighbour still reads, one once the
-	 staging is written, so that the sweep reads the records of the entry standing, and one once
-	 the sweep is written, so that each pixel reads the spans of its own sub-rows and not the
-	 spans of the entry before — and the two others are the staging's own, between its rounds."
-
-	| inside index |
-	inside := self
-		          both: (self
-				           word: (self valueNamed: #pixelX)
-				           below: (self valueNamed: #frameWidth))
-		          and: (self
-				           word: (self valueNamed: #pixelY)
-				           below: (self valueNamed: #frameHeight)).
-	index := self
-		         sumOfWord: (self
-				          productOfWord: (self valueNamed: #pixelY)
-				          and: (self valueNamed: #frameWidth))
-		         and: (self valueNamed: #pixelX).
-	self
-		remember: (self floatOfWord: (self valueNamed: #pixelX))
-		as: #pixelLeft.
+	| columns insides indexes lefts |
+	columns := (1 to: self class pixelsPerInvocation) collect: [ :ordinal |
+		           self emitPixelXOfOrdinal: ordinal ].
+	insides := self emitInsideTestsOf: columns.
+	indexes := self emitTargetIndexesOf: columns.
+	lefts := columns collect: [ :column | self floatOfWord: column ].
 	self
 		remember: (self floatOfWord: (self valueNamed: #pixelY))
 		as: #pixelRow.
-	builder emitIf: inside then: [
-		self store: (self elementOf: #target at: index) into: #dest ].
+	self emitReadOfPixelWordsWhere: insides at: indexes.
 	self store: (self constantWord: 0) into: #reference.
 	builder
 		emitWhile: [
@@ -939,14 +1000,42 @@ VGTiledFillKernel >> emitPixel [
 			self emitBarrier.
 			interior := self emitRecordsAndSweepOfEntry.
 			self emitBarrier.
-			builder emitIf: inside then: [
-				self emitEntryGivenInterior: interior ].
+			self
+				emitEntryIntoPixelWordsWhere: insides
+				lefts: lefts
+				given: interior.
 			self
 				store:
 					(self sumOfWord: (self load: #reference) and: (self constantWord: 1))
 				into: #reference ].
-	builder emitIf: inside then: [
-		self storeWord: (self load: #dest) into: #target at: index ]
+	self emitWriteBackOfPixelWordsWhere: insides at: indexes
+]
+
+{ #category : 'emitting' }
+VGTiledFillKernel >> emitPixelXOfOrdinal: anOrdinal [
+	"The column of that pixel of the word this invocation owns, counted from one: the first of
+	 them is the pixel emitBody remembered and each one after it is a column further right. The
+	 first is answered as it stands rather than as a sum with nought, so the module carries no
+	 instruction for it."
+
+	anOrdinal = 1 ifTrue: [ ^ self valueNamed: #pixelX ].
+	^ self
+		  sumOfWord: (self valueNamed: #pixelX)
+		  and: (self constantWord: anOrdinal - 1)
+]
+
+{ #category : 'emitting - pixel' }
+VGTiledFillKernel >> emitReadOfPixelWordsWhere: insides at: indexes [
+	"Reads the destination word of each pixel this invocation owns, once, before the loop over
+	 the references of the tile. The read is guarded per pixel and not per word, because the
+	 width of the frame can fall inside a word: a pixel past the edge of the frame never touches
+	 its own word, and its neighbours in the same word still draw."
+
+	insides doWithIndex: [ :inside :ordinal |
+		builder emitIf: inside then: [
+			self
+				store: (self elementOf: #target at: (indexes at: ordinal))
+				into: (self class destVariableNameOfPixel: ordinal) ] ]
 ]
 
 { #category : 'emitting - sweep' }
@@ -1161,6 +1250,19 @@ VGTiledFillKernel >> emitStageOfTile [
 				 and: (self constantWord: VGTiledFillLayout tileRecordWords))
 ]
 
+{ #category : 'emitting - staging' }
+VGTiledFillKernel >> emitStagingIndexOfRound: anInteger [
+	"Which word of a run this invocation stages in that round of the cooperative load: its own
+	 number in the first round and a workgroup further along in each round after it. The first
+	 round is the number itself and not a sum with nought, so a run that fits the workgroup emits
+	 the one instruction it emitted before unit 3.9 made rounds possible."
+
+	anInteger = 0 ifTrue: [ ^ self valueNamed: #localIndex ].
+	^ self
+		  sumOfWord: (self valueNamed: #localIndex)
+		  and: (self constantWord: anInteger * stagedBlock invocationCount)
+]
+
 { #category : 'emitting - sweep' }
 VGTiledFillKernel >> emitSumOfSpansOfSubRowOfTile: aSubRowId from: aLeftId to: aRightId [
 	"The spans that sub-row of the tile found, each cut to this pixel's window and added to the
@@ -1358,6 +1460,21 @@ VGTiledFillKernel >> emitSweepOfTileSubRows [
 				into: #sweepRound ]
 ]
 
+{ #category : 'emitting - pixel' }
+VGTiledFillKernel >> emitTargetIndexesOf: columns [
+	"The index into the target of each pixel this invocation owns: the row times the width of the
+	 frame, plus the column. The product is the same for the pixels of one word, and the emitter
+	 holds no common-subexpression pass, so it is emitted once per pixel and the device's own
+	 compiler is what folds it."
+
+	^ columns collect: [ :column |
+		  self
+			  sumOfWord: (self
+					   productOfWord: (self valueNamed: #pixelY)
+					   and: (self valueNamed: #frameWidth))
+			  and: column ]
+]
+
 { #category : 'emitting' }
 VGTiledFillKernel >> emitWindingOnSubRow: aSubRowId accepting: aBlock [
 	"What the crossings that block accepts contribute to the winding of the shape in hand, which
@@ -1425,31 +1542,97 @@ VGTiledFillKernel >> emitWordRun: aRun from: aBindingName base: aBaseId [
 VGTiledFillKernel >> emitWordRun: aRun from: aBindingName base: aBaseId lengthId: aLengthId [
 	"One cooperative load of a run of words: the invocations of the workgroup take one word each
 	 of the run, by their own number, so the first n invocations stage a run of n words in one
-	 step. A run is never longer than the workgroup — a test of the staged block asserts it — so
-	 no invocation takes a second word of one and the step needs no loop.
+	 step. A run longer than the workgroup is staged in as many rounds as it takes, each
+	 invocation taking the word a workgroup further along than the one it took before; the number
+	 of rounds is known while the module is built, so the rounds are unrolled and a run that fits
+	 the workgroup emits one step with no loop. Every run of the 16 by 16 tile the device draws
+	 fits, the sixty-four words of the shape records exactly.
 	 The words of a record lie next to each other both in the buffer and in the block, so one
 	 index serves the read and the write and the run says where it starts in the block. The
 	 length is a value and not a constant where the run may be short: a run of shape records is
 	 as long as the entry has shapes, and a word past that is left as it was because no
 	 invocation reads it."
 
-	| index |
-	index := self valueNamed: #localIndex.
-	builder emitIf: (self word: index below: aLengthId) then: [
-		builder
-			emitStore:
-			(self elementOf: aBindingName at: (self sumOfWord: aBaseId and: index))
-			at: (self
-					 sharedPointerTo: stagedWords
-					 ofType: self wordType
-					 atId: (self
-							  sumOfWord: (self constantWord: aRun second)
-							  and: index)) ]
+	0 to: (stagedBlock roundsOfRunLength: aRun fourth size) - 1 do: [ :round |
+		| index |
+		index := self emitStagingIndexOfRound: round.
+		builder emitIf: (self word: index below: aLengthId) then: [
+			builder
+				emitStore:
+				(self elementOf: aBindingName at: (self sumOfWord: aBaseId and: index))
+				at: (self
+						 sharedPointerTo: stagedWords
+						 ofType: self wordType
+						 atId: (self
+								  sumOfWord: (self constantWord: aRun second)
+								  and: index)) ] ]
+]
+
+{ #category : 'emitting - pixel' }
+VGTiledFillKernel >> emitWriteBackOfPixelWordsWhere: insides at: indexes [
+	"Writes the destination word of each pixel this invocation owns, once, after the last entry
+	 of the tile. One invocation owns these pixels alone, so nothing else can have written them
+	 in between, which is what lets the write stand outside the loop over the references."
+
+	insides doWithIndex: [ :inside :ordinal |
+		builder emitIf: inside then: [
+			self
+				storeWord: (self load: (self class destVariableNameOfPixel: ordinal))
+				into: #target
+				at: (indexes at: ordinal) ] ]
 ]
 
 { #category : 'building' }
 VGTiledFillKernel >> freshKernel [
 	^ self class onTileExtent: tileExtent
+]
+
+{ #category : 'inspector' }
+VGTiledFillKernel >> inspectorWorkgroup: aBuilder [
+	<inspectorPresentationOrder: 2 title: 'Workgroup'>
+	"The shape of the workgroup this kernel emits, as the kernel itself answers it: how many
+	 pixels one invocation owns, the invocation grid that follows from the tile, the local size
+	 the module declares, and what the two blocks of workgroup storage make of that count. Every
+	 row sends the live method, so the tab cannot drift from the emitter; the last rows are the
+	 two facts unit 3.9 made tight — a sub-row is swept in rounds when the invocations are fewer
+	 than the sub-rows, and a staged run longer than the workgroup is staged in rounds too."
+
+	| spans staged |
+	spans := VGTiledFillSpanBlock onTileExtent: tileExtent.
+	staged := VGTiledFillStagedBlock onTileExtent: tileExtent.
+	^ aBuilder newTable
+		  items: {
+				  { 'Tile'. tileExtent printString , ' pixels' }.
+				  { 'Pixels an invocation'.
+				  self class pixelsPerInvocation printString }.
+				  { 'Invocation grid'. self invocationExtent printString }.
+				  { 'Local size'. self localSize printString }.
+				  { 'Invocations a workgroup'.
+				  spans invocationCount printString }.
+				  { 'Sub-rows a tile'. spans subRowCount printString }.
+				  { 'Sweeps an invocation'.
+				  spans sweepsPerInvocation printString }.
+				  { 'Longest staged run'.
+				  staged shapeRun fourth size printString , ' words' }.
+				  { 'Rounds it is staged in'.
+				  (staged roundsOfRunLength: staged shapeRun fourth size)
+					  printString } };
+		  addColumn: (SpStringTableColumn title: 'Of the workgroup' evaluated: [
+					   :each | each first ]);
+		  addColumn:
+			  (SpStringTableColumn title: 'Is' evaluated: [ :each | each second ]);
+		  yourself
+]
+
+{ #category : 'accessing' }
+VGTiledFillKernel >> invocationExtent [
+	"The grid of invocations of one workgroup, which is the grid of pixels of a tile narrowed by
+	 the pixels an invocation owns. Unit 3.9 made the two different: an invocation finds the
+	 first of its own pixels by multiplying its column by that factor, and a slot of shared
+	 storage is written by the invocation whose number it carries, so every count of invocations
+	 reads this and not the tile."
+
+	^ tileExtent x // self class pixelsPerInvocation @ tileExtent y
 ]
 
 { #category : 'testing' }
@@ -1461,12 +1644,13 @@ VGTiledFillKernel >> isReadyToBuild [
 
 { #category : 'accessing' }
 VGTiledFillKernel >> localSize [
-	"One invocation per pixel of a tile, which is what lets an invocation find its pixel by
-	 adding its own local id to the corner its tile record carries."
+	"One invocation per word of four horizontally adjacent pixels of a tile, which is what lets
+	 an invocation find the first of its pixels by multiplying its own local column by that
+	 factor and adding the corner its tile record carries."
 
 	^ {
-		  tileExtent x.
-		  tileExtent y.
+		  self invocationExtent x.
+		  self invocationExtent y.
 		  self class layerCount }
 ]
 

@@ -16,12 +16,14 @@ Class {
 	#tag : 'Tests'
 }
 
-{ #category : 'asserting' }
+{ #category : 'private' }
 VGTiledFillKernelTest >> assertSlotsAndWritersOf: aStagedBlock [
 	"The rows of that block name every slot of it exactly once, name every word, and give the
-	 words of each run the writers nought upwards, which is the cooperative load the kernel
-	 emits. No run is longer than the workgroup, because an invocation stages one word of a run
-	 and not two."
+	 words of each run the writers nought upwards, round the workgroup, which is the cooperative
+	 load the kernel emits. A run longer than the workgroup is staged in rounds — an invocation
+	 takes the word of its own number in each round — so the writer of a word is its position in
+	 its run modulo the workgroup, and a run of as many rounds gives each invocation as many
+	 words."
 
 	| rows |
 	rows := aStagedBlock rows.
@@ -37,10 +39,11 @@ VGTiledFillKernelTest >> assertSlotsAndWritersOf: aStagedBlock [
 		equals: (0 to: aStagedBlock floatCount - 1) asArray.
 	self deny: (rows anySatisfy: [ :each | each fourth isEmpty ]).
 	aStagedBlock runs do: [ :run |
-		self assert: run fourth size <= aStagedBlock invocationCount.
 		self
 			assert: (self writersOfRun: run in: rows)
-			equals: (0 to: run fourth size - 1) asArray ]
+			equals: (((0 to: run fourth size - 1) collect: [ :position |
+					  position \\ aStagedBlock invocationCount ]) asSortedCollection
+					 asArray) ]
 ]
 
 { #category : 'private' }
@@ -101,6 +104,61 @@ VGTiledFillKernelTest >> testAPixelEmitterSharesTheModuleOfTheKernelThatBuildsIt
 	self
 		assert: (emitter valueNamed: #alphaByte)
 		equals: (kernel valueNamed: #alphaByte)
+]
+
+{ #category : 'tests - unit 3.9' }
+VGTiledFillKernelTest >> testARunLongerThanTheWorkgroupIsStagedInRounds [
+	"Unit 3.9 takes the workgroup down to half of the pixels of a tile, and the longest run of
+	 the block is the sixty-four words of the shape records, so a run can now be longer than the
+	 workgroup: the staging turns as many rounds as it takes and an invocation stages the word of
+	 its own number in each round. At the 16 by 16 tile of every frame the device draws the
+	 workgroup is 128 and the run 64, so that staging is one round and costs what it cost before;
+	 the narrower tiles the module is built for are what turn the round more than once."
+
+	| narrow wide |
+	wide := VGTiledFillStagedBlock onTileExtent: 16 @ 16.
+	narrow := VGTiledFillStagedBlock onTileExtent: 8 @ 8.
+	self assert: narrow invocationCount equals: 32.
+	self assert: (wide roundsOfRunLength: wide shapeRun fourth size) equals: 1.
+	self
+		assert: (narrow roundsOfRunLength: narrow shapeRun fourth size)
+		equals: 2.
+	self
+		assert: (narrow roundsOfRunLength: narrow clipRun fourth size)
+		equals: 1.
+	self assert: (narrow writerOfWordSlot: narrow shapeSlotBase) equals: 0.
+	self
+		assert: (narrow writerOfWordSlot:
+				 narrow shapeSlotBase + narrow invocationCount)
+		equals: 0.
+	self
+		assert: (narrow writerOfWordSlot: narrow shapeSlotBase + 1)
+		equals: 1
+]
+
+{ #category : 'tests - unit 3.9' }
+VGTiledFillKernelTest >> testAnInvocationOwnsTwoAdjacentPixels [
+	"Unit 3.9: an invocation owns two horizontally adjacent pixels and not one, so a workgroup
+	 of a 16 by 16 tile is 128 invocations and its shape is the invocation grid and not the pixel
+	 grid. The two blocks of shared storage count invocations and not pixels, so they divide by
+	 the same factor, and the cooperative sweep turns two rounds over the 240 sub-rows of the
+	 tile where it turned one."
+
+	| kernel spans |
+	kernel := VGTiledFillKernel onTileExtent: 16 @ 16.
+	spans := VGTiledFillSpanBlock onTileExtent: 16 @ 16.
+	self assert: VGTiledFillKernel pixelsPerInvocation equals: 2.
+	self
+		assert: kernel localSize
+		equals: {
+				8.
+				16.
+				VGTiledFillKernel layerCount }.
+	self assert: spans invocationCount equals: 128.
+	self
+		assert: (VGTiledFillStagedBlock onTileExtent: 16 @ 16) invocationCount
+		equals: 128.
+	self assert: spans sweepsPerInvocation equals: 2
 ]
 
 { #category : 'tests' }
@@ -377,11 +435,12 @@ VGTiledFillKernelTest >> testTheSpirvOfATileExtentIsAnsweredFromTheCacheTheSecon
 { #category : 'tests' }
 VGTiledFillKernelTest >> testTheStagedBlockGivesEverySlotOneWriterAndNamesThemAll [
 	"A run of the block is loaded cooperatively: the invocations of the workgroup take one word
-	 each of it, by their own number, so the writer of a slot is its position in its own run. No
-	 two words of one run share a writer, which is what keeps a word from being written twice,
-	 and a run is no longer than the workgroup, which is what lets one step stage it with no
-	 loop. The narrowest tile the kernel builds for is the measure of that, because the longest
-	 run is the sixty-four words of the shape records.
+	 each of it, by their own number, so the writer of a slot is its position in its own run
+	 counted round the workgroup. No two words of one round of a run share a writer, which is
+	 what keeps a word from being written twice. A run longer than the workgroup is staged in
+	 rounds, which is what the narrower tiles the module is built for need since unit 3.9 made a
+	 workgroup a quarter of the pixels of a tile; the 16 by 16 tile every frame of the device
+	 draws stages its longest run, the sixty-four words of the shape records, in one round.
 	 Two slots of different runs do share a writer, and that writes no word twice: a run is a
 	 place of its own, so an invocation writing one word of each writes two slots.
 	 The rows are what the inspector reads, so they must name every slot and nothing else."
@@ -391,6 +450,9 @@ VGTiledFillKernelTest >> testTheStagedBlockGivesEverySlotOneWriterAndNamesThemAl
 	self assertSlotsAndWritersOf: wide.
 	self
 		assertSlotsAndWritersOf: (VGTiledFillStagedBlock onTileExtent: 8 @ 8).
+	self
+		assert: (wide roundsOfRunLength: wide shapeRun fourth size)
+		equals: 1.
 	self assert: (wide writerOfWordSlot: wide shapeSlotBase) equals: 0.
 	self assert: (wide writerOfFloatSlot: 0) equals: 0
 ]
@@ -444,6 +506,28 @@ VGTiledFillKernelTest >> testTheVocabularyNamesNothingOfThisRasteriser [
 			self
 				deny: (class name beginsWith: 'VG')
 				description: each printString , ' names ' , class name ] ]
+]
+
+{ #category : 'tests - unit 3.9' }
+VGTiledFillKernelTest >> testTheWorkgroupTabReadsTheShapeOfTheWorkgroupFromTheKernel [
+	"The tab sends the live methods, so it says what the emitter really emits. A column block
+	 only runs when a row is drawn, so every cell is asked for here, and the row of the local
+	 size is read back against the kernel's own answer."
+
+	| builder presenter rows localSize |
+	builder := SpPresenterBuilder newApplication: SpApplication new.
+	presenter := (VGTiledFillKernel onTileExtent: 16 @ 16)
+		             inspectorWorkgroup: builder.
+	rows := presenter items collect: [ :item |
+		        presenter columns collect: [ :column |
+			        column evaluation value: item ] ].
+	localSize := rows detect: [ :each | each first = 'Local size' ].
+	self
+		assert: localSize second
+		equals: (VGTiledFillKernel onTileExtent: 16 @ 16) localSize printString.
+	self assert: ((rows collect: [ :each | each second ]) includes:
+			 (VGTiledFillSpanBlock onTileExtent: 16 @ 16) invocationCount
+				 printString)
 ]
 
 { #category : 'asserting' }

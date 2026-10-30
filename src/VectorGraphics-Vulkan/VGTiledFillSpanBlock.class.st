@@ -127,9 +127,11 @@ VGTiledFillSpanBlock >> inspectorSubRowsContext: aContext [
 
 { #category : 'accessing' }
 VGTiledFillSpanBlock >> invocationCount [
-	"The invocations of one workgroup, which is one a pixel of a tile."
+	"The invocations of one workgroup, which is one per word of four pixels of a tile since unit
+	 3.9 and was one a pixel before it. The sweepers of the sub-rows of a tile are counted here,
+	 so a quarter as many invocations turn four times as many rounds over the same sub-rows."
 
-	^ tileExtent x * tileExtent y
+	^ tileExtent x * tileExtent y // VGTiledFillKernel pixelsPerInvocation
 ]
 
 { #category : 'printing' }

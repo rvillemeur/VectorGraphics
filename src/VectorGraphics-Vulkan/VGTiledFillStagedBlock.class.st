@@ -210,9 +210,11 @@ VGTiledFillStagedBlock >> inspectorSlotsContext: aContext [
 
 { #category : 'accessing' }
 VGTiledFillStagedBlock >> invocationCount [
-	"The invocations of one workgroup, which is one a pixel of a tile."
+	"The invocations of one workgroup, which is one per word of four pixels of a tile since unit
+	 3.9 and was one a pixel before it. A run of mine is staged by the invocations taking one
+	 word each by their own number, so a run longer than this is staged in rounds."
 
-	^ tileExtent x * tileExtent y
+	^ tileExtent x * tileExtent y // VGTiledFillKernel pixelsPerInvocation
 ]
 
 { #category : 'runs' }
@@ -289,6 +291,18 @@ VGTiledFillStagedBlock >> referenceSlot [
 	^ VGTiledFillKernel frameRecordWords + VGTiledFillLayout tileRecordWords
 ]
 
+{ #category : 'runs' }
+VGTiledFillStagedBlock >> roundsOfRunLength: anInteger [
+	"How many rounds the invocations of a workgroup need to stage a run of that many words, one
+	 word each a round. It is one for every run at the 16 by 16 tile of every frame the device
+	 draws, because the longest run is the sixty-four words of the shape records and a workgroup
+	 of that tile is sixty-four invocations; a narrower tile the module is built for turns the
+	 round more than once. The kernel reads this at emit time, so a round is unrolled and a block
+	 whose runs all fit emits exactly the staging it emitted before unit 3.9."
+
+	^ (anInteger / self invocationCount) ceiling
+]
+
 { #category : 'describing' }
 VGTiledFillStagedBlock >> rows [
 	"One row a slot I hold: the storage it is in, its slot, the record it belongs to, the name of
@@ -301,8 +315,9 @@ VGTiledFillStagedBlock >> rows [
 VGTiledFillStagedBlock >> rowsOfRuns: aCollection [
 	"One row a word of every run of that collection: the storage it is in, its slot, the record
 	 it belongs to, the name of the word and the invocation of the workgroup that writes it. The
-	 writer is the position of the word in its own run, because a run is loaded cooperatively and
-	 the invocations take one word each by their own number."
+	 writer is the position of the word in its own run counted round the workgroup, because a run
+	 is loaded cooperatively, the invocations take one word each by their own number, and a run
+	 longer than the workgroup is staged in rounds."
 
 	| rows |
 	rows := OrderedCollection new.
@@ -313,7 +328,7 @@ VGTiledFillStagedBlock >> rowsOfRuns: aCollection [
 					(run second + position - 1).
 					run third.
 					name.
-					(position - 1) } ] ].
+					((position - 1) \\ self invocationCount) } ] ].
 	^ rows asArray
 ]
 
@@ -477,21 +492,23 @@ VGTiledFillStagedBlock >> wordRuns [
 { #category : 'slots' }
 VGTiledFillStagedBlock >> writerOfFloatSlot: aSlot [
 	"The invocation of the workgroup that stages that slot of the float block, counted from the
-	 first word of the run it belongs to."
+	 first word of the run it belongs to and round the workgroup, as writerOfWordSlot: counts a
+	 word."
 
-	^ aSlot - (self runInFloats: aSlot) second
+	^ (aSlot - (self runInFloats: aSlot) second) \\ self invocationCount
 ]
 
 { #category : 'slots' }
 VGTiledFillStagedBlock >> writerOfWordSlot: aSlot [
 	"The invocation of the workgroup that stages that slot of the word block: the position of
-	 the word in the run of its own record. A run is loaded cooperatively — the invocations of
-	 the workgroup take one word each of it, by their own number — so the first word of every run
-	 is staged by invocation nought and no two words of one run share a writer.
+	 the word in the run of its own record, counted round the workgroup. A run is loaded
+	 cooperatively — the invocations take one word each of it, by their own number — so the first
+	 word of every run is staged by invocation nought, and a run longer than the workgroup is
+	 staged in rounds, so the word a round further along is staged by the same invocation again
+	 in the next round.
 	 Two slots of different runs do share a writer, and that writes no word twice: a run is a
 	 place of its own, so an invocation writing one word of each writes two slots and not one
-	 twice. What this asks of a run is only that it be no longer than the workgroup, which a
-	 test of mine asserts, because an invocation stages one word of a run and not two."
+	 twice."
 
-	^ aSlot - (self runInWords: aSlot) second
+	^ (aSlot - (self runInWords: aSlot) second) \\ self invocationCount
 ]

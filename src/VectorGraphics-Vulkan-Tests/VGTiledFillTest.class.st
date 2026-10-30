@@ -1135,9 +1135,11 @@ VGTiledFillTest >> testTheFrameTheDeviceGateDrawsReallyCarriesMarkedReferences [
 
 { #category : 'tests' }
 VGTiledFillTest >> testTheKernelWorkgroupIsOneTileOfTheGrid [
-	"One workgroup owns one tile, so the local size is the tile's own extent and nothing else:
-	 an invocation finds its pixel by adding its local id to the corner its tile record
-	 carries."
+	"One workgroup owns one tile, so the local size is the tile's own extent narrowed by the
+	 pixels an invocation owns: an invocation finds the first of its pixels by multiplying its
+	 local column by that factor and adding the corner its tile record carries. The module the
+	 validator reads is what the device runs, so the local size is read out of its bytes and not
+	 off the kernel."
 
 	| grid |
 	grid := VGTileGrid extent: self caseExtent.
@@ -1145,7 +1147,7 @@ VGTiledFillTest >> testTheKernelWorkgroupIsOneTileOfTheGrid [
 		assert: (PVSpirvValidator on:
 				 (VGTiledFillKernel onTileExtent: grid tileExtent) spirv) localSizeFromWords
 		equals: {
-				grid tileExtent x.
+				(grid tileExtent x // VGTiledFillKernel pixelsPerInvocation).
 				grid tileExtent y.
 				1 }
 ]
