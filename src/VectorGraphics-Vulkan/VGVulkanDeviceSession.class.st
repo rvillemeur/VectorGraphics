@@ -8,7 +8,8 @@ Class {
 		'context',
 		'dispatches',
 		'unavailableReason',
-		'blur'
+		'blur',
+		'imageRun'
 	],
 	#classVars : [
 		'Default'
@@ -33,6 +34,16 @@ VGVulkanDeviceSession class >> default [
 	^ Default ifNil: [ Default := self new ]
 ]
 
+{ #category : 'class initialization' }
+VGVulkanDeviceSession class >> initialize [
+	"The hook Pharo sends when this class is installed, used for the one thing the session class
+	 needs of the system: to be told when the image starts. A session is only valid inside the
+	 run of the virtual machine that opened its device, and an image is routinely saved with one
+	 in Default."
+
+	SessionManager default registerUserClassNamed: self name asSymbol
+]
+
 { #category : 'constants' }
 VGVulkanDeviceSession class >> noDeviceErrorMessage [
 	"What a caller that insists on a device is told where none computes, with the reason the
@@ -48,6 +59,19 @@ VGVulkanDeviceSession class >> releaseDefault [
 
 	Default ifNil: [ ^ self ].
 	Default releaseDevice
+]
+
+{ #category : 'system startup' }
+VGVulkanDeviceSession class >> startUp: isImageStarting [
+	"Forget the session the image came back holding. Its context, its buffers and its command
+	 pool are Vulkan handles of the virtual machine run that saved the image, and that process
+	 is gone: reading one of them takes the virtual machine down without raising anything, which
+	 is what a frame drawn on a restored session did before this hook existed.
+	 The session is dropped and not released, because vkDestroy on a dangling handle is the same
+	 dereference as drawing on it. Nothing of the device leaks: the device went with the process,
+	 and what is let go of here is only the Pharo object that described it."
+
+	isImageStarting ifTrue: [ Default := nil ]
 ]
 
 { #category : 'accessing' }
@@ -76,14 +100,21 @@ VGVulkanDeviceSession >> contextOrNil [
 	"The context of this session, opened on the first ask and answered unopened afterwards, or
 	 nil where no device on this machine computes. Every fault of a driver is caught here,
 	 whatever class it arrives as, because a frame asks me for a device and takes the software
-	 path when there is none."
+	 path when there is none.
+	 A session that was saved into the image and came back in it holds handles of the run that
+	 saved it, and answering those would take the virtual machine down on the next frame, so the
+	 run is checked before the context is answered and a device of another run is dropped here."
 
-	context ifNotNil: [ ^ context ].
+	context ifNotNil: [
+		self isOfThisImageRun ifTrue: [ ^ context ].
+		self forgetDeviceOfAnotherImageRun ].
 	unavailableReason ifNotNil: [ ^ nil ].
+	imageRun := Smalltalk session.
 	^ context := [ VkContext computeContext ]
 		  on: Error
 		  do: [ :failure |
 			  unavailableReason := failure description.
+			  imageRun := nil.
 			  nil ]
 ]
 
@@ -106,10 +137,57 @@ VGVulkanDeviceSession >> dispatchForTileExtent: aPoint [
 		  ifAbsentPut: [ VGTiledFillDispatch on: context ]
 ]
 
+{ #category : 'lifetime' }
+VGVulkanDeviceSession >> forgetDeviceOfAnotherImageRun [
+	"Let go of everything I hold without sending any of it a message. The context, the dispatches
+	 and the blur are Vulkan handles of a virtual machine run that has ended, so vkDestroy on one
+	 of them is the dereference of a dangling handle that kills the virtual machine — the very
+	 crash releasing them looks like it would avoid. Nothing of the device leaks: the device went
+	 with the process. The reason a machine had no device is forgotten too, so that the next ask
+	 probes this run's driver rather than answering the last run's no."
+
+	context := nil.
+	blur := nil.
+	dispatches removeAll.
+	unavailableReason := nil.
+	imageRun := nil
+]
+
 { #category : 'initialization' }
 VGVulkanDeviceSession >> initialize [
 	super initialize.
 	dispatches := Dictionary new
+]
+
+{ #category : 'inspector' }
+VGVulkanDeviceSession >> inspectorLifetime: aBuilder [
+	<inspectorPresentationOrder: 11 title: 'Lifetime'>
+	"How long the device I hold is mine, which is what the stale session defect turned on: a
+	 session saved into an image comes back holding handles of the run that saved it, and the
+	 row naming the run says so before a frame finds out the hard way. The values come from
+	 lifetimeRows, which asks the predicate, the dispatches and the session manager themselves,
+	 so the tab reports the code rather than repeating it. Opening the tab opens no device and
+	 releases none, so an inspection never changes what the next frame pays."
+
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn
+				   title: 'Fact'
+				   evaluated: [ :each | each first ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Answer'
+				   evaluated: [ :each | each second printString ]);
+		  items: self lifetimeRows;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGVulkanDeviceSession >> inspectorLifetimeContext: aContext [
+	"The tab states its facts for a session that holds nothing as well as for one that holds a
+	 device — a released session and a machine with no driver are exactly the states the rows
+	 were written for — so the only thing it needs is the dictionary the dispatch count is read
+	 from."
+
+	aContext active: dispatches notNil
 ]
 
 { #category : 'inspector' }
@@ -144,11 +222,38 @@ VGVulkanDeviceSession >> inspectorResidencyContext: aContext [
 ]
 
 { #category : 'testing' }
+VGVulkanDeviceSession >> isOfThisImageRun [
+	"Whether the device I hold was opened by the run of the virtual machine that is running now.
+	 A session that holds no device answers false, whether it has never opened one or has
+	 released the one it opened: there is nothing of this run or of any other in it."
+
+	^ context isNotNil and: [ imageRun == Smalltalk session ]
+]
+
+{ #category : 'testing' }
 VGVulkanDeviceSession >> isReleased [
 	"Whether I hold nothing at all. A session that has never been asked for a device is released
 	 in exactly the same sense: there is nothing of a device to let go of."
 
 	^ context isNil
+]
+
+{ #category : 'inspecting' }
+VGVulkanDeviceSession >> lifetimeRows [
+	"One row a fact about the device I hold and how long it is mine: whether I hold one at all,
+	 whether the run that opened it is the run that is going now, how many dispatches hang off
+	 it, whether my class will be told when an image starts, and the reason a machine without a
+	 driver gave. Every value is asked of the object that owns it — the predicate, the dictionary
+	 and the session manager — so that a row cannot say one thing while the code does another.
+	 Reading them opens no device, which is what lets an inspector show them."
+
+	^ {
+		  { 'Holds a device'. context isNotNil }.
+		  { 'Device of this image run'. self isOfThisImageRun }.
+		  { 'Dispatches kept'. dispatches size }.
+		  { 'Registered for an image start'.
+		  SessionManager default hasRegistered: self class name asSymbol }.
+		  { 'Reason there is no device'. unavailableReason ifNil: [ 'none given' ] } }
 ]
 
 { #category : 'printing' }

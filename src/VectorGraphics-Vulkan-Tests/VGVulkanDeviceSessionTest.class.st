@@ -111,6 +111,50 @@ VGVulkanDeviceSessionTest >> testAResidentDispatchKeepsItsKernelAndItsBuffersBet
 ]
 
 { #category : 'tests' }
+VGVulkanDeviceSessionTest >> testASessionOfAnotherImageRunOpensItsDeviceAgainAndDestroysNothing [
+	"The startup hook forgets the session in Default, and reaches no further: a session held in
+	 an instance variable of a benchmark, a renderer or an inspector survives a save and a
+	 restart with Vulkan handles of the run that saved the image. So the ask for a context
+	 checks the run it belongs to as well, and a session of another run opens a device again
+	 rather than answering handles that would take the virtual machine down.
+	 The stale context and the stale dispatch here are plain objects, so destroying or releasing
+	 either of them instead of dropping it fails this test with a doesNotUnderstand — dropping
+	 is the whole point, since vkDestroy on a dangling handle is the same dereference as drawing
+	 on one. Faking the run is the only way to hold a stale session without saving the image."
+
+	| session |
+	session := VGVulkanDeviceSession new.
+	session contextOrNil ifNil: [ ^ self ].
+	self assert: session isOfThisImageRun.
+	(session instVarNamed: 'dispatches') at: 16 @ 16 put: Object new.
+	session
+		instVarNamed: 'context' put: Object new;
+		instVarNamed: 'imageRun' put: nil.
+	self deny: session isOfThisImageRun.
+	self assert: session contextOrNil isNotNil.
+	self assert: session isOfThisImageRun.
+	self assert: (session instVarNamed: 'dispatches') isEmpty.
+	session releaseDevice
+]
+
+{ #category : 'tests' }
+VGVulkanDeviceSessionTest >> testAnImageStartForgetsTheDefaultSessionAndDoesNotReleaseIt [
+	"What an image start must do with the session it came back holding: forget it, and send it
+	 nothing at all. Releasing it would send vkDestroy to the handles of the virtual machine run
+	 that saved the image, which is the same dereference of a dangling handle that starting a
+	 frame on it is. The stand-in is a plain object, so any message the hook sends to the
+	 session it forgets fails this test with a doesNotUnderstand."
+
+	| default standIn |
+	default := VGVulkanDeviceSession classVariableNamed: #Default.
+	standIn := default value.
+	[
+	default value: Object new.
+	VGVulkanDeviceSession startUp: true.
+	self assert: default value isNil ] ensure: [ default value: standIn ]
+]
+
+{ #category : 'tests' }
 VGVulkanDeviceSessionTest >> testTheDispatchOfATileExtentIsTheOneDispatchOfThatExtent [
 	"A dispatch is held per tile extent, because the kernel it prepares is compiled for that
 	 extent and nothing else of it depends on the frame."
@@ -122,6 +166,29 @@ VGVulkanDeviceSessionTest >> testTheDispatchOfATileExtentIsTheOneDispatchOfThatE
 	self assert: (session dispatchForTileExtent: 16 @ 16) identicalTo: first.
 	self deny: (session dispatchForTileExtent: 8 @ 8) identicalTo: first.
 	self assert: first context identicalTo: session contextOrNil
+]
+
+{ #category : 'tests' }
+VGVulkanDeviceSessionTest >> testTheLifetimeRowsAskTheSessionItselfWhatRunItsDeviceBelongsTo [
+	"The rows behind the Lifetime tab state the two facts the crash of this defect turned on:
+	 whether the device held was opened by the run of the virtual machine that is running now,
+	 and whether the class is registered to be told when an image starts. Both are asked of the
+	 session and of the session manager rather than restated, so neither row can drift from the
+	 code it reports. A session that has opened nothing answers the first with false, which is
+	 the degenerate state, and a machine with no device never leaves it."
+
+	| session valueOf |
+	session := VGVulkanDeviceSession new.
+	valueOf := [ :label |
+	           (session lifetimeRows detect: [ :each | each first = label ])
+		           second ].
+	self deny: (valueOf value: 'Device of this image run').
+	self assert: (valueOf value: 'Registered for an image start').
+	self assert: (valueOf value: 'Dispatches kept') equals: 0.
+	session contextOrNil ifNil: [ ^ self ].
+	self assert: (valueOf value: 'Device of this image run').
+	session forgetDeviceOfAnotherImageRun.
+	self deny: (valueOf value: 'Device of this image run')
 ]
 
 { #category : 'tests' }
@@ -152,6 +219,18 @@ VGVulkanDeviceSessionTest >> testTheResidencyRowsNameEveryBufferEveryDispatchOfT
 		self assert: (each at: 3) > 0 ].
 	session releaseDevice.
 	self assert: session residencyRows isEmpty
+]
+
+{ #category : 'tests' }
+VGVulkanDeviceSessionTest >> testTheSessionClassIsRegisteredWithTheSessionManager [
+	"The device of a session belongs to the run of the virtual machine that opened it, and an
+	 image saved with a session in Default comes back holding Vulkan handles of a process that
+	 no longer exists. Dereferencing one of them kills the virtual machine outright rather than
+	 raising anything an image can handle, so the class has to be told when the image starts,
+	 and being told means being registered here."
+
+	self
+		assert: (SessionManager default hasRegistered: #VGVulkanDeviceSession)
 ]
 
 { #category : 'tests' }

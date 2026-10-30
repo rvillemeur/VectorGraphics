@@ -223,6 +223,36 @@ VGTiledFillTest >> testAFrameNotReadBackAtOnceHasOnTheDeviceThePixelsAFrameReadB
 ]
 
 { #category : 'tests' }
+VGTiledFillTest >> testAFramePaysOneQueueSubmissionWhateverItsTileCount [
+	"The fixed cost of a frame on the device — one command buffer allocated, one submission,
+	 one wait on its fence — is paid once however many tiles the frame touches, because the
+	 whole grid goes down in a single dispatch. Unit 3.8 measured that cost at 0.18 to 0.47 ms
+	 against a background frame whose dispatch is 4.1 ms, and the small share it makes holds
+	 only while each of the three counts below is one: a shape that splits the frame into two
+	 dispatches pays the fixed cost twice, and the plan's accounting would have to be redone."
+
+	| sendsOf |
+	sendsOf := [ :aMethod :aSelector |
+	           (aMethod ast allChildren select: [ :each |
+		            each isMessage and: [ each selector = aSelector ] ]) size ].
+	self
+		assert: (sendsOf
+				 value: VGTiledFillDispatch >> #draw:into:readBack:
+				 value: #dispatchOver:)
+		equals: 1.
+	self
+		assert: (sendsOf
+				 value: VGTiledFillDispatch >> #dispatchOver:
+				 value: #dispatch:y:z:)
+		equals: 1.
+	self
+		assert: (sendsOf
+				 value: PVComputeKernel >> #dispatch:y:z:
+				 value: #submit:andWait:)
+		equals: 1
+]
+
+{ #category : 'tests' }
 VGTiledFillTest >> testAFrameThatIsNotAWholeNumberOfTilesDrawsOnTheDeviceWhatTheSoftwareBackendDraws [
 	"A frame whose extent is not a multiple of the tile size leaves the tiles of its last column
 	 and of its last row short, and the invocations of such a workgroup that fall past the frame

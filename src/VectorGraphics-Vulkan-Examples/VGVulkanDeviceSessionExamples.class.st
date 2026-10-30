@@ -51,3 +51,25 @@ VGVulkanDeviceSessionExamples class >> sessionOfThisMachine [
 	2 timesRepeat: [ blur blur: bytes columns: 64 rows: 64 boxRadii: radii ].
 	^ session
 ]
+
+{ #category : 'examples' }
+VGVulkanDeviceSessionExamples class >> sessionThatDroppedADeviceOfAnotherImageRun [
+	<sampleInstance>
+	"One click: a session that opened a device, dropped it the way an image start drops the one
+	 it came back holding — forgotten, never destroyed, because vkDestroy on a handle of a run
+	 that has ended kills the virtual machine — and then opened a device of this run instead.
+	 The Lifetime tab is the point of the click: it names what the session holds, the run that
+	 holds it and the registration that will forget it at the next image start, which is the
+	 whole of the stale session defect in five rows.
+	 The session is a fresh one and not the default, so a click does not disturb the device the
+	 frames of this image draw on. Where no driver answers, the session is answered with its
+	 reason recorded and nothing is opened: an example may not raise on a machine with no
+	 device."
+
+	| session |
+	session := VGVulkanDeviceSession new.
+	session contextOrNil ifNil: [ ^ session ].
+	session forgetDeviceOfAnotherImageRun.
+	session contextOrNil.
+	^ session
+]
