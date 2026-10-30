@@ -1624,6 +1624,14 @@ VGTiledFillKernel >> inspectorWorkgroup: aBuilder [
 		  yourself
 ]
 
+{ #category : 'inspector' }
+VGTiledFillKernel >> inspectorWorkgroupContext: aContext [
+	"A kernel with no tile extent has no invocation grid and no blocks of workgroup storage, so
+	 every row of the tab would be built on nothing."
+
+	aContext active: tileExtent isNotNil
+]
+
 { #category : 'accessing' }
 VGTiledFillKernel >> invocationExtent [
 	"The grid of invocations of one workgroup, which is the grid of pixels of a tile narrowed by
