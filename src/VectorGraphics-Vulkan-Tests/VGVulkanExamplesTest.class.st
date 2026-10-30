@@ -15,6 +15,7 @@ Class {
 
 { #category : 'accessing' }
 VGVulkanExamplesTest >> exampleHolders [
+
 	^ {
 		  VGVulkanBackendExamples.
 		  VGVulkanRoundTripExamples.
@@ -22,6 +23,7 @@ VGVulkanExamplesTest >> exampleHolders [
 		  VGTiledFillExamples.
 		  VGVulkanBlurExamples.
 		  VGVulkanDeviceSessionExamples.
+		  VGVulkanDriverSdl2HostExamples.
 		  VGFrameDeviceBenchmarkExamples.
 		  VGFrameDrawingKitExamples.
 		  VGFrameStageBenchmarkExamples.
