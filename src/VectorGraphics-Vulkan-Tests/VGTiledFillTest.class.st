@@ -44,6 +44,57 @@ VGTiledFillTest class >> gradientFrameCount [
 ]
 
 { #category : 'fixtures' }
+VGTiledFillTest >> bufferAccessorSelectors [
+	"The methods of VGTiledFillBuffers that answer one buffer by its literal name. They are read
+	 off the class itself, so a buffer added later is covered without the test being touched."
+
+	^ (VGTiledFillBuffers selectors select: [ :each |
+		   | ast |
+		   ast := (VGTiledFillBuffers >> each) ast.
+		   ast sendNodes size = 1 and: [
+			   ast sendNodes first selector = #bufferNamed: and: [
+				   ast sendNodes first arguments first isLiteralNode ] ] ]) asSet
+]
+
+{ #category : 'fixtures' }
+VGTiledFillTest >> bufferFetchesIn: aMethod among: aSelectorSet [
+	"Every send of that method that fetches a buffer out of the buffers of an encoding, as the
+	 accessor sent paired with whether the send stands inside a block."
+
+	^ aMethod ast sendNodes
+		  select: [ :send |
+			  (aSelectorSet includes: send selector) and: [
+				  send receiver isVariable and: [ send receiver name = 'buffers' ] ] ]
+		  thenCollect: [ :send |
+			  send selector -> (send allParents anySatisfy: [ :each | each isBlock ]) ]
+]
+
+{ #category : 'fixtures' }
+VGTiledFillTest >> countingBlitEntryOfExtent: anExtent [
+	"One blit of a small mask, recorded as the counting fixture so that a test can see how often
+	 the frame asks it for the fill the tiled rasteriser draws in its place. The mask carries two
+	 alphas, because a blit of one byte repeated would not prove the sampling happened at all."
+
+	| mask context |
+	mask := VGCairoImageSurface extent: 8 @ 6.
+	context := mask newContext.
+	context clearTransparent.
+	context sourceColorR: 1.0 g: 1.0 b: 1.0 a: 0.5.
+	context rectangleX: 0 y: 0 width: 8 height: 3.
+	context fill.
+	context sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
+	context rectangleX: 0 y: 3 width: 8 height: 3.
+	context fill.
+	mask flush.
+	^ VGCountingBlitEntry
+		  surface: mask
+		  at: 4 @ 4
+		  paint: (VGColorPaint r: 0.2 g: 0.4 b: 0.9 alpha: 1.0)
+		  clip: (VGClip bounds: (0 @ 0 corner: anExtent))
+		  operator: VGPorterDuffOperator over
+]
+
+{ #category : 'fixtures' }
 VGTiledFillTest >> fillCasesDo: aBlock [
 	"Every case the subset draws that records no blit, with the block that draws it. The count is
 	 asserted here, so that a subset quietly narrowed by a later change fails in every test that
@@ -500,6 +551,29 @@ VGTiledFillTest >> testAnEncodedEntryCarriesThePixelItsPaintAnswersAndItsOwnAlph
 		self assert: decoded clip isRectangular ]
 ]
 
+{ #category : 'tests - encoding' }
+VGTiledFillTest >> testAnEntryDrawnTwiceInOneFrameIsEncodedOnce [
+	"A display list may hold the same entry object twice, and the conversion of a blit to the
+	 fill the tiled rasteriser draws samples the alpha of every pixel of its mask. That work is
+	 memoised on the entry itself, so a frame pays for it once however often the entry is drawn,
+	 and both references carry the same records."
+
+	| entry list encoding first second |
+	entry := self countingBlitEntryOfExtent: 32 @ 32.
+	list := VGDisplayList new.
+	list
+		add: entry;
+		add: entry.
+	encoding := VGTiledFillEncoding of: list extent: 32 @ 32.
+	self assert: entry conversionCount equals: 1.
+	self assert: entry asTiledFill identicalTo: entry asTiledFill.
+	self assert: entry conversionCount equals: 1.
+	first := encoding entryAt: 1.
+	second := encoding entryAt: 2.
+	self assert: first tiledMaskRectangle equals: second tiledMaskRectangle.
+	self assert: first tiledMaskBytes equals: second tiledMaskBytes
+]
+
 { #category : 'tests' }
 VGTiledFillTest >> testAnEvenOddStarDrawsTheSameBytesAsTheSoftwareBackend [
 	"A self-intersecting path, where the even-odd rule leaves the middle empty: the walk counts
@@ -574,32 +648,22 @@ VGTiledFillTest >> testEveryBufferAnEncodingWritesIsFetchedOnceAndNotOncePerElem
 	 is the wrong thing to do a hundred thousand times a frame: measured on the reference frame,
 	 the lookups inside the write loops were better than a third of the encoding. So an encoding
 	 fetches a buffer at most once in a method and never inside a block, and a loop writes
-	 through a temporary fetched before it. The accessors are read off VGTiledFillBuffers itself,
-	 as the methods that answer one buffer by its literal name, so this test cannot miss a
-	 buffer added later."
+	 through a temporary fetched before it."
 
 	| accessors inBlocks fetchedTwice |
-	accessors := (VGTiledFillBuffers selectors select: [ :each |
-		              | ast |
-		              ast := (VGTiledFillBuffers >> each) ast.
-		              ast sendNodes size = 1 and: [
-			              ast sendNodes first selector = #bufferNamed: and: [
-				              ast sendNodes first arguments first isLiteralNode ] ] ]) asSet.
+	accessors := self bufferAccessorSelectors.
 	self deny: accessors isEmpty.
 	inBlocks := OrderedCollection new.
 	fetchedTwice := OrderedCollection new.
 	VGTiledFillEncoding selectorsAndMethodsDo: [ :selector :method |
-		| fetches |
-		fetches := OrderedCollection new.
-		method ast sendNodes do: [ :send |
-			((accessors includes: send selector) and: [
-				 send receiver isVariable and: [ send receiver name = 'buffers' ] ])
-				ifTrue: [
-					fetches add: send selector.
-					(send allParents anySatisfy: [ :each | each isBlock ]) ifTrue: [
-						inBlocks add: selector -> send selector ] ] ].
-		fetches asSet size = fetches size ifFalse: [
-			fetchedTwice add: selector -> fetches asArray ] ].
+		| fetches names |
+		fetches := self bufferFetchesIn: method among: accessors.
+		names := fetches collect: [ :each | each key ].
+		inBlocks addAll:
+			((fetches select: [ :each | each value ]) collect: [ :each |
+				 selector -> each key ]).
+		names asSet size = names size ifFalse: [
+			fetchedTwice add: selector -> names asArray ] ].
 	self assertEmpty: inBlocks.
 	self assertEmpty: fetchedTwice
 ]
@@ -993,6 +1057,31 @@ VGTiledFillTest >> testTheBuffersOfAFrameAreSizedByTheCountsOfThatFrame [
 		assert: buffers tileTable size
 		equals: 6 * VGTiledFillLayout tileRecordWords.
 	self assert: buffers entryRefs size equals: 9
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testTheBuffersOfAFrameAreTheSameBytesWhenItsEntriesCarryTheirMemos [
+	"A blit keeps the fill the tiled rasteriser draws in its place once it has built it, so the
+	 second encoding of a frame reads memos the first one built. A memo is only sound while it
+	 cannot be seen: every buffer of the second encoding has to be the first one byte for byte,
+	 down to the runs of mask bytes the memo holds."
+
+	| surface list blit first second |
+	surface := VGCairoImageSurface extent: 64 @ 64.
+	self mixedFillFrame value: surface newContext.
+	list := surface displayList.
+	blit := self countingBlitEntryOfExtent: 64 @ 64.
+	list
+		add: blit;
+		add: blit.
+	first := VGTiledFillEncoding of: list extent: 64 @ 64.
+	second := VGTiledFillEncoding of: list extent: 64 @ 64.
+	self assert: first bufferNames size > 1.
+	first bufferNames do: [ :name |
+		self
+			assert: (second perform: name) asArray
+			equals: (first perform: name) asArray ].
+	self assert: blit conversionCount equals: 1
 ]
 
 { #category : 'tests' }

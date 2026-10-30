@@ -86,6 +86,47 @@ VGRasteriserTest >> edgeReachOfBandsOf: coordinates bandHeight: aHeight [
 			self assert: edge bottom >= rows top ] ]
 ]
 
+{ #category : 'fixtures' }
+VGRasteriserTest >> enclosureCorpus [
+	"Shapes that between them hold every case the fast enclosure path may meet: a plain
+	 rectangle, whose every edge lies on the border of its own box; two nested squares, whose
+	 inner edges lie inside it; a triangle, whose slanted edge crosses it; a rectangle on
+	 fractional coordinates; a rectangle traced twice, once each way, which is empty under the
+	 winding rule though its edges still lie on the border; and a shape of no height at all."
+
+	^ {
+		  (VGSegments
+			   coordinates:
+			   (self segmentsOfAll: { { 8 @ 8. 40 @ 8. 40 @ 40. 8 @ 40 } })
+			   fillRule: #winding).
+		  (VGSegments
+			   coordinates: (self segmentsOfAll: {
+						    { 8 @ 8. 40 @ 8. 40 @ 40. 8 @ 40 }.
+						    { 16 @ 16. 32 @ 16. 32 @ 32. 16 @ 32 } })
+			   fillRule: #winding).
+		  (VGSegments
+			   coordinates: (self segmentsOfAll: {
+						    { 8 @ 8. 40 @ 8. 40 @ 40. 8 @ 40 }.
+						    { 16 @ 16. 32 @ 16. 32 @ 32. 16 @ 32 } })
+			   fillRule: #evenOdd).
+		  (VGSegments
+			   coordinates:
+			   (self segmentsOfAll: { { 4 @ 4. 44 @ 20. 8 @ 44 } })
+			   fillRule: #winding).
+		  (VGSegments
+			   coordinates: (self segmentsOfAll:
+					    { { 7.5 @ 7.5. 40.25 @ 7.5. 40.25 @ 40.25. 7.5 @ 40.25 } })
+			   fillRule: #winding).
+		  (VGSegments
+			   coordinates: (self segmentsOfAll: {
+						    { 8 @ 8. 40 @ 8. 40 @ 40. 8 @ 40 }.
+						    { 8 @ 8. 8 @ 40. 40 @ 40. 40 @ 8 } })
+			   fillRule: #winding).
+		  (VGSegments
+			   coordinates: (self segmentsOfAll: { { 8 @ 8. 40 @ 8 } })
+			   fillRule: #winding) }
+]
+
 { #category : 'support' }
 VGRasteriserTest >> fivePointedStarOfRadius: aNumber center: aPoint [
 	"The points taken two apart, which is what makes the star one self-crossing path with a
@@ -338,6 +379,30 @@ VGRasteriserTest >> testAnEdgeIndexOfBandsOfAGivenHeightAlignsThemToThatHeight [
 			self assert: (index bandOf: box top - 1000) equals: 1.
 			self assert: (index bandOf: box bottom + 1000) equals: index bandCount ].
 		self edgeReachOfBandsOf: coordinates bandHeight: height ]
+]
+
+{ #category : 'tests - enclosure' }
+VGRasteriserTest >> testEveryEnclosureAnswerIsTheAnswerOfTheScanOverTheCorpus [
+	"The predicate a tiled binning asks of a shape once a tile is answered by a fast path where
+	 the shape holds no edge inside its own box: a rectangle strictly inside such a box meets no
+	 edge, and the insideness of one point of that interior is the insideness of all of it. The
+	 fast answer has to be the scanning answer for every shape of the corpus and every tile of a
+	 grid laid over it, tiles that lie on the box's own border included, or the path is wrong."
+
+	| answered |
+	answered := 0.
+	self enclosureCorpus do: [ :shape |
+		0 to: 40 by: 8 do: [ :x |
+			0 to: 40 by: 8 do: [ :y |
+				| rectangle |
+				rectangle := x @ y corner: x + 8 @ (y + 8).
+				answered := answered + 1.
+				self
+					assert: (shape enclosesWholly: rectangle)
+						= (shape scanner enclosesWhollyByScan: rectangle)
+					description:
+						shape printString , ' at ' , rectangle printString ] ] ].
+	self assert: answered equals: self enclosureCorpus size * 36
 ]
 
 { #category : 'tests' }

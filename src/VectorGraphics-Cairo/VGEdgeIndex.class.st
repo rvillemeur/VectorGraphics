@@ -187,23 +187,31 @@ VGEdgeIndex >> edgeIndexesMeetingRowsFrom: aTop to: aBottom [
 	^ self edgeIndexesInBandAt: (self bandOf: aTop)
 ]
 
-{ #category : 'initialization' }
+{ #category : 'private' }
 VGEdgeIndex >> fillBands [
 	"Every edge into every band its own rows reach. An edge is held as its index into the
 	 coordinates, so that no edge is copied and an answer is read from the array the shape
 	 already carries. A band holds its edges in the order they were given, which is the order a
-	 scan over every edge would read them in."
+	 scan over every edge would read them in.
+	 A band is given a stream only when an edge reaches it: the bands of a frame are the rows of
+	 tiles of the whole surface, and a shape of a few hundred pixels reaches two or three of the
+	 thirty-eight rows an eight hundred by six hundred frame has. A band no edge reaches answers
+	 the one empty array, which every caller only reads."
 
 	| streams |
-	streams := (1 to: bandCount) collect: [ :each |
-		           WriteStream on: (Array new: 8) ].
+	streams := Array new: bandCount.
 	1 to: coordinates size by: 4 do: [ :index |
 		| top bottom |
 		top := (coordinates at: index + 1) min: (coordinates at: index + 3).
 		bottom := (coordinates at: index + 1) max: (coordinates at: index + 3).
 		(self bandOf: top) to: (self bandOf: bottom) do: [ :band |
-			(streams at: band) nextPut: index ] ].
-	bands := streams collect: [ :each | each contents ]
+			((streams at: band) ifNil: [
+				 streams at: band put: (WriteStream on: (Array new: 8)) ])
+				nextPut: index ] ].
+	bands := streams collect: [ :each |
+		         each
+			         ifNil: [ #(  ) ]
+			         ifNotNil: [ :stream | stream contents ] ]
 ]
 
 { #category : 'inspector' }

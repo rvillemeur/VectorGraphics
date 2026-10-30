@@ -35,6 +35,40 @@ VGCairoSurfaceMask >> alphaAtX: x y: y [
 	^ surface format alphaOfPixel: (surface pixelAtX: point x y: point y)
 ]
 
+{ #category : 'reading' }
+VGCairoSurfaceMask >> alphaBytesOver: aRectangle [
+	"The alpha of every pixel of that rectangle, row by row from the top left, as one run. Byte
+	 for byte what alphaAtX:y: gives pixel by pixel, which VGCairoDrawingTest holds me to; what
+	 does not change from pixel to pixel is done once here instead. The frame is drained once, my
+	 origin is rounded once, a row that lies off my surface is stepped over rather than asked
+	 column by column, and the columns of a row that do lie on it are read as one run and copied
+	 into place by the primitive. A run is as many pixels as the clip of a blit is wide times as
+	 many as it is high, so the reference frame of unit 3.5 reads a quarter of a million of them
+	 a frame."
+
+	| bytes index width height shift first last start |
+	bytes := ByteArray new: aRectangle width * aRectangle height.
+	surface flush.
+	width := surface width.
+	height := surface height.
+	shift := origin rounded.
+	first := (aRectangle left - shift x) max: 0.
+	last := (aRectangle right - 1 - shift x) min: width - 1.
+	start := first + shift x - aRectangle left + 1.
+	index := 0.
+	aRectangle top to: aRectangle bottom - 1 do: [ :y |
+		| row |
+		row := y - shift y.
+		((row between: 0 and: height - 1) and: [ first <= last ]) ifTrue: [
+			bytes
+				replaceFrom: index + start
+				to: index + start + (last - first)
+				with: (surface alphaBytesOfRow: row from: first to: last)
+				startingAt: 1 ].
+		index := index + aRectangle width ].
+	^ bytes
+]
+
 { #category : 'accessing' }
 VGCairoSurfaceMask >> boundsRectangle [
 	"The device rectangle I cover. A fractional origin lands on the nearest pixel, which is the
@@ -53,6 +87,41 @@ VGCairoSurfaceMask >> drawOn: aBackend paint: aPaint clip: aClip operator: anOpe
 		clip: aClip
 		operator: anOperator
 		into: aTarget
+]
+
+{ #category : 'inspecting' }
+VGCairoSurfaceMask >> inspectorAlphaRun: aBuilder [
+	<inspectorPresentationOrder: 11 title: 'Alpha run'>
+	"The run of bytes the tiled rasteriser reads out of me in one go, sampled against the single
+	 pixel reader beside it. The rectangle is mine grown by one pixel on each side, so the rows
+	 and columns outside me are in the run as well, where a mask of Cairo's extend mode of none
+	 lets nothing through. Each row asks both methods, so a run that stopped agreeing with the
+	 reader would show as two different bytes rather than go unseen."
+
+	| rectangle bytes points |
+	rectangle := self boundsRectangle expandBy: 1.
+	bytes := self alphaBytesOver: rectangle.
+	points := OrderedCollection new.
+	rectangle top to: rectangle bottom - 1 do: [ :y |
+		rectangle left to: rectangle right - 1 do: [ :x | points add: x @ y ] ].
+	^ aBuilder newTable
+		  items: points asArray;
+		  addColumn: (SpStringTableColumn title: 'Point' evaluated: [ :each |
+					   each printString ]);
+		  addColumn: (SpStringTableColumn title: 'In the run' evaluated: [ :each |
+					   (bytes at:
+						    (each y - rectangle top) * rectangle width + (each x - rectangle left)
+						    + 1) printString ]);
+		  addColumn: (SpStringTableColumn title: 'Read one by one' evaluated: [ :each |
+					   (self alphaAtX: each x y: each y) printString ]);
+		  yourself
+]
+
+{ #category : 'inspecting' }
+VGCairoSurfaceMask >> inspectorAlphaRunContext: aContext [
+	"A mask with no surface has no alpha to read."
+
+	aContext active: surface isNotNil
 ]
 
 { #category : 'inspector' }

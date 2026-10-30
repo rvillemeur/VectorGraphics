@@ -578,6 +578,27 @@ VGCairoDrawingTest >> testStrokePreservingPathKeepsThePathAndStrokeConsumesIt [
 	self assert: (second pixelAtX: 10 y: 8) equals: self opaqueBlack
 ]
 
+{ #category : 'tests' }
+VGCairoDrawingTest >> testTheAlphaRunOfAMaskIsTheAlphaOfEveryPixelOfItAskedOneByOne [
+	"A blit is drawn by the tiled rasteriser as a fill carrying the alpha of its mask, and that
+	 run is the one costly thing an entry builds off the device. The mask builds the whole run in
+	 one go, and this holds the run to the pixels: byte for byte what asking for the alpha of
+	 each pixel in turn gives, inside the mask and outside it, where a mask carries nothing."
+
+	| mask rectangle oneByOne index |
+	mask := VGDisplayListExamples surfaceMaskOfATile.
+	rectangle := mask boundsRectangle expandBy: 3.
+	oneByOne := ByteArray new: rectangle width * rectangle height.
+	index := 0.
+	rectangle top to: rectangle bottom - 1 do: [ :y |
+		rectangle left to: rectangle right - 1 do: [ :x |
+			index := index + 1.
+			oneByOne at: index put: (mask alphaAtX: x y: y) ] ].
+	self assert: (mask alphaBytesOver: rectangle) equals: oneByOne.
+	self assert: (oneByOne includes: 0).
+	self assert: (oneByOne includes: 255)
+]
+
 { #category : 'tests - the current point' }
 VGCairoDrawingTest >> testTheCurrentPointIsReadBackInUserSpace [
 	"The path is kept in device space, so the current point has to come back through the inverse of

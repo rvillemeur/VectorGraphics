@@ -19,6 +19,27 @@ Class {
 }
 
 { #category : 'examples' }
+VGTileBinningExamples class >> binningOfAWideFillAndAThinOne [
+	<sampleInstance>
+	"Two fills in a frame of sixty-four tiles, binned. The Inner blocks tab answers the wide fill
+	 in one question: the block of tiles inside the ring its box ends in is more than two tiles
+	 across and lies wholly inside the fill, so a single answer there is the mark of every tile of
+	 the block. The thin fill reaches two rows of tiles and both rows are ring, so each of its
+	 tiles is asked on its own."
+
+	| surface context |
+	surface := VGCairoImageSurface extent: 128 @ 128.
+	context := surface newContext.
+	context sourceColorR: 0.2 g: 0.4 b: 0.8 a: 1.0.
+	context rectangleX: 16 y: 16 width: 96 height: 96.
+	context fill.
+	context sourceColorR: 0.9 g: 0.5 b: 0.1 a: 1.0.
+	context rectangleX: 10 y: 10 width: 100 height: 20.
+	context fill.
+	^ VGTileBinning of: surface displayList extent: surface extent
+]
+
+{ #category : 'examples' }
 VGTileBinningExamples class >> binningOfTwoDistantShapes [
 	<sampleInstance>
 	"Two small fills far apart in one frame, binned. The Binning tab counts the tiles they touch

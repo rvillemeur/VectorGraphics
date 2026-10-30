@@ -16,6 +16,27 @@ Class {
 	#tag : 'Tests'
 }
 
+{ #category : 'asserting' }
+VGTileBinningTest >> assertEveryMarkOf: aBinning grid: aGrid [
+	"Every pair of the binning, held beside the answer the entry of the pair gives for the
+	 rectangle of its tile. The binning may reach a mark by a shortcut over several tiles at
+	 once, and this is what says the shortcut wrote the mark the entry would have given."
+
+	| pairs |
+	pairs := 0.
+	aBinning touchedTileIndexes do: [ :index |
+		| bounds |
+		bounds := aGrid boundsOfTileAt: index.
+		aBinning referencesOfTileAt: index do: [ :ordinal :isInterior |
+			pairs := pairs + 1.
+			self
+				assert: isInterior
+					= ((aBinning entries at: ordinal) coversEveryPixelOf: bounds)
+				description: 'tile ' , index printString , ' entry '
+					, ordinal printString ] ].
+	self assert: pairs > 0
+]
+
 { #category : 'fixtures' }
 VGTileBinningTest >> censusOverTheCorpus [
 	"The corpus lives in this package and the census does not, so the cases are handed to it
@@ -361,6 +382,49 @@ VGTileBinningTest >> testTheDefaultTileHoldsAWholeNumberOfWorkgroups [
 	self
 		assert: (tile x * tile y) \\ VGVulkanRoundTrip workItemsPerGroup
 		equals: 0
+]
+
+{ #category : 'tests' }
+VGTileBinningTest >> testTheMarkOfEveryPairIsTheAnswerTheEntryItselfGivesForThatTile [
+	"The binning may take a shortcut to the mark of a pair: a rectangle that holds several tiles
+	 answered once stands for every tile inside it, because the question is monotone — a fill
+	 that covers every pixel of a rectangle covers every pixel of anything inside it. A shortcut
+	 is sound only while the mark it writes is the mark the entry itself gives, so this holds the
+	 two side by side over every case of the corpus."
+
+	VGConformanceCorpus cases do: [ :case |
+		| grid |
+		grid := VGTileGrid
+			        extent: case extent
+			        tileExtent: VGTileGrid defaultTileExtent.
+		self
+			assertEveryMarkOf: (VGTileBinning
+					 of: (self
+							  frameOfExtent: case extent
+							  drawnWith: [ :context | case drawOn: context ])
+					 grid: grid)
+			grid: grid ]
+]
+
+{ #category : 'tests' }
+VGTileBinningTest >> testTheMarkOfEveryPairOfTheReferenceFrameIsTheAnswerTheEntryItselfGives [
+	"The corpus cases are sixty-four pixels square, so an entry of theirs spans two or three
+	 tiles and a shortcut over a whole row of tiles is barely exercised. The reference frame is
+	 eight hundred by six hundred and carries entries that span the frame, which is where the
+	 shortcut earns its time and where an unsound one would show."
+
+	| profile canvas grid |
+	profile := VGFrameProfile new.
+	canvas := profile newCanvas.
+	(profile sceneForRendererClass: VGRenderer) aeFullDrawOn: canvas.
+	grid := VGTileGrid
+		        extent: profile extent
+		        tileExtent: VGTileGrid defaultTileExtent.
+	self
+		assertEveryMarkOf: (VGTileBinning
+				 of: canvas privateAeCairoSurface displayList
+				 grid: grid)
+		grid: grid
 ]
 
 { #category : 'tests - corpus' }

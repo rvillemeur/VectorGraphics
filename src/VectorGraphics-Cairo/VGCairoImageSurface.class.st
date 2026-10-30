@@ -97,6 +97,29 @@ VGCairoImageSurface class >> unownedNewForData: aBuffer format: aFormat width: a
 	^ surface
 ]
 
+{ #category : 'accessing - pixels' }
+VGCairoImageSurface >> alphaBytesOfRow: y from: aFirstColumn to: aLastColumn [
+	"The alpha of that run of one row, read without draining the frame first, as the pixel reader
+	 beside me reads it one pixel at a time. What does not change from pixel to pixel is read
+	 once here: the stride, the width of a pixel and the depth of the format. The tiled encoder
+	 reads a quarter of a million mask pixels a frame through this, and asking the pixel reader
+	 for each of them was three sends and a multiplication a pixel."
+
+	| run step base isA8 |
+	run := ByteArray new: aLastColumn - aFirstColumn + 1.
+	step := format bytesPerPixel.
+	base := y * stride + (aFirstColumn * step).
+	isA8 := format isA8.
+	1 to: run size do: [ :each |
+		| offset pixel |
+		offset := base + (each - 1 * step).
+		pixel := isA8
+			         ifTrue: [ data uint8AtOffset: offset ]
+			         ifFalse: [ data uint32AtOffset: offset ].
+		run at: each put: (format alphaOfPixel: pixel) ].
+	^ run
+]
+
 { #category : 'converting' }
 VGCairoImageSurface >> asForm [
 	"A Form holds straight alpha, so the stored premultiplication is divided back out. A fully

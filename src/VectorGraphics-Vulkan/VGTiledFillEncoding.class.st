@@ -160,6 +160,16 @@ VGTiledFillEncoding >> binnedEntryCount [
 ]
 
 { #category : 'accessing' }
+VGTiledFillEncoding >> bufferNames [
+	"The bindings I hold a buffer for, each of them answered by a message of its own name. A
+	 caller that has to read every buffer — a test holding two encodings side by side, a
+	 decoder, an uploader — asks for the names rather than keeping a list of its own that a
+	 binding added to the contract would leave short."
+
+	^ buffers bufferNames
+]
+
+{ #category : 'accessing' }
 VGTiledFillEncoding >> clips [
 	^ buffers clips
 ]
@@ -680,7 +690,7 @@ VGTiledFillEncoding >> touchedTileIndexes [
 			  (row - 1) * VGTiledFillLayout tileRecordWords + VGTiledFillLayout tileIndexField ]
 ]
 
-{ #category : 'writing' }
+{ #category : 'private - writing' }
 VGTiledFillEncoding >> writeBandBlocksAt: aDictionary [
 	"The band blocks: one block of shape records for every row of tiles an entry reaches, each
 	 record naming only the edges of that shape which reach the rows of that row, and those
@@ -688,7 +698,12 @@ VGTiledFillEncoding >> writeBandBlocksAt: aDictionary [
 	 is written in both of them, which is what buys the kernel a short run: an edge whose own
 	 rows miss the rows of a tile cannot cross a sub-row of it, so a tile reading its own row
 	 reads fewer edges for the same coverage. The blocks are written in the order
-	 VGTiledFillBands lays them out, so a reference finds one by arithmetic and not by a search."
+	 VGTiledFillBands lays them out, so a reference finds one by arithmetic and not by a search.
+	 An edge of a block is copied inside the edge buffer and not read out of the shape again:
+	 the whole-shape run of every entry is already written when this pass runs, and a copy from
+	 one Float32Array into another is a primitive where a float at a time is four narrowings and
+	 four stores. The reference frame copies five thousand band edges a frame, and that is a
+	 millisecond of the gate of unit 3.5."
 
 	| record cursor edges floats |
 	record := (aDictionary at: #shapes) last.
@@ -696,24 +711,27 @@ VGTiledFillEncoding >> writeBandBlocksAt: aDictionary [
 	edges := buffers edges.
 	floats := VGTiledFillLayout edgeFloats.
 	bands blocksDo: [ :index :row |
+		| shapeEdges |
+		shapeEdges := (aDictionary at: #edges) at: index.
 		(bands shapesOfEntry: index) withIndexDo: [ :shape :ordinal |
-			| indexes segments |
+			| indexes |
 			indexes := bands
 				           edgeIndexesOfEntry: index
 				           shape: ordinal
 				           inRow: row.
-			segments := shape segments.
 			self
 				writeShapeRecordAt: record
 				for: shape
 				edgeOffset: cursor
 				count: indexes size.
 			indexes do: [ :offset |
-				1 to: floats do: [ :each |
-					edges
-						at: cursor * floats + each
-						put: (segments at: offset + each - 1) ].
+				edges
+					replaceFrom: cursor * floats + 1
+					to: cursor * floats + floats
+					with: edges
+					startingAt: shapeEdges * floats + offset.
 				cursor := cursor + 1 ].
+			shapeEdges := shapeEdges + (shape segments size / floats).
 			record := record + 1 ] ]
 ]
 
@@ -925,23 +943,7 @@ VGTiledFillEncoding >> writeShapesOf: anEntry at: anIndex shapeOffset: aShapeOff
 		cursor := cursor + count ]
 ]
 
-{ #category : 'writing' }
-VGTiledFillEncoding >> writeTileRecordAt: aRow tile: aTileIndex offset: anOffset count: aCount [
-	"Where the tile is and which references belong to it. The corner is in whole pixels, which
-	 is what a workgroup adds its own invocation to."
-
-	| base bounds table |
-	base := (aRow - 1) * VGTiledFillLayout tileRecordWords.
-	bounds := grid boundsOfTileAt: aTileIndex.
-	table := buffers tileTable.
-	table at: base + VGTiledFillLayout tileIndexField put: aTileIndex.
-	table at: base + VGTiledFillLayout tileLeftField put: bounds left.
-	table at: base + VGTiledFillLayout tileTopField put: bounds top.
-	table at: base + VGTiledFillLayout referenceOffsetField put: anOffset.
-	table at: base + VGTiledFillLayout referenceCountField put: aCount
-]
-
-{ #category : 'writing' }
+{ #category : 'encoding' }
 VGTiledFillEncoding >> writeTilesOf: aBinning [
 	"One record a touched tile, in tile order so that a row can be found by a halving search,
 	 and the references of a tile in the order the entries were drawn, because compositing is
@@ -951,20 +953,33 @@ VGTiledFillEncoding >> writeTilesOf: aBinning [
 	 block of the row of tiles the tile lies in.
 	 The binning answers its tiles in tile order and names each entry by its ordinal, with the
 	 mark beside it, so nothing is sorted here, no entry is looked up in a dictionary of
-	 identities, and the mark is not asked for a second time."
+	 identities, and the mark is not asked for a second time. The three buffers are fetched
+	 once, before the loop: a buffer is held under the name the kernel binds it by, and the
+	 reference frame writes nineteen hundred tiles and thirty-eight hundred references. The
+	 record of a tile is written here rather than in a method of its own, because the loop is
+	 hot enough that a send a tile is worth more than the tidier method."
 
-	| indexes offset entryRefs refShapes |
+	| indexes offset entryRefs refShapes table stride |
 	indexes := aBinning touchedTileIndexes.
-	buffers allocateForTiles: indexes size references: aBinning binnedEntryCount.
+	buffers
+		allocateForTiles: indexes size
+		references: aBinning binnedEntryCount.
 	entryRefs := buffers entryRefs.
 	refShapes := buffers refShapes.
+	table := buffers tileTable.
+	stride := VGTiledFillLayout tileRecordWords.
 	offset := 0.
 	indexes withIndexDo: [ :tileIndex :row |
-		self
-			writeTileRecordAt: row
-			tile: tileIndex
-			offset: offset
-			count: (aBinning referenceCountOfTileAt: tileIndex).
+		| base bounds |
+		base := (row - 1) * stride.
+		bounds := grid boundsOfTileAt: tileIndex.
+		table at: base + VGTiledFillLayout tileIndexField put: tileIndex.
+		table at: base + VGTiledFillLayout tileLeftField put: bounds left.
+		table at: base + VGTiledFillLayout tileTopField put: bounds top.
+		table at: base + VGTiledFillLayout referenceOffsetField put: offset.
+		table
+			at: base + VGTiledFillLayout referenceCountField
+			put: (aBinning referenceCountOfTileAt: tileIndex).
 		aBinning referencesOfTileAt: tileIndex do: [ :ordinal :interior |
 			offset := offset + 1.
 			entryRefs

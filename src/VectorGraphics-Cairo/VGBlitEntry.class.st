@@ -10,7 +10,8 @@ Class {
 	#superclass : 'VGDisplayListEntry',
 	#instVars : [
 		'surface',
-		'origin'
+		'origin',
+		'tiledFill'
 	],
 	#category : 'VectorGraphics-Cairo-Display list',
 	#package : 'VectorGraphics-Cairo',
@@ -22,6 +23,18 @@ VGBlitEntry class >> surface: aSurface at: aPoint paint: aPaint clip: aClip oper
 	^ (self new setPaint: aPaint clip: aClip operator: anOperator)
 		  setSurface: aSurface origin: aPoint;
 		  yourself
+]
+
+{ #category : 'converting' }
+VGBlitEntry >> asTiledFill [
+	"The fill the tiled rasteriser draws in my place, built once. The conversion samples the
+	 alpha of every pixel of my mask, which is the one costly thing an entry does off the device,
+	 and a display list may hold me more than once. The memo is mine and is keyed on nothing but
+	 my own identity: I am recorded with my paint, my clip and my operator and never changed
+	 after, so a memo that lives as long as I do cannot go stale, and no caller has a version
+	 number to maintain."
+
+	^ tiledFill ifNil: [ tiledFill := self newTiledFill ]
 ]
 
 { #category : 'draining' }

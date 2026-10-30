@@ -18,7 +18,9 @@ Class {
 	#instVars : [
 		'extent',
 		'tileExtent',
-		'bounds'
+		'bounds',
+		'columnCount',
+		'rowCount'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -66,7 +68,7 @@ VGTileGrid >> columns [
 	"Rounded up, because the last column is short wherever the extent does not divide by the tile
 	 and the pixels in it still have to be drawn."
 
-	^ (extent x / tileExtent x) ceiling
+	^ columnCount
 ]
 
 { #category : 'accessing' }
@@ -101,14 +103,26 @@ VGTileGrid >> indexesIntersecting: aRectangle [
 	 a dispatch over pixels no entry writes. Which rows and which columns a box reaches is asked
 	 of the two methods that answer those, so a caller holding rows alone reads the same box."
 
-	| rows columns indexes |
-	rows := self rowsIntersecting: aRectangle.
-	columns := self columnsIntersecting: aRectangle.
-	indexes := OrderedCollection new: rows size * columns size.
-	rows do: [ :row |
-		columns do: [ :column |
-			indexes add: (self indexAtColumn: column row: row) ] ].
+	| indexes |
+	indexes := OrderedCollection new:
+		           (self rowsIntersecting: aRectangle) size
+		           * (self columnsIntersecting: aRectangle) size.
+	self indexesIntersecting: aRectangle do: [ :each | indexes add: each ].
 	^ indexes
+]
+
+{ #category : 'accessing' }
+VGTileGrid >> indexesIntersecting: aRectangle do: aBlock [
+	"That block once for every tile the rectangle can touch, in dispatch order, allocating
+	 nothing. A binning walks every entry and tile pair of a frame — nearly four thousand of
+	 them on the reference frame — and the collection indexesIntersecting: builds is read once
+	 and thrown away."
+
+	| columns |
+	columns := self columnsIntersecting: aRectangle.
+	(self rowsIntersecting: aRectangle) do: [ :row |
+		columns do: [ :column |
+			aBlock value: (self indexAtColumn: column row: row) ] ]
 ]
 
 { #category : 'inspector' }
@@ -145,16 +159,18 @@ VGTileGrid >> inspectorTilesContext: aContext [
 	aContext active: extent isNotNil
 ]
 
-{ #category : 'private' }
+{ #category : 'accessing' }
 VGTileGrid >> newBoundsOfTileAt: anIndex [
 	"The pixels of that tile, worked out from the index. The column and the row come out of the
 	 index because a tile is numbered row-major, which is the order a dispatch walks."
 
-	| column row origin |
-	column := (anIndex - 1) \\ self columns.
-	row := (anIndex - 1) // self columns.
-	origin := column * tileExtent x @ (row * tileExtent y).
-	^ origin corner: ((origin + tileExtent) min: extent)
+	| column row left top |
+	column := (anIndex - 1) \\ columnCount.
+	row := (anIndex - 1) // columnCount.
+	left := column * tileExtent x.
+	top := row * tileExtent y.
+	^ left @ top
+	  corner: ((left + tileExtent x) min: extent x) @ ((top + tileExtent y) min: extent y)
 ]
 
 { #category : 'printing' }
@@ -171,7 +187,7 @@ VGTileGrid >> printOn: aStream [
 
 { #category : 'accessing' }
 VGTileGrid >> rows [
-	^ (extent y / tileExtent y) ceiling
+	^ rowCount
 ]
 
 { #category : 'accessing' }
@@ -188,10 +204,16 @@ VGTileGrid >> rowsIntersecting: aRectangle [
 	^ box origin y // tileExtent y to: box corner y - 1 // tileExtent y
 ]
 
-{ #category : 'initialization' }
+{ #category : 'accessing' }
 VGTileGrid >> setExtent: anExtent tileExtent: aTileExtent [
+	"The count of columns and of rows is worked out here rather than asked for: the bounds of
+	 every tile are worked out from the column count, the division it takes builds a fraction,
+	 and a frame of 1900 tiles asked for it nineteen hundred times."
+
 	extent := anExtent.
-	tileExtent := aTileExtent
+	tileExtent := aTileExtent.
+	columnCount := (extent x / tileExtent x) ceiling.
+	rowCount := (extent y / tileExtent y) ceiling
 ]
 
 { #category : 'accessing' }

@@ -115,6 +115,26 @@ VGCairoClipTest >> testAClipEdgeAndAFillEdgeIntersectRatherThanMultiply [
 	self assert: (surface pixelAtX: 21 y: 5) equals: self opaqueBlack
 ]
 
+{ #category : 'tests - bounds' }
+VGCairoClipTest >> testAClipHoldsARectangleWhollyExactlyWhenItsOwnBoundsContainIt [
+	"The question the tiled binning asks of every entry and tile pair, which has to answer what
+	 Rectangle>>containsRect: answers, boundary included and on a clip whose bounds are
+	 fractions."
+
+	| clip |
+	clip := VGClip bounds: (10.5 @ 20.25 corner: 100 @ 200.75) shapes: #(  ).
+	{
+		(11 @ 21 corner: 90 @ 190).
+		(10.5 @ 20.25 corner: 100 @ 200.75).
+		(10 @ 21 corner: 90 @ 190).
+		(11 @ 21 corner: 90 @ 201).
+		(0 @ 0 corner: 0 @ 0).
+		(200 @ 300 corner: 210 @ 310) } do: [ :each |
+		self
+			assert: (clip holdsWholly: each)
+			equals: (clip bounds containsRect: each) ]
+]
+
 { #category : 'tests' }
 VGCairoClipTest >> testAClipIsFixedInDeviceSpaceAndNotMovedByALaterTransformation [
 	"Measured: Cairo transforms a path as its verbs are sent, so the clip is a device-space shape

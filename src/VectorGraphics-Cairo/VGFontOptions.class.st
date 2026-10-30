@@ -158,6 +158,13 @@ VGFontOptions >> inspectorNames: aBuilder [
 		  yourself
 ]
 
+{ #category : 'inspecting' }
+VGFontOptions >> inspectorNamesContext: aContext [
+	"Options with no antialias name set hold nothing to put beside the enumerations."
+
+	aContext active: antialias isNotNil
+]
+
 { #category : 'printing' }
 VGFontOptions >> printOn: aStream [
 	aStream

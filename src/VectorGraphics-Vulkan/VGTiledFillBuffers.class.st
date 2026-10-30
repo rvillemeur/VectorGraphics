@@ -127,8 +127,13 @@ VGTiledFillBuffers >> headers [
 
 { #category : 'initialization' }
 VGTiledFillBuffers >> initialize [
+	"The buffers are held under the symbol the kernel binds them by, and an identity dictionary
+	 is what that asks for: a symbol is unique in the image, so a lookup compares pointers where
+	 a plain dictionary compares the characters of the name. The encoder of unit 3.5 fetches a
+	 buffer thousands of times a frame, and comparing names was half a millisecond of it."
+
 	super initialize.
-	arrays := Dictionary new
+	arrays := IdentityDictionary new
 ]
 
 { #category : 'inspector' }

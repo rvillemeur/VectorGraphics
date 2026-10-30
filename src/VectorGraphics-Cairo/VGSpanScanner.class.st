@@ -11,7 +11,9 @@ Class {
 		'fillRule',
 		'antialias',
 		'exactBounds',
-		'edgeIndex'
+		'edgeIndex',
+		'borderOnlyEdges',
+		'interiorInsideness'
 	],
 	#category : 'VectorGraphics-Cairo-Rasterising',
 	#package : 'VectorGraphics-Cairo',
@@ -50,6 +52,28 @@ VGSpanScanner >> antialias [
 	^ antialias
 ]
 
+{ #category : 'enclosing' }
+VGSpanScanner >> computeEveryEdgeOnItsBorder [
+	"One scan over my edges: an edge lies on the border of my box when it is vertical on the
+	 left or the right of it, or horizontal on the top or the bottom. A slanted edge cannot lie
+	 along the border of a rectangle, so it is enough to ask of each edge that it stand on one
+	 side."
+
+	| box |
+	box := self exactBoundingBox.
+	box ifNil: [ ^ false ].
+	1 to: segments size by: 4 do: [ :index |
+		| x0 y0 x1 y1 onBorder |
+		x0 := segments at: index.
+		y0 := segments at: index + 1.
+		x1 := segments at: index + 2.
+		y1 := segments at: index + 3.
+		onBorder := (x0 = x1 and: [ x0 = box left or: [ x0 = box right ] ]) or: [
+			            y0 = y1 and: [ y0 = box top or: [ y0 = box bottom ] ] ].
+		onBorder ifFalse: [ ^ false ] ].
+	^ true
+]
+
 { #category : 'private' }
 VGSpanScanner >> crossingsAt: aNumber [
 	"Every edge the line crosses, as an x to direction association sorted by x. An edge is taken
@@ -86,7 +110,7 @@ VGSpanScanner >> edgeIndex [
 			               (self exactBoundingBox ifNil: [ 0 @ 0 corner: 0 @ 0 ]) ]
 ]
 
-{ #category : 'testing' }
+{ #category : 'enclosing' }
 VGSpanScanner >> enclosesWholly: aRectangle [
 	"Whether every point of that rectangle, its boundary included, is inside me under my own
 	 fill rule. A tiled rasteriser asks this of a tile before it walks it, of the fill and of
@@ -94,7 +118,31 @@ VGSpanScanner >> enclosesWholly: aRectangle [
 	 they all enclose is one and the walk has nothing to find there.
 	 The answer is conservative, since a yes paints whole a pixel the walk would have painted in
 	 part: an edge that so much as touches the rectangle answers no, and that leaves one point to
-	 ask of the fill rule, the centre."
+	 ask of the fill rule, the centre.
+	 A shape that holds every edge on the border of its own box is answered by arithmetic, which
+	 is what a frame is made of: a rectangle strictly inside such a box meets no edge of mine,
+	 and the insideness of its centre is the insideness of the whole interior, read once. The
+	 binning of the reference frame asked this question of a shape nearly four thousand times a
+	 frame and spent half of its time scanning edges to answer it."
+
+	| box |
+	box := self exactBoundingBox.
+	box ifNil: [ ^ false ].
+	(box containsRect: aRectangle) ifFalse: [ ^ false ].
+	((self strictlyHolds: aRectangle in: box) and: [
+		 self holdsEveryEdgeOnItsBorder ]) ifTrue: [
+		^ self interiorOfBoxIsInside ].
+	(self anEdgeMeets: aRectangle) ifTrue: [ ^ false ].
+	^ self isInsideAt: aRectangle center
+]
+
+{ #category : 'enclosing' }
+VGSpanScanner >> enclosesWhollyByScan: aRectangle [
+	"Whether every point of that rectangle, its boundary included, is inside me under my own
+	 fill rule, answered by reading my edges: the box has to hold the rectangle, no edge of mine
+	 may so much as touch it, and that leaves one point to ask of the fill rule, the centre.
+	 This is the rule itself. enclosesWholly: answers it and takes a shorter road where it can,
+	 and a test holds the two answers side by side over a corpus of shapes and tiles."
 
 	| box |
 	box := self exactBoundingBox.
@@ -154,6 +202,19 @@ VGSpanScanner >> exactBoundingBox [
 { #category : 'accessing' }
 VGSpanScanner >> fillRule [
 	^ fillRule
+]
+
+{ #category : 'enclosing' }
+VGSpanScanner >> holdsEveryEdgeOnItsBorder [
+	"Whether every edge of mine lies along the border of my own box, which is what a rectangle,
+	 a run of rectangles sharing a box and a mask's own extents all are. Such a shape holds no
+	 edge inside its box, so no rectangle strictly inside the box meets an edge of mine and the
+	 insideness of one point of that interior is the insideness of all of it.
+	 The answer is remembered, because a binning asks the enclosure of one shape once a tile and
+	 my coordinates never change after I am built."
+
+	borderOnlyEdges ifNotNil: [ ^ borderOnlyEdges ].
+	^ borderOnlyEdges := self computeEveryEdgeOnItsBorder
 ]
 
 { #category : 'inspector' }
@@ -222,6 +283,22 @@ VGSpanScanner >> inspectorSpans: aBuilder [
 VGSpanScanner >> inspectorSpansContext: aContext [
 	"A scanner with no edges answers no span anywhere, so there is nothing to list."
 	aContext active: self isEmpty not
+]
+
+{ #category : 'enclosing' }
+VGSpanScanner >> interiorOfBoxIsInside [
+	"Whether the inside of my box is inside me, asked at its centre and asked once. This is only
+	 the answer for a shape that holds every edge on its border: there the interior of the box
+	 holds no edge of mine, the winding changes nowhere in it, and one point speaks for all of
+	 it. A box of no area has no interior, and the answer is then false and read by nobody."
+
+	interiorInsideness ifNotNil: [ ^ interiorInsideness ].
+	^ interiorInsideness := self exactBoundingBox
+		                        ifNil: [ false ]
+		                        ifNotNil: [ :box |
+		                        (box width > 0 and: [ box height > 0 ])
+			                        ifTrue: [ self isInsideAt: box center ]
+			                        ifFalse: [ false ] ]
 ]
 
 { #category : 'testing' }
@@ -318,4 +395,16 @@ VGSpanScanner >> spansOfPixelRowAt: aNumber do: aBlock [
 		first := (from - 0.5) ceiling.
 		after := (to - 0.5) ceiling.
 		after > first ifTrue: [ aBlock value: first asFloat value: after asFloat ] ]
+]
+
+{ #category : 'enclosing' }
+VGSpanScanner >> strictlyHolds: aRectangle in: aBox [
+	"Whether that rectangle lies inside that box sharing no point of its border. A rectangle
+	 that touches the border is left to the scan, because an edge along the border touches it
+	 and the answer is then no."
+
+	^ aBox left < aRectangle left and: [
+		  aBox top < aRectangle top and: [
+			  aBox right > aRectangle right and: [
+				  aBox bottom > aRectangle bottom ] ] ]
 ]

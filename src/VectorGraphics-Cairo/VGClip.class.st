@@ -132,6 +132,58 @@ VGClip >> extents [
 	  corner: bounds right ceiling @ bounds bottom ceiling
 ]
 
+{ #category : 'testing' }
+VGClip >> holdsWholly: aRectangle [
+	"Whether my area holds every point of that rectangle, its boundary included: what
+	 bounds containsRect: answers, with the four numbers compared one at a time. A rectangle
+	 comparison is two point comparisons, and a point comparison of my fractional bound against
+	 a whole tile bound coerces one number against the other twice a corner, which the binning
+	 of unit 3.5 paid for every entry and tile pair of the frame."
+
+	| mine |
+	mine := bounds.
+	^ mine left <= aRectangle left and: [
+		  mine top <= aRectangle top and: [
+			  mine right >= aRectangle right and: [
+				  mine bottom >= aRectangle bottom ] ] ]
+]
+
+{ #category : 'inspecting' }
+VGClip >> inspectorHoldsWholly: aBuilder [
+	<inspectorPresentationOrder: 4 title: 'Holds wholly'>
+	"What I answer about rectangles taken from my own area, which is the question a tiled
+	 binning asks of me once for every entry and tile pair of a frame. Each row asks the
+	 predicate and asks my bounds beside it, so a spelling of the question that stopped
+	 agreeing with Rectangle>>containsRect: would show as two different answers rather than go
+	 unseen."
+
+	| whole |
+	whole := self extents.
+	^ aBuilder newTable
+		  items: {
+				  ('my extents' -> whole).
+				  ('my extents inset by one pixel' -> (whole insetBy: 1)).
+				  ('my extents grown by one pixel' -> (whole expandBy: 1)).
+				  ('my exact bounds' -> bounds).
+				  ('the pixel at my top left' -> (whole origin corner: whole origin + (1 @ 1))).
+				  ('one pixel past my right edge'
+				   -> (whole topRight corner: whole bottomRight + (1 @ 0))) };
+		  addColumn: (SpStringTableColumn title: 'Rectangle' evaluated: [ :each |
+					   each key , ' ' , each value printString ]);
+		  addColumn: (SpStringTableColumn title: 'Held wholly' evaluated: [ :each |
+					   (self holdsWholly: each value) printString ]);
+		  addColumn: (SpStringTableColumn title: 'Inside my bounds' evaluated: [ :each |
+					   (bounds containsRect: each value) printString ]);
+		  yourself
+]
+
+{ #category : 'inspecting' }
+VGClip >> inspectorHoldsWhollyContext: aContext [
+	"A clip with no bounds has no area to take a rectangle from."
+
+	aContext active: bounds isNotNil
+]
+
 { #category : 'inspector' }
 VGClip >> inspectorMaskSide [
 	"The side of the mask the walk view measures. Sixteen pixels is a glyph of a readable size,

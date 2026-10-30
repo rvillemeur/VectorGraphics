@@ -486,6 +486,37 @@ VGCairoSurfaceTest >> testStrideSmallerThanOneRowIsRefusedByStatus [
 	self should: [ surface status ensureIsSuccess ] raise: Error
 ]
 
+{ #category : 'tests - reading' }
+VGCairoSurfaceTest >> testTheAlphaBytesOfARowAreTheAlphaOfEveryPixelOfItAskedOneByOne [
+	"The bulk reader the tiled encoder reads a mask with has to answer byte for byte what the
+	 pixel reader answers, on a surface of either depth, and a run of one pixel is a run too."
+
+	| argb mask |
+	argb := VGCairoImageSurface extent: 5 @ 4.
+	argb newContext
+		sourceColor: (Color red alpha: 0.4);
+		paint.
+	mask := argb newSimilarImageFormat: VGCairoSurfaceFormat a8 width: 5 height: 4.
+	mask newContext
+		sourceColor: (Color white alpha: 0.6);
+		paint.
+	{ argb. mask } do: [ :surface |
+		surface flush.
+		0 to: surface height - 1 do: [ :y |
+			| run |
+			run := surface alphaBytesOfRow: y from: 1 to: 3.
+			self assert: run size equals: 3.
+			1 to: 3 do: [ :each |
+				self
+					assert: (run at: each)
+					equals: (surface format alphaOfPixel:
+							 (surface primitivePixelAtX: each y: y)) ] ].
+		self
+			assert: (surface alphaBytesOfRow: 0 from: 4 to: 4)
+			equals: (ByteArray with: (surface format alphaOfPixel:
+						  (surface primitivePixelAtX: 4 y: 0))) ]
+]
+
 { #category : 'tests' }
 VGCairoSurfaceTest >> testTheFormDividesThePremultiplicationOutExactlyAsAlexandrieDoes [
 	"The corpus compares our Form against Alexandrie's, pixel word for pixel word, so the two have

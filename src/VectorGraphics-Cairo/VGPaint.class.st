@@ -290,22 +290,19 @@ VGPaint >> matrix [
 	 Every pixel of every fill asks for it, and building the decode afresh each time was the whole
 	 cost of a frame. My block stays the truth: matrix: writes it and drops the decode, and no one
 	 else writes the six fields. The matrix I answer is mine, so a caller that wants to change one
-	 copies it first."
+	 copies it first.
+	 The six fields are read one by one through the order the class names them in, rather than
+	 gathered into a dictionary first: a frame decodes a matrix for every entry it carries, and
+	 the dictionary was six symbol hashes and an allocation each time."
 
 	^ matrix ifNil: [
-		  | named |
-		  named := Dictionary new.
-		  self class matrixFieldIndices doWithIndex: [ :field :index |
-			  named
-				  at: (self class matrixFieldOrder at: index)
-				  put: (coefficients at: field) ].
 		  matrix := VGCairoMatrix
-			            newX: (named at: #x)
-			            y: (named at: #y)
-			            sx: (named at: #sx)
-			            sy: (named at: #sy)
-			            shx: (named at: #shx)
-			            shy: (named at: #shy) ]
+			            newX: (self matrixCoefficientNamed: #x)
+			            y: (self matrixCoefficientNamed: #y)
+			            sx: (self matrixCoefficientNamed: #sx)
+			            sy: (self matrixCoefficientNamed: #sy)
+			            shx: (self matrixCoefficientNamed: #shx)
+			            shy: (self matrixCoefficientNamed: #shy) ]
 ]
 
 { #category : 'accessing' }
@@ -321,6 +318,16 @@ VGPaint >> matrix: aMatrix [
 		coefficients
 			at: field
 			put: (aMatrix perform: (self class matrixFieldOrder at: index)) asFloat ]
+]
+
+{ #category : 'private' }
+VGPaint >> matrixCoefficientNamed: aName [
+	"The field of my block that carries that coefficient, found through the order the class
+	 names the fields in, so a block whose fields move needs no change here."
+
+	^ coefficients at:
+		  (self class matrixFieldIndices at:
+			   (self class matrixFieldOrder indexOf: aName))
 ]
 
 { #category : 'painting' }

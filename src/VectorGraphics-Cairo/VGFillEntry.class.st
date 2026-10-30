@@ -47,7 +47,7 @@ VGFillEntry >> coversEveryPixelOf: aRectangle [
 	 asked before the shapes of the clip because a fill that encloses no tile at all is the common
 	 case, and failing on it leaves the shapes of its clip unasked."
 
-	(clip bounds containsRect: aRectangle) ifFalse: [ ^ false ].
+	(clip holdsWholly: aRectangle) ifFalse: [ ^ false ].
 	(segments enclosesWholly: aRectangle) ifFalse: [ ^ false ].
 	clip shapes do: [ :each |
 		(each enclosesWholly: aRectangle) ifFalse: [ ^ false ] ].
