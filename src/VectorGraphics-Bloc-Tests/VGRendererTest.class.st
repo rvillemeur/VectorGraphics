@@ -278,6 +278,29 @@ VGRendererTest >> testTheBlocBackendMethodsThatBypassTheCanvasAreKnown [
 			 #renderWith:pixels:stride:physicalRectangle:logicalRectangle:)
 ]
 
+{ #category : 'tests' }
+VGRendererTest >> testTheCpuSurfaceLockIsSentByTheFrameMethodAlone [
+	"The finding of the present plan's section 6, held as a fact: nothing in `BlHostSpace` or
+	 `BlHostRenderer` forces a frame through CPU pixels. One method sends
+	 `lockSurfaceFor:scaleFactor:during:`, and it is `BARenderer >> render:`, which a renderer
+	 subclass may override, so a renderer that presents a device image instead of locking a
+	 surface has a place to stand. A second sender would mean the seam has moved and that
+	 finding has to be read again. My own class is left out of the count, because naming the
+	 selector to ask the question makes the asking method a sender of it."
+
+	| senders |
+	senders := ((SystemNavigation default allSendersOf:
+		             #lockSurfaceFor:scaleFactor:during:)
+		            reject: [ :each | each methodClass == self class ])
+		           collect: [ :each |
+		           each methodClass name , '>>' , each selector ].
+	self
+		assertCollection: senders asSet
+		hasSameElements: #( 'BARenderer>>render:' ) asSet.
+	self assert: (VGRenderer inheritsFrom: BARenderer).
+	self deny: (VGRenderer includesSelector: #render:)
+]
+
 { #category : 'tests - form and png' }
 VGRendererTest >> testTheFormOfAnElementIsDrawnByOurCanvas [
 	"`newFormFrom:` is how Bloc turns an element into a Pharo `Form`, which is what an inspector
