@@ -11,6 +11,18 @@ Class {
 	#package : 'VectorGraphics-Bloc-Tests'
 }
 
+{ #category : 'private' }
+VGFrameProfileTest >> entriesOfOneFrameOf: aScene [
+	"The display list one frame of that scene records, read before the surface drains: draining
+	 empties the list, so a reader who flushes first counts nothing."
+
+	| canvas |
+	canvas := VGCanvas extent: profile extent.
+	canvas clippingRectangle: (0 @ 0 extent: profile extent).
+	aScene aeFullDrawOn: canvas.
+	^ canvas privateAeCairoSurface displayList entries copy
+]
+
 { #category : 'accessing' }
 VGFrameProfileTest >> millisecondTolerance [
 	"Two sums of the same floats differ by this much at most."
@@ -173,4 +185,43 @@ VGFrameProfileTest >> testTheStageOfTheRasteriserIsTheCoverageStage [
 	 keys."
 
 	self assert: (VGFrameProfile stageOfClass: VGRasteriser) equals: #coverage
+]
+
+{ #category : 'tests' }
+VGFrameProfileTest >> testTwoFramesOfTheSameSceneRecordTheSameGeometry [
+	"The other half of unit 3.7's premise: what the second frame rebuilds is the same picture to
+	 the coordinate, so the work re-encoded is genuinely repeated work and not a frame that has
+	 changed. The two facts together say where a memo would have to hang - on something that
+	 outlives a frame, which an entry does not."
+
+	| scene fillsOf first second |
+	scene := profile sceneForRendererClass: VGRenderer.
+	fillsOf := [ :entries |
+	            entries select: [ :each | each class = VGFillEntry ] ].
+	first := fillsOf value: (self entriesOfOneFrameOf: scene).
+	second := fillsOf value: (self entriesOfOneFrameOf: scene).
+	self deny: first isEmpty.
+	first
+		with: second
+		do: [ :one :other |
+			self
+				assert: one segments coordinates
+				equals: other segments coordinates ]
+]
+
+{ #category : 'tests' }
+VGFrameProfileTest >> testTwoFramesOfTheSameSceneShareNoEntry [
+	"Unit 3.7's premise, held as a fact: an unchanged element tree drawn twice hands the canvas a
+	 wholly new set of entries, so a record memoised on an entry is read back by nobody. The
+	 scene is one object drawn twice, not two scenes, which is the case a window redraw is."
+
+	| scene first second |
+	scene := profile sceneForRendererClass: VGRenderer.
+	first := self entriesOfOneFrameOf: scene.
+	second := self entriesOfOneFrameOf: scene.
+	self deny: first isEmpty.
+	self assert: first size equals: second size.
+	self
+		assert: (first select: [ :each | second identityIncludes: each ]) size
+		equals: 0
 ]
