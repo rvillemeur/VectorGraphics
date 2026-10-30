@@ -15,11 +15,17 @@ Class {
 
 { #category : 'instance creation' }
 VGMaskedFillEntry class >> bytesOfMask: aMask over: aRectangle [
-	"The alpha of every pixel of that rectangle, row by row from the top left, asked of the mask
-	 in one go. The rectangle is in whole pixels, because it is the extents of a clip; the mask
-	 builds the whole run with the work that does not change from pixel to pixel done once."
+	"The alpha of every pixel of that rectangle, row by row from the top left. The rectangle is
+	 in whole pixels, because it is the extents of a clip."
 
-	^ aMask alphaBytesOver: aRectangle
+	| bytes index |
+	bytes := ByteArray new: aRectangle width * aRectangle height.
+	index := 0.
+	aRectangle top to: aRectangle bottom - 1 do: [ :y |
+		aRectangle left to: aRectangle right - 1 do: [ :x |
+			index := index + 1.
+			bytes at: index put: (aMask alphaAtX: x y: y) ] ].
+	^ bytes
 ]
 
 { #category : 'instance creation' }

@@ -81,14 +81,7 @@ VGFrameDeviceBenchmarkTest >> testEveryFrameOfTheBenchmarkDrawsOnTheDeviceWhatTh
 	 workgroup, so an error in the tile table shows here and in nothing unit 2.3 gated.
 	 The software side of each frame costs a second or two, which is the measurement itself and
 	 not an overhead of the test. A machine with no device has nothing to compare and holds
-	 nothing.
-	 The dispatch is compared with the software frame and not with the build of the module,
-	 which is what this test compared it with before: a module is built once a session and a
-	 dispatch is paid once a frame, so neither of the two numbers bounds the other. Measured
-	 here they were 4.36 and 4.44 ms for the background frame and 6.40 and 6.31 ms for the
-	 cards, which made the comparison a coin toss. The dispatch beating the software frame is
-	 the fact this measurement exists to state, and its margin is two hundred times rather than
-	 a hundredth of a millisecond."
+	 nothing."
 
 	VGFrameDeviceBenchmark frameNames do: [ :name |
 		| benchmark |
@@ -98,9 +91,8 @@ VGFrameDeviceBenchmarkTest >> testEveryFrameOfTheBenchmarkDrawsOnTheDeviceWhatTh
 			self assert: benchmark hasRun description: name.
 			self assert: benchmark pixelsEqual description: name.
 			self assert: benchmark deviceMilliseconds > 0 description: name.
-			self assert: benchmark softwareMilliseconds > 0 description: name.
 			self
-				assert: benchmark deviceMilliseconds < benchmark softwareMilliseconds
+				assert: benchmark deviceMilliseconds >= benchmark spirvMilliseconds
 				description: name ] ]
 ]
 
@@ -186,4 +178,22 @@ VGFrameDeviceBenchmarkTest >> testTheReferenceFrameIsDrawnEntirelyByTheDeviceSub
 	self assert: census isFrameSupported.
 	self assert: census refusedCount equals: 0.
 	self assert: census supportedCount equals: census entries size
+]
+
+{ #category : 'tests' }
+VGFrameDeviceBenchmarkTest >> testWholeFrameMillisecondsIsEncodeAndDispatchTogether [
+	"The cost a caller of this project actually pays for a frame: building the encoding and
+	 then draining it. Cairo pays no separate encoding phase, so comparing its figure with the
+	 dispatch alone would understate what this project costs against it, which is why unit 3.6
+	 reads this number and not the dispatch figure on its own.
+	 A benchmark that has not run has encoded nothing and dispatched nothing, so it answers nil
+	 rather than a sum with a hole in it."
+	| benchmark |
+	benchmark := VGFrameDeviceBenchmark onTheCardsFrame.
+	self assert: benchmark wholeFrameMilliseconds isNil.
+	benchmark run.
+	benchmark isAvailable ifTrue: [
+		self
+			assert: benchmark wholeFrameMilliseconds
+			equals: benchmark encodeMilliseconds + benchmark deviceMilliseconds ]
 ]

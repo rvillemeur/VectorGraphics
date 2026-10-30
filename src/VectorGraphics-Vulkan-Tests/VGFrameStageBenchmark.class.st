@@ -173,12 +173,13 @@ VGFrameStageBenchmark >> measureStagesOn: aSession [
 
 { #category : 'reporting' }
 VGFrameStageBenchmark >> reportRows [
-	"Everything my superclass reports, and then one row a stage of the dispatch. The stage rows
-	 come last because they are the inside of the dispatch row above them, and their labels say
-	 so, so that a reader adding the rows up does not count the dispatch twice."
-
+	"Everything my superclass reports, then one row a stage of the dispatch, then the verdict
+	 they add up to. The stage rows come first because they are the inside of the dispatch row
+	 above them, and the verdict comes last because it is the bottom line of everything above
+	 it and not a phase of its own."
 	^ super reportRows , (self stageRows collect: [ :each |
 		   'stage ' , each key asString -> (self millisecondStringFor: each value) ])
+	  , self verdictRows
 ]
 
 { #category : 'running' }
@@ -214,6 +215,16 @@ VGFrameStageBenchmark >> run [
 ]
 
 { #category : 'accessing' }
+VGFrameStageBenchmark >> slowerThanCairoBy [
+	"How many times the whole frame this project pays costs what Cairo costs over the same
+	 picture, or nil while either side is unmeasured."
+	| whole cairo |
+	whole := self wholeFrameMilliseconds ifNil: [ ^ nil ].
+	cairo := self cairoMilliseconds ifNil: [ ^ nil ].
+	^ whole / cairo
+]
+
+{ #category : 'accessing' }
 VGFrameStageBenchmark >> stageMilliseconds [
 	"What each stage of one frame cost, in milliseconds, keyed by the stage names
 	 VGTiledFillDispatch gives them. Empty until the frame has been measured on a device."
@@ -242,4 +253,18 @@ VGFrameStageBenchmark >> stagedFrameMilliseconds [
 	 to. It is above the dispatch figure by whatever the clock readings cost."
 
 	^ self millisecondsOf: #stagedFrame
+]
+
+{ #category : 'reporting' }
+VGFrameStageBenchmark >> verdictRows [
+	"The bottom line unit 3.6 is read for: the whole frame beside Cairo's and how many times
+	 the two differ, which a reader would otherwise compute from the rows above by hand."
+	| rows |
+	rows := OrderedCollection new.
+	self wholeFrameMilliseconds ifNotNil: [ :whole |
+		rows add: 'whole frame' -> (self millisecondStringFor: whole) ].
+	self slowerThanCairoBy ifNotNil: [ :factor |
+		rows add: 'slower than Cairo by'
+			-> ((factor asFloat printShowingDecimalPlaces: 1) , ' times') ].
+	^ rows asArray
 ]

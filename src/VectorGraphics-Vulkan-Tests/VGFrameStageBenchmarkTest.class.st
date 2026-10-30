@@ -186,6 +186,23 @@ VGFrameStageBenchmarkTest >> testNeitherKitNamesAClassOfTheOtherSide [
 ]
 
 { #category : 'tests' }
+VGFrameStageBenchmarkTest >> testSlowerThanCairoByIsTheWholeFrameOverCairo [
+	"The one ratio unit 3.6 is read for: how many times the whole frame this project pays costs
+	 what the same picture costs Cairo, measured here and not quoted from an earlier unit.
+	 Nil while either side is unmeasured, so a report never divides by nothing."
+	| benchmark |
+	benchmark := VGFrameStageBenchmark onTheCardsFrame.
+	self assert: benchmark slowerThanCairoBy isNil.
+	benchmark run.
+	benchmark isAvailable ifTrue: [
+		self
+			assert: benchmark slowerThanCairoBy
+			equals: benchmark wholeFrameMilliseconds / benchmark cairoMilliseconds.
+		self assert: ((benchmark reportRows collect: [ :each | each key ]) asArray
+			includes: 'slower than Cairo by') ]
+]
+
+{ #category : 'tests' }
 VGFrameStageBenchmarkTest >> testTheCairoKitDrawsThePictureOursDraws [
 	"The Cairo figure of the report is only a comparison if both sides drew one picture. The
 	 background and the cards frames come out byte for byte the same on either side, which is

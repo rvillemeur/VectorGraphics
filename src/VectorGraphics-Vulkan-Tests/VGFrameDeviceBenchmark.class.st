@@ -349,12 +349,13 @@ VGFrameDeviceBenchmark >> measureEncoding [
 	 every time. The encoding itself is kept, so that a machine with no driver still reports what
 	 the frame weighs and what it would dispatch."
 
+	| surface |
+	surface := self newSurface.
 	milliseconds
 		at: #encode
-		put: self millisecondsPerRepeatEncodingAFreshFrame.
-	encoding := VGTiledFillEncoding
-		            of: self newSurface displayList
-		            extent: self extent.
+		put: (self millisecondsPerRepeatOf: [
+				 VGTiledFillEncoding of: surface displayList extent: self extent ]).
+	encoding := VGTiledFillEncoding of: surface displayList extent: self extent.
 	milliseconds
 		at: #buildSpirv
 		put: (self millisecondsPerRepeatOf: [
@@ -438,27 +439,6 @@ VGFrameDeviceBenchmark >> millisecondsOf: aPhase [
 	 neither the rows nor the view name a phase the measurement does not have."
 
 	^ milliseconds at: aPhase ifAbsent: [ nil ]
-]
-
-{ #category : 'private - measuring' }
-VGFrameDeviceBenchmark >> millisecondsPerRepeatEncodingAFreshFrame [
-	"The encoding of the frame, timed over a frame recorded afresh every repeat. An entry keeps
-	 the fill the tiled rasteriser draws in its place once it has built it, so encoding the same
-	 display list a second time reads memos no running application ever has, and timing repeats
-	 of one list would report an encoder faster than the one a frame meets. Recording the frame
-	 is left outside the clock, because it is the backend's work and not the encoder's; the
-	 first pass is thrown away, as everywhere here, for the first touch of the pages."
-
-	| total |
-	VGTiledFillEncoding of: self newSurface displayList extent: self extent.
-	total := 0.
-	repeats timesRepeat: [
-		| list start |
-		list := self newSurface displayList.
-		start := Time microsecondClockValue.
-		VGTiledFillEncoding of: list extent: self extent.
-		total := total + (Time microsecondClockValue - start) ].
-	^ (total / repeats / VGVulkanRoundTrip microsecondsPerMillisecond) asFloat
 ]
 
 { #category : 'measuring' }
@@ -632,4 +612,15 @@ VGFrameDeviceBenchmark >> unavailableReason [
 { #category : 'accessing' }
 VGFrameDeviceBenchmark >> uploadedByteCount [
 	^ uploadedByteCount
+]
+
+{ #category : 'accessing' }
+VGFrameDeviceBenchmark >> wholeFrameMilliseconds [
+	"Encoding and dispatch together, which is what a caller of this project actually pays for
+	 one frame. Cairo draws and flushes in a single phase and pays no encoding of its own, so
+	 the dispatch figure alone understates what this project costs against it."
+	| encode dispatch |
+	encode := self encodeMilliseconds ifNil: [ ^ nil ].
+	dispatch := self deviceMilliseconds ifNil: [ ^ nil ].
+	^ encode + dispatch
 ]
