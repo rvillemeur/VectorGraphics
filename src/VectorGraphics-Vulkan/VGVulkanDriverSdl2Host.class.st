@@ -17,12 +17,24 @@ Class {
 	#tag : 'Backend'
 }
 
-{ #category : 'driver selection' }
+{ #category : 'testing' }
 VGVulkanDriverSdl2Host class >> isSupported [
 	"Exactly the case my superclass misses: SDL2 is there and driving windows, but the installed
 	 driver is PharoVulkan's subclass of OSSDL2Driver rather than that class itself, and the
 	 superclass compares class names. Answering true any wider than this would leave two SDL2
-	 hosts supported at once, and the registry would then pick between them by order alone."
+	 hosts supported at once, and the registry would then pick between them by order alone.
+	 The second half is unit 7.1's: while presenting is opted into, VGVulkanPresentHost answers
+	 for the driver in my place, so the three of us still partition."
+
+	^ self respondsToVulkanDriver and: [ VGVulkanPresentHost isEnabled not ]
+]
+
+{ #category : 'testing' }
+VGVulkanDriverSdl2Host class >> respondsToVulkanDriver [
+	"Whether the driver installed now is PharoVulkan's. It is the case Bloc's own SDL2 host
+	 misses, because that host compares class names, and it is the half my subclass and I have in
+	 common. The test is a kind-of test on purpose: PVVulkanDriver is a subclass of OSSDL2Driver,
+	 and a later subclass of PVVulkanDriver must answer here too."
 
 	^ OSWindowDriver current isKindOf: PVVulkanDriver
 ]

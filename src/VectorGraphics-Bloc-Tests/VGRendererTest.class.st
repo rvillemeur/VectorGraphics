@@ -285,13 +285,14 @@ VGRendererTest >> testTheCpuSurfaceLockIsSentByTheFrameMethodAlone [
 	 `lockSurfaceFor:scaleFactor:during:`, and it is `BARenderer >> render:`, which a renderer
 	 subclass may override, so a renderer that presents a device image instead of locking a
 	 surface has a place to stand. A second sender would mean the seam has moved and that
-	 finding has to be read again. My own class is left out of the count, because naming the
-	 selector to ask the question makes the asking method a sender of it."
+	 finding has to be read again. Tests are left out of the count, this one and unit 7.1's
+	 together: a test that names the selector is asking a question about the seam, which is the
+	 opposite of a frame taking the CPU route through it."
 
 	| senders |
 	senders := ((SystemNavigation default allSendersOf:
 		             #lockSurfaceFor:scaleFactor:during:)
-		            reject: [ :each | each methodClass == self class ])
+		            reject: [ :each | each methodClass inheritsFrom: TestCase ])
 		           collect: [ :each |
 		           each methodClass name , '>>' , each selector ].
 	self

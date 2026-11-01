@@ -12,6 +12,22 @@ Class {
 }
 
 { #category : 'running' }
+VGVulkanDriverSdl2HostTest class >> withDriverClass: aDriverClass during: aBlock [
+	"Swap the OSWindow driver the way PVVulkanDriver class >> installDuring: does, for the one
+	 driver class it cannot install: the stock one. The swap runs non-interactively because
+	 OSWindowDriver class >> driverClass: ends with a dialog telling the user to restart the
+	 image, advice that does not apply when the same method nils the cached driver instance.
+	 I am on the class side because VGVulkanPresentHostTest needs the same swap, and one copy of
+	 it is better than two that can drift apart."
+
+	| previous |
+	previous := OSWindowDriver driverClass.
+	UIManager nonInteractiveDuring: [ OSWindowDriver driverClass: aDriverClass ].
+	^ aBlock ensure: [
+		  UIManager nonInteractiveDuring: [ OSWindowDriver driverClass: previous ] ]
+]
+
+{ #category : 'running' }
 VGVulkanDriverSdl2HostTest >> tearDown [
 	"Asking a registry which hosts are available builds the singleton of every supported host,
 	 and BlOSWindowSDL2Host class >> default registers that singleton in the image's own
@@ -75,14 +91,7 @@ VGVulkanDriverSdl2HostTest >> testTheHostIsSupportedWhileTheVulkanDriverIsInstal
 
 { #category : 'running' }
 VGVulkanDriverSdl2HostTest >> withDriverClass: aDriverClass during: aBlock [
-	"Swap the OSWindow driver the way PVVulkanDriver class >> installDuring: does, for the one
-	 driver class it cannot install: the stock one. The swap runs non-interactively because
-	 OSWindowDriver class >> driverClass: ends with a dialog telling the user to restart the
-	 image, advice that does not apply when the same method nils the cached driver instance."
+	"Delegated to the class side, which is where a second test class can reach it."
 
-	| previous |
-	previous := OSWindowDriver driverClass.
-	UIManager nonInteractiveDuring: [ OSWindowDriver driverClass: aDriverClass ].
-	^ aBlock ensure: [
-		  UIManager nonInteractiveDuring: [ OSWindowDriver driverClass: previous ] ]
+	^ self class withDriverClass: aDriverClass during: aBlock
 ]
