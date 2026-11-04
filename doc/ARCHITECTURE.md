@@ -124,9 +124,20 @@ The blend hooks follow the same three cases: `blendFillOnly`, `blendStrokeOnly` 
 `VectorCanvas` is a subclass of Pharo's `Canvas` and holds **two** engines: `engine`, which draws,
 and `boundsFinderEngine`, which measures. `updatingMorphBoundsDo:` swaps the second in for the
 duration of a block and restores it in an `ensure:`, so a morph can be asked what it would paint
-without painting it. **In this port the second engine is never built**: nothing assigns
-`boundsFinderEngine`, so the swap hands the canvas nil and a drawing inside that block fails. Ask
-the drawing engine for `morphBoundsAfterDraw` after a real drawing until a bounds finder is built.
+without painting it, and `measuredMorphBounds` answers the box afterwards.
+
+The measuring engine is a `VectorEngineBoundsFinder`, built by `setForm:` beside the drawing one.
+It is a subclass of `VectorEnginePixel` and inherits every `prim…` walk and the whole of
+`finishPath:`, so the box it answers is the box the drawing engine reports for the same commands,
+not an estimate. What it overrides is only the writing: `updateAlphasForX:y:` writes no coverage,
+`updateEdgesAndBoundsForX:y:` keeps the blend box and counts no edge, `blendPath` runs no blend
+pass and `pvtAllocateMorphIds` allocates nothing, so a finder owns no buffer at all where a
+painting engine of the same size owns three arrays of width times height. The margin `finishPath:`
+adds comes from the anti-aliasing width and the horizontal expansion, and both differ between the
+whole-pixel and the sub-pixel engine, so the finder takes them from the engine it stands in for
+through `mirror:`; `doSubPixelAntiAliasing` mirrors it again after replacing that engine.
+`updatingMorphBoundsDo:` resets the finder's bounds on entry, so each block measures its own
+drawing. A finder cannot answer `morph:isAtPoint:`: that reads the morph id map it never writes.
 
 `VectorCanvas class >> onForm:` installs a `VectorEngineWholePixel`, so a canvas is one byte a
 pixel in each buffer unless the engine is replaced by hand.
@@ -248,6 +259,7 @@ rebuilds its subject every call.
 | `VectorEnginePixel >> inspectorBuffers` | `VectorCanvasExample class >> exampleEngineDuringAFillPath` | the three buffers during a path, counted rather than described |
 | `VectorEngineAbstract >> inspectorPathState` | the same example | the path state, the two morph ids and the bounds of the last drawing |
 | `VectorCanvas >> inspectorTarget` | `VectorCanvasExample class >> exampleCanvasAfterADrawing` | the target form, which engine draws and which measures |
+| `VectorEngineBoundsFinder >> inspectorMeasurement` | `VectorCanvasExample class >> exampleBoundsFinderAfterMeasuringATriangle` | the box measured, the margins mirrored from the painting engine, and that nothing was painted and no buffer allocated |
 | `TTGlyph >> inspectorContours` | `TrueTypeExample class >> exampleGlyphWithContours` | each contour, with its straight segments and its quadratic Béziers counted by the drawing rule itself |
 | `TTGlyph >> inspectorGlyph` | the same example | the glyph as `VectorCanvas` really fills it |
 | `TTFontDescription >> inspectorGlyphMap` | `TrueTypeExample class >> exampleGlyphMap` | every code point the font maps, with the record it points at |

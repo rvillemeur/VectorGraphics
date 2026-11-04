@@ -57,6 +57,12 @@ VectorCanvas class >> onForm: aForm [
 	^ canvas
 ]
 
+{ #category : 'accessing' }
+VectorCanvas >> boundsFinderEngine [
+
+	^ boundsFinderEngine
+]
+
 { #category : 'paths' }
 VectorCanvas >> closePath [
 
@@ -91,7 +97,7 @@ VectorCanvas >> doSubPixelAntiAliasing [
 	"
 
 	engine := VectorEngineSubPixel onForm: form.
-	"self newClipRect: nil"
+	boundsFinderEngine mirror: engine
 ]
 
 { #category : 'drawing - icons' }
@@ -404,6 +410,15 @@ VectorCanvas >> line: pt1 to: pt2 width: morphStrokeWidth color: aStrokeColor [
 VectorCanvas >> lineToX: xTo y: yTo [
 
 	engine abs_LineTo: xTo @ yTo
+]
+
+{ #category : 'accessing' }
+VectorCanvas >> measuredMorphBounds [
+
+	"The area the drawing inside the last #updatingMorphBoundsDo: would have covered,
+	in form coordinates, with no clipping applied."
+
+	^ boundsFinderEngine morphBoundsAfterDraw
 ]
 
 { #category : 'paths' }
@@ -744,6 +759,7 @@ VectorCanvas >> setForm: aForm [
 		self error: 'VectorCanvas can only work on 32 bit destination' ].
 	form := aForm.
 	engine := VectorEngineWholePixel onForm: form.
+	boundsFinderEngine := VectorEngineBoundsFinder onForm: form mirroring: engine
 ]
 
 { #category : 'context and parameters for path' }
@@ -792,8 +808,9 @@ VectorCanvas >> updatingMorphBoundsDo: aBlock [
 
 	| prevEngine |
 	prevEngine := engine.
-	[ 
+	[
 	engine := boundsFinderEngine.
+	boundsFinderEngine resetMorphBounds.
 	aBlock value ] ensure: [ engine := prevEngine ]
 ]
 

@@ -233,6 +233,12 @@ VectorEngineAbstract >> abs_QuadraticBezierTo: aPoint control: cPoint [
 ]
 
 { #category : 'accessing' }
+VectorEngineAbstract >> antiAliasingWidth [
+
+	^ antiAliasingWidth
+]
+
+{ #category : 'accessing' }
 VectorEngineAbstract >> antiAliasingWidth: aNumber [
 
 	antiAliasingWidth := aNumber
@@ -673,6 +679,15 @@ VectorEngineAbstract >> primQuadraticBezierFromX: xFrom y: yFrom toX: xTo y: yTo
 	^self subclassResponsibility
 ]
 
+{ #category : 'private' }
+VectorEngineAbstract >> pvtAllocateMorphIds [
+
+	"A hook: an engine that writes no pixel, and therefore no morph id, overrides this
+	and keeps the map unallocated."
+
+	morphIds := WordArray new: targetForm width * targetForm height
+]
+
 { #category : 'abstract' }
 VectorEngineAbstract >> pvtFillColor: aFillColor [
 ^ self subclassResponsibility
@@ -682,7 +697,7 @@ VectorEngineAbstract >> pvtFillColor: aFillColor [
 VectorEngineAbstract >> pvtSetForm: aForm [
 
 	targetForm := aForm.
-	morphIds := WordArray new: targetForm width * targetForm height.
+	self pvtAllocateMorphIds.
 	targetWidth := targetForm width.
 	self resetMorphBounds.
 	self clipRect: targetForm boundingBox.

@@ -85,6 +85,20 @@ VectorEnginePixel >> blendHorizontalExpansion [
 	^ 0.0
 ]
 
+{ #category : 'private' }
+VectorEnginePixel >> blendPath [
+
+	"A hook: an engine that only measures overrides this and writes nothing. The blend box
+	is already clipped here, and the colours say which pass to run."
+
+	fillColor notNil
+		ifTrue: [
+			strokeColor notNil
+				ifTrue: [ self blendStrokeAndFill ]
+				ifFalse: [ self blendFillOnly ] ]
+		ifFalse: [ self blendStrokeOnly ]
+]
+
 { #category : 'private - blend with mask' }
 VectorEnginePixel >> blendStrokeOnly [
 
@@ -144,12 +158,7 @@ VectorEnginePixel >> finishPath: ensureClosePath [
 	blendBottom := blendBottom min: clipBottom.
 
 	(blendRight >= blendLeft and: [ blendBottom >= blendTop ]) ifTrue: [
-		fillColor notNil
-			ifTrue: [
-				strokeColor notNil
-					ifTrue: [ self blendStrokeAndFill ]
-					ifFalse: [ self blendFillOnly ] ]
-			ifFalse: [ self blendStrokeOnly ] ].
+		self blendPath ].
 
 	pathFirstX := 0.0.
 	pathFirstY := 0.0.

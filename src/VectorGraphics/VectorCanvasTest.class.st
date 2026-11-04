@@ -6,6 +6,20 @@ Class {
 	#tag : 'Tests'
 }
 
+{ #category : 'running' }
+VectorCanvasTest >> drawTriangleOn: aCanvas [
+
+	aCanvas
+		strokeWidth: 1.0
+		color: Color black
+		fillColor: Color blue
+		do: [
+			aCanvas moveToX: 5 y: 5.
+			aCanvas lineToX: 55 y: 5.
+			aCanvas lineToX: 30 y: 55.
+			aCanvas closePath ]
+]
+
 { #category : 'helpers' }
 VectorCanvasTest >> makeCanvas [
 
@@ -13,6 +27,15 @@ VectorCanvasTest >> makeCanvas [
 	form := Form extent: 60 @ 60 depth: 32.
 	form fillColor: Color white.
 	^ VectorCanvas onForm: form
+]
+
+{ #category : 'running' }
+VectorCanvasTest >> newWhiteForm [
+
+	| form |
+	form := Form extent: 60 @ 60 depth: 32.
+	form fillColor: Color white.
+	^ form
 ]
 
 { #category : 'tests' }
@@ -51,6 +74,59 @@ VectorCanvasTest >> testFillColorDoesNotError [
 ]
 
 { #category : 'tests' }
+VectorCanvasTest >> testMeasuredMorphBoundsEqualTheBoundsTheDrawingCovers [
+
+	| measuring painting |
+	measuring := VectorCanvas onForm: self newWhiteForm.
+	painting := VectorCanvas onForm: self newWhiteForm.
+	measuring updatingMorphBoundsDo: [ self drawTriangleOn: measuring ].
+	self drawTriangleOn: painting.
+	self
+		assert: measuring measuredMorphBounds
+		equals: painting engine morphBoundsAfterDraw
+]
+
+{ #category : 'tests' }
+VectorCanvasTest >> testMeasuringFollowsTheCanvasToSubPixelAntiAliasing [
+
+	| measuring painting |
+	measuring := VectorCanvas onForm: self newWhiteForm.
+	painting := VectorCanvas onForm: self newWhiteForm.
+	measuring doSubPixelAntiAliasing.
+	painting doSubPixelAntiAliasing.
+	measuring updatingMorphBoundsDo: [ self drawTriangleOn: measuring ].
+	self drawTriangleOn: painting.
+	self
+		assert: measuring measuredMorphBounds
+		equals: painting engine morphBoundsAfterDraw
+]
+
+{ #category : 'tests' }
+VectorCanvasTest >> testMeasuringMorphBoundsPaintsNothing [
+
+	| form canvas before |
+	form := self newWhiteForm.
+	canvas := VectorCanvas onForm: form.
+	before := form bits copy.
+	canvas updatingMorphBoundsDo: [ self drawTriangleOn: canvas ].
+	self assert: form bits equals: before
+]
+
+{ #category : 'tests' }
+VectorCanvasTest >> testMeasuringTwiceForgetsTheFirstDrawing [
+
+	| canvas first second |
+	canvas := VectorCanvas onForm: self newWhiteForm.
+	canvas updatingMorphBoundsDo: [
+		canvas line: 2 @ 2 to: 10 @ 10 width: 1.0 color: Color black ].
+	first := canvas measuredMorphBounds.
+	canvas updatingMorphBoundsDo: [
+		canvas line: 40 @ 40 to: 50 @ 50 width: 1.0 color: Color black ].
+	second := canvas measuredMorphBounds.
+	self deny: (second containsRect: first)
+]
+
+{ #category : 'tests' }
 VectorCanvasTest >> testMoveToLineToDoesNotError [
 
 	| canvas |
@@ -86,4 +162,17 @@ VectorCanvasTest >> testStrokeAndFillDoesNotError [
 			canvas lineToX: 30 y: 55.
 			canvas closePath ].
 	self assert: true
+]
+
+{ #category : 'tests' }
+VectorCanvasTest >> testThePaintingEngineComesBackAfterMeasuring [
+
+	| form canvas painting |
+	form := self newWhiteForm.
+	canvas := VectorCanvas onForm: form.
+	painting := canvas engine.
+	canvas updatingMorphBoundsDo: [ self drawTriangleOn: canvas ].
+	self assert: canvas engine identicalTo: painting.
+	self drawTriangleOn: canvas.
+	self deny: (form pixelValueAt: 30 @ 30) = (Color white pixelValueForDepth: 32)
 ]

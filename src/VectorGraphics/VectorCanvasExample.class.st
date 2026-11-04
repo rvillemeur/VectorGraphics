@@ -59,6 +59,27 @@ Class {
 }
 
 { #category : 'examples' }
+VectorCanvasExample class >> exampleBoundsFinderAfterMeasuringATriangle [
+
+	"The engine a canvas measures with, after a drawing has been measured and not painted.
+	The form it was given stays white: only the morph bounds change.
+	The Measurement view then shows the box it measured, the margins it took from the engine
+	it mirrors, and that it owns no buffer at all.
+	VectorCanvasExample exampleBoundsFinderAfterMeasuringATriangle inspect"
+
+	<sampleInstance>
+	| canvas |
+	canvas := self newCanvasOn: self newForm.
+	canvas updatingMorphBoundsDo: [
+		canvas strokeWidth: 2.0 color: Color black fillColor: Color yellow do: [
+			canvas moveToX: 60 y: 40.
+			canvas lineToX: 240 y: 60.
+			canvas lineToX: 150 y: 170.
+			canvas closePath ] ].
+	^ canvas boundsFinderEngine
+]
+
+{ #category : 'examples' }
 VectorCanvasExample class >> exampleCanvasAfterADrawing [
 	"The canvas itself after something has painted through it, rather than the form it painted.
 	The Target view then shows what the canvas draws on, which engine draws and which measures,

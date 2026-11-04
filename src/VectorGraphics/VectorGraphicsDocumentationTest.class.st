@@ -454,13 +454,12 @@ VectorGraphicsDocumentationTest >> testTheTokeniserReadsBackticksOutsideAFenceAn
 
 { #category : 'accessing' }
 VectorGraphicsDocumentationTest >> viewSubjects [
-	"Every class of this package that offers an inspector view, with the example that feeds it.
-	A view is only documentation if a reader can reach it in one click, so the pairing is held
-	here rather than left to a reader to guess."
 
 	^ {
 		VectorEnginePixel -> (VectorCanvasExample -> #exampleEngineDuringAFillPath) .
 		VectorEngineAbstract -> (VectorCanvasExample -> #exampleEngineDuringAFillPath) .
+		VectorEngineBoundsFinder
+		-> (VectorCanvasExample -> #exampleBoundsFinderAfterMeasuringATriangle) .
 		VectorCanvas -> (VectorCanvasExample -> #exampleCanvasAfterADrawing) .
 		TTGlyph -> (TrueTypeExample -> #exampleGlyphWithContours) .
 		TTFontDescription -> (TrueTypeExample -> #exampleGlyphMap) }
