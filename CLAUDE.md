@@ -117,8 +117,8 @@ VectorCanvas (subclass of Canvas)
 
 **Anti-aliasing algorithm** (Vuletich prefiltering):
 
-1. Path traversal in sub-pixel hops (`primLineFrom:to:hops:increment:`).
-2. Per hop, update `alphaMask` (distance buffer) via `updateAlphasFor:`.
+1. Path traversal in sub-pixel hops (`primLineFromX:y:toX:y:hops:incrementX:incrementY:`).
+2. Per hop, update `alphaMask` (distance buffer) via `updateAlphasForX:y:`.
 3. Per hop, update `edgeCounts` (winding number for fills) via `updateEdgesAndBoundsForX:y:`.
 4. After path done, blend stroke/fill colors into `targetForm` using the buffers.
 
