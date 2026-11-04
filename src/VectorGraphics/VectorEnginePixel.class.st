@@ -172,6 +172,69 @@ VectorEnginePixel >> initializePath [
 	blendBottom := 0 "drawable top. Will later be refined."
 ]
 
+{ #category : 'inspector' }
+VectorEnginePixel >> inspectorBufferContentEntries [
+	"One row per fact about what the three buffers hold, each holding the block that reads it, so
+	a row is measured when it is drawn and cannot drift from the engine."
+
+	^ {
+		  ('slots per buffer' -> [ alphaMask size ]) .
+		  ('alpha mask' -> [ alphaMask class name ]) .
+		  ('alpha mask, pixels not zero' -> [ self inspectorPixelsSetIn: alphaMask ]) .
+		  ('alpha mask, largest value' -> [ alphaMask max ]) .
+		  ('edge counts' -> [ edgeCounts class name ]) .
+		  ('edge counts, pixels not zero' -> [ self inspectorPixelsSetIn: edgeCounts ]) .
+		  ('morph ids, pixels not zero' -> [ self inspectorPixelsSetIn: morphIds ]) }
+]
+
+{ #category : 'inspector' }
+VectorEnginePixel >> inspectorBufferEntries [
+	"What the Buffers view shows, in two halves: what the buffers hold, then the geometry the
+	blend will read."
+
+	^ self inspectorBufferContentEntries , self inspectorBufferGeometryEntries
+]
+
+{ #category : 'inspector' }
+VectorEnginePixel >> inspectorBufferGeometryEntries [
+	"One row per number the blend pass will read: the box it walks, the box it is clipped to and
+	the radii computed from the stroke width and the anti-aliasing width."
+
+	^ {
+		  ('blend box' -> [ blendLeft @ blendTop corner: blendRight @ blendBottom ]) .
+		  ('clip box, last pixel drawn' -> [ clipLeft @ clipTop corner: clipRight @ clipBottom ]) .
+		  ('anti-aliasing width' -> [ antiAliasingWidth ]) .
+		  ('stroke width' -> [ strokeWidth ]) .
+		  ('dilated half width' -> [ auxStrokeWidthDilatedHalf ]) .
+		  ('eroded half width, squared and signed' -> [ auxStrokeWidthErodedHalfSquared ]) .
+		  ('hops per pixel' -> [ hopsPerPixel ]) .
+		  ('horizontal expansion of the blend box' -> [ self blendHorizontalExpansion ]) }
+]
+
+{ #category : 'inspector' }
+VectorEnginePixel >> inspectorBuffers [
+	<inspectorPresentationOrder: 20 title: 'Buffers'>
+	"What the three buffers of this engine hold now, counted rather than described. The blend pass
+	zeroes alphaMask and edgeCounts at every pixel it visits, so after a finished drawing both are
+	empty and only morphIds still says anything: a reader who wants to see coverage must inspect
+	an engine during a path, which is what
+	VectorCanvasExample class >> exampleEngineDuringAFillPath answers."
+
+	^ SpTablePresenter new
+		  addColumn: ((SpStringTableColumn title: 'Buffer' evaluated: [ :each | each key ]) width: 200);
+		  addColumn: (SpStringTableColumn title: 'Now' evaluated: [ :each | each value value printString ]);
+		  items: self inspectorBufferEntries;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VectorEnginePixel >> inspectorPixelsSetIn: aBuffer [
+	"How many pixels of one buffer hold anything. The blend pass zeroes a pixel as it reads it,
+	so this is zero after a finished drawing."
+
+	^ aBuffer count: [ :each | each ~= 0 ]
+]
+
 { #category : 'private' }
 VectorEnginePixel >> newTrajectoryFragment [
 

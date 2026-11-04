@@ -577,6 +577,55 @@ VectorEngineAbstract >> initializePath [
 	self newTrajectoryFragment
 ]
 
+{ #category : 'inspector' }
+VectorEngineAbstract >> inspectorDrawingStateEntries [
+	"The target and the widths a path is drawn with, and the two morph ids every pixel is gated
+	on, read when the row is drawn."
+
+	^ {
+		  ('target form' -> [ targetForm ]) .
+		  ('stroke width' -> [ strokeWidth ]) .
+		  ('anti-aliasing width' -> [ antiAliasingWidth ]) .
+		  ('hops per pixel' -> [ hopsPerPixel ]) .
+		  ('morph being painted' -> [ currentMorphId ]) .
+		  ('morph the drawing is clipped to' -> [ clippingMorphId ]) .
+		  ('bounds the last drawing covered' -> [ self morphBoundsAfterDraw ]) }
+]
+
+{ #category : 'inspector' }
+VectorEngineAbstract >> inspectorPathPointEntries [
+	"The four points a path call keeps, read when the row is drawn. finishPath: puts all of them
+	back to zero, so a path drawn through the public entry leaves them at the origin."
+
+	^ {
+		  ('current point' -> [ pathCurrentX @ pathCurrentY ]) .
+		  ('first point of the path' -> [ pathFirstX @ pathFirstY ]) .
+		  ('point the previous call ended at' -> [ previousCallX @ previousCallY ]) .
+		  ('control point it reflects' -> [ previousCallControlX @ previousCallControlY ]) }
+]
+
+{ #category : 'inspector' }
+VectorEngineAbstract >> inspectorPathState [
+	<inspectorPresentationOrder: 30 title: 'Path state'>
+	"The state a path call leaves behind: the point the path is at, the point it started from, and
+	the reflected control point an S or a T command reads. finishPath: puts all of them back to
+	zero, so a path drawn through the public entry leaves this view at the origin."
+
+	^ SpTablePresenter new
+		  addColumn: ((SpStringTableColumn title: 'What' evaluated: [ :each | each key ]) width: 200);
+		  addColumn: (SpStringTableColumn title: 'Now' evaluated: [ :each | each value value printString ]);
+		  items: self inspectorPathStateEntries;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VectorEngineAbstract >> inspectorPathStateEntries [
+	"What the Path state view shows, in two halves: the points of the path, then the state the
+	engine draws them with."
+
+	^ self inspectorPathPointEntries , self inspectorDrawingStateEntries
+]
+
 { #category : 'morphic' }
 VectorEngineAbstract >> morph: aMorph isAtPoint: aPoint [
 

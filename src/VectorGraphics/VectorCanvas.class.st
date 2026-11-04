@@ -334,6 +334,64 @@ VectorCanvas >> image: aForm multipliedBy: aColor at: aPoint [
 	super image: aForm multipliedBy: aColor at: aPoint
 ]
 
+{ #category : 'inspector' }
+VectorCanvas >> inspectorEngineEntries [
+	"The two engines and the morph the pixels are filed under. The morph row asks the real
+	question rather than restating it: currentMorph: needs a morph that answers morphId."
+
+	^ {
+		  ('engine that draws' -> [ engine class name ]) .
+		  ('engine that measures' -> [ boundsFinderEngine class name ]) .
+		  ('engine in use now' -> [ self inspectorEngineInUse ]) .
+		  ('bounds the last drawing covered' -> [ engine morphBoundsAfterDraw ]) .
+		  ('morph the pixels are filed under' -> [ currentMorph ]) .
+		  ('that morph answers morphId' -> [ currentMorph notNil and: [ currentMorph respondsTo: #morphId ] ]) .
+		  ('display bounds of the clipping morph' -> [ clippingMorphDisplayBounds ]) }
+]
+
+{ #category : 'inspector' }
+VectorCanvas >> inspectorEngineInUse [
+	"Which of the two engines a drawing would go to now. Inside updatingMorphBoundsDo: it is the
+	one that measures, which in this port is nil, since nothing ever builds one."
+
+	engine == boundsFinderEngine ifTrue: [ ^ 'the one that measures' ].
+	^ 'the one that draws'
+]
+
+{ #category : 'inspector' }
+VectorCanvas >> inspectorFormEntries [
+	"The form this canvas draws on. A canvas refuses any depth but 32, so the row is there to
+	show which form it got rather than to warn of another depth."
+
+	^ {
+		  ('form drawn on' -> [ form ]) .
+		  ('extent' -> [ form extent ]) .
+		  ('depth' -> [ form depth ]) }
+]
+
+{ #category : 'inspector' }
+VectorCanvas >> inspectorTarget [
+	<inspectorPresentationOrder: 20 title: 'Target'>
+	"What this canvas draws on and with. Two engines are held: engine draws, boundsFinderEngine
+	measures, and updatingMorphBoundsDo: swaps the second in for the duration of a block. The
+	morph row asks the real question rather than restating it: currentMorph: needs a morph that
+	answers morphId, and nothing in this image does, so a hit test over morphIds finds nothing
+	until a morph class answers it."
+
+	^ SpTablePresenter new
+		  addColumn: ((SpStringTableColumn title: 'What' evaluated: [ :each | each key ]) width: 240);
+		  addColumn: (SpStringTableColumn title: 'Now' evaluated: [ :each | each value value printString ]);
+		  items: self inspectorTargetEntries;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VectorCanvas >> inspectorTargetEntries [
+	"What the Target view shows, in two halves: the form drawn on, then the two engines."
+
+	^ self inspectorFormEntries , self inspectorEngineEntries
+]
+
 { #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> line: pt1 to: pt2 width: morphStrokeWidth color: aStrokeColor [
 

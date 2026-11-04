@@ -182,6 +182,91 @@ TTGlyph >> initializeContours: numContours with: endPoints [
 		startPt := endPt ]
 ]
 
+{ #category : 'inspector' }
+TTGlyph >> inspectorContourEntries [
+	"Measure each contour the way the drawing code reads it. An empty contour is reported as
+	such rather than skipped, since drawGlyphOn:geometryTransformation: skips one silently."
+
+	^ contours collectWithIndex: [ :contour :index |
+		  | straight curved bounds |
+		  straight := 0.
+		  curved := 0.
+		  bounds := nil.
+		  contour isEmpty ifFalse: [
+			  contour quadraticBeziersDo: [ :endPoint :controlPoint |
+				  endPoint = controlPoint
+					  ifTrue: [ straight := straight + 1 ]
+					  ifFalse: [ curved := curved + 1 ] ].
+			  contour points do: [ :point |
+				  bounds := bounds
+					            ifNil: [ point corner: point ]
+					            ifNotNil: [ bounds encompass: point ] ] ].
+		  {
+			  index .
+			  contour points size .
+			  straight .
+			  curved .
+			  (bounds ifNil: [ 'no point' ]) } ]
+]
+
+{ #category : 'inspector' }
+TTGlyph >> inspectorContours [
+	<inspectorPresentationOrder: 20 title: 'Contours'>
+	"One row per contour, with the segments counted by asking quadraticBeziersDo: rather than by
+	reading the flags again: a straight segment is the one whose control point is its end point,
+	which is the rule that method itself applies."
+
+	^ SpTablePresenter new
+		  addColumn: ((SpStringTableColumn title: 'Contour' evaluated: [ :each | each first printString ]) width: 80);
+		  addColumn: ((SpStringTableColumn title: 'Points' evaluated: [ :each | each second printString ]) width: 80);
+		  addColumn: ((SpStringTableColumn title: 'Straight segments' evaluated: [ :each | each third printString ]) width: 140);
+		  addColumn: ((SpStringTableColumn title: 'Quadratic Beziers' evaluated: [ :each | each fourth printString ]) width: 140);
+		  addColumn: (SpStringTableColumn title: 'Point bounds' evaluated: [ :each | each fifth printString ]);
+		  items: self inspectorContourEntries;
+		  yourself
+]
+
+{ #category : 'inspector' }
+TTGlyph >> inspectorGlyph [
+	<inspectorPresentationOrder: 30 title: 'Glyph'>
+	"The glyph as the engine really draws it: a VectorCanvas fills it through
+	drawGlyphOn:geometryTransformation: with no transformation, so the picture is in font units.
+	TrueType counts y upwards and the form counts it downwards, so the form is flipped afterwards
+	rather than the points being moved — this view must not change the glyph it shows."
+
+	| extent form canvas |
+	extent := self inspectorPointExtent.
+	(extent x > 0 and: [ extent y > 0 ]) ifFalse: [
+		^ SpTextPresenter new
+			  text: 'This glyph has no point to draw';
+			  beNotEditable;
+			  yourself ].
+	form := Form extent: extent depth: 32.
+	form fillColor: Color white.
+	canvas := VectorCanvas onForm: form.
+	canvas fillColor: Color black do: [
+		self drawGlyphOn: canvas geometryTransformation: nil ].
+	^ SpImagePresenter new
+		  image: ((form flipBy: #vertical centerAt: form center) scaledToSize: 240 @ 240);
+		  yourself
+]
+
+{ #category : 'inspector' }
+TTGlyph >> inspectorPointExtent [
+	"The extent a form needs to hold every point of this glyph, read from the points themselves
+	rather than from the bounds the font file declared, so a glyph whose bounds are missing still
+	draws. One pixel is added because a point sits on the edge of the form it draws in."
+
+	| right bottom |
+	right := 0.
+	bottom := 0.
+	contours do: [ :contour |
+		contour points do: [ :point |
+			right := right max: point x.
+			bottom := bottom max: point y ] ].
+	^ (right + 1) @ (bottom + 1)
+]
+
 { #category : 'testing' }
 TTGlyph >> isComposite [
 

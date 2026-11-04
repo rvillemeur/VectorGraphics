@@ -59,6 +59,26 @@ Class {
 }
 
 { #category : 'examples' }
+VectorCanvasExample class >> exampleCanvasAfterADrawing [
+	"The canvas itself after something has painted through it, rather than the form it painted.
+	The Target view then shows what the canvas draws on, which engine draws and which measures,
+	the clip rectangle, the morph the pixels are filed under and the bounds the drawing covered.
+	No morph is named here because nothing in this image answers morphId, which is what
+	currentMorph: asks of one; the view shows that too.
+	VectorCanvasExample exampleCanvasAfterADrawing inspect"
+
+	<sampleInstance>
+	| canvas |
+	canvas := self newCanvasOn: self newForm.
+	canvas strokeWidth: 2.0 color: Color black fillColor: Color yellow do: [
+		canvas moveToX: 60 y: 40.
+		canvas lineToX: 240 y: 60.
+		canvas lineToX: 150 y: 170.
+		canvas closePath ].
+	^ canvas
+]
+
+{ #category : 'examples' }
 VectorCanvasExample class >> exampleCircleFill [
 	"Filled circle using fillColor:do: with an ellipse of equal radii.
 	VectorCanvasExample exampleCircleFill inspect"
@@ -186,6 +206,26 @@ VectorCanvasExample class >> exampleEllipse [
 		borderColor: Color black
 		fillColor: (Color cyan alpha: 0.8).
 	^ form
+]
+
+{ #category : 'examples' }
+VectorCanvasExample class >> exampleEngineDuringAFillPath [
+	"An engine holding a path it has walked and not yet blended, which is the only state in which
+	its buffers hold anything: the blend pass zeroes both of them as it goes.
+	The empty fill call first is how the engine is given its stroke radii and its hops per pixel
+	through the public entry; the second path is then walked and left unblended.
+	VectorCanvasExample exampleEngineDuringAFillPath inspect"
+
+	<sampleInstance>
+	| engine |
+	engine := VectorEngineSubPixel onForm: self newForm.
+	engine fillColor: Color red do: [ :each | ].
+	engine initializePath.
+	engine abs_MoveTo: 60 @ 40.
+	engine abs_LineTo: 240 @ 60.
+	engine abs_LineTo: 150 @ 170.
+	engine do_ClosePath.
+	^ engine
 ]
 
 { #category : 'examples' }

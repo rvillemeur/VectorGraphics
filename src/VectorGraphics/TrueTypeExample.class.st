@@ -124,6 +124,30 @@ TrueTypeExample class >> exampleGlyphSmall [
 ]
 
 { #category : 'examples' }
+TrueTypeExample class >> exampleGlyphWithContours [
+	"One glyph object, built from absolute points as the font reader leaves them: an outer
+	triangle and an inner one, so the Contours view has two contours to report and the Glyph view
+	a shape to draw. A font file holds no glyph object to inspect — the reader flattens every
+	glyph into the contour data of its TTFontDescription — so this example builds one.
+	boundsBottom holds the highest y of the glyph, which is what topSideBearing answers.
+	TrueTypeExample exampleGlyphWithContours inspect"
+
+	<sampleInstance>
+	| glyph |
+	glyph := TTGlyph new.
+	glyph contours: (Array
+			 with: (self newContourFromAbsolutePoints: #( #( 0 0 ) #( 600 0 ) #( 300 700 ) ))
+			 with: (self newContourFromAbsolutePoints: #( #( 200 100 ) #( 400 100 ) #( 300 400 ) ))).
+	glyph advanceWidth: 700.
+	glyph
+		boundsLeft: 0
+		boundsRight: 600
+		boundsTop: 0
+		boundsBottom: 700.
+	^ glyph
+]
+
+{ #category : 'examples' }
 TrueTypeExample class >> exampleMultipleGlyphs [
 	"Render several glyphs side by side onto a single Form.
 	TrueTypeExample exampleMultipleGlyphs inspect"
@@ -150,6 +174,20 @@ TrueTypeExample class >> loadFontFrom: aPathString [
 	| bytes |
 	bytes := aPathString asFileReference binaryReadStreamDo: [ :s | s contents ].
 	^ TTFontReader readTTFFrom: bytes
+]
+
+{ #category : 'examples' }
+TrueTypeExample class >> newContourFromAbsolutePoints: anArrayOfPairs [
+	"Build one contour of a glyph. Every control point flag is left clear, so each segment is a
+	straight line rather than a quadratic Bezier, and the points are already absolute, as the
+	font reader leaves them once it has sent makePointsAbsolute."
+
+	| points |
+	points := Int16PointArray new: anArrayOfPairs size.
+	anArrayOfPairs doWithIndex: [ :pair :index |
+		points at: index putX: pair first.
+		points at: index putY: pair second ].
+	^ TTContourConstruction on: points
 ]
 
 { #category : 'see class side' }

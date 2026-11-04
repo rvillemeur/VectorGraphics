@@ -97,6 +97,23 @@ VectorGraphicsDocumentationTest >> behaviourNamedBy: aString [
 	^ isClassSide ifTrue: [ class class ] ifFalse: [ class ]
 ]
 
+{ #category : 'running' }
+VectorGraphicsDocumentationTest >> buildView: aSelector of: anObject [
+	"Build one inspector view and draw what it would show. A table's column blocks run per drawn
+	row only, so this test runs each of them over each item itself; otherwise a broken column
+	would pass."
+
+	| presenter |
+	presenter := anObject perform: aSelector.
+	self
+		assert: presenter notNil
+		description: anObject class name , ' >> ' , aSelector , ' builds nothing'.
+	(presenter isKindOf: SpTablePresenter) ifTrue: [
+		presenter columns do: [ :column |
+			presenter items do: [ :item | column evaluation value: item ] ] ].
+	^ presenter
+]
+
 { #category : 'parsing' }
 VectorGraphicsDocumentationTest >> classSideSuffix [
 	^ ' class'
@@ -112,6 +129,16 @@ VectorGraphicsDocumentationTest >> classVariableNamesOfThePackage [
 	self packageUnderTest definedClasses do: [ :each |
 		names addAll: (each classVariables collect: [ :variable | variable name asString ]) ].
 	^ names
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> inspectorViewSelectorsOf: aClass [
+	"Answer the selectors of aClass that are inspector views, read from the pragma rather than
+	from a naming convention, so a renamed method cannot slip out of the gates below."
+
+	^ (aClass selectors select: [ :each |
+		   (aClass >> each) pragmas anySatisfy: [ :pragma |
+			   pragma selector = #inspectorPresentationOrder:title: ] ]) asSortedCollection asArray
 ]
 
 { #category : 'parsing' }
@@ -190,6 +217,19 @@ VectorGraphicsDocumentationTest >> skipTheDocumentIsAbsent [
 	^ self skip: 'There is no checkout of ' , self repositoryName , ' in this image'
 ]
 
+{ #category : 'running' }
+VectorGraphicsDocumentationTest >> stateSnapshotOf: anObject [
+	"Answer what every instance variable of anObject holds, with a copy of each collection, so a
+	view that moved a point or inserted an element is caught rather than described."
+
+	^ (1 to: anObject class instSize) collect: [ :index |
+		   | value |
+		   value := anObject instVarAt: index.
+		   (value isCollection and: [ value isString not ])
+			   ifTrue: [ value copy ]
+			   ifFalse: [ value ] ]
+]
+
 { #category : 'accessing' }
 VectorGraphicsDocumentationTest >> tagHeadingOfThePackageComment [
 	"The line the tag list follows. Changing it means changing the comment and this constant
@@ -236,6 +276,37 @@ VectorGraphicsDocumentationTest >> tagNamesOfThePackage [
 ]
 
 { #category : 'tests' }
+VectorGraphicsDocumentationTest >> testEveryClassWithAViewIsFedByAnExampleOfItsOwnKind [
+	self viewSubjects do: [ :pair |
+		| subject holder selector instance |
+		subject := pair key.
+		holder := pair value key.
+		selector := pair value value.
+		self
+			assert: (holder class includesSelector: selector)
+			description: holder name , ' does not hold the example ' , selector.
+		self
+			assert: ((holder class >> selector) pragmas anySatisfy: [ :each | each selector = #sampleInstance ])
+			description: holder name , ' >> ' , selector , ' is not a sample instance'.
+		instance := holder perform: selector.
+		self
+			assert: (instance isKindOf: subject)
+			description: holder name , ' >> ' , selector , ' does not answer a ' , subject name.
+		self
+			assert: (self inspectorViewSelectorsOf: subject) notEmpty
+			description: subject name , ' has no inspector view' ]
+]
+
+{ #category : 'tests' }
+VectorGraphicsDocumentationTest >> testEveryInspectorViewOfThisPackageBuildsFromItsExample [
+	self viewSubjects do: [ :pair |
+		| instance |
+		instance := pair value key perform: pair value value.
+		(self inspectorViewSelectorsOf: pair key) do: [ :selector |
+			self buildView: selector of: instance ] ]
+]
+
+{ #category : 'tests' }
 VectorGraphicsDocumentationTest >> testEveryMethodTheArchitectureDocumentNamesIsImplementedByThatClass [
 	| contents missing |
 	contents := self architectureDocumentContents ifNil: [ ^ self skipTheDocumentIsAbsent ].
@@ -262,6 +333,28 @@ VectorGraphicsDocumentationTest >> testEveryNameTheArchitectureDocumentBackticks
 ]
 
 { #category : 'tests' }
+VectorGraphicsDocumentationTest >> testEverySampleInstanceOfThisPackageRuns [
+	"Each example of this package rebuilds its subject on every call and must run with one click.
+	A failure here is a broken example, which a reader meets before any test."
+
+	| holders broken |
+	holders := self packageUnderTest definedClasses select: [ :each |
+		           each class selectors anySatisfy: [ :selector |
+			           (each class >> selector) pragmas anySatisfy: [ :pragma |
+				           pragma selector = #sampleInstance ] ] ].
+	self assert: holders notEmpty description: 'This package holds no example'.
+	broken := OrderedCollection new.
+	holders do: [ :holder |
+		(holder class selectors select: [ :selector |
+			 (holder class >> selector) pragmas anySatisfy: [ :pragma |
+				 pragma selector = #sampleInstance ] ]) do: [ :selector |
+			[ (holder perform: selector) ifNil: [ broken add: holder name , ' >> ' , selector , ' answers nil' ] ]
+				on: Error
+				do: [ :error | broken add: holder name , ' >> ' , selector , ' ' , error messageText printString ] ] ].
+	self assert: broken isEmpty description: broken asArray printString
+]
+
+{ #category : 'tests' }
 VectorGraphicsDocumentationTest >> testEverySelectorTheArchitectureDocumentNamesOnItsOwnIsImplemented [
 	| contents missing |
 	contents := self architectureDocumentContents ifNil: [ ^ self skipTheDocumentIsAbsent ].
@@ -274,6 +367,26 @@ VectorGraphicsDocumentationTest >> testEverySelectorTheArchitectureDocumentNames
 		assert: missing isEmpty
 		description: 'Named by the document, implemented nowhere: '
 			, missing asSet asSortedCollection asArray printString
+]
+
+{ #category : 'tests' }
+VectorGraphicsDocumentationTest >> testNoInspectorViewOfThisPackageChangesWhatItInspects [
+	"A view a reader opens to understand an object must not be what changes it. The engine
+	buffers and the glyph points are both mutable in place, so this compares them element by
+	element after every view of the class has been built."
+
+	self viewSubjects do: [ :pair |
+		| instance before after |
+		instance := pair value key perform: pair value value.
+		before := self stateSnapshotOf: instance.
+		(self inspectorViewSelectorsOf: pair key) do: [ :selector |
+			self buildView: selector of: instance ].
+		after := self stateSnapshotOf: instance.
+		before doWithIndex: [ :value :index |
+			self
+				assert: value = (after at: index)
+				description: pair key name , ' changed instance variable '
+					, (instance class allInstVarNames at: index) , ' while a view was built' ] ]
 ]
 
 { #category : 'tests' }
@@ -337,4 +450,18 @@ VectorGraphicsDocumentationTest >> testTheTokeniserReadsBackticksOutsideAFenceAn
 	self
 		assert: (self backtickedTokensOf: document) asArray
 		equals: #( 'VectorCanvas' 'TTGlyph' )
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> viewSubjects [
+	"Every class of this package that offers an inspector view, with the example that feeds it.
+	A view is only documentation if a reader can reach it in one click, so the pairing is held
+	here rather than left to a reader to guess."
+
+	^ {
+		VectorEnginePixel -> (VectorCanvasExample -> #exampleEngineDuringAFillPath) .
+		VectorEngineAbstract -> (VectorCanvasExample -> #exampleEngineDuringAFillPath) .
+		VectorCanvas -> (VectorCanvasExample -> #exampleCanvasAfterADrawing) .
+		TTGlyph -> (TrueTypeExample -> #exampleGlyphWithContours) .
+		TTFontDescription -> (TrueTypeExample -> #exampleGlyphMap) }
 ]

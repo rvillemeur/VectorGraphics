@@ -124,13 +124,21 @@ The blend hooks follow the same three cases: `blendFillOnly`, `blendStrokeOnly` 
 `VectorCanvas` is a subclass of Pharo's `Canvas` and holds **two** engines: `engine`, which draws,
 and `boundsFinderEngine`, which measures. `updatingMorphBoundsDo:` swaps the second in for the
 duration of a block and restores it in an `ensure:`, so a morph can be asked what it would paint
-without painting it.
+without painting it. **In this port the second engine is never built**: nothing assigns
+`boundsFinderEngine`, so the swap hands the canvas nil and a drawing inside that block fails. Ask
+the drawing engine for `morphBoundsAfterDraw` after a real drawing until a bounds finder is built.
+
+`VectorCanvas class >> onForm:` installs a `VectorEngineWholePixel`, so a canvas is one byte a
+pixel in each buffer unless the engine is replaced by hand.
 
 Three pieces of state make a morph tree work on one `Form`:
 
 - `currentMorph:` sets the id written into `morphIds` for every pixel painted from here on, and
   `morph:isAtPoint:` is the hit test that reads it back. A morph with an irregular outline is hit
-  tested against what it really painted, not against its bounds.
+  tested against what it really painted, not against its bounds. **Nothing in a Pharo image
+  answers `morphId`**, which is what `currentMorph:` asks of the morph it is given, so the id
+  stays zero, `morphIds` stays empty and the hit test finds nothing until a morph class answers
+  it. The Target view of `VectorCanvas` reports that rather than describing it.
 - `clippingMorph:` names the morph whose painted pixels a drawing may touch, which is how a child
   is clipped to a parent of any shape: the blend pass skips a pixel whose `morphIds` entry is
   neither the clipping morph nor the current one.
@@ -229,3 +237,22 @@ about drawing. `VectorCanvas >> runPathCommands:` runs a whole sequence.
   sibling morphs.
 - **A hit test needs the drawing it is asking about.** `morphIds` is written while painting, so
   `morph:isAtPoint:` answers about the last frame drawn on that `Form` and nothing else.
+
+## 13. Where to look in the image
+
+Every claim above can be opened. Each view is one click from an example, and each example
+rebuilds its subject every call.
+
+| View | Example that feeds it | Shows |
+|---|---|---|
+| `VectorEnginePixel >> inspectorBuffers` | `VectorCanvasExample class >> exampleEngineDuringAFillPath` | the three buffers during a path, counted rather than described |
+| `VectorEngineAbstract >> inspectorPathState` | the same example | the path state, the two morph ids and the bounds of the last drawing |
+| `VectorCanvas >> inspectorTarget` | `VectorCanvasExample class >> exampleCanvasAfterADrawing` | the target form, which engine draws and which measures |
+| `TTGlyph >> inspectorContours` | `TrueTypeExample class >> exampleGlyphWithContours` | each contour, with its straight segments and its quadratic Béziers counted by the drawing rule itself |
+| `TTGlyph >> inspectorGlyph` | the same example | the glyph as `VectorCanvas` really fills it |
+| `TTFontDescription >> inspectorGlyphMap` | `TrueTypeExample class >> exampleGlyphMap` | every code point the font maps, with the record it points at |
+| `TTFontDescription >> inspectorMapDensity` | the same example | what that map costs in floats and index entries |
+
+`VectorGraphicsDocumentationTest` holds this document and those artefacts to the code: every name
+written in backticks here must exist, every example must run, every view must build from its
+example, and no view may change what it inspects.
