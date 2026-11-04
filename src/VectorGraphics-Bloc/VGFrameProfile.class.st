@@ -129,7 +129,7 @@ VGFrameProfile class >> sceneStage [
 	^ #sceneAndLayout
 ]
 
-{ #category : 'reference' }
+{ #category : 'accessing' }
 VGFrameProfile class >> stageByPackageAndTag [
 	"The stage each package and tag of this project belongs to, keyed by `'<package>/<tag>'`. The
 	 tag is the unit rather than the class, so a class moved between tags moves stage with it and
@@ -168,6 +168,7 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Cairo/Blur' -> #blur).
 			  ('VectorGraphics-Vulkan/Blur' -> #blur).
 			  ('VectorGraphics-Bloc/Hosts' -> #handover).
+			  ('VectorGraphics-Vulkan/Present' -> #handover).
 			  ('VectorGraphics-Bloc/Profiling' -> #harness).
 			  ('VectorGraphics-Cairo/Export' -> #notInTheFrame).
 			  ('VectorGraphics-Cairo/Inventory' -> #notInTheFrame).

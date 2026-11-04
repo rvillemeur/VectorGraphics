@@ -129,6 +129,23 @@ VGVulkanPresentChainTest >> testTheChainOfARealWindowRendersInTheFormatThisProje
 		self assert: chain imageCount >= 1 ]
 ]
 
+{ #category : 'tests - frames' }
+VGVulkanPresentChainTest >> testTheChainRemembersTheIndexesItPresentedAndStillAnswersThemWhenDestroyed [
+	"The cycle is the fact this unit is about, so the chain keeps it rather than leaving a
+	 caller to collect it: presentedIndexes is what the inspector view reads and what an
+	 example hands back. It outlives destroy, because an example destroys everything it built
+	 before it answers and a window already closed is exactly when a reader wants to see what
+	 it did."
+
+	self withChainDo: [ :chain |
+		| answered |
+		answered := (1 to: self class presentedFrameCount) collect: [ :each |
+			            chain presentFrameDuring: [ :image |  ] ].
+		self assert: chain presentedIndexes asArray equals: answered asArray.
+		chain destroy.
+		self assert: chain presentedIndexes asArray equals: answered asArray ]
+]
+
 { #category : 'tests - format' }
 VGVulkanPresentChainTest >> testTheFormatThisProjectRendersInIsAccepted [
 	"The format is not a property of a surface but a choice this project makes: the kernel

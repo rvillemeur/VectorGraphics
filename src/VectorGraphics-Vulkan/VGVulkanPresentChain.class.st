@@ -23,7 +23,8 @@ Class {
 		'commandBuffer',
 		'imageAvailable',
 		'renderFinished',
-		'fence'
+		'fence',
+		'presentedIndexes'
 	],
 	#category : 'VectorGraphics-Vulkan-Present',
 	#package : 'VectorGraphics-Vulkan',
@@ -138,6 +139,12 @@ VGVulkanPresentChain >> imageCount [
 ]
 
 { #category : 'initialization' }
+VGVulkanPresentChain >> initialize [
+	super initialize.
+	presentedIndexes := OrderedCollection new
+]
+
+{ #category : 'initialization' }
 VGVulkanPresentChain >> initializeContext: aVkContext backendWindow: aVulkanBackendWindow [
 	"In the order partsInCreationOrder states, which destruction reads backwards. The extent
 	 is the drawable SDL answers for a Vulkan window and never the window's logical size: on a
@@ -222,11 +229,11 @@ VGVulkanPresentChain >> partsInDestructionOrder [
 VGVulkanPresentChain >> presentFrameDuring: aBlock [
 	"One frame: wait for the previous one, acquire an image, hand that image to the block,
 	 clear it, submit and present. Answers the index of the image presented, which is what
-	 says the cycle is a cycle. Both waits are bounded by frameTimeoutNanoseconds; neither may
-	 be unbounded, since both run inside a plain uFFI call that stops the whole virtual
-	 machine while it waits. The clear is a render pass because the pass this chain builds is
-	 the one that leaves the image in presentSrcKHR, and the pass is closed here: a command
-	 buffer's end does not close it."
+	 says the cycle is a cycle, and keeps it in presentedIndexes. Both waits are bounded by
+	 frameTimeoutNanoseconds; neither may be unbounded, since both run inside a plain uFFI
+	 call that stops the whole virtual machine while it waits. The clear is a render pass
+	 because the pass this chain builds is the one that leaves the image in presentSrcKHR, and
+	 the pass is closed here: a command buffer's end does not close it."
 
 	| imageIndex |
 	fence waitTimeout: self class frameTimeoutNanoseconds.
@@ -253,7 +260,17 @@ VGVulkanPresentChain >> presentFrameDuring: aBlock [
 		present: imageIndex
 		queue: context computeQueue
 		waitSemaphore: renderFinished handle.
+	presentedIndexes add: imageIndex.
 	^ imageIndex
+]
+
+{ #category : 'accessing' }
+VGVulkanPresentChain >> presentedIndexes [
+	"Every swapchain index this chain has presented, in order. It is the one thing a presented
+	 frame answers, so the chain keeps it: the inspector view reads it, and it outlives destroy
+	 because an example closes its window before it hands the chain back."
+
+	^ presentedIndexes
 ]
 
 { #category : 'accessing' }
