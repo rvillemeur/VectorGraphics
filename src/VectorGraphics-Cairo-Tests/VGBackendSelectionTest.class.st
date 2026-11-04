@@ -149,15 +149,18 @@ VGBackendSelectionTest >> testEveryCandidateIsABackendThatAnswersWhetherItIsAvai
 		self assert: each preferenceRank isNumber ]
 ]
 
-{ #category : 'tests - architecture' }
+{ #category : 'tests' }
 VGBackendSelectionTest >> testEveryPackageOfTheProjectIsNamedInTheBaseline [
 	"A package the baseline does not name is a package nobody loads, which is how a split into
-	 packages goes wrong. The names are looked for in the baseline's own source, because a
+	 packages goes wrong. The names are looked for in the source of every method of
+	 BaselineOfVectorGraphics — baseline: declares its packages through helpers — because a
 	 Metacello spec is built by sending messages and reading it back is more machinery than the
 	 fact deserves."
 
 	| source missing |
-	source := (BaselineOfVectorGraphics >> #baseline:) sourceCode.
+	source := String streamContents: [ :stream |
+		          BaselineOfVectorGraphics methods do: [ :each |
+			          stream nextPutAll: each sourceCode ] ].
 	missing := (PackageOrganizer default packages select: [ :each |
 		            each name beginsWith:
 			            VGCairoReferenceScanner projectPackagePrefix ]) reject: [

@@ -1,8 +1,14 @@
 "
-I hold the agreed layering of this project: which package may name a class of which other package.
+I hold the agreed layering of this project: which package may name a class of which other package, and which packages each group of the baseline loads.
+
 The table is VGArchitectureTest class >> allowedDependencies, one entry per package, and my tests fail both when a package makes an edge the table does not grant and when the table grants an edge the code no longer makes, so the table cannot drift into a description of the project history.
+
 I also hold the table against the organiser, against BaselineOfVectorGraphics and against a fixture that plants a reference three blocks deep, because a scan that reads only a method own literals misses every reference inside a block.
+
+The second fact is mine since the renderer left the default group: no package the default group loads may name a class of Bloc or of Alexandrie, so this project rasterises in an image where neither is present, and the bloc group loads everything the default group loads plus the renderer, so using it as Alexandrie's replacement inside Bloc stays one Metacello load. My class-side Groups tab shows all three columns live, and VGArchitectureTest class >> replacedStackPackageNames reads the stack from the organiser by prefix.
+
 Two project-wide rules are not mine and stay where they were written: VGBackendSelectionTest holds that only the Vulkan family names a PharoVulkan class, through VGCairoReferenceScanner, and that every package of this project is named in the baseline.
+
 I live in VectorGraphics-Cairo-Tests rather than in a package of my own, since this project has no aggregate test package and a new package would owe the baseline and the profiling stage table an entry for one class.
 "
 Class {
@@ -108,6 +114,32 @@ VGArchitectureTest class >> edgesTheBaselineCannotDeclare [
 		  ('VectorGraphics-Vulkan-Examples' -> 'VectorGraphics-Vulkan-Tests') }
 ]
 
+{ #category : 'layering' }
+VGArchitectureTest class >> groupReport [
+	"One row per group of BaselineOfVectorGraphics: its name, the packages loading that group
+	 brings in, and the classes of Bloc or Alexandrie those packages name. The packages come
+	 from the spec and the classes from a live scan, so a reader of the report and
+	 testNoPackageOfTheDefaultGroupNamesAClassOfTheStackItReplaces cannot be looking at
+	 different numbers."
+
+	| scanner |
+	scanner := VGCairoReferenceScanner new.
+	^ ((BaselineOfVectorGraphics project version groups collect: [ :each |
+		    each name asString ]) asSortedCollection asArray) collect: [ :groupName |
+		  | loaded named |
+		  loaded := (self packagesLoadedByGroupNamed: groupName) asSortedCollection asArray.
+		  named := Set new.
+		  loaded do: [ :package |
+			  (scanner
+				   offendersIn: package
+				   naming: self replacedStackPackageNames) do: [ :each |
+				  each value do: [ :one | named add: one name asString ] ] ].
+		  {
+			  groupName.
+			  (self packageNameSeparator join: loaded).
+			  (self packageNameSeparator join: named asSortedCollection) } ]
+]
+
 { #category : 'inspecting' }
 VGArchitectureTest class >> inspectorDependencies: aBuilder [
 	"The granted, the real and the declared outgoing edges side by side, for every package of
@@ -134,10 +166,66 @@ VGArchitectureTest class >> inspectorDependenciesContext: aContext [
 ]
 
 { #category : 'layering' }
+VGArchitectureTest class >> inspectorGroups: aBuilder [
+	"What each group of the baseline loads, and which classes of the stack this project
+	 replaces those packages name. Reads groupReport, so the tab is a live scan of the image
+	 the moment it opens: the default group's third cell is empty exactly while the project
+	 loads in an image with no Bloc. It mutates nothing it shows."
+
+	<inspectorPresentationOrder: 20 title: 'Groups'>
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn title: 'Group' evaluated: [ :each | each first ]);
+		  addColumn:
+			  (SpStringTableColumn title: 'Loads' evaluated: [ :each | each second ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Names of Bloc or Alexandrie'
+				   evaluated: [ :each | each third ]);
+		  items: self groupReport;
+		  yourself
+]
+
+{ #category : 'layering' }
+VGArchitectureTest class >> inspectorGroupsContext: aContext [
+	"The tab belongs to whichever class in this hierarchy reads the baseline's groups, which
+	 today is this one and only one. Asking the baseline rather than naming the class keeps the
+	 gate true if a second project ever subclasses me for its own layering."
+
+	^ aContext active: BaselineOfVectorGraphics project version groups notEmpty
+]
+
+{ #category : 'layering' }
 VGArchitectureTest class >> packageNameSeparator [
 	"What dependencyReport puts between two package names inside one table cell."
 
 	^ ', '
+]
+
+{ #category : 'layering' }
+VGArchitectureTest class >> packagesLoadedByGroupNamed: aGroupName [
+	"The packages of this project that Metacello loads for one group of
+	 BaselineOfVectorGraphics: the names that group includes, every group among them expanded in
+	 turn, and everything those packages require. Read from the spec rather than listed here, so
+	 a group edited in the baseline moves this answer with it. An external project the baseline
+	 names, such as Bloc, is left out: it is a name in another repository's baseline, and the
+	 image happens to hold a package of the same name."
+
+	| groups found todo |
+	groups := Dictionary new.
+	BaselineOfVectorGraphics project version groups do: [ :each |
+		groups at: each name put: each includes ].
+	found := Set new.
+	todo := OrderedCollection with: aGroupName.
+	[ todo isEmpty ] whileFalse: [
+		| next |
+		next := todo removeFirst.
+		(groups includesKey: next)
+			ifTrue: [ todo addAll: (groups at: next) ]
+			ifFalse: [
+				((found includes: next) or: [
+					 (next beginsWith: self projectPackageNamePrefix) not ]) ifFalse: [
+					found add: next.
+					todo addAll: (self requiresOfPackageNamed: next) ] ] ].
+	^ found
 ]
 
 { #category : 'layering' }
@@ -178,6 +266,35 @@ VGArchitectureTest class >> projectPackageNames [
 	^ ((PackageOrganizer default packages select: [ :each |
 		    each name beginsWith: self projectPackageNamePrefix ]) collect: [ :each |
 		   each name asString ]) asSet
+]
+
+{ #category : 'layering' }
+VGArchitectureTest class >> replacedStackPackageNamePrefixes [
+	"Bloc and the Alexandrie packages Bloc is built on. This project exists to replace
+	 Alexandrie's canvas inside Bloc, so the Bloc layer of this project may name both and no
+	 other layer may name either."
+
+	^ #( 'Bloc' 'Alexandrie' )
+]
+
+{ #category : 'layering' }
+VGArchitectureTest class >> replacedStackPackageNames [
+	"Every package of Bloc and of Alexandrie present in this image, read from the organiser by
+	 prefix so that a package a Bloc update adds is covered without this method being edited."
+
+	^ (PackageOrganizer default packages select: [ :each |
+		   self replacedStackPackageNamePrefixes anySatisfy: [ :prefix |
+			   each name beginsWith: prefix ] ]) collect: [ :each | each name asString ]
+]
+
+{ #category : 'layering' }
+VGArchitectureTest class >> requiresOfPackageNamed: aPackageName [
+	"What BaselineOfVectorGraphics says one package needs. A name the baseline declares as a
+	 group or as an external project is not a package of ours and needs nothing here."
+
+	^ (BaselineOfVectorGraphics project version packages
+		   detect: [ :each | each name = aPackageName ]
+		   ifNone: [ ^ #(  ) ]) requires
 ]
 
 { #category : 'running' }
@@ -302,6 +419,89 @@ VGArchitectureTest >> testEveryPackageOfThisProjectHasADeclaredAllowedSet [
 	self
 		assert: self class allowedDependencies keys asSortedCollection asArray
 		equals: self class projectPackageNames asSortedCollection asArray
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testNoClassOfTheDefaultGroupInheritsFromTheStackItReplaces [
+	"A superclass and a trait are named by the class definition, not by any method, so the
+	 literal scan of testNoPackageOfTheDefaultGroupNamesAClassOfTheStackItReplaces cannot see
+	 them. This is the link that fails the load first: VGRenderer is a subclass of BARenderer,
+	 and Metacello cannot install the class at all without Bloc in the image."
+
+	| stack found |
+	stack := self class replacedStackPackageNames.
+	found := OrderedCollection new.
+	(self class packagesLoadedByGroupNamed: 'default') do: [ :packageName |
+		(PackageOrganizer default packageNamed: packageName) definedClasses do: [ :each |
+			| behaviours |
+			behaviours := each allSuperclasses asOrderedCollection
+				              addAll: each traits;
+				              addAll: each class traits;
+				              yourself.
+			behaviours do: [ :one |
+				(one package notNil and: [ stack includes: one package name asString ])
+					ifTrue: [ found add: each name , ' -> ' , one name ] ] ] ].
+	self assert: found asSortedCollection asArray equals: #(  )
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testNoPackageOfTheDefaultGroupNamesAClassOfTheStackItReplaces [
+	"Loading this project with no group named must not reach Bloc or Alexandrie. The engine and
+	 the Cairo backend are what a user loads to rasterise; the Bloc renderer is the opt-in layer
+	 that replaces Alexandrie's canvas inside Bloc. A package of the default group that names a
+	 class of either fails to load in an image where neither is present, and VGRenderer, a
+	 subclass of BARenderer, is how that was found."
+
+	| scanner offenders |
+	scanner := VGCairoReferenceScanner new.
+	offenders := (self class packagesLoadedByGroupNamed: 'default') asSortedCollection asArray
+		             flatCollect: [ :package |
+			             (scanner
+				              offendersIn: package
+				              naming: self class replacedStackPackageNames) collect: [ :each |
+				             package , ': ' , each key methodClass name , '>>'
+				             , each key selector , ' names '
+				             , (each value collect: [ :one | one name ]) asArray printString ] ].
+	self assert: offenders asSortedCollection asArray equals: #(  )
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testTheBlocGroupLoadsEverythingTheDefaultGroupLoadsAndTheRenderer [
+	"Using this project as Alexandrie's replacement stays one load: the bloc group brings the
+	 renderer and everything the default group brings. Dropping the renderer out of the default
+	 group must not make it harder to reach."
+
+	| loaded |
+	loaded := self class packagesLoadedByGroupNamed: 'bloc'.
+	self assert: (loaded includes: 'VectorGraphics-Bloc').
+	self assert: ((self class packagesLoadedByGroupNamed: 'default') allSatisfy: [ :each |
+			 loaded includes: each ])
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testTheBlocLayerRequiresTheExternalBlocProject [
+	"The renderer subclasses BARenderer, so the group that loads it must fetch Bloc rather than
+	 assume an image that already holds it. The default group declares no external project at
+	 all, which is the other half of the same fact."
+
+	| requires |
+	requires := Dictionary new.
+	BaselineOfVectorGraphics project version packages do: [ :each |
+		requires at: each name put: each requires asSet ].
+	self assert: ((requires at: 'VectorGraphics-Bloc') includes: 'Bloc').
+	self assert: (BaselineOfVectorGraphics project version projects
+			 collect: [ :each | each name ]) asSortedCollection asArray
+		equals: #( 'Bloc' )
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testTheDefaultGroupLoadsTheEngineAndTheCairoBackendAlone [
+	"What `Metacello load: 'VectorGraphics'` brings in, named here so the group cannot grow a
+	 layer back by accident. Every other layer is a group of its own."
+
+	self
+		assert: (self class packagesLoadedByGroupNamed: 'default') asSortedCollection asArray
+		equals: #( 'VectorGraphics' 'VectorGraphics-Cairo' )
 ]
 
 { #category : 'tests' }

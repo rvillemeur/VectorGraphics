@@ -45,24 +45,6 @@ VGFontFace class >> argumentsAreWordsFlag [
 	^ 1
 ]
 
-{ #category : 'instance creation' }
-VGFontFace class >> bytesForFamilyName: aFamilyName styleName: aStyleName [
-	"The bytes of the font the manager registered under this family and style. A font we cannot
-	 name falls back to the bundled default, because a frame drawn in the wrong font is better
-	 than a frame that raises inside the renderer."
-
-	| entry |
-	entry := AeFontManager globalInstance faceEntries
-		         detect: [ :each |
-			         each familyName = aFamilyName and: [
-				         each styleName = aStyleName ] ]
-		         ifNone: [ nil ].
-	entry ifNil: [ ^ self defaultBytes ].
-	^ (entry isKindOf: AeMemoryFaceEntry)
-		  ifTrue: [ entry bytes ]
-		  ifFalse: [ entry location binaryReadStream upToEnd ]
-]
-
 { #category : 'constants' }
 VGFontFace class >> componentHasMatrixFlag [
 	^ 128
