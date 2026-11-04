@@ -5,7 +5,7 @@ The table is VGArchitectureTest class >> allowedDependencies, one entry per pack
 
 I also hold the table against the organiser, against BaselineOfVectorGraphics and against a fixture that plants a reference three blocks deep, because a scan that reads only a method own literals misses every reference inside a block.
 
-The second fact is mine since the renderer left the default group: no package the default group loads may name a class of Bloc or of Alexandrie, so this project rasterises in an image where neither is present, and the bloc group loads everything the default group loads plus the renderer, so using it as Alexandrie's replacement inside Bloc stays one Metacello load. My class-side Groups tab shows all three columns live, and VGArchitectureTest class >> replacedStackPackageNames reads the stack from the organiser by prefix.
+The second fact is mine since the renderer left the default group: no package the default group loads may name a class of Bloc or of Alexandrie and no class of those packages may inherit from one, so this project rasterises in an image where neither is present. The bloc group loads everything the default group loads plus the renderer, so using it as Alexandrie's replacement inside Bloc stays one Metacello load, and the cairo-examples and cairo-tests groups load without Bloc as well — of Alexandrie they are allowed, because the conformance gate compares this rasteriser with live Cairo and a comparison needs that positive control. Each test asks the same question of a group that must answer yes, so an empty answer cannot come from a walk that finds nothing at all. My class-side Groups tab shows every group live, and VGArchitectureTest class >> replacedStackPackageNames and >> blocPackageNames read the stack from the organiser by prefix.
 
 Two project-wide rules are not mine and stay where they were written: VGBackendSelectionTest holds that only the Vulkan family names a PharoVulkan class, through VGCairoReferenceScanner, and that every package of this project is named in the baseline.
 
@@ -63,6 +63,17 @@ VGArchitectureTest class >> allowedDependencies [
 			  'VectorGraphics-Vulkan-Tests'
 			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Tests'
 				    'VectorGraphics-Vulkan' 'VectorGraphics-Vulkan-Examples' ) }
+]
+
+{ #category : 'layering' }
+VGArchitectureTest class >> blocPackageNames [
+	"Every package of Bloc present in this image, read from the organiser by prefix. Alexandrie
+	 is left out, unlike replacedStackPackageNames: the Cairo test package names Alexandrie's
+	 Cairo bindings on purpose, because the conformance gate proves this rasteriser matches
+	 live Cairo and a comparison needs that positive control."
+
+	^ (PackageOrganizer default packages select: [ :each |
+		   each name beginsWith: 'Bloc' ]) collect: [ :each | each name asString ]
 ]
 
 { #category : 'layering' }
@@ -138,6 +149,29 @@ VGArchitectureTest class >> groupReport [
 			  groupName.
 			  (self packageNameSeparator join: loaded).
 			  (self packageNameSeparator join: named asSortedCollection) } ]
+]
+
+{ #category : 'layering' }
+VGArchitectureTest class >> inheritanceOfGroupNamed: aGroupName into: aCollectionOfPackageNames [
+	"The links from a class of that group to a superclass or trait in one of those packages,
+	 as 'Subject -> Behaviour' strings. A superclass and a trait are named by the class
+	 definition, not by any method, so the literal scan of VGCairoReferenceScanner cannot see
+	 them, and this is the link Metacello fails on first."
+
+	| found |
+	found := OrderedCollection new.
+	(self packagesLoadedByGroupNamed: aGroupName) do: [ :packageName |
+		(PackageOrganizer default packageNamed: packageName) definedClasses do: [ :each |
+			| behaviours |
+			behaviours := each allSuperclasses asOrderedCollection
+				              addAll: each traits;
+				              addAll: each class traits;
+				              yourself.
+			behaviours do: [ :one |
+				(one package notNil and: [
+					 aCollectionOfPackageNames includes: one package name asString ]) ifTrue: [
+					found add: each name , ' -> ' , one name ] ] ] ].
+	^ found asSortedCollection asArray
 ]
 
 { #category : 'inspecting' }
@@ -422,26 +456,39 @@ VGArchitectureTest >> testEveryPackageOfThisProjectHasADeclaredAllowedSet [
 ]
 
 { #category : 'tests' }
-VGArchitectureTest >> testNoClassOfTheDefaultGroupInheritsFromTheStackItReplaces [
-	"A superclass and a trait are named by the class definition, not by any method, so the
-	 literal scan of testNoPackageOfTheDefaultGroupNamesAClassOfTheStackItReplaces cannot see
-	 them. This is the link that fails the load first: VGRenderer is a subclass of BARenderer,
-	 and Metacello cannot install the class at all without Bloc in the image."
+VGArchitectureTest >> testNoClassOfTheCairoExampleAndTestGroupsInheritsFromBloc [
+	"The cairo-examples and cairo-tests groups install in an image with no Bloc, which the
+	 literal scan of testTheCairoExampleAndTestGroupsNameNoBlocClass cannot prove on its own:
+	 a superclass is named by the class definition. Alexandrie is not asked about here —
+	 blocPackageNames says why."
 
-	| stack found |
-	stack := self class replacedStackPackageNames.
-	found := OrderedCollection new.
-	(self class packagesLoadedByGroupNamed: 'default') do: [ :packageName |
-		(PackageOrganizer default packageNamed: packageName) definedClasses do: [ :each |
-			| behaviours |
-			behaviours := each allSuperclasses asOrderedCollection
-				              addAll: each traits;
-				              addAll: each class traits;
-				              yourself.
-			behaviours do: [ :one |
-				(one package notNil and: [ stack includes: one package name asString ])
-					ifTrue: [ found add: each name , ' -> ' , one name ] ] ] ].
-	self assert: found asSortedCollection asArray equals: #(  )
+	#( 'cairo-examples' 'cairo-tests' ) do: [ :group |
+		self
+			assert: (self class inheritanceOfGroupNamed: group into: self class blocPackageNames)
+			equals: #(  ) ].
+	self
+		assert: (self class inheritanceOfGroupNamed: 'bloc' into: self class blocPackageNames)
+				notEmpty
+		description: 'the walk finds nothing at all, so the empty answers above prove nothing'
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testNoClassOfTheDefaultGroupInheritsFromTheStackItReplaces [
+	"This is the link that fails the load first: VGRenderer is a subclass of BARenderer, and
+	 Metacello cannot install the class at all without Bloc in the image. The same question is
+	 asked of the Cairo examples and tests by
+	 testNoClassOfTheCairoExampleAndTestGroupsInheritsFromBloc."
+
+	self
+		assert: (self class
+				 inheritanceOfGroupNamed: 'default'
+				 into: self class replacedStackPackageNames)
+		equals: #(  ).
+	self
+		assert:
+			(self class inheritanceOfGroupNamed: 'bloc' into: self class replacedStackPackageNames)
+				notEmpty
+		description: 'the walk finds nothing at all, so the empty answer above proves nothing'
 ]
 
 { #category : 'tests' }
@@ -495,6 +542,36 @@ VGArchitectureTest >> testTheBlocLayerRequiresTheExternalBlocProject [
 ]
 
 { #category : 'tests' }
+VGArchitectureTest >> testTheCairoExampleAndTestGroupsNameNoBlocClass [
+	"The examples and the tests of the Cairo layer load without Bloc too, each from a group of
+	 its own: the project-wide examples and tests groups span all three layers, so asking for
+	 them fetches Bloc and wants PharoVulkan, which a user of the Cairo backend wants neither
+	 of. Alexandrie is not asked about here — blocPackageNames says why. A group that does not
+	 exist would pass on an empty scan, so the packages each one must bring in are named
+	 first."
+
+	| scanner offenders |
+	scanner := VGCairoReferenceScanner new.
+	self
+		assert: (self class packagesLoadedByGroupNamed: 'cairo-examples')
+		equals: #( 'VectorGraphics' 'VectorGraphics-Cairo'
+			   'VectorGraphics-Cairo-Examples' ) asSet.
+	self
+		assert: (self class packagesLoadedByGroupNamed: 'cairo-tests')
+		equals: #( 'VectorGraphics' 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
+			   'VectorGraphics-Cairo-Tests' ) asSet.
+	offenders := #( 'cairo-examples' 'cairo-tests' ) flatCollect: [ :group |
+		             (self class packagesLoadedByGroupNamed: group) asSortedCollection asArray
+			             flatCollect: [ :package |
+				             (scanner
+					              offendersIn: package
+					              naming: self class blocPackageNames) collect: [ :each |
+					             group , ' ' , package , ': ' , each key methodClass name , '>>'
+					             , each key selector ] ] ].
+	self assert: offenders asSortedCollection asArray equals: #(  )
+]
+
+{ #category : 'tests' }
 VGArchitectureTest >> testTheDefaultGroupLoadsTheEngineAndTheCairoBackendAlone [
 	"What `Metacello load: 'VectorGraphics'` brings in, named here so the group cannot grow a
 	 layer back by accident. Every other layer is a group of its own."
@@ -507,6 +584,31 @@ VGArchitectureTest >> testTheDefaultGroupLoadsTheEngineAndTheCairoBackendAlone [
 { #category : 'tests' }
 VGArchitectureTest >> testTheEngineStaysInsideItsAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics'
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testTheExamplesAndTestsGroupsAreTheUnionOfTheirLayerGroups [
+	"One group per layer for examples and for tests, and the project-wide group is their union.
+	 Stating the union as the layer group names rather than as package names is what keeps the
+	 two from drifting apart when a layer gains a package."
+
+	| groups |
+	groups := Dictionary new.
+	BaselineOfVectorGraphics project version groups do: [ :each |
+		groups at: each name put: each includes asArray ].
+	self
+		assert: (groups at: 'examples')
+		equals: #( 'cairo-examples' 'bloc-examples' 'vulkan-examples' ).
+	self
+		assert: (groups at: 'tests')
+		equals: #( 'cairo-tests' 'bloc-tests' 'vulkan-tests' ).
+	#( 'examples' 'tests' ) do: [ :name |
+		self
+			assert: (self class packagesLoadedByGroupNamed: name)
+			equals: ((groups at: name) inject: Set new into: [ :all :layer |
+					 all
+						 addAll: (self class packagesLoadedByGroupNamed: layer);
+						 yourself ]) ]
 ]
 
 { #category : 'tests' }

@@ -45,20 +45,27 @@ BaselineOfVectorGraphics >> declareExternalProjectsOn: spec [
 BaselineOfVectorGraphics >> declareGroupsOn: spec [
 	"One group per layer, and a default group of the engine and the Cairo backend. A layer
 	 above them is opt-in: 'bloc' is the renderer that replaces Alexandrie's canvas inside
-	 Bloc, 'vulkan' the device backend, and the examples and tests of every layer load on
-	 their own names."
+	 Bloc, 'vulkan' the device backend.
+
+	 The examples and the tests of each layer are a group of their own, because the
+	 project-wide 'examples' and 'tests' groups span all three layers: asking for them fetches
+	 Bloc and wants PharoVulkan, which a user of the Cairo backend alone wants neither of. The
+	 two project-wide groups are declared as the union of the layer groups, so a layer that
+	 gains a package is in both at once."
 
 	spec
 		group: 'core' with: #( 'VectorGraphics' );
 		group: 'cairo' with: #( 'VectorGraphics-Cairo' );
+		group: 'cairo-examples' with: #( 'VectorGraphics-Cairo-Examples' );
+		group: 'cairo-tests' with: #( 'VectorGraphics-Cairo-Tests' );
 		group: 'bloc' with: #( 'VectorGraphics-Bloc' );
+		group: 'bloc-examples' with: #( 'VectorGraphics-Bloc-Examples' );
+		group: 'bloc-tests' with: #( 'VectorGraphics-Bloc-Tests' );
 		group: 'vulkan' with: #( 'VectorGraphics-Vulkan' );
-		group: 'examples'
-		with: #( 'VectorGraphics-Cairo-Examples' 'VectorGraphics-Bloc-Examples'
-		         'VectorGraphics-Vulkan-Examples' );
-		group: 'tests'
-		with: #( 'VectorGraphics-Cairo-Tests' 'VectorGraphics-Bloc-Tests'
-		         'VectorGraphics-Vulkan-Tests' );
+		group: 'vulkan-examples' with: #( 'VectorGraphics-Vulkan-Examples' );
+		group: 'vulkan-tests' with: #( 'VectorGraphics-Vulkan-Tests' );
+		group: 'examples' with: #( 'cairo-examples' 'bloc-examples' 'vulkan-examples' );
+		group: 'tests' with: #( 'cairo-tests' 'bloc-tests' 'vulkan-tests' );
 		group: 'default' with: #( 'core' 'cairo' )
 ]
 
