@@ -8,6 +8,10 @@ I cannot reach BlHostSpace >> initializeRenderer by sending super, since my supe
 Class {
 	#name : 'VGVulkanPresentHostSpace',
 	#superclass : 'BlOSWindowSDL2HostSpace',
+	#instVars : [
+		'presentContext',
+		'presentChain'
+	],
 	#category : 'VectorGraphics-Vulkan-Present',
 	#package : 'VectorGraphics-Vulkan',
 	#tag : 'Present'
@@ -19,6 +23,22 @@ VGVulkanPresentHostSpace >> backendWindow [
 	 reads its class to see that it carries SDL_WINDOW_VULKAN."
 
 	^ window backendWindow
+]
+
+{ #category : 'host space - lifecycle' }
+VGVulkanPresentHostSpace >> close [
+	"The chain, then the context, then the window my superclass closes: the reverse of the
+	 order they were acquired in, because the surface inside the chain belongs to the instance
+	 the context holds. Tolerates a second close, as my superclass's does, since a test may
+	 close a space its fixture closes again."
+
+	presentChain ifNotNil: [
+		presentChain destroy.
+		presentChain := nil ].
+	presentContext ifNotNil: [
+		presentContext destroy.
+		presentContext := nil ].
+	super close
 ]
 
 { #category : 'initialization' }
@@ -65,4 +85,54 @@ VGVulkanPresentHostSpace >> physicalSize [
 	 created with as well."
 
 	^ self backendWindow vulkanDrawableExtent asPhysicalSize
+]
+
+{ #category : 'presenting' }
+VGVulkanPresentHostSpace >> presentChain [
+	"The chain over this window: surface, swapchain, render pass, one framebuffer per image,
+	 and the frame synchronisation. One chain per drawable extent, kept for as long as it
+	 matches — a swapchain is created for one extent and is not valid for another, so a resized
+	 window is answered by destroying the chain and building the next one, and an unresized
+	 window keeps the one it has instead of paying for a swapchain every frame."
+
+	presentChain ifNotNil: [
+		presentChain matchesDrawable ifTrue: [ ^ presentChain ].
+		presentChain destroy.
+		presentChain := nil ].
+	^ presentChain := VGVulkanPresentChain
+		                  onContext: self presentContext
+		                  backendWindow: self backendWindow
+]
+
+{ #category : 'presenting' }
+VGVulkanPresentHostSpace >> presentContext [
+	"The Vulkan context this host space presents through, built on first use from the instance
+	 extensions SDL asks for on this platform. It is the host space's own, and not
+	 VGVulkanDeviceSession's: the session's context is created for compute and carries none of
+	 the surface extensions a window needs. Unit 7.3 is where the two become one context, and
+	 this method is the one place that has to change for it."
+
+	^ presentContext ifNil: [
+		  presentContext := VkContext graphicsContextForExtensions:
+			                    self backendWindow requiredInstanceExtensions ]
+]
+
+{ #category : 'presenting' }
+VGVulkanPresentHostSpace >> presentContextOrNil [
+	"The context if one was built, and nil before the first frame and after close. Tests read
+	 this rather than presentContext, which would build one to answer the question."
+
+	^ presentContext
+]
+
+{ #category : 'rendering' }
+VGVulkanPresentHostSpace >> presentFrameFor: logicalDamagedRectangle scaleFactor: aNumber during: aBlock [
+	"The frame of a presenting window, where BARenderer sends lockSurfaceFor:scaleFactor:during:
+	 on the CPU path: acquire an image of the swapchain, evaluate the block with it, present it,
+	 and answer the index presented. The damaged rectangle and the scale factor are the
+	 arguments the method this replaces is given, and they are the ones unit 7.4 draws from;
+	 this unit clears the image and presents it whatever they say, because a swapchain image is
+	 not the previous frame and a partial frame would leave the rest of it undefined."
+
+	^ self presentChain presentFrameDuring: aBlock
 ]

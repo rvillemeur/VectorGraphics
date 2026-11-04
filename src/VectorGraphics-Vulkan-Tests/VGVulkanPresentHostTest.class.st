@@ -14,6 +14,15 @@ Class {
 	#tag : 'Tests'
 }
 
+{ #category : 'accessing' }
+VGVulkanPresentHostTest class >> resizeTimeout [
+	"How long a test waits for the window system to answer a resize before it fails. Generous,
+	 because a compositor is free to take its time, and bounded, because a suite that hangs
+	 tells nobody anything."
+
+	^ 5 seconds
+]
+
 { #category : 'running' }
 VGVulkanPresentHostTest >> setUp [
 	"BlHostRenderer class >> preferableClass caches the renderer the whole image draws through,
@@ -53,6 +62,24 @@ VGVulkanPresentHostTest >> testAFrameOfMySpaceReachesMyRendererAndNotTheSurfaceL
 		self assert: hostSpace renderer frameCount equals: 1 ]
 ]
 
+{ #category : 'tests - presenting' }
+VGVulkanPresentHostTest >> testClosingMyHostSpaceDestroysItsChainAndItsContext [
+	"The window, the chain over it and the Vulkan context the chain was built on all end when
+	 the space does, in that reverse order, and nothing is left on the device. The context is
+	 the host space's own for now: the session's context is built for compute and carries none
+	 of the instance extensions a surface needs, and unit 7.3 is where the two become one."
+
+	self withPresentingHostSpaceDo: [ :hostSpace |
+		| chain context |
+		chain := hostSpace presentChain.
+		context := hostSpace presentContext.
+		self deny: chain isDestroyed.
+		hostSpace close.
+		self assert: chain isDestroyed.
+		self assert: hostSpace presentContextOrNil isNil.
+		self assert: context device isNil ]
+]
+
 { #category : 'tests' }
 VGVulkanPresentHostTest >> testExactlyOneSdl2HostIsSupportedInEveryCombination [
 	"Which SDL2 host the registry picks must never be a coin toss. There are three of us now and
@@ -71,6 +98,29 @@ VGVulkanPresentHostTest >> testExactlyOneSdl2HostIsSupportedInEveryCombination [
 		self assert: supported value equals: { VGVulkanDriverSdl2Host }.
 		VGVulkanPresentHost enableDuring: [
 			self assert: supported value equals: { VGVulkanPresentHost } ] ]
+]
+
+{ #category : 'tests - presenting' }
+VGVulkanPresentHostTest >> testMyHostSpacePresentsFramesThatCycleThroughItsSwapchainImages [
+	"Unit 7.2 through the host space rather than through the chain directly: the method Bloc's
+	 renderer will send in 7.4 is presentFrameFor:scaleFactor:during:, and it has to acquire an
+	 image, hand that image to the block and present it. More frames than the swapchain holds,
+	 so an index that never comes round shows up here."
+
+	self withPresentingHostSpaceDo: [ :hostSpace |
+		| indexes imagesSeen chain |
+		indexes := OrderedCollection new.
+		imagesSeen := OrderedCollection new.
+		chain := hostSpace presentChain.
+		chain imageCount * 2 + 1 timesRepeat: [
+			indexes add: (hostSpace
+					 presentFrameFor: (0 @ 0 extent: chain extent)
+					 scaleFactor: 1
+					 during: [ :image | imagesSeen add: image ]) ].
+		self assert: imagesSeen size equals: indexes size.
+		self
+			assert: indexes asSet asSortedCollection asArray
+			equals: (0 to: chain imageCount - 1) asArray ]
 ]
 
 { #category : 'tests' }
@@ -111,6 +161,31 @@ VGVulkanPresentHostTest >> testMyWindowOwnsNoSdlAcceleratedRenderer [
 
 	self withHostSpaceDo: [ :hostSpace |
 		self assert: hostSpace backendWindow renderer isNil ]
+]
+
+{ #category : 'tests - presenting' }
+VGVulkanPresentHostTest >> testTheChainOfMyHostSpaceIsKeptUntilTheDrawableChangesAndIsThenRebuilt [
+	"A swapchain is created for one drawable extent and is not valid for another, so a resized
+	 window needs a new one — and an unchanged window must not get one every frame, which is
+	 what the first two assertions hold. The resize is a real one: SDL answers the new drawable
+	 through SDL_Vulkan_GetDrawableSize, and the chain is rebuilt because it no longer matches
+	 it."
+
+	self withPresentingHostSpaceDo: [ :hostSpace |
+		| first resized |
+		first := hostSpace presentChain.
+		self assert: hostSpace presentChain identicalTo: first.
+		self assert: first matchesDrawable.
+		hostSpace windowExtent: hostSpace backendWindow vulkanDrawableExtent * 2.
+		self
+			waitUntil: [ first matchesDrawable not ]
+			description: 'the window system has to answer the new drawable extent'.
+		resized := hostSpace presentChain.
+		self deny: resized identicalTo: first.
+		self assert: first isDestroyed.
+		self
+			assert: resized extent
+			equals: hostSpace backendWindow vulkanDrawableExtent ]
 ]
 
 { #category : 'tests' }
@@ -175,6 +250,19 @@ VGVulkanPresentHostTest >> testTheWindowOfMyHostSpaceIsAVulkanWindow [
 ]
 
 { #category : 'running' }
+VGVulkanPresentHostTest >> waitUntil: aBlock description: aString [
+	"A window system answers a resize when it chooses to, not when the test asks, so a test
+	 that reads the drawable extent straight after the request reads the old one. The wait is
+	 bounded and fails with the reason rather than hanging the suite."
+
+	| deadline |
+	deadline := DateAndTime now + self class resizeTimeout.
+	[ aBlock value ] whileFalse: [
+		DateAndTime now > deadline ifTrue: [ ^ self fail: aString ].
+		(Delay forMilliseconds: 20) wait ]
+]
+
+{ #category : 'running' }
 VGVulkanPresentHostTest >> withHostSpaceDo: aBlock [
 	"A host space of mine over a real window, closed whatever the block does with it. The window
 	 is hidden, because the attributes a Bloc host builds start invisible. The space is never
@@ -197,4 +285,22 @@ VGVulkanPresentHostTest >> withPresentHostDuring: aBlock [
 	 answers supported. Both are put back when the block ends, whatever the block does."
 
 	^ PVVulkanDriver installDuring: [ VGVulkanPresentHost enableDuring: aBlock ]
+]
+
+{ #category : 'running' }
+VGVulkanPresentHostTest >> withPresentingHostSpaceDo: aBlock [
+	"A host space of mine whose window is shown, because a presentation engine owes a hidden
+	 window nothing and an acquire against one can wait until its bound runs out. Answers
+	 without evaluating the block when this machine has no Vulkan device, which is how every
+	 device test of this project answers. The host space is closed whatever the block does,
+	 and closing it is what destroys the chain and the context it built."
+
+	VGVulkanDeviceSession default contextOrNil ifNil: [ ^ self ].
+	^ self withPresentHostDuring: [
+		  | hostSpace |
+		  hostSpace := VGVulkanPresentHost default newHostSpaceFor: BlSpace new.
+		  hostSpace initializeRenderer.
+		  [
+		  hostSpace show.
+		  aBlock value: hostSpace ] ensure: [ hostSpace close ] ]
 ]

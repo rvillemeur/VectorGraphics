@@ -30,6 +30,17 @@ Class {
 	#tag : 'Present'
 }
 
+{ #category : 'constants' }
+VGVulkanPresentChain class >> frameTimeoutNanoseconds [
+	"One second: longer than any frame a presentation engine owes us, shorter than a user's
+	 patience. Every wait of a frame is bounded by it, because a fence wait and an image
+	 acquire are plain uFFI calls — the virtual machine sits inside the driver for as long as
+	 they take, no Pharo process runs, and an unbounded one froze this image on 4 November.
+	 Past the bound the driver raises, which is what a caller can see and a test can catch."
+
+	^ 1000000000
+]
+
 { #category : 'instance creation' }
 VGVulkanPresentChain class >> onContext: aVkContext backendWindow: aVulkanBackendWindow [
 	"Answer a built chain, or nothing at all. A raise part-way through building would
@@ -55,6 +66,17 @@ VGVulkanPresentChain class >> verifyFormat: aFormat [
 	self error: 'A presenting swapchain must render in format '
 		, VkRenderConfig formatRenderedIn printString , ', and this surface offered '
 		, aFormat printString
+]
+
+{ #category : 'verifying' }
+VGVulkanPresentChain class >> verifySurface: aSurface presentsOnQueueFamily: aQueueFamilyIndex [
+	"Refuse a queue family the surface does not accept. Presenting on such a queue is invalid
+	 use that nothing reports when the validation layers are off: the frame goes nowhere and
+	 the next acquire waits for an image the presentation engine never gives back."
+
+	(aSurface supportsPresentation: aQueueFamilyIndex) ifTrue: [ ^ self ].
+	self error: 'Queue family ' , aQueueFamilyIndex printString
+		, ' cannot present on this surface'
 ]
 
 { #category : 'accessing' }
@@ -119,15 +141,20 @@ VGVulkanPresentChain >> imageCount [
 VGVulkanPresentChain >> initializeContext: aVkContext backendWindow: aVulkanBackendWindow [
 	"In the order partsInCreationOrder states, which destruction reads backwards. The extent
 	 is the drawable SDL answers for a Vulkan window and never the window's logical size: on a
-	 scaled display the two differ, and the swapchain's images are the drawable's pixels. The
-	 format is verified as soon as the driver has answered one, so a surface that offers
-	 something else fails here rather than presenting swapped channels."
+	 scaled display the two differ, and the swapchain's images are the drawable's pixels. Both
+	 refusals happen as soon as the driver has answered: a surface that offers another format
+	 would present swapped channels, and a queue family that cannot present would swallow
+	 every frame."
+
 	context := aVkContext.
 	backendWindow := aVulkanBackendWindow.
 	surface := VkSurface
 		           fromWindow: backendWindow
 		           instance: context instance
 		           physicalDevice: context physicalDevice.
+	self class
+		verifySurface: surface
+		presentsOnQueueFamily: context computeQueueFamily.
 	swapchain := VkSwapchain
 		             on: context device
 		             surface: surface
@@ -193,21 +220,21 @@ VGVulkanPresentChain >> partsInDestructionOrder [
 
 { #category : 'presenting' }
 VGVulkanPresentChain >> presentFrameDuring: aBlock [
-	"One frame, and the image index it went into, so a caller can watch the cycle advance.
-	 The fence wait blocks until the previous frame's work is done, which is what Vk noTimeout
-	 says, and the acquire blocks until the presentation engine has an image free.
-	 The block is handed the image of that index and evaluated before anything is submitted,
-	 because in unit 7.3 it is the block's own copy into that image that becomes the
-	 submission waiting on imageAvailable and signalling renderFinished. Until then the clear
-	 below is the whole frame: a render pass rather than a vkCmdClearColorImage, because the
-	 pass leaves the image in presentSrcKHR by itself and so needs no barrier written here.
-	 The pass is ended explicitly — vkEndCommandBuffer does not close an open render pass."
+	"One frame: wait for the previous one, acquire an image, hand that image to the block,
+	 clear it, submit and present. Answers the index of the image presented, which is what
+	 says the cycle is a cycle. Both waits are bounded by frameTimeoutNanoseconds; neither may
+	 be unbounded, since both run inside a plain uFFI call that stops the whole virtual
+	 machine while it waits. The clear is a render pass because the pass this chain builds is
+	 the one that leaves the image in presentSrcKHR, and the pass is closed here: a command
+	 buffer's end does not close it."
+
 	| imageIndex |
-	fence waitTimeout: Vk noTimeout.
+	fence waitTimeout: self class frameTimeoutNanoseconds.
 	fence reset.
 	imageIndex := swapchain
 		              acquireNextImage: imageAvailable handle
-		              fence: ExternalAddress null.
+		              fence: ExternalAddress null
+		              timeout: self class frameTimeoutNanoseconds.
 	aBlock value: (swapchain images at: imageIndex + 1).
 	commandPool reset.
 	commandBuffer do: [ :recorder |

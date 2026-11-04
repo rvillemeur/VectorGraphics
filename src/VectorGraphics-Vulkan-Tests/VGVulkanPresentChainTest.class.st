@@ -62,6 +62,48 @@ VGVulkanPresentChainTest >> testAFormatOtherThanTheOneThisProjectRendersInIsRefu
 	self assert: (message includesSubstring: offered printString)
 ]
 
+{ #category : 'tests - presentation' }
+VGVulkanPresentChainTest >> testAQueueFamilyThatCannotPresentOnTheSurfaceIsRefused [
+	"Submitting and presenting on a queue whose family cannot present on the surface is
+	 invalid use that no validation layer catches when the layers are off: the driver may
+	 answer nothing at all, and the acquire of the next frame then waits for an image that
+	 never comes back. The chain asks before it presents, and says which family it asked
+	 about."
+
+	| message |
+	message := [
+	           VGVulkanPresentChain
+		           verifySurface: VGNonPresentingSurfaceStub new
+		           presentsOnQueueFamily: 7.
+	           nil ]
+		           on: Error
+		           do: [ :error | error messageText ].
+	self assert: message isNotNil.
+	self assert: (message includesSubstring: '7')
+]
+
+{ #category : 'tests - waiting' }
+VGVulkanPresentChainTest >> testEveryWaitOfAPresentedFrameIsBounded [
+	"On 4 November a present loop with two unbounded waits in it froze this image for minutes:
+	 a fence wait and an image acquire are plain uFFI calls, so the virtual machine is inside
+	 the driver with the user interface stopped, and no Pharo process can interrupt it. The
+	 bound converts that freeze into a raise. This test holds the bound rather than the
+	 comment, because the next person to copy the hello-triangle loop would copy Vk noTimeout
+	 with it."
+
+	| timeout source |
+	timeout := VGVulkanPresentChain frameTimeoutNanoseconds.
+	self assert: timeout > 0.
+	self assert: timeout < Vk noTimeout.
+	self
+		assert: timeout <= (10 raisedTo: 10)
+		description: 'a bound of more than ten seconds is a freeze by another name'.
+	source := VGVulkanPresentChain >> #presentFrameDuring:.
+	self assert: (source sendsSelector: #frameTimeoutNanoseconds).
+	self assert: (source sendsSelector: #acquireNextImage:fence:timeout:).
+	self deny: (source sendsSelector: #noTimeout)
+]
+
 { #category : 'tests - lifetime' }
 VGVulkanPresentChainTest >> testTheChainDestroysItsPartsInTheReverseOfTheOrderItBuiltThem [
 	"A framebuffer references an image view of the swapchain, and a swapchain references the
@@ -93,6 +135,18 @@ VGVulkanPresentChainTest >> testTheFormatThisProjectRendersInIsAccepted [
 	 writes b8g8r8a8Unorm words and a presented frame has to be the same bytes an offscreen
 	 frame is, so a swapchain of that format is the only one a presenting chain accepts."
 	VGVulkanPresentChain verifyFormat: VkRenderConfig formatRenderedIn
+]
+
+{ #category : 'tests - presentation' }
+VGVulkanPresentChainTest >> testTheQueueTheChainPresentsOnCanPresentOnItsSurface [
+	"The refusal above is a stub; this is the machine. The chain submits and presents on the
+	 one queue its context holds, so that queue's family has to be one the surface accepts.
+	 This is the fact the chain verifies while it is being built, asserted here against a real
+	 surface so that a machine where it does not hold fails a test rather than a window."
+
+	self withChainDo: [ :chain |
+		self assert:
+			(chain surface supportsPresentation: chain context computeQueueFamily) ]
 ]
 
 { #category : 'tests - frames' }
