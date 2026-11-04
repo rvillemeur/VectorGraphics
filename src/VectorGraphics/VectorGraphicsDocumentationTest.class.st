@@ -3,7 +3,9 @@ I hold the documents of this package to the code they describe.
 
 The package comment is the map a reader sees first in the browser, so I check that it names every tag the package has and no tag it does not have: a renamed tag fails here instead of sending a reader to a part of the package that is not there. I read only the list under the `Tags:` heading, since the comment holds other lists; `tagNamesNamedBy:` is that reader and is tested on its own degenerate states.
 
-I grow with the other two documentation artefacts of this package: `doc/ARCHITECTURE.md`, whose class and selector names I check against the image, and the inspector views of the engine, whose examples I build. `VGCairoExamplesTest` does the same work for the layers above, but I cannot subclass it: `VGArchitectureTest class >> allowedDependencies` gives this package no outgoing edge, so no class here may name one of `VectorGraphics-Cairo-Tests`.
+`doc/ARCHITECTURE.md` is the second document, and I hold every name it writes in backticks to the image: a capitalised word must be a class, a class variable of this package or a package; a `Class >> selector` form must be answered by that class; a keyword selector on its own must be implemented somewhere. I read nothing inside a fenced code block, because the diagram in one is a drawing rather than a claim, and I say nothing about a unary token, which cannot be told from an instance variable name. The document is a file of the repository and not of the image, so I skip when there is no checkout to read.
+
+I grow with the third documentation artefact of this package, the inspector views of the engine, whose examples I build. `VGCairoExamplesTest` does the same work for the layers above, but I cannot subclass it: `VGArchitectureTest class >> allowedDependencies` gives this package no outgoing edge, so no class here may name one of `VectorGraphics-Cairo-Tests`.
 "
 Class {
 	#name : 'VectorGraphicsDocumentationTest',
@@ -12,6 +14,148 @@ Class {
 	#package : 'VectorGraphics',
 	#tag : 'Tests'
 }
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> architectureDocumentContents [
+	"Answer the text of the architecture document, or nil when there is none to read."
+
+	| file |
+	file := self architectureDocumentFile ifNil: [ ^ nil ].
+	^ file exists ifTrue: [ file contents ] ifFalse: [ nil ]
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> architectureDocumentFile [
+	"Answer the architecture document, or nil when this image has no checkout of the project.
+	The document is a file of the repository, not of the image, so an image that loaded the
+	package from Metacello has no copy of it and the gates below skip rather than fail."
+
+	| repository |
+	repository := IceRepository registry
+		detect: [ :each | each name = self repositoryName ]
+		ifNone: [ ^ nil ].
+	^ repository location / 'doc' / self architectureDocumentName
+]
+
+{ #category : 'testing' }
+VectorGraphicsDocumentationTest >> architectureDocumentMayName: aToken [
+	"A capitalised name of the document is held to one of three things that really exist: a class
+	of the image, a class variable of a class of this package, or a package."
+
+	(Smalltalk includesKey: aToken asSymbol) ifTrue: [ ^ true ].
+	(self classVariableNamesOfThePackage includes: aToken) ifTrue: [ ^ true ].
+	^ (PackageOrganizer default packageNamed: aToken ifAbsent: [ nil ]) notNil
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> architectureDocumentName [
+	^ 'ARCHITECTURE.md'
+]
+
+{ #category : 'parsing' }
+VectorGraphicsDocumentationTest >> backtickedTokensOf: aString [
+	"Answer every piece of aString written between two backticks, outside a fenced code block.
+	A fence is skipped because the diagram inside it is a drawing, not a claim about a name."
+
+	| tokens insideAFence |
+	tokens := OrderedCollection new.
+	insideAFence := false.
+	aString lines do: [ :line |
+		(line beginsWith: '```')
+			ifTrue: [ insideAFence := insideAFence not ]
+			ifFalse: [ insideAFence ifFalse: [ self backtickedTokensOf: line into: tokens ] ] ].
+	^ tokens
+]
+
+{ #category : 'parsing' }
+VectorGraphicsDocumentationTest >> backtickedTokensOf: aLine into: aCollection [
+	"Add every backticked piece of one line to aCollection. An unclosed backtick ends the line."
+
+	| index |
+	index := 1.
+	[ (index := aLine indexOf: $` startingAt: index) > 0 ] whileTrue: [
+		| closing |
+		closing := aLine indexOf: $` startingAt: index + 1.
+		closing = 0
+			ifTrue: [ index := aLine size + 1 ]
+			ifFalse: [
+				aCollection add: (aLine copyFrom: index + 1 to: closing - 1).
+				index := closing + 1 ] ]
+]
+
+{ #category : 'parsing' }
+VectorGraphicsDocumentationTest >> behaviourNamedBy: aString [
+	"Answer the class or metaclass aString names, or nil. 'Foo class' names the metaclass."
+
+	| isClassSide name class |
+	isClassSide := aString endsWith: self classSideSuffix.
+	name := isClassSide
+		ifTrue: [ (aString allButLast: self classSideSuffix size) trimmed ]
+		ifFalse: [ aString trimmed ].
+	class := Smalltalk at: name asSymbol ifAbsent: [ ^ nil ].
+	(class isBehavior) ifFalse: [ ^ nil ].
+	^ isClassSide ifTrue: [ class class ] ifFalse: [ class ]
+]
+
+{ #category : 'parsing' }
+VectorGraphicsDocumentationTest >> classSideSuffix [
+	^ ' class'
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> classVariableNamesOfThePackage [
+	"Answer the names of every class variable declared by a class of this package, so the
+	document may name one — the font caches are class variables, not classes."
+
+	| names |
+	names := Set new.
+	self packageUnderTest definedClasses do: [ :each |
+		names addAll: (each classVariables collect: [ :variable | variable name asString ]) ].
+	^ names
+]
+
+{ #category : 'parsing' }
+VectorGraphicsDocumentationTest >> isClassNameToken: aToken [
+	"A backticked token is read as a name of the image when it is one word beginning with a
+	capital. An expression, an instance variable, a selector, a file extension and a hexadecimal
+	literal are all claims this test cannot check, and it leaves them alone."
+
+	^ aToken notEmpty
+		and: [ aToken first isUppercase
+		and: [ aToken allSatisfy: [ :each | each isAlphaNumeric ] ] ]
+]
+
+{ #category : 'testing' }
+VectorGraphicsDocumentationTest >> isImplementedMethodToken: aToken [
+	"The named class must answer the named selector. Inherited counts: the document speaks of
+	what a class does, not of which class in the hierarchy holds the method. The separator is
+	found as a substring rather than with substrings:, which would also split on each $> alone."
+
+	| separator index behaviour selector |
+	separator := self qualifiedSelectorSeparator.
+	index := aToken indexOfSubCollection: separator.
+	index = 0 ifTrue: [ ^ false ].
+	behaviour := self behaviourNamedBy: (aToken first: index - 1).
+	behaviour ifNil: [ ^ false ].
+	selector := (aToken allButFirst: index - 1 + separator size) trimmed.
+	^ behaviour canUnderstand: selector asSymbol
+]
+
+{ #category : 'parsing' }
+VectorGraphicsDocumentationTest >> isKeywordSelectorToken: aToken [
+	"A token holding a colon and no space is read as a keyword selector on its own. A unary
+	selector cannot be told from an instance variable name, so this test says nothing about one."
+
+	^ (aToken includes: $:)
+		and: [ (aToken includes: Character space) not ]
+]
+
+{ #category : 'parsing' }
+VectorGraphicsDocumentationTest >> isQualifiedSelectorToken: aToken [
+	"A token of the form Class >> selector, or Class class >> selector, names one method."
+
+	^ aToken includesSubstring: self qualifiedSelectorSeparator
+]
 
 { #category : 'accessing' }
 VectorGraphicsDocumentationTest >> packageComment [
@@ -26,6 +170,24 @@ VectorGraphicsDocumentationTest >> packageUnderTest [
 	"The package these tests document: the engine, the path commands and the TrueType code."
 
 	^ PackageOrganizer default packageNamed: 'VectorGraphics'
+]
+
+{ #category : 'parsing' }
+VectorGraphicsDocumentationTest >> qualifiedSelectorSeparator [
+	^ ' >> '
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> repositoryName [
+	^ 'VectorGraphics'
+]
+
+{ #category : 'running' }
+VectorGraphicsDocumentationTest >> skipTheDocumentIsAbsent [
+	"The document is a file of the repository; an image that loaded the package from Metacello
+	has none, and these gates say nothing there."
+
+	^ self skip: 'There is no checkout of ' , self repositoryName , ' in this image'
 ]
 
 { #category : 'accessing' }
@@ -73,6 +235,58 @@ VectorGraphicsDocumentationTest >> tagNamesOfThePackage [
 	^ (self packageUnderTest tags collect: [ :each | each name asString ]) asSet
 ]
 
+{ #category : 'tests' }
+VectorGraphicsDocumentationTest >> testEveryMethodTheArchitectureDocumentNamesIsImplementedByThatClass [
+	| contents missing |
+	contents := self architectureDocumentContents ifNil: [ ^ self skipTheDocumentIsAbsent ].
+	missing := ((self backtickedTokensOf: contents)
+		select: [ :each | self isQualifiedSelectorToken: each ])
+			reject: [ :each | self isImplementedMethodToken: each ].
+	self
+		assert: missing isEmpty
+		description: 'Named by the document, not answered by that class: '
+			, missing asSet asSortedCollection asArray printString
+]
+
+{ #category : 'tests' }
+VectorGraphicsDocumentationTest >> testEveryNameTheArchitectureDocumentBackticksExists [
+	| contents unknown |
+	contents := self architectureDocumentContents ifNil: [ ^ self skipTheDocumentIsAbsent ].
+	unknown := ((self backtickedTokensOf: contents)
+		select: [ :each | self isClassNameToken: each ])
+			reject: [ :each | self architectureDocumentMayName: each ].
+	self
+		assert: unknown isEmpty
+		description: 'Named by the document, absent from the image: '
+			, unknown asSet asSortedCollection asArray printString
+]
+
+{ #category : 'tests' }
+VectorGraphicsDocumentationTest >> testEverySelectorTheArchitectureDocumentNamesOnItsOwnIsImplemented [
+	| contents missing |
+	contents := self architectureDocumentContents ifNil: [ ^ self skipTheDocumentIsAbsent ].
+	missing := ((self backtickedTokensOf: contents)
+		select: [ :each |
+			(self isKeywordSelectorToken: each)
+				and: [ (self isQualifiedSelectorToken: each) not ] ])
+			reject: [ :each | (SystemNavigation default allImplementorsOf: each asSymbol) notEmpty ].
+	self
+		assert: missing isEmpty
+		description: 'Named by the document, implemented nowhere: '
+			, missing asSet asSortedCollection asArray printString
+]
+
+{ #category : 'tests' }
+VectorGraphicsDocumentationTest >> testTheGateRejectsANameAndAMethodTheImageDoesNotHave [
+	"The gates above pass; this says they can fail, which is what makes them worth running."
+
+	self deny: (self architectureDocumentMayName: 'VGNoSuchClassOfThisProject').
+	self deny: (self isImplementedMethodToken: 'VectorCanvas >> noSuchSelectorHere').
+	self deny: (self isImplementedMethodToken: 'VGNoSuchClassOfThisProject >> onForm:').
+	self assert: (self architectureDocumentMayName: 'VectorCanvas').
+	self assert: (self isImplementedMethodToken: 'VectorCanvas class >> onForm:')
+]
+
 { #category : 'tests - package comment' }
 VectorGraphicsDocumentationTest >> testThePackageCommentNamesEveryTagOfThePackage [
 	"A tag nobody has written down is a part of the package a reader will not look in."
@@ -109,4 +323,18 @@ VectorGraphicsDocumentationTest >> testTheTagListIsReadOnlyUnderItsHeadingAndSto
 	self
 		assert: (self tagNamesNamedBy: comment)
 		equals: (Set withAll: #( 'Kernel' 'Tests' ))
+]
+
+{ #category : 'tests' }
+VectorGraphicsDocumentationTest >> testTheTokeniserReadsBackticksOutsideAFenceAndNothingInsideOne [
+	| document |
+	document := String lf join: #(
+		'Text naming `VectorCanvas` and `nothing closed here'
+		'```'
+		'`InsideAFence` is a drawing, not a claim'
+		'```'
+		'and `TTGlyph` after it' ).
+	self
+		assert: (self backtickedTokensOf: document) asArray
+		equals: #( 'VectorCanvas' 'TTGlyph' )
 ]
