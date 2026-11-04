@@ -1,0 +1,256 @@
+"
+I am the presentation half of a presenting window: the `VkSurface` over its handle, the `VkSwapchain` over that surface, the render pass and framebuffers over the swapchain's own image views, and the one command buffer, two semaphores and fence a frame loop needs. `VGVulkanPresentHostSpace` owns one of me and hands me the frames it is asked for.
+
+I do not own the `VkContext`. A device lives longer than a window and a second window of the same image should not open a second one, so my host space creates the context and destroys it; I am handed it and I destroy nothing of it. Unit 7.3 decides whether that context becomes the one `VGVulkanDeviceSession` holds, which it has to be before a tiled fill can write into an image I acquired: a swapchain image belongs to the device its swapchain was created on, and the session's compute context is created from an instance that carries none of the window-system extensions a surface needs.
+
+`presentFrameDuring:` is one frame: wait on the fence of the previous frame, acquire the next image, evaluate the block with it, clear it through a render pass, submit, present, and answer the image index so a caller can watch the cycle advance. The clear is what unit 7.4's drawing replaces; until then it is the whole of the frame, and it is a render pass rather than a `vkCmdClearColorImage` because the pass already leaves the image in `presentSrcKHR` and so needs no barrier written by hand.
+
+My format is checked rather than adapted. `verifyFormat:` refuses any swapchain format but `VkRenderConfig formatRenderedIn`, because the kernel writes that format's words and a presented frame has to be the bytes an offscreen frame is.
+
+My parts are destroyed in the reverse of the order they were created, which `partsInCreationOrder` states once and `destroy` reads backwards.
+"
+Class {
+	#name : 'VGVulkanPresentChain',
+	#superclass : 'Object',
+	#instVars : [
+		'context',
+		'backendWindow',
+		'surface',
+		'swapchain',
+		'renderPass',
+		'framebuffers',
+		'commandPool',
+		'commandBuffer',
+		'imageAvailable',
+		'renderFinished',
+		'fence'
+	],
+	#category : 'VectorGraphics-Vulkan-Present',
+	#package : 'VectorGraphics-Vulkan',
+	#tag : 'Present'
+}
+
+{ #category : 'instance creation' }
+VGVulkanPresentChain class >> onContext: aVkContext backendWindow: aVulkanBackendWindow [
+	"Answer a built chain, or nothing at all. A raise part-way through building would
+	 otherwise strand the Vulkan objects already created on an instance no caller receives,
+	 and there would be no way left to destroy them. destroy tolerates nil slots, so it is
+	 safe on a half-built chain — this is PVHelloTriangleScene class >> prepare:backendWindow:
+	 and for the same reason."
+	| chain |
+	chain := self new.
+	[
+	chain initializeContext: aVkContext backendWindow: aVulkanBackendWindow ]
+		ifCurtailed: [ chain destroy ].
+	^ chain
+]
+
+{ #category : 'format' }
+VGVulkanPresentChain class >> verifyFormat: aFormat [
+	"The format a swapchain really came back with, against the one this project renders in.
+	 A surface that offers no b8g8r8a8Unorm would present the kernel's words with their
+	 channels swapped, so this refuses rather than adapts, and the message names both numbers
+	 because the one the machine does offer is what a reader needs next."
+	aFormat = VkRenderConfig formatRenderedIn ifTrue: [ ^ self ].
+	self error: 'A presenting swapchain must render in format '
+		, VkRenderConfig formatRenderedIn printString , ', and this surface offered '
+		, aFormat printString
+]
+
+{ #category : 'accessing' }
+VGVulkanPresentChain >> backendWindow [
+	^ backendWindow
+]
+
+{ #category : 'accessing' }
+VGVulkanPresentChain >> context [
+	^ context
+]
+
+{ #category : 'lifetime' }
+VGVulkanPresentChain >> destroy [
+	"Every object I own, in the reverse of the order I built it, after the device has finished
+	 the frame that may still be in flight: destroying a resource the device is still reading
+	 is undefined behaviour, and with the validation layers off it surfaces as a segfault
+	 rather than an error. Safe to run twice, because a host space closing reaches this from
+	 an ensure: block that may already have run."
+	self waitForDevice.
+	self partsInDestructionOrder do: [ :each | each destroy ].
+	surface := nil.
+	swapchain := nil.
+	renderPass := nil.
+	framebuffers := nil.
+	commandBuffer := nil.
+	commandPool := nil.
+	imageAvailable := nil.
+	renderFinished := nil.
+	fence := nil
+]
+
+{ #category : 'accessing' }
+VGVulkanPresentChain >> extent [
+	"The swapchain's own extent, which is the drawable it was created with and not whatever the
+	 window answers now: a resize is answered by building a new chain, so mine never changes."
+	^ swapchain extent
+]
+
+{ #category : 'accessing' }
+VGVulkanPresentChain >> fence [
+	^ fence
+]
+
+{ #category : 'accessing' }
+VGVulkanPresentChain >> format [
+	^ swapchain format
+]
+
+{ #category : 'accessing' }
+VGVulkanPresentChain >> framebuffers [
+	^ framebuffers
+]
+
+{ #category : 'accessing' }
+VGVulkanPresentChain >> imageCount [
+	"What the driver really made, which may be more images than the request asked for."
+	^ swapchain imageCount
+]
+
+{ #category : 'initialization' }
+VGVulkanPresentChain >> initializeContext: aVkContext backendWindow: aVulkanBackendWindow [
+	"In the order partsInCreationOrder states, which destruction reads backwards. The extent
+	 is the drawable SDL answers for a Vulkan window and never the window's logical size: on a
+	 scaled display the two differ, and the swapchain's images are the drawable's pixels. The
+	 format is verified as soon as the driver has answered one, so a surface that offers
+	 something else fails here rather than presenting swapped channels."
+	context := aVkContext.
+	backendWindow := aVulkanBackendWindow.
+	surface := VkSurface
+		           fromWindow: backendWindow
+		           instance: context instance
+		           physicalDevice: context physicalDevice.
+	swapchain := VkSwapchain
+		             on: context device
+		             surface: surface
+		             extent: backendWindow vulkanDrawableExtent.
+	self class verifyFormat: swapchain format.
+	renderPass := VkRenderPass
+		              createColorPassDevice: context device
+		              format: swapchain format.
+	framebuffers := swapchain imageViews collect: [ :view |
+		                VkFramebuffer
+			                on: context device
+			                renderPass: renderPass
+			                imageView: view
+			                extent: self extent ].
+	commandPool := VkCommandPool
+		               on: context device
+		               queueFamilyIndex: context computeQueueFamily.
+	commandBuffer := commandPool allocateBuffer.
+	imageAvailable := VkSemaphoreWrapper createDevice: context device.
+	renderFinished := VkSemaphoreWrapper createDevice: context device.
+	fence := VkFenceWrapper createSignaledDevice: context device
+]
+
+{ #category : 'lifetime' }
+VGVulkanPresentChain >> isDestroyed [
+	"I hold no part of my own. The surface is the first thing built and the last destroyed, so
+	 it is the one slot that answers for all of them, and the list says so rather than this
+	 naming a slot twice."
+	^ self partsInCreationOrder isEmpty
+]
+
+{ #category : 'testing' }
+VGVulkanPresentChain >> matchesDrawable [
+	"Whether my swapchain's images are still the size of my window's drawable. A resize is
+	 answered by building a new chain and destroying this one, because a swapchain cannot be
+	 resized: its images are allocated at the extent it was created with."
+	^ self isDestroyed not and: [
+		  self extent = backendWindow vulkanDrawableExtent ]
+]
+
+{ #category : 'lifetime' }
+VGVulkanPresentChain >> partsInCreationOrder [
+	"Every Vulkan object I own, in the order I built it, and nothing I was handed: the context
+	 is not mine. A framebuffer references an image view of the swapchain and the swapchain
+	 references the surface, so this order is also the order of dependency, which is why
+	 destruction is this list backwards and not a second list that could drift from it.
+	 The command buffer is absent on purpose: the pool frees its buffers and a buffer has no
+	 destroy of its own."
+	^ (Array streamContents: [ :out |
+		   out nextPut: surface; nextPut: swapchain; nextPut: renderPass.
+		   framebuffers ifNotNil: [ out nextPutAll: framebuffers ].
+		   out
+			   nextPut: commandPool;
+			   nextPut: imageAvailable;
+			   nextPut: renderFinished;
+			   nextPut: fence ]) reject: #isNil
+]
+
+{ #category : 'lifetime' }
+VGVulkanPresentChain >> partsInDestructionOrder [
+	^ self partsInCreationOrder reversed
+]
+
+{ #category : 'presenting' }
+VGVulkanPresentChain >> presentFrameDuring: aBlock [
+	"One frame, and the image index it went into, so a caller can watch the cycle advance.
+	 The fence wait blocks until the previous frame's work is done, which is what Vk noTimeout
+	 says, and the acquire blocks until the presentation engine has an image free.
+	 The block is handed the image of that index and evaluated before anything is submitted,
+	 because in unit 7.3 it is the block's own copy into that image that becomes the
+	 submission waiting on imageAvailable and signalling renderFinished. Until then the clear
+	 below is the whole frame: a render pass rather than a vkCmdClearColorImage, because the
+	 pass leaves the image in presentSrcKHR by itself and so needs no barrier written here.
+	 The pass is ended explicitly — vkEndCommandBuffer does not close an open render pass."
+	| imageIndex |
+	fence waitTimeout: Vk noTimeout.
+	fence reset.
+	imageIndex := swapchain
+		              acquireNextImage: imageAvailable handle
+		              fence: ExternalAddress null.
+	aBlock value: (swapchain images at: imageIndex + 1).
+	commandPool reset.
+	commandBuffer do: [ :recorder |
+		recorder
+			beginRenderPass: renderPass
+			framebuffer: (framebuffers at: imageIndex + 1)
+			extent: self extent
+			clearColor: VkRenderConfig clearColorBlackOpaque.
+		recorder endRenderPass ].
+	context computeQueue
+		submitGraphics: commandBuffer
+		waitSemaphore: imageAvailable
+		signalSemaphore: renderFinished
+		fence: fence.
+	swapchain
+		present: imageIndex
+		queue: context computeQueue
+		waitSemaphore: renderFinished handle.
+	^ imageIndex
+]
+
+{ #category : 'accessing' }
+VGVulkanPresentChain >> renderPass [
+	^ renderPass
+]
+
+{ #category : 'accessing' }
+VGVulkanPresentChain >> surface [
+	^ surface
+]
+
+{ #category : 'accessing' }
+VGVulkanPresentChain >> swapchain [
+	^ swapchain
+]
+
+{ #category : 'lifetime' }
+VGVulkanPresentChain >> waitForDevice [
+	"Block until the device has finished every command submitted through my queue. The context
+	 is not mine, so one already destroyed or never given is simply skipped — destroy is
+	 reached from ensure: blocks, where a half-built chain is the normal case."
+	context ifNil: [ ^ self ].
+	(context device isNotNil and: [ context computeQueue isNotNil ]) ifFalse: [
+		^ self ].
+	context computeQueue waitIdle
+]
