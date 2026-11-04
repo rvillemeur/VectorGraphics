@@ -10,6 +10,25 @@ Class {
 }
 
 { #category : 'accessing' }
+VGCairoExamplesTest class >> windowExamplePrefix [
+	"An example whose selector begins with this opens a window. The suite does not run one:
+	 see testAnExampleThatOpensAWindowIsNamedForItAndNoGateRunsIt for why the name carries
+	 the rule rather than a list of selectors."
+
+	^ 'open'
+]
+
+{ #category : 'accessing' }
+VGCairoExamplesTest >> allExampleMethods [
+	"Every class-side method tagged <sampleInstance>, found by the pragma rather than by a
+	 list, window examples included."
+
+	^ self exampleHolders flatCollect: [ :each |
+		  each class methods select: [ :method |
+			  method hasPragmaNamed: #sampleInstance ] ]
+]
+
+{ #category : 'accessing' }
 VGCairoExamplesTest >> defaultTimeLimit [
 	"Every example of every family is rebuilt and every view of each is built and filled, which
 	 takes minutes rather than the ten seconds SUnit allows a test by default. Without this a
@@ -47,10 +66,10 @@ VGCairoExamplesTest >> exampleHolders [
 
 { #category : 'accessing' }
 VGCairoExamplesTest >> exampleMethods [
-	"Every class-side method tagged <sampleInstance>, found by the pragma rather than by a list."
+	"The examples every gate below runs: all of them but the ones that open a window."
 
-	^ self exampleHolders flatCollect: [ :each |
-		  each class methods select: [ :method | method hasPragmaNamed: #sampleInstance ] ]
+	^ self allExampleMethods reject: [ :each |
+		  each selector beginsWith: self class windowExamplePrefix ]
 ]
 
 { #category : 'accessing' }
@@ -73,6 +92,33 @@ VGCairoExamplesTest >> projectDefines: aCompiledMethod [
 	package := aCompiledMethod package.
 	^ package notNil and: [
 		  VGCairoReferenceScanner projectPackageNames includes: package name asSymbol ]
+]
+
+{ #category : 'tests' }
+VGCairoExamplesTest >> testAnExampleThatOpensAWindowIsNamedForItAndNoGateRunsIt [
+	"Three freezes on 4 November, all of them this: an example that opens a window and drives
+	 the device through uFFI is run four times by one pass of these gates — once by
+	 testEveryExampleRunsAndAnswersSomething, twice by testEveryExampleRebuildsItsObject, and
+	 again through exampleSubjects for each view gate — and an error raised in that window
+	 opens a debugger on the process serving the call, which then answers nothing at all. Such
+	 an example is run by hand, alone, after a commit. So the running gates take
+	 exampleMethods, which leaves those out, and this test holds what is left of the rule: a
+	 window example is named for what it does, it is a class-side example of a holder like any
+	 other, and it is none of the examples a gate runs."
+
+	| windowExamples |
+	windowExamples := self windowExampleMethods.
+	windowExamples do: [ :each |
+		self assert: each methodClass isClassSide.
+		self assert: each numArgs equals: 0.
+		self assert: (each hasPragmaNamed: #sampleInstance).
+		self assert:
+			(each selector beginsWith: self class windowExamplePrefix) ].
+	self assert:
+		(self exampleMethods noneSatisfy: [ :each | windowExamples includes: each ]).
+	self
+		assert: self allExampleMethods size
+		equals: self exampleMethods size + windowExamples size
 ]
 
 { #category : 'tests' }
@@ -177,4 +223,13 @@ VGCairoExamplesTest >> viewMethodsOf: anObject [
 	  , (class class methods collect: [ :each | class -> each ]) select: [ :each |
 		  (each value hasPragmaNamed: #inspectorPresentationOrder:title:) and: [
 			  self projectDefines: each value ] ]
+]
+
+{ #category : 'accessing' }
+VGCairoExamplesTest >> windowExampleMethods [
+	"The examples that open a window, which a suite must not run: an error inside one opens a
+	 debugger and the process serving the call answers nothing."
+
+	^ self allExampleMethods select: [ :each |
+		  each selector beginsWith: self class windowExamplePrefix ]
 ]

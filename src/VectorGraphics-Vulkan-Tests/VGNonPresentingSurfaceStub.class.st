@@ -4,8 +4,9 @@ A surface whose queue families cannot present on it, which no machine with a wor
 Class {
 	#name : 'VGNonPresentingSurfaceStub',
 	#superclass : 'Object',
-	#category : 'VectorGraphics-Vulkan-Tests',
-	#package : 'VectorGraphics-Vulkan-Tests'
+	#category : 'VectorGraphics-Vulkan-Tests-Fixtures',
+	#package : 'VectorGraphics-Vulkan-Tests',
+	#tag : 'Fixtures'
 }
 
 { #category : 'testing' }

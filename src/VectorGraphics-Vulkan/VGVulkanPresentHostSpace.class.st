@@ -25,7 +25,7 @@ VGVulkanPresentHostSpace >> backendWindow [
 	^ window backendWindow
 ]
 
-{ #category : 'host space - lifecycle' }
+{ #category : 'host space - displaying' }
 VGVulkanPresentHostSpace >> close [
 	"The chain, then the context, then the window my superclass closes: the reverse of the
 	 order they were acquired in, because the surface inside the chain belongs to the instance

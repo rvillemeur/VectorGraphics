@@ -154,6 +154,57 @@ VGVulkanPresentChainTest >> testTheFormatThisProjectRendersInIsAccepted [
 	VGVulkanPresentChain verifyFormat: VkRenderConfig formatRenderedIn
 ]
 
+{ #category : 'tests' }
+VGVulkanPresentChainTest >> testTheFramesViewReadsTheChainAndChangesNothingInIt [
+	"No device: a chain that holds no part answers every row of the report, which is what the
+	 tab has to do after an example closes its window — so its gate stays active there, unlike
+	 the Parts gate. The cells are pulled by hand because a table column's block runs once per
+	 drawn row and nothing is drawn here."
+
+	| chain view rows before context |
+	chain := VGVulkanPresentChain new.
+	before := chain presentedIndexes asArray.
+	context := StInspectionContext new.
+	chain inspectorFramesContext: context.
+	self assert: context isActive.
+	view := chain inspectorFrames:
+		        (SpPresenterBuilder newApplication: SpApplication new).
+	rows := view items.
+	self assert: rows size equals: chain frameReport size.
+	self
+		assert: (rows collect: [ :each | each key ]) asArray
+		equals: (chain frameReport collect: [ :each | each key ]) asArray.
+	view columns do: [ :column |
+		rows do: [ :row | self assert: (column evaluation value: row) isString ] ].
+	self assert: (rows detect: [ :each | each key = 'destroyed' ]) value equals: 'true'.
+	self
+		assert: (rows detect: [ :each | each key = 'frames presented' ]) value
+		equals: '0'.
+	self assert: chain presentedIndexes asArray equals: before.
+	self assert: chain partsInCreationOrder isEmpty
+]
+
+{ #category : 'tests' }
+VGVulkanPresentChainTest >> testThePartsViewNumbersThePartsByDestructionAndIsGatedOnHoldingSome [
+	"The Parts tab, device-free. A chain that holds no part has no tab, which is the gate; and
+	 the numbering it would show is read from partsInDestructionOrder rather than written in
+	 the view, so a part added to the chain appears in it on its own."
+
+	| chain view context |
+	chain := VGVulkanPresentChain new.
+	context := StInspectionContext new.
+	chain inspectorPartsContext: context.
+	self deny: context isActive.
+	view := chain inspectorParts:
+		        (SpPresenterBuilder newApplication: SpApplication new).
+	self assert: view items isEmpty.
+	self assert: (view columns collect: [ :each | each title ]) asArray
+		equals: #( 'Destroyed' 'Part' ).
+	self assert: (chain partsInDestructionOrder
+			 collect: [ :each | chain partsInCreationOrder indexOf: each ]) asArray
+		equals: (1 to: chain partsInCreationOrder size) asArray reversed
+]
+
 { #category : 'tests - presentation' }
 VGVulkanPresentChainTest >> testTheQueueTheChainPresentsOnCanPresentOnItsSurface [
 	"The refusal above is a stub; this is the machine. The chain submits and presents on the

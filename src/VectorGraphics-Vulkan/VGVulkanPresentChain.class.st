@@ -3,11 +3,11 @@ I am the presentation half of a presenting window: the `VkSurface` over its hand
 
 I do not own the `VkContext`. A device lives longer than a window and a second window of the same image should not open a second one, so my host space creates the context and destroys it; I am handed it and I destroy nothing of it. Unit 7.3 decides whether that context becomes the one `VGVulkanDeviceSession` holds, which it has to be before a tiled fill can write into an image I acquired: a swapchain image belongs to the device its swapchain was created on, and the session's compute context is created from an instance that carries none of the window-system extensions a surface needs.
 
-`presentFrameDuring:` is one frame: wait on the fence of the previous frame, acquire the next image, evaluate the block with it, clear it through a render pass, submit, present, and answer the image index so a caller can watch the cycle advance. The clear is what unit 7.4's drawing replaces; until then it is the whole of the frame, and it is a render pass rather than a `vkCmdClearColorImage` because the pass already leaves the image in `presentSrcKHR` and so needs no barrier written by hand.
+`presentFrameDuring:` is one frame: wait on the fence of the previous frame, acquire the next image, evaluate the block with it, clear it through a render pass, submit, present, and answer the image index so a caller can watch the cycle advance. Every wait of that frame is bounded by `frameTimeoutNanoseconds`, because a wait inside a plain uFFI call stops the whole virtual machine and no Pharo process can interrupt it; an unbounded one is `VkSwapchain >> acquireNextImage:fence:`, which no frame path of this project sends. The clear is what unit 7.4's drawing replaces; until then it is the whole of the frame, and it is a render pass rather than a `vkCmdClearColorImage` because the pass already leaves the image in `presentSrcKHR` and so needs no barrier written by hand.
 
-My format is checked rather than adapted. `verifyFormat:` refuses any swapchain format but `VkRenderConfig formatRenderedIn`, because the kernel writes that format's words and a presented frame has to be the bytes an offscreen frame is.
+My format is checked rather than adapted. `verifyFormat:` refuses any swapchain format but `VkRenderConfig formatRenderedIn`, because the kernel writes that format's words and a presented frame has to be the bytes an offscreen frame is. `verifySurface:presentsOnQueueFamily:` refuses a queue family the surface cannot present on, before a swapchain is created over it.
 
-My parts are destroyed in the reverse of the order they were created, which `partsInCreationOrder` states once and `destroy` reads backwards.
+My parts are destroyed in the reverse of the order they were created, which `partsInCreationOrder` states once and `destroy` reads backwards. Renraku counts my variables as excessive and they are: one slot per Vulkan object I own is the point of me, and splitting them across helper objects would move the destruction order out of the one list that states it. The twelfth, `presentedIndexes`, is the only one that is not a Vulkan object — it outlives `destroy` so that my `Frames` tab still answers for a chain whose window is already closed.
 "
 Class {
 	#name : 'VGVulkanPresentChain',
@@ -127,6 +127,39 @@ VGVulkanPresentChain >> format [
 	^ swapchain format
 ]
 
+{ #category : 'reporting' }
+VGVulkanPresentChain >> frameReport [
+	"What this chain is and what it did, each row asking the live object rather than restating
+	 it, and every row answering after destroy as well: an example hands back a chain whose
+	 window is already closed. The swapchain is gone then, so what it answered is read through
+	 presentedIndexes, which the chain keeps."
+
+	| imageCountOrNil gone |
+	gone := 'gone with the swapchain'.
+	imageCountOrNil := swapchain ifNotNil: [ :each | each imageCount ].
+	^ {
+		  ('destroyed' -> self isDestroyed printString).
+		  ('parts alive' -> self partsInCreationOrder size printString).
+		  ('format' -> (swapchain
+			    ifNil: [ gone ]
+			    ifNotNil: [ :each |
+				    (VkFormat nameForValue: each format) ifNil: [
+					    each format printString ] ])).
+		  ('extent' -> (swapchain
+			    ifNil: [ gone ]
+			    ifNotNil: [ :each | each extent printString ])).
+		  ('image count'
+		   -> (imageCountOrNil ifNil: [ gone ] ifNotNil: [ :each | each printString ])).
+		  ('frames presented' -> self presentedIndexes size printString).
+		  ('indexes presented' -> self presentedIndexes asArray printString).
+		  ('every image presented' -> (imageCountOrNil
+			    ifNil: [ 'unknown without the swapchain' ]
+			    ifNotNil: [ :count | (self presentedIndexes asSet size = count) printString ])).
+		  ('frame wait bound'
+		   -> (self class frameTimeoutNanoseconds printString , ' ns')).
+		  ('matches the drawable' -> self matchesDrawable printString) }
+]
+
 { #category : 'accessing' }
 VGVulkanPresentChain >> framebuffers [
 	^ framebuffers
@@ -183,6 +216,57 @@ VGVulkanPresentChain >> initializeContext: aVkContext backendWindow: aVulkanBack
 	imageAvailable := VkSemaphoreWrapper createDevice: context device.
 	renderFinished := VkSemaphoreWrapper createDevice: context device.
 	fence := VkFenceWrapper createSignaledDevice: context device
+]
+
+{ #category : 'inspector' }
+VGVulkanPresentChain >> inspectorFrames: aBuilder [
+	<inspectorPresentationOrder: 10 title: 'Frames'>
+	"The unit's own gate, read live: the format and extent the driver gave, the indexes this
+	 chain presented in order, and whether they covered every image of the swapchain. Reads
+	 frameReport, so it cannot drift from what the chain answers, and writes nothing."
+
+	^ aBuilder newTable
+		  addColumn:
+			  (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
+		  addColumn:
+			  (SpStringTableColumn title: 'Value' evaluated: [ :each | each value ]);
+		  items: self frameReport;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGVulkanPresentChain >> inspectorFramesContext: aContext [
+	"Always: the Frames tab answers for a live chain and for a destroyed one alike, and after
+	 destroy it is the only tab that still says anything."
+
+	aContext active: true
+]
+
+{ #category : 'inspector' }
+VGVulkanPresentChain >> inspectorParts: aBuilder [
+	<inspectorPresentationOrder: 20 title: 'Parts'>
+	"The order this chain destroys in, which is partsInCreationOrder read backwards: one row
+	 per part, numbered by when it is destroyed. The list is sampled from the chain rather
+	 than written here, so a part added to the chain appears without this view being touched."
+
+	| parts |
+	parts := self partsInDestructionOrder.
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn
+				   title: 'Destroyed'
+				   evaluated: [ :each | (parts indexOf: each) printString ]);
+		  addColumn:
+			  (SpStringTableColumn title: 'Part' evaluated: [ :each | each class name ]);
+		  items: parts;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGVulkanPresentChain >> inspectorPartsContext: aContext [
+	"Only while the chain holds parts. A destroyed chain holds none, and a tab that says so
+	 with an empty table says less than no tab at all; the Frames tab names the destruction."
+
+	aContext active: self isDestroyed not
 ]
 
 { #category : 'lifetime' }
