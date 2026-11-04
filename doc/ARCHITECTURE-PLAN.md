@@ -124,3 +124,35 @@ Unit 1, then 2, then 3, each committed on its own. A unit is done when:
 - its tests pass, and the suites of the package still pass;
 - `run_critics` is clean on the classes it touched;
 - the documents and the code agree, which after unit 2 is a test rather than a reading.
+
+## What was done
+
+All three units are done, each on its own commit.
+
+| Unit | Commit | Result |
+|---|---|---|
+| 1 | `8372aec` | The package comment rewritten, three tests holding it to the real tags of the package, and the two stale selector names in `CLAUDE.md` corrected |
+| 2 | `80225fc` | `doc/ARCHITECTURE.md`, thirteen sections, and four tests holding every name it writes in backticks to the image |
+| 3 | `0e14cca` | Five inspector views, three examples feeding them, and four gates over the examples and the views |
+
+Three things differ from the plan above, each for a reason found while doing the work:
+
+- **The views need no `…Context:` gate.** The plan asked for one on
+  `VectorEnginePixel >> inspectorBuffers`, since the buffers hold something only during a path.
+  The view says that instead: it is always shown, and it reports how many pixels of each buffer
+  hold anything, which is zero after a finished drawing. A gate would have hidden the fact the
+  reader most needs.
+- **The example for the buffers walks a path through the public entry and stops before the
+  blend.** An empty `fillColor:do:` first gives the engine its stroke radii and its hops per
+  pixel, then `initializePath` and the path commands leave both buffers full and unblended. No
+  new method was needed on the engine to reach that state.
+- **Two gaps of the port came out of writing the views**, and are now in `doc/ARCHITECTURE.md`
+  rather than only in a reader's head: nothing assigns `boundsFinderEngine`, so
+  `updatingMorphBoundsDo:` hands the canvas nil, and nothing in a Pharo image answers `morphId`,
+  which `currentMorph:` asks of the morph it is given, so `morphIds` stays empty and
+  `morph:isAtPoint:` finds nothing. Both are defects of the port, not of the design, and neither
+  is fixed here: a fix belongs in its own unit, with the failing test first.
+
+The suite of the base package is 226 tests over 23 concrete test classes and passes. `run_critics`
+reports nothing new on any class touched; what it does report on `VectorEnginePixel`,
+`VectorEngineAbstract` and `VectorCanvas` was there before this work and is unchanged by it.
