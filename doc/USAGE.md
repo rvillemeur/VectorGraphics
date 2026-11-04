@@ -5,10 +5,30 @@ one to the other without a line of its own changing.
 This file shows the three levels at which the replacement is used, and how to run the Alexandrie
 experiment corpus through it.
 
+## What to load for which level
+
+The groups of the baseline follow these levels, and the default load stops below Bloc.
+`README.md` lists every group.
+
+| Level | Group | What the group brings |
+|---|---|---|
+| A surface and a context | the default load | `VectorGraphics` and `VectorGraphics-Cairo`, which name no class of Bloc or of Alexandrie |
+| A canvas, and all of Bloc | `bloc` | `VectorGraphics-Bloc`, and Bloc itself from `github://pharo-graphics/Bloc:master` |
+| The experiment corpus | `cairo-tests` | `VectorGraphics-Cairo-Tests`, and the Cairo examples below it, still without Bloc |
+
+```smalltalk
+Metacello new
+	baseline: 'VectorGraphics';
+	repository: 'github://rvillemeur/VectorGraphics:main/src';
+	load: 'bloc'.    "or 'cairo-tests', or nothing at all for the default"
+```
+
 ## The Cairo layer: a surface and a context
 
 `VGCairoImageSurface` stands in for `AeCairoImageSurface` and answers a `VGCairoContext`, which
 carries the selectors of `AeCairoContext`.
+Both are in `VectorGraphics-Cairo`, which the default load brings, so this level runs in an image
+that holds neither Bloc nor Alexandrie.
 
 ```smalltalk
 | surface context |
@@ -29,6 +49,8 @@ Bloc draws through an `AeCanvas`, and almost all of that class is backend indepe
 that build a surface, the two that build a gradient pattern, the one that builds the blurred alpha
 surface of a shadow, and the one that builds a scaled font.
 Everything else stays Alexandrie's.
+It is a subclass of a class of Alexandrie, so it lives in `VectorGraphics-Bloc` and arrives with
+the `bloc` group, not with the default load.
 
 ```smalltalk
 | canvas |
@@ -43,7 +65,8 @@ canvas asForm
 
 `setBackgroundWith:` takes a block that sets the source, not a colour; a colour passed there trips
 an assertion inside Alexandrie.
-`VGCanvasExamples` holds the same canvas as a one-click example, with a gradient one beside it.
+`VGCanvasExamples`, in `VectorGraphics-Bloc-Examples`, holds the same canvas as a one-click
+example, with a gradient one beside it; the `bloc-examples` group brings it.
 
 ## All of Bloc
 
@@ -70,6 +93,12 @@ measurements is `VGOffscreen instance textMeasurer`.
 ## The Alexandrie experiment corpus
 
 `AlexandrieCairoExperiment` belongs to the BookletGraphics package and holds 82 drawings.
+This baseline does not load BookletGraphics, so load it from its own repository before a walk of
+the corpus; Alexandrie itself ships with Pharo.
+The corpus is in `VectorGraphics-Cairo-Tests`, which the `cairo-tests` group brings without Bloc.
+The classes there do name Alexandrie, on purpose: a comparison against live Cairo needs that
+positive control, and `VGArchitectureTest` states the exception.
+
 `VGAlexandrieCorpus regenerate` derives one class-side method per experiment onto
 `VGAlexandriePortedExperiments`, substituting the Alexandrie class names that have a counterpart of
 ours and changing nothing else.
@@ -108,4 +137,3 @@ A mesh is sampled at half a pixel in device space, so the largest mesh case take
 seconds and an ordinary one about four.
 `VGAlexandrieCase >> ourForm` renders on every send and is not memoised, so each traversal of the
 corpus draws all of it again.
-
