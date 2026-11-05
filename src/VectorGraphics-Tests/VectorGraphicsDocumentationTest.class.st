@@ -10,10 +10,46 @@ I grow with the third documentation artefact of this package, the inspector view
 Class {
 	#name : 'VectorGraphicsDocumentationTest',
 	#superclass : 'TestCase',
-	#category : 'VectorGraphics-Tests',
-	#package : 'VectorGraphics',
+	#category : 'VectorGraphics-Tests-Tests',
+	#package : 'VectorGraphics-Tests',
 	#tag : 'Tests'
 }
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest class >> concreteGates [
+	"Every gate that names a package, found by walking up to the abstract root of the hierarchy
+	and back down. Walked rather than listed so that a gate added for a new package is seen by
+	the gates already here, and so that no method names this class."
+
+	| root |
+	root := self.
+	[ root isAbstract ] whileFalse: [ root := root superclass ].
+	^ root withAllSubclasses reject: [ :each | each isAbstract ]
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest class >> documentedPackages [
+	"Every code package this hierarchy documents. The architecture document covers the whole
+	project, so the name gates are read against all of them, whichever subclass runs."
+
+	^ self concreteGates collect: [ :each | each packageUnderTest ]
+]
+
+{ #category : 'testing' }
+VectorGraphicsDocumentationTest class >> isAbstract [
+	"The documentation gates are written once and run once per code package, so only the
+	subclasses, each of which names a package, have a suite. Each subclass answers false."
+
+	^ true
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest class >> packageUnderTest [
+	"The code package a concrete subclass documents. On the class side so that the whole
+	hierarchy can be asked which packages are documented without building an instance."
+
+	^ self subclassResponsibility
+]
 
 { #category : 'accessing' }
 VectorGraphicsDocumentationTest >> architectureDocumentContents [
@@ -37,13 +73,13 @@ VectorGraphicsDocumentationTest >> architectureDocumentFile [
 	^ repository location / 'doc' / self architectureDocumentName
 ]
 
-{ #category : 'testing' }
+{ #category : 'accessing' }
 VectorGraphicsDocumentationTest >> architectureDocumentMayName: aToken [
 	"A capitalised name of the document is held to one of three things that really exist: a class
-	of the image, a class variable of a class of this package, or a package."
+	of the image, a class variable of a class of a documented package, or a package."
 
 	(Smalltalk includesKey: aToken asSymbol) ifTrue: [ ^ true ].
-	(self classVariableNamesOfThePackage includes: aToken) ifTrue: [ ^ true ].
+	(self classVariableNamesOfTheDocumentedPackages includes: aToken) ifTrue: [ ^ true ].
 	^ (PackageOrganizer default packageNamed: aToken ifAbsent: [ nil ]) notNil
 ]
 
@@ -120,15 +156,32 @@ VectorGraphicsDocumentationTest >> classSideSuffix [
 ]
 
 { #category : 'accessing' }
-VectorGraphicsDocumentationTest >> classVariableNamesOfThePackage [
-	"Answer the names of every class variable declared by a class of this package, so the
-	document may name one — the font caches are class variables, not classes."
+VectorGraphicsDocumentationTest >> classVariableNamesOfTheDocumentedPackages [
+	"Answer the names of every class variable declared by a class of the documented packages, so
+	the document may name one — the font caches are class variables, not classes."
 
 	| names |
 	names := Set new.
-	self packageUnderTest definedClasses do: [ :each |
-		names addAll: (each classVariables collect: [ :variable | variable name asString ]) ].
+	self documentedPackages do: [ :package |
+		package definedClasses do: [ :each |
+			names addAll: (each classVariables collect: [ :variable | variable name asString ]) ] ].
 	^ names
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> documentedPackages [
+	"Every code package this hierarchy documents; the class side walks the hierarchy for them."
+
+	^ self class documentedPackages
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> examplesPackageUnderTest [
+	"The sibling package holding this package's examples. The examples live in their own package
+	since the split, so the examples gate below reads that one, not the code package. Strict on
+	purpose: a code package with no examples package is a hole the gate must report."
+
+	^ PackageOrganizer default packageNamed: self packageUnderTest name , '-Examples'
 ]
 
 { #category : 'accessing' }
@@ -194,9 +247,9 @@ VectorGraphicsDocumentationTest >> packageComment [
 
 { #category : 'accessing' }
 VectorGraphicsDocumentationTest >> packageUnderTest [
-	"The package these tests document: the engine, the path commands and the TrueType code."
+	"The package these tests document. The subclass names it on the class side."
 
-	^ PackageOrganizer default packageNamed: 'VectorGraphics'
+	^ self class packageUnderTest
 ]
 
 { #category : 'parsing' }
@@ -338,11 +391,13 @@ VectorGraphicsDocumentationTest >> testEverySampleInstanceOfThisPackageRuns [
 	A failure here is a broken example, which a reader meets before any test."
 
 	| holders broken |
-	holders := self packageUnderTest definedClasses select: [ :each |
+	holders := self examplesPackageUnderTest definedClasses select: [ :each |
 		           each class selectors anySatisfy: [ :selector |
 			           (each class >> selector) pragmas anySatisfy: [ :pragma |
 				           pragma selector = #sampleInstance ] ] ].
-	self assert: holders notEmpty description: 'This package holds no example'.
+	self
+		assert: holders notEmpty
+		description: self examplesPackageUnderTest name , ' holds no example'.
 	broken := OrderedCollection new.
 	holders do: [ :holder |
 		(holder class selectors select: [ :selector |
@@ -387,6 +442,19 @@ VectorGraphicsDocumentationTest >> testNoInspectorViewOfThisPackageChangesWhatIt
 				assert: value = (after at: index)
 				description: pair key name , ' changed instance variable '
 					, (instance class allInstVarNames at: index) , ' while a view was built' ] ]
+]
+
+{ #category : 'tests' }
+VectorGraphicsDocumentationTest >> testTheGateHierarchyFindsEveryDocumentedPackage [
+	"The document covers the whole project, so a gate must see the packages the other gates name,
+	whichever subclass is running. The hierarchy is walked, not listed, so adding a gate adds its
+	package here."
+
+	self assert: self class concreteGates size equals: self documentedPackages size.
+	self assert: self documentedPackages size > 1.
+	self assert: (self documentedPackages includes: self packageUnderTest).
+	self deny: (self documentedPackages includes: nil).
+	self assert: (self class concreteGates noneSatisfy: [ :each | each isAbstract ])
 ]
 
 { #category : 'tests' }
@@ -454,12 +522,8 @@ VectorGraphicsDocumentationTest >> testTheTokeniserReadsBackticksOutsideAFenceAn
 
 { #category : 'accessing' }
 VectorGraphicsDocumentationTest >> viewSubjects [
-	^ {
-		VectorEnginePixel -> (VectorCanvasExamples -> #engineDuringAFillPath) .
-		VectorEngineAbstract -> (VectorCanvasExamples -> #engineDuringAFillPath) .
-		VectorEngineBoundsFinder
-		-> (VectorCanvasExamples -> #boundsFinderAfterMeasuringATriangle) .
-		VectorCanvas -> (VectorCanvasExamples -> #canvasAfterADrawing) .
-		TTGlyph -> (TrueTypeExamples -> #glyphWithContours) .
-		TTFontDescription -> (TrueTypeExamples -> #glyphMap) }
+	"Pairs of a class with an inspector view and the example that feeds it. Empty by default: a
+	package with no view declares none, and a subclass with views names them."
+
+	^ #()
 ]

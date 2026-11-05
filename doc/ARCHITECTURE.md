@@ -1,12 +1,21 @@
-# Inside the VectorGraphics package
+# Inside the VectorGraphics packages
 
 This document holds what no single class comment can: the facts that span classes. Each class here
 already carries its own comment, and the inspector views of the engine show the live state, so this
 file states the order of things and the conventions two classes have to agree on.
 
-Everything below is in the `VectorGraphics` package, which depends on nothing above it.
+The code lives in four packages, and each section below names the one it describes:
 
-## 1. Coordinate spaces
+- `VectorGraphics-Engine` — the rasteriser itself: sections 1 to 7.
+- `VectorGraphics-Text` — drawing a string with that rasteriser: section 8.
+- `VectorGraphics-TrueType` — reading a font and the glyphs it holds: sections 9 and 10.
+- `VectorGraphics-Paths` — the SVG path commands and their parser: section 11.
+
+`VectorGraphics-Engine`, `VectorGraphics-Paths` and `VectorGraphics-TrueType` each depend on
+nothing but the image. `VectorGraphics-Text` is the one package that needs two of them, which is
+why the glue sits in a package of its own. Sections 12 and 13 span all four.
+
+## 1. Coordinate spaces — `VectorGraphics-Engine`
 
 There are two, and only one conversion between them.
 
@@ -20,7 +29,7 @@ A drawing method is prefixed for which space its arguments are read in: `abs_` t
 coordinates, `rel_` takes an offset from the current point. Both match the SVG letters of the same
 name.
 
-## 2. The four layers of a path call
+## 2. The four layers of a path call — `VectorGraphics-Engine`
 
 A call from a client goes down four layers, and only the last one touches a buffer. Knowing the
 order is what makes the engine readable.
@@ -39,7 +48,7 @@ path state and the geometry, and a concrete engine owns the pixels. There are fo
 `primCubicBezierFromX:y:toX:y:control1X:y:control2X:y:hops:` and
 `primArcCenterX:centerY:radiusX:radiusY:start:rotationCos:rotationSin:hops:angleDelta:`.
 
-## 3. The buffers
+## 3. The buffers — `VectorGraphics-Engine`
 
 `VectorEnginePixel` allocates one slot a pixel in each of three buffers, every time a `Form` is
 installed. Width and height come from the target `Form`, so a resize means a new buffer.
@@ -66,7 +75,7 @@ the anti-aliasing width has a negative eroded radius, so no pixel of it is ever 
 The anti-aliasing width itself is a class decision — 1.4 in `VectorEngineSubPixel`, 1.7 in
 `VectorEngineWholePixel`, 1.0 as the default of `VectorEngineAbstract`.
 
-## 4. The anti-aliasing algorithm
+## 4. The anti-aliasing algorithm — `VectorGraphics-Engine`
 
 Vuletich prefiltering: a figure is walked rather than scanned, and every hop writes coverage
 around itself.
@@ -92,7 +101,7 @@ whole buffer would cost more than the drawing. So a buffer inspected after a com
 all zeros; the Buffers view of `VectorEnginePixel` says so, and its example walks a path without
 blending it.
 
-## 5. The two concrete engines
+## 5. The two concrete engines — `VectorGraphics-Engine`
 
 | | `VectorEngineSubPixel` | `VectorEngineWholePixel` |
 |---|---|---|
@@ -105,7 +114,7 @@ blending it.
 Both are subclasses of `VectorEnginePixel`, so the path state, the bounds and the stroke radii are
 written once.
 
-## 6. Stroke, fill, and the passes they need
+## 6. Stroke, fill, and the passes they need — `VectorGraphics-Engine`
 
 `strokeWidth:color:fillColor:do:` is the one entry a client should use, and it decides how many
 passes the figure needs before any pixel is touched:
@@ -119,7 +128,7 @@ passes the figure needs before any pixel is touched:
 The blend hooks follow the same three cases: `blendFillOnly`, `blendStrokeOnly` and
 `blendStrokeAndFill`.
 
-## 7. Morphic integration
+## 7. Morphic integration — `VectorGraphics-Engine`
 
 `VectorCanvas` is a subclass of Pharo's `Canvas` and holds **two** engines: `engine`, which draws,
 and `boundsFinderEngine`, which measures. `updatingMorphBoundsDo:` swaps the second in for the
@@ -161,7 +170,7 @@ Three pieces of state make a morph tree work on one `Form`:
 includes its left and top and excludes its right and bottom, so `clipRect:` keeps
 `right - 1` and `bottom - 1` as the last pixel it draws.
 
-## 8. Text: two routes to a glyph
+## 8. Text: two routes to a glyph — `VectorGraphics-Text`
 
 A glyph can be drawn as a figure or stamped as a picture, and the package does both.
 
@@ -180,7 +189,7 @@ draws one unknown glyph rather than one per byte.
 `Form` and answers a `FormGlyph`, which carries that `Form` with its offsets and advance width.
 `TrueTypeFont >> glyphAtUtf8Byte1:byte2:byte3:byte4:` is the cache in front of it.
 
-## 9. Reading a font
+## 9. Reading a font — `VectorGraphics-TrueType`
 
 ```
 TTFontReader class >> readTTFFrom:    raw .ttf bytes
@@ -208,7 +217,7 @@ Three details the chain depends on:
 - `TTFontDescription class >> read:` walks a directory of `.ttf` files and files each face under
   its family name and emphasis.
 
-## 10. The four caches, and who clears them
+## 10. The four caches, and who clears them — `VectorGraphics-TrueType`
 
 | Cache | Lives in | Cleared by |
 |---|---|---|
@@ -219,7 +228,7 @@ Three details the chain depends on:
 
 A reader who misses the last one renders every glyph of every frame again.
 
-## 11. SVG path data
+## 11. SVG path data — `VectorGraphics-Paths`
 
 `SVGPathParser class >> parse:` reads a `d` attribute into a sequence of `PathCommand` instances,
 with `SVGNumberStream` doing the lexing. `PathCommand class >> classFor:` maps the letter to the
@@ -233,7 +242,7 @@ case letter means relative coordinates, which the instance keeps in
 Each instance then drives a canvas through `runOn:`, which is the only thing the commands know
 about drawing. `VectorCanvas >> runPathCommands:` runs a whole sequence.
 
-## 12. Costs and traps
+## 12. Costs and traps — all four packages
 
 - **This engine is slow.** On an 800 by 600 frame of twelve cards the whole of it takes about 2149
   ms where Cairo takes under 2 ms, and nearly all of that is the hop walk and the blend. It is
@@ -249,22 +258,26 @@ about drawing. `VectorCanvas >> runPathCommands:` runs a whole sequence.
 - **A hit test needs the drawing it is asking about.** `morphIds` is written while painting, so
   `morph:isAtPoint:` answers about the last frame drawn on that `Form` and nothing else.
 
-## 13. Where to look in the image
+## 13. Where to look in the image — all four packages
 
 Every claim above can be opened. Each view is one click from an example, and each example
 rebuilds its subject every call.
 
 | View | Example that feeds it | Shows |
 |---|---|---|
-| `VectorEnginePixel >> inspectorBuffers` | `VectorCanvasExample class >> exampleEngineDuringAFillPath` | the three buffers during a path, counted rather than described |
+| `VectorEnginePixel >> inspectorBuffers` | `VectorCanvasExamples class >> engineDuringAFillPath` | the three buffers during a path, counted rather than described |
 | `VectorEngineAbstract >> inspectorPathState` | the same example | the path state, the two morph ids and the bounds of the last drawing |
-| `VectorCanvas >> inspectorTarget` | `VectorCanvasExample class >> exampleCanvasAfterADrawing` | the target form, which engine draws and which measures |
-| `VectorEngineBoundsFinder >> inspectorMeasurement` | `VectorCanvasExample class >> exampleBoundsFinderAfterMeasuringATriangle` | the box measured, the margins mirrored from the painting engine, and that nothing was painted and no buffer allocated |
-| `TTGlyph >> inspectorContours` | `TrueTypeExample class >> exampleGlyphWithContours` | each contour, with its straight segments and its quadratic Béziers counted by the drawing rule itself |
+| `VectorCanvas >> inspectorTarget` | `VectorCanvasExamples class >> canvasAfterADrawing` | the target form, which engine draws and which measures |
+| `VectorEngineBoundsFinder >> inspectorMeasurement` | `VectorCanvasExamples class >> boundsFinderAfterMeasuringATriangle` | the box measured, the margins mirrored from the painting engine, and that nothing was painted and no buffer allocated |
+| `TTGlyph >> inspectorContours` | `TrueTypeExamples class >> glyphWithContours` | each contour, with its straight segments and its quadratic Béziers counted by the drawing rule itself |
 | `TTGlyph >> inspectorGlyph` | the same example | the glyph as `VectorCanvas` really fills it |
-| `TTFontDescription >> inspectorGlyphMap` | `TrueTypeExample class >> exampleGlyphMap` | every code point the font maps, with the record it points at |
+| `TTFontDescription >> inspectorGlyphMap` | `TrueTypeExamples class >> glyphMap` | every code point the font maps, with the record it points at |
 | `TTFontDescription >> inspectorMapDensity` | the same example | what that map costs in floats and index entries |
 
 `VectorGraphicsDocumentationTest` holds this document and those artefacts to the code: every name
 written in backticks here must exist, every example must run, every view must build from its
-example, and no view may change what it inspects.
+example, and no view may change what it inspects. It is abstract, and its four concrete
+subclasses — `VGEngineDocumentationTest`, `VGPathsDocumentationTest`,
+`VGTrueTypeDocumentationTest` and `VGTextDocumentationTest` — each name one package, so every
+package's own examples, views and package comment are gated by its own suite, and this document
+is read by all four.

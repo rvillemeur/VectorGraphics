@@ -16,12 +16,19 @@ neither is present. Every layer above them is a group of its own.
 
 | Package | What it holds |
 |---|---|
-| `VectorGraphics` | The software rasteriser: paths, spans, paint, clips, text |
+| `VectorGraphics` | The front page of the project in the browser: a package comment and the Renraku rule configuration, no code |
+| `VectorGraphics-Engine` | The software rasteriser: paths, spans, paint, clips |
+| `VectorGraphics-Paths` | The SVG path commands, and the parser that reads a `d` attribute into them |
+| `VectorGraphics-TrueType` | Reading a `.ttf`, and the glyphs, metrics and font classes it yields |
+| `VectorGraphics-Text` | The glue that draws a string: extension methods over the engine and the font reader |
 | `VectorGraphics-Cairo` | The replacement for the Cairo layer, same calling API as `Alexandrie-Cairo` |
 | `VectorGraphics-Bloc` | `VGCanvas` and `VGRenderer`, the Bloc backend, plus the pixel buffer host |
 | `VectorGraphics-Vulkan` | The GPU backend: device session, tiled fill, the present host and its SDL2 host |
-| `VectorGraphics-Cairo-Examples`, `VectorGraphics-Bloc-Examples`, `VectorGraphics-Vulkan-Examples` | One `<sampleInstance>` example per subject |
-| `VectorGraphics-Cairo-Tests`, `VectorGraphics-Bloc-Tests`, `VectorGraphics-Vulkan-Tests` | The suites, including the conformance gate against Alexandrie |
+| `VectorGraphics-Engine-Examples`, `VectorGraphics-Paths-Examples`, `VectorGraphics-TrueType-Examples`, `VectorGraphics-Text-Examples` | One `<sampleInstance>` example per subject of the rasteriser |
+| `VectorGraphics-Cairo-Examples`, `VectorGraphics-Bloc-Examples`, `VectorGraphics-Vulkan-Examples` | One `<sampleInstance>` example per subject of the layers above it |
+| `VectorGraphics-Tests` | `VectorGraphicsDocumentationTest`, the abstract documentation gate the four suites below subclass |
+| `VectorGraphics-Engine-Tests`, `VectorGraphics-Paths-Tests`, `VectorGraphics-TrueType-Tests`, `VectorGraphics-Text-Tests` | The suites of the rasteriser, each with the documentation gate of its own package |
+| `VectorGraphics-Cairo-Tests`, `VectorGraphics-Bloc-Tests`, `VectorGraphics-Vulkan-Tests` | The suites of the layers above, including the conformance gate against Alexandrie |
 
 ## Groups
 
