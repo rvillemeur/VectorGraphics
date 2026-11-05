@@ -27,13 +27,53 @@ VGArchitectureTest class >> allowedDependencies [
 	 fail on either, so adding a dependency means stating it here and in the baseline first.
 	 The rule that only the Vulkan family may name a PharoVulkan class is held elsewhere, by
 	 VGBackendSelectionTest through VGCairoReferenceScanner, so no edge out of this project
-	 appears here."
+	 appears here.
+	 An edge is a reference one package's methods make to another's classes, which is not the
+	 same as what a package needs in order to load: the four documentation gates subclass
+	 VectorGraphicsDocumentationTest without naming it in a method, so the baseline declares
+	 that edge and this table cannot."
 
 	^ Dictionary newFrom: {
-			  "The engine is the pure-Pharo rasteriser this project was built on and it knows
-			   nothing of the layers above it."
+			  "The front page holds no code since the split, only the package comment that says
+			   which package holds what, so it names nothing and nothing names it."
 			  'VectorGraphics' -> #(  ).
-			  'VectorGraphics-Cairo' -> #( 'VectorGraphics' ).
+			  "The rasteriser, in four packages. Paths is the command language, Engine the
+			   scan-line rasteriser, TrueType the font reader, Text the glue that lets the one
+			   draw the other: no edge runs from Engine to TrueType or back, which is what the
+			   split was for."
+			  'VectorGraphics-Paths' -> #(  ).
+			  'VectorGraphics-Paths-Examples'
+			  -> #( 'VectorGraphics-Engine' 'VectorGraphics-Paths' ).
+			  'VectorGraphics-Paths-Tests'
+			  -> #( 'VectorGraphics-Paths' 'VectorGraphics-Paths-Examples' ).
+			  'VectorGraphics-Engine' -> #(  ).
+			  'VectorGraphics-Engine-Examples' -> #( 'VectorGraphics-Engine' ).
+			  "The engine tests run paths through the engine, which is what the engine is for,
+			   and the paths examples draw into a canvas, so both name the other layer. Neither
+			   edge is one the code itself makes."
+			  'VectorGraphics-Engine-Tests'
+			  -> #( 'VectorGraphics-Engine' 'VectorGraphics-Engine-Examples' 'VectorGraphics-Paths' ).
+			  'VectorGraphics-TrueType' -> #( 'VectorGraphics-Paths' ).
+			  'VectorGraphics-TrueType-Examples' -> #( 'VectorGraphics-TrueType' ).
+			  "The font tests read a glyph as path commands and name no engine class: a font can
+			   be parsed and measured with no rasteriser in the image."
+			  'VectorGraphics-TrueType-Tests'
+			  -> #( 'VectorGraphics-Paths' 'VectorGraphics-TrueType'
+				    'VectorGraphics-TrueType-Examples' ).
+			  "Text is six extension methods on classes of the two packages it joins, so it
+			   holds no class of its own and nothing can name it."
+			  'VectorGraphics-Text' -> #( 'VectorGraphics-Engine' 'VectorGraphics-TrueType' ).
+			  'VectorGraphics-Text-Examples'
+			  -> #( 'VectorGraphics-Engine' 'VectorGraphics-TrueType' ).
+			  'VectorGraphics-Text-Tests'
+			  -> #( 'VectorGraphics-Engine' 'VectorGraphics-Text-Examples'
+				    'VectorGraphics-TrueType' ).
+			  "The abstract documentation gate the four concrete ones subclass. It reads its
+			   package from the subclass hook and the organiser, so it names no package of ours."
+			  'VectorGraphics-Tests' -> #(  ).
+			  "The Cairo backend draws text through the font reader and knows nothing of the
+			   other three packages of the rasteriser."
+			  'VectorGraphics-Cairo' -> #( 'VectorGraphics-TrueType' ).
 			  "An examples class names its subject, and the subjects of these three examples
 			   holders — the two corpora, the comparison and the font lifetime — live in the test
 			   package, because they are fixtures of the conformance gate and of nothing else."
@@ -379,6 +419,21 @@ VGArchitectureTest >> testCairoTestsStayInsideTheirAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Cairo-Tests'
 ]
 
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testEngineExamplesStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Engine-Examples'
+]
+
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testEngineStaysInsideItsAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Engine'
+]
+
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testEngineTestsStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Engine-Tests'
+]
+
 { #category : 'tests' }
 VGArchitectureTest >> testEveryAllowedDependencyIsDeclaredInTheBaseline [
 	"A package can load only what the baseline says it needs. An edge the table grants but the
@@ -455,6 +510,29 @@ VGArchitectureTest >> testEveryPackageOfThisProjectHasADeclaredAllowedSet [
 		equals: self class projectPackageNames asSortedCollection asArray
 ]
 
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testEveryPackageOfThisProjectIsScannedByOneOfMyTests [
+	"The table covering a package is not the same as a test scanning it: a package can appear in
+	 allowedDependencies with an empty set and never be read, in which case every reference it
+	 makes is allowed by nobody. One test per package names it, so the failure says which
+	 package broke; this reads the package name out of each of those tests rather than listing
+	 them, so the twenty-three stay in step with the organiser."
+
+	| scanned |
+	scanned := Set new.
+	(self class selectors select: [ :each | each beginsWith: 'test' ]) do: [ :selector |
+		| method |
+		method := self class >> selector.
+		(method sendsSelector: #assertEdgesOfPackageNamed:) ifTrue: [
+			method literals do: [ :literal |
+				(literal isString and: [
+					 self class projectPackageNames includes: literal asString ]) ifTrue: [
+					scanned add: literal asString ] ] ] ].
+	self
+		assert: scanned asSortedCollection asArray
+		equals: self class projectPackageNames asSortedCollection asArray
+]
+
 { #category : 'tests' }
 VGArchitectureTest >> testNoClassOfTheCairoExampleAndTestGroupsInheritsFromBloc [
 	"The cairo-examples and cairo-tests groups install in an image with no Bloc, which the
@@ -491,6 +569,27 @@ VGArchitectureTest >> testNoClassOfTheDefaultGroupInheritsFromTheStackItReplaces
 		description: 'the walk finds nothing at all, so the empty answer above proves nothing'
 ]
 
+{ #category : 'tests - hierarchy' }
+VGArchitectureTest >> testNoClassOfThisProjectInheritsFromAnObsoleteClass [
+	"A class whose superclass is obsolete looks right in the browser and answers right in the
+	 tests, because the obsolete copy still holds the methods the live class holds. It is still
+	 broken: the live class is no longer in its own hierarchy, so a method added to it never
+	 reaches the subclass, and the package the obsolete copy was filed under holds a class
+	 nothing can find. Reparenting a class moved between packages, and reloading one from its
+	 Tonel file after a crash, are the two ways this project has made one.
+	 This is asked of every package of the project rather than of a list, so a package added
+	 tomorrow is covered."
+
+	| strays |
+	strays := Set new.
+	self class projectPackageNames do: [ :name |
+		(PackageOrganizer default packageNamed: name) definedClasses do: [ :cls |
+			cls allSuperclasses do: [ :each |
+				each isObsolete ifTrue: [
+					strays add: cls name asString , ' < ' , each name asString ] ] ] ].
+	self assert: strays asSortedCollection asArray equals: #(  )
+]
+
 { #category : 'tests' }
 VGArchitectureTest >> testNoPackageOfTheDefaultGroupNamesAClassOfTheStackItReplaces [
 	"Loading this project with no group named must not reach Bloc or Alexandrie. The engine and
@@ -510,6 +609,36 @@ VGArchitectureTest >> testNoPackageOfTheDefaultGroupNamesAClassOfTheStackItRepla
 				             , each key selector , ' names '
 				             , (each value collect: [ :one | one name ]) asArray printString ] ].
 	self assert: offenders asSortedCollection asArray equals: #(  )
+]
+
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testPathsExamplesStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Paths-Examples'
+]
+
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testPathsStaysInsideItsAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Paths'
+]
+
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testPathsTestsStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Paths-Tests'
+]
+
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testTextExamplesStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Text-Examples'
+]
+
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testTextStaysInsideItsAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Text'
+]
+
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testTextTestsStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Text-Tests'
 ]
 
 { #category : 'tests' }
@@ -541,25 +670,26 @@ VGArchitectureTest >> testTheBlocLayerRequiresTheExternalBlocProject [
 		equals: #( 'Bloc' )
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests - groups' }
 VGArchitectureTest >> testTheCairoExampleAndTestGroupsNameNoBlocClass [
 	"The examples and the tests of the Cairo layer load without Bloc too, each from a group of
-	 its own: the project-wide examples and tests groups span all three layers, so asking for
-	 them fetches Bloc and wants PharoVulkan, which a user of the Cairo backend wants neither
-	 of. Alexandrie is not asked about here — blocPackageNames says why. A group that does not
-	 exist would pass on an empty scan, so the packages each one must bring in are named
-	 first."
+	 its own: the project-wide examples and tests groups span every layer, so asking for them
+	 fetches Bloc and wants PharoVulkan, which a user of the Cairo backend wants neither of.
+	 Neither group brings the front page or the other three packages of the rasteriser, because
+	 the Cairo backend names the font reader alone. Alexandrie is not asked about here —
+	 blocPackageNames says why. A group that does not exist would pass on an empty scan, so the
+	 packages each one must bring in are named first."
 
 	| scanner offenders |
 	scanner := VGCairoReferenceScanner new.
 	self
 		assert: (self class packagesLoadedByGroupNamed: 'cairo-examples')
-		equals: #( 'VectorGraphics' 'VectorGraphics-Cairo'
-			   'VectorGraphics-Cairo-Examples' ) asSet.
+		equals: #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples' 'VectorGraphics-Paths'
+			   'VectorGraphics-TrueType' ) asSet.
 	self
 		assert: (self class packagesLoadedByGroupNamed: 'cairo-tests')
-		equals: #( 'VectorGraphics' 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
-			   'VectorGraphics-Cairo-Tests' ) asSet.
+		equals: #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
+			   'VectorGraphics-Cairo-Tests' 'VectorGraphics-Paths' 'VectorGraphics-TrueType' ) asSet.
 	offenders := #( 'cairo-examples' 'cairo-tests' ) flatCollect: [ :group |
 		             (self class packagesLoadedByGroupNamed: group) asSortedCollection asArray
 			             flatCollect: [ :package |
@@ -571,37 +701,40 @@ VGArchitectureTest >> testTheCairoExampleAndTestGroupsNameNoBlocClass [
 	self assert: offenders asSortedCollection asArray equals: #(  )
 ]
 
-{ #category : 'tests' }
-VGArchitectureTest >> testTheDefaultGroupLoadsTheEngineAndTheCairoBackendAlone [
+{ #category : 'tests - groups' }
+VGArchitectureTest >> testTheDefaultGroupLoadsTheRasteriserAndTheCairoBackendAlone [
 	"What `Metacello load: 'VectorGraphics'` brings in, named here so the group cannot grow a
-	 layer back by accident. Every other layer is a group of its own."
+	 layer back by accident. The rasteriser is four packages since the split and the default
+	 group brings all four, because that is what the one package it replaced held. Every layer
+	 above it is a group of its own."
 
 	self
 		assert: (self class packagesLoadedByGroupNamed: 'default') asSortedCollection asArray
-		equals: #( 'VectorGraphics' 'VectorGraphics-Cairo' )
+		equals: #( 'VectorGraphics' 'VectorGraphics-Cairo' 'VectorGraphics-Engine'
+			   'VectorGraphics-Paths' 'VectorGraphics-Text' 'VectorGraphics-TrueType' )
 ]
 
-{ #category : 'tests' }
-VGArchitectureTest >> testTheEngineStaysInsideItsAllowedDependencies [
-	self assertEdgesOfPackageNamed: 'VectorGraphics'
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testTheDocumentationGatePackageStaysInsideItsAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Tests'
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests - groups' }
 VGArchitectureTest >> testTheExamplesAndTestsGroupsAreTheUnionOfTheirLayerGroups [
 	"One group per layer for examples and for tests, and the project-wide group is their union.
 	 Stating the union as the layer group names rather than as package names is what keeps the
-	 two from drifting apart when a layer gains a package."
+	 two from drifting apart when a layer gains a package. Seven layers since the split: the
+	 four packages of the rasteriser, then Cairo, Bloc and Vulkan."
 
 	| groups |
 	groups := Dictionary new.
 	BaselineOfVectorGraphics project version groups do: [ :each |
 		groups at: each name put: each includes asArray ].
-	self
-		assert: (groups at: 'examples')
-		equals: #( 'cairo-examples' 'bloc-examples' 'vulkan-examples' ).
-	self
-		assert: (groups at: 'tests')
-		equals: #( 'cairo-tests' 'bloc-tests' 'vulkan-tests' ).
+	self assert: (groups at: 'examples') equals: #( 'paths-examples' 'engine-examples'
+			 'truetype-examples' 'text-examples' 'cairo-examples' 'bloc-examples'
+			 'vulkan-examples' ).
+	self assert: (groups at: 'tests') equals: #( 'paths-tests' 'engine-tests' 'truetype-tests'
+			 'text-tests' 'cairo-tests' 'bloc-tests' 'vulkan-tests' ).
 	#( 'examples' 'tests' ) do: [ :name |
 		self
 			assert: (self class packagesLoadedByGroupNamed: name)
@@ -609,6 +742,11 @@ VGArchitectureTest >> testTheExamplesAndTestsGroupsAreTheUnionOfTheirLayerGroups
 					 all
 						 addAll: (self class packagesLoadedByGroupNamed: layer);
 						 yourself ]) ]
+]
+
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testTheFrontPagePackageStaysInsideItsAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics'
 ]
 
 { #category : 'tests' }
@@ -623,6 +761,21 @@ VGArchitectureTest >> testTheScanReadsAReferencePlantedInsideANestedBlock [
 		assert: (self class packagesNamedBy:
 				 VGNestedBlockReferenceFixture >> #reachThroughThreeBlocks)
 		equals: (Set with: VGCairoMatrix package name asString)
+]
+
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testTrueTypeExamplesStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-TrueType-Examples'
+]
+
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testTrueTypeStaysInsideItsAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-TrueType'
+]
+
+{ #category : 'tests - dependencies' }
+VGArchitectureTest >> testTrueTypeTestsStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-TrueType-Tests'
 ]
 
 { #category : 'tests' }

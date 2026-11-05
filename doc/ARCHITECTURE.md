@@ -11,9 +11,12 @@ The code lives in four packages, and each section below names the one it describ
 - `VectorGraphics-TrueType` — reading a font and the glyphs it holds: sections 9 and 10.
 - `VectorGraphics-Paths` — the SVG path commands and their parser: section 11.
 
-`VectorGraphics-Engine`, `VectorGraphics-Paths` and `VectorGraphics-TrueType` each depend on
-nothing but the image. `VectorGraphics-Text` is the one package that needs two of them, which is
-why the glue sits in a package of its own. Sections 12 and 13 span all four.
+`VectorGraphics-Engine` and `VectorGraphics-Paths` each depend on nothing but the image, and
+`VectorGraphics-TrueType` depends on `VectorGraphics-Paths` alone, because it answers a glyph as
+path commands. `VectorGraphics-Text` is the one package that needs both the rasteriser and the font
+reader, which is why the glue sits in a package of its own: no edge runs from the engine to the
+font code or back. `VGArchitectureTest class >> allowedDependencies` states every edge, and its
+tests hold the statement against what the code really names. Sections 12 and 13 span all four.
 
 ## 1. Coordinate spaces — `VectorGraphics-Engine`
 

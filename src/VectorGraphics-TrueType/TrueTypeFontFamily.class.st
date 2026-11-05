@@ -21,7 +21,7 @@ each family into FontFamily's AvailableFamilies dictionary.
 "
 Class {
 	#name : 'TrueTypeFontFamily',
-	#superclass : 'AnObsoleteFontFamily',
+	#superclass : 'FontFamily',
 	#instVars : [
 		'baseTTFontDescription',
 		'ttFontDescriptionsByEmphasis'

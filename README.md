@@ -34,15 +34,21 @@ neither is present. Every layer above them is a group of its own.
 
 | Group | Loads |
 |---|---|
-| `default` | `core` and `cairo` — the rasteriser and the Cairo replacement, no Bloc |
-| `core` | `VectorGraphics` alone |
-| `cairo` | the Cairo replacement |
+| `default` | `core` and `cairo` — the whole rasteriser and the Cairo replacement, no Bloc |
+| `core` | the front page and the four packages of the rasteriser: `paths`, `engine`, `truetype`, `text` |
+| `paths` | the SVG path commands and their parser, alone |
+| `engine` | the scan-line rasteriser, with no font code |
+| `truetype` | the `.ttf` reader, with no rasteriser: it brings `paths` and nothing else |
+| `text` | the glue that draws a string, so it brings `engine` and `truetype` |
+| `paths-examples`, `engine-examples`, `truetype-examples`, `text-examples` | the examples of one package of the rasteriser |
+| `paths-tests`, `engine-tests`, `truetype-tests`, `text-tests` | the suite of one package of the rasteriser, each bringing `VectorGraphics-Tests` for the documentation gate |
+| `cairo` | the Cairo replacement. It names the font reader alone, so this brings `paths` and `truetype`, not the whole of `core` |
 | `cairo-examples`, `cairo-tests` | the examples and the suites of that layer, still without Bloc |
-| `bloc` | `VectorGraphics-Bloc`, and Bloc itself from `github://pharo-graphics/Bloc:master` |
+| `bloc` | `core`, `VectorGraphics-Bloc`, and Bloc itself from `github://pharo-graphics/Bloc:master` |
 | `bloc-examples`, `bloc-tests` | the examples and the suites of the Bloc backend |
-| `vulkan` | `VectorGraphics-Vulkan`. PharoVulkan is not published, so load it before asking for this group |
+| `vulkan` | `core` and `VectorGraphics-Vulkan`. PharoVulkan is not published, so load it before asking for this group |
 | `vulkan-examples`, `vulkan-tests` | the examples and the suites of the GPU backend |
-| `examples`, `tests` | the union of the three layer groups, so they reach Bloc and PharoVulkan |
+| `examples`, `tests` | the union of the seven layer groups, so they reach Bloc and PharoVulkan |
 
 The Cairo examples and suites load without Bloc:
 
@@ -53,8 +59,10 @@ Metacello new
 	load: 'cairo-tests'.
 ```
 
-`cairo-tests` requires `cairo-examples`, which requires `cairo`, which requires the rasteriser, so
-that one name brings all four packages in. They do name Alexandrie's Cairo bindings, on purpose:
+`cairo-tests` requires `cairo-examples`, which requires `cairo`, which requires the font reader and
+the path commands, so that one name brings five packages in — and neither the scan-line engine nor
+the text glue, which the Cairo layer does not name. They do name Alexandrie's Cairo bindings, on
+purpose:
 the conformance gate proves this rasteriser matches live Cairo byte for byte, and a comparison
 needs that positive control.
 
