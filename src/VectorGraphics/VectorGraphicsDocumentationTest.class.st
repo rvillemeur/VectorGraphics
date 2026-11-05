@@ -454,13 +454,12 @@ VectorGraphicsDocumentationTest >> testTheTokeniserReadsBackticksOutsideAFenceAn
 
 { #category : 'accessing' }
 VectorGraphicsDocumentationTest >> viewSubjects [
-
 	^ {
-		VectorEnginePixel -> (VectorCanvasExample -> #exampleEngineDuringAFillPath) .
-		VectorEngineAbstract -> (VectorCanvasExample -> #exampleEngineDuringAFillPath) .
+		VectorEnginePixel -> (VectorCanvasExamples -> #engineDuringAFillPath) .
+		VectorEngineAbstract -> (VectorCanvasExamples -> #engineDuringAFillPath) .
 		VectorEngineBoundsFinder
-		-> (VectorCanvasExample -> #exampleBoundsFinderAfterMeasuringATriangle) .
-		VectorCanvas -> (VectorCanvasExample -> #exampleCanvasAfterADrawing) .
-		TTGlyph -> (TrueTypeExample -> #exampleGlyphWithContours) .
-		TTFontDescription -> (TrueTypeExample -> #exampleGlyphMap) }
+		-> (VectorCanvasExamples -> #boundsFinderAfterMeasuringATriangle) .
+		VectorCanvas -> (VectorCanvasExamples -> #canvasAfterADrawing) .
+		TTGlyph -> (TrueTypeExamples -> #glyphWithContours) .
+		TTFontDescription -> (TrueTypeExamples -> #glyphMap) }
 ]
