@@ -550,13 +550,13 @@ VectorEngineAbstract >> inspectorPathPointEntries [
 ]
 
 { #category : 'inspector' }
-VectorEngineAbstract >> inspectorPathState [
+VectorEngineAbstract >> inspectorPathState: aBuilder [
 	<inspectorPresentationOrder: 30 title: 'Path state'>
 	"The state a path call leaves behind: the point the path is at, the point it started from, and
 	the reflected control point an S or a T command reads. finishPath: puts all of them back to
 	zero, so a path drawn through the public entry leaves this view at the origin."
 
-	^ SpTablePresenter new
+	^ aBuilder newTable
 		  addColumn: ((SpStringTableColumn title: 'What' evaluated: [ :each | each key ]) width: 200);
 		  addColumn: (SpStringTableColumn title: 'Now' evaluated: [ :each | each value value printString ]);
 		  items: self inspectorPathStateEntries;

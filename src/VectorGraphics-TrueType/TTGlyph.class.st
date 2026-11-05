@@ -210,13 +210,13 @@ TTGlyph >> inspectorContourEntries [
 ]
 
 { #category : 'inspector' }
-TTGlyph >> inspectorContours [
+TTGlyph >> inspectorContours: aBuilder [
 	<inspectorPresentationOrder: 20 title: 'Contours'>
 	"One row per contour, with the segments counted by asking quadraticBeziersDo: rather than by
 	reading the flags again: a straight segment is the one whose control point is its end point,
 	which is the rule that method itself applies."
 
-	^ SpTablePresenter new
+	^ aBuilder newTable
 		  addColumn: ((SpStringTableColumn title: 'Contour' evaluated: [ :each | each first printString ]) width: 80);
 		  addColumn: ((SpStringTableColumn title: 'Points' evaluated: [ :each | each second printString ]) width: 80);
 		  addColumn: ((SpStringTableColumn title: 'Straight segments' evaluated: [ :each | each third printString ]) width: 140);

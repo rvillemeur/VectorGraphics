@@ -221,15 +221,15 @@ VectorEnginePixel >> inspectorBufferGeometryEntries [
 ]
 
 { #category : 'inspector' }
-VectorEnginePixel >> inspectorBuffers [
+VectorEnginePixel >> inspectorBuffers: aBuilder [
 	<inspectorPresentationOrder: 20 title: 'Buffers'>
 	"What the three buffers of this engine hold now, counted rather than described. The blend pass
 	zeroes alphaMask and edgeCounts at every pixel it visits, so after a finished drawing both are
 	empty and only morphIds still says anything: a reader who wants to see coverage must inspect
 	an engine during a path, which is what
-	VectorCanvasExample class >> exampleEngineDuringAFillPath answers."
+	VectorCanvasExamples class >> engineDuringAFillPath answers."
 
-	^ SpTablePresenter new
+	^ aBuilder newTable
 		  addColumn: ((SpStringTableColumn title: 'Buffer' evaluated: [ :each | each key ]) width: 200);
 		  addColumn: (SpStringTableColumn title: 'Now' evaluated: [ :each | each value value printString ]);
 		  items: self inspectorBufferEntries;

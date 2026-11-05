@@ -333,7 +333,7 @@ VectorCanvas >> inspectorFormEntries [
 ]
 
 { #category : 'inspector' }
-VectorCanvas >> inspectorTarget [
+VectorCanvas >> inspectorTarget: aBuilder [
 	<inspectorPresentationOrder: 20 title: 'Target'>
 	"What this canvas draws on and with. Two engines are held: engine draws, boundsFinderEngine
 	measures, and updatingMorphBoundsDo: swaps the second in for the duration of a block. The
@@ -341,7 +341,7 @@ VectorCanvas >> inspectorTarget [
 	answers morphId, and nothing in this image does, so a hit test over morphIds finds nothing
 	until a morph class answers it."
 
-	^ SpTablePresenter new
+	^ aBuilder newTable
 		  addColumn: ((SpStringTableColumn title: 'What' evaluated: [ :each | each key ]) width: 240);
 		  addColumn: (SpStringTableColumn title: 'Now' evaluated: [ :each | each value value printString ]);
 		  items: self inspectorTargetEntries;

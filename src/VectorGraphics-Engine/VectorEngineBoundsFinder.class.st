@@ -78,15 +78,14 @@ VectorEngineBoundsFinder >> inspectorMeasuredBoxEntries [
 ]
 
 { #category : 'inspector' }
-VectorEngineBoundsFinder >> inspectorMeasurement [
-
+VectorEngineBoundsFinder >> inspectorMeasurement: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Measurement'>
 	"What this engine measured and what it mirrored to measure it. Every row asks the live
 	state, including the count of painted pixels, which says that measuring paints nothing.
-	VectorCanvasExample class >> exampleBoundsFinderAfterMeasuringATriangle answers one
+	VectorCanvasExamples class >> boundsFinderAfterMeasuringATriangle answers one
 	of these after a measured drawing."
 
-	^ SpTablePresenter new
+	^ aBuilder newTable
 		  addColumn:
 			  ((SpStringTableColumn
 				    title: 'Measurement'

@@ -315,13 +315,13 @@ TTFontDescription >> includesAscii [
 ]
 
 { #category : 'inspector' }
-TTFontDescription >> inspectorGlyphMap [
+TTFontDescription >> inspectorGlyphMap: aBuilder [
 	<inspectorPresentationOrder: 30 title: 'Glyph map'>
 	"Every code point this font maps, with the position its record sits at, the advance width read
 	 from that record and the number of contours. A code point absent from the table is answered the
 	 unknown glyph."
 
-	^ SpTablePresenter new
+	^ aBuilder newTable
 		  addColumn: ((SpStringTableColumn title: 'Code point' evaluated: [ :each |
 					    '16r' , each key printStringHex ]) width: 90);
 		  addColumn: ((SpStringTableColumn title: 'Character' evaluated: [ :each |
@@ -359,7 +359,7 @@ TTFontDescription >> inspectorGlyphMapEntries [
 ]
 
 { #category : 'inspector' }
-TTFontDescription >> inspectorMapDensity [
+TTFontDescription >> inspectorMapDensity: aBuilder [
 	<inspectorPresentationOrder: 40 title: 'Map density'>
 	"What the map costs, measured rather than described: the mapped code points against the floats
 	 and index entries they need, and against what one slot per code point of the whole Basic
@@ -369,7 +369,7 @@ TTFontDescription >> inspectorMapDensity [
 	| mapped floats |
 	mapped := self inspectorGlyphMapEntries size.
 	floats := contourDataForUtf8 size.
-	^ SpTextPresenter new
+	^ aBuilder newText
 		  text: (String streamContents: [ :stream |
 					   stream
 						   nextPutAll: 'mapped code points: ';

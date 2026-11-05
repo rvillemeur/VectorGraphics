@@ -265,14 +265,14 @@ rebuilds its subject every call.
 
 | View | Example that feeds it | Shows |
 |---|---|---|
-| `VectorEnginePixel >> inspectorBuffers` | `VectorCanvasExamples class >> engineDuringAFillPath` | the three buffers during a path, counted rather than described |
-| `VectorEngineAbstract >> inspectorPathState` | the same example | the path state, the two morph ids and the bounds of the last drawing |
-| `VectorCanvas >> inspectorTarget` | `VectorCanvasExamples class >> canvasAfterADrawing` | the target form, which engine draws and which measures |
-| `VectorEngineBoundsFinder >> inspectorMeasurement` | `VectorCanvasExamples class >> boundsFinderAfterMeasuringATriangle` | the box measured, the margins mirrored from the painting engine, and that nothing was painted and no buffer allocated |
-| `TTGlyph >> inspectorContours` | `TrueTypeExamples class >> glyphWithContours` | each contour, with its straight segments and its quadratic Béziers counted by the drawing rule itself |
-| `TTGlyph >> inspectorGlyph` | the same example | the glyph as `VectorCanvas` really fills it |
-| `TTFontDescription >> inspectorGlyphMap` | `TrueTypeExamples class >> glyphMap` | every code point the font maps, with the record it points at |
-| `TTFontDescription >> inspectorMapDensity` | the same example | what that map costs in floats and index entries |
+| `VectorEnginePixel >> inspectorBuffers:` | `VectorCanvasExamples class >> engineDuringAFillPath` | the three buffers during a path, counted rather than described |
+| `VectorEngineAbstract >> inspectorPathState:` | the same example | the path state, the two morph ids and the bounds of the last drawing |
+| `VectorCanvas >> inspectorTarget:` | `VectorCanvasExamples class >> canvasAfterADrawing` | the target form, which engine draws and which measures |
+| `VectorEngineBoundsFinder >> inspectorMeasurement:` | `VectorCanvasExamples class >> boundsFinderAfterMeasuringATriangle` | the box measured, the margins mirrored from the painting engine, and that nothing was painted and no buffer allocated |
+| `TTGlyph >> inspectorContours:` | `TrueTypeExamples class >> glyphWithContours` | each contour, with its straight segments and its quadratic Béziers counted by the drawing rule itself |
+| `TTGlyph >> inspectorGlyph:` | the same example | the glyph as `VectorCanvas` really fills it |
+| `TTFontDescription >> inspectorGlyphMap:` | `TrueTypeExamples class >> glyphMap` | every code point the font maps, with the record it points at |
+| `TTFontDescription >> inspectorMapDensity:` | the same example | what that map costs in floats and index entries |
 
 `VectorGraphicsDocumentationTest` holds this document and those artefacts to the code: every name
 written in backticks here must exist, every example must run, every view must build from its

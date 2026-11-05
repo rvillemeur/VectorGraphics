@@ -135,12 +135,21 @@ VectorGraphicsDocumentationTest >> behaviourNamedBy: aString [
 
 { #category : 'running' }
 VectorGraphicsDocumentationTest >> buildView: aSelector of: anObject [
-	"Build one inspector view and draw what it would show. A table's column blocks run per drawn
-	row only, so this test runs each of them over each item itself; otherwise a broken column
-	would pass."
+	"Build one inspector view the way the inspector really builds it, through
+	StInspectionContext, so that a view this gate passes is a view a reader can open:
+	basicNewInspectionPresenter: hands the method a presenter builder, which is the only
+	supported way since Pharo 13, and refuses a view that does not take one.
+	newInspectionPresenterOnApplication: is not used here because it answers a debug presenter
+	instead of failing. A table's column blocks run per drawn row only, so this runs each of them
+	over each item itself; otherwise a broken column would pass."
 
-	| presenter |
-	presenter := anObject perform: aSelector.
+	| context presenter |
+	context := StInspectionContext new
+		           inspectedObject: anObject;
+		           methodSelector: aSelector;
+		           yourself.
+	presenter := context basicNewInspectionPresenter:
+		             (SpPresenterBuilder newApplication: SpApplication new).
 	self
 		assert: presenter notNil
 		description: anObject class name , ' >> ' , aSelector , ' builds nothing'.
@@ -357,6 +366,28 @@ VectorGraphicsDocumentationTest >> testEveryInspectorViewOfThisPackageBuildsFrom
 		instance := pair value key perform: pair value value.
 		(self inspectorViewSelectorsOf: pair key) do: [ :selector |
 			self buildView: selector of: instance ] ]
+]
+
+{ #category : 'tests' }
+VectorGraphicsDocumentationTest >> testEveryInspectorViewOfThisPackageTakesAPresenterBuilder [
+	"Pharo hands an inspector view the presenter builder it must build with. A view that
+	instantiates a presenter itself is refused — 'Inspections made without presenter builder are
+	no longer supported' — when a reader opens the object. The rule is read from
+	StInspectionContext rather than restated here, so it cannot drift from the inspector, and the
+	package's own methods are read, so an extension method on a class of another package is too."
+
+	| wrong |
+	wrong := OrderedCollection new.
+	self packageUnderTest methods do: [ :method |
+		method pragmas do: [ :pragma |
+			(pragma selector = #inspectorPresentationOrder:title: and: [
+				 (StInspectionContext new
+					  methodSelector: method selector;
+					  yourself) methodSelectorNeedsBuilder not ]) ifTrue: [
+				wrong add: method methodClass name , ' >> ' , method selector ] ] ].
+	self
+		assert: wrong isEmpty
+		description: 'these views take no presenter builder: ' , wrong asArray printString
 ]
 
 { #category : 'tests' }
