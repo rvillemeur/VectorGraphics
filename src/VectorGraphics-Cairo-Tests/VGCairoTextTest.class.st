@@ -290,6 +290,31 @@ VGCairoTextTest >> testAFontWithNoOutlineTableIsRefused [
 		description: 'a font with no glyf table must be refused'
 ]
 
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testAFreeTypeLibraryOfAnotherImageRunIsNeverAnsweredAgain [
+	"What a restarted image must not be handed: the FT_Library of a virtual machine run that has
+	 ended. The library is kept for the whole session, and a session ends when the image is saved,
+	 so an image that comes back holds a handle of a process that no longer exists; every font
+	 test of this project then fails with an invalid library handle, which is what the whole Cairo
+	 suite did when the image of 6 November 2026 was restarted. The run is stamped when the
+	 library is opened and read on every ask, so a library of another run is dropped and one is
+	 opened again."
+	"What is kept stays kept, dead faces included. Letting go of the only reference to a face
+	 lets the collector reach it and send FT_Done_Face to a dangling handle, which is the
+	 finalisation crash VGAlexandrieFontLifetime exists to prevent. Faking the run is the only
+	 way to hold a stale library without saving the image."
+	| stale kept |
+	stale := VGAlexandrieFontLifetime freeTypeLibrary.
+	self assert: VGAlexandrieFontLifetime isOfThisImageRun.
+	kept := VGAlexandrieFontLifetime retained size.
+	VGAlexandrieFontLifetime instVarNamed: 'imageRun' put: nil.
+	self deny: VGAlexandrieFontLifetime isOfThisImageRun.
+	self deny: VGAlexandrieFontLifetime freeTypeLibrary identicalTo: stale.
+	self assert: VGAlexandrieFontLifetime isOfThisImageRun.
+	self assert: (VGAlexandrieFontLifetime retained includes: stale).
+	self assert: VGAlexandrieFontLifetime retained size equals: kept + 1
+]
+
 { #category : 'tests' }
 VGCairoTextTest >> testAGlyphOutlineHoldsAbsoluteFontUnitPointsAndTheGlyphsAdvance [
 	"An outline is the glyph as the font draws it: contours of quadratic segments in font units,
@@ -451,6 +476,28 @@ VGCairoTextTest >> testEveryFaceHandedToHarfbuzzIsKeptForTheSession [
 			assert: (each sendsSelector: #retain:)
 			description: each methodClass name , ' >> ' , each selector
 				, ' hands a face to harfbuzz without keeping it' ]
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testEveryInspectorViewOfTheFontKeeperBuildsThroughThePresenterBuilder [
+	"Both tabs of the keeper, built the way the inspector builds them: through
+	 StInspectionContext, which hands the method a presenter builder and refuses a view that
+	 does not take one. A table's column blocks run per drawn row only, so each one is run over
+	 each item here; otherwise a broken column would pass. The documentation gate of this
+	 project covers the four rasteriser layers and not this package, which is why the keeper's
+	 views are built here."
+	| builder |
+	VGAlexandrieFontLifetime freeTypeLibrary.
+	builder := SpPresenterBuilder newApplication: SpApplication new.
+	#( #inspectorKept: #inspectorLifetime: ) do: [ :selector |
+		| presenter |
+		presenter := (StInspectionContext new
+			 inspectedObject: VGAlexandrieFontLifetime;
+			 methodSelector: selector;
+			 yourself) basicNewInspectionPresenter: builder.
+		self assert: presenter notNil.
+		presenter columns do: [ :column |
+			presenter items do: [ :item | column evaluation value: item ] ] ]
 ]
 
 { #category : 'tests' }
@@ -753,6 +800,27 @@ VGCairoTextTest >> testTheGlyphsOfAStringMatchLiveCairoAndFreeType [
 			assert: each y
 			closeTo: theirGlyph y
 			precision: self class liveCairoMetricTolerance ]
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testTheLifetimeRowsAskTheClassWhatRunItsLibraryBelongsTo [
+	"The one fact this defect turned on, where a reader can see it: whether the library held was
+	 opened by the run of the virtual machine that is running now. The row asks the class rather
+	 than restating the rule, so it cannot drift from the code, and it reads false for a library
+	 of a run that has ended — the state a restarted image comes back in. The count beside it is
+	 the size of what is kept, which only ever grows."
+	| valueOf |
+	valueOf := [ :label |
+		(VGAlexandrieFontLifetime lifetimeRows detect: [ :each | each first = label ]) second ].
+	VGAlexandrieFontLifetime freeTypeLibrary.
+	self assert: (valueOf value: 'Library of this image run').
+	self
+		assert: (valueOf value: 'Objects kept')
+		equals: VGAlexandrieFontLifetime retained size.
+	VGAlexandrieFontLifetime instVarNamed: 'imageRun' put: nil.
+	self deny: (valueOf value: 'Library of this image run').
+	VGAlexandrieFontLifetime freeTypeLibrary.
+	self assert: (valueOf value: 'Library of this image run')
 ]
 
 { #category : 'tests - font lifetime' }

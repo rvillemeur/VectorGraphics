@@ -18,8 +18,9 @@ VGAlexandrieFontLifetimeExamples class >> fontObjectsKeptForThisSession [
 	"One click: a reference picture drawn by Alexandrie, which replaces the global font manager
 	 and may hand its face to harfbuzz, and then the keeper that holds what the collector must
 	 not reach. Its Kept tab names the FreeType library, the managers and the faces, with the
-	 reason each one is held."
-
+	 reason each one is held, and its Lifetime tab says whether the library in hand was opened
+	 by this run of the virtual machine — false there is the state a restarted image comes back
+	 in, and the next ask for the library repairs it."
 	VGAlexandrieFontLifetime freeTypeLibrary.
 	(VGAlexandrieCase for: #lineCap) cairoForm.
 	^ VGAlexandrieFontLifetime
