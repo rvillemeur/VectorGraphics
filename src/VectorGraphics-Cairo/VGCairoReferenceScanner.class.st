@@ -25,19 +25,6 @@ Class {
 }
 
 { #category : 'constants' }
-VGCairoReferenceScanner class >> benchmarkPackageNames [
-	"The packages of this project that measure it against the alternatives. A benchmark names
-	 every backend it drives, on purpose, the way a test package names Alexandrie as a
-	 positive control, and no group a user of one backend asks for loads it — so it is left
-	 out of the scan that keeps the driver out of the engine. The prefix is asked for as well
-	 as the suffix, because other projects in the image have a -Benchmarks package too."
-	^ (PackageOrganizer default packages select: [ :each |
-		   (each name beginsWith: self projectPackagePrefix) and: [
-			   each name endsWith: self benchmarksPackageSuffix ] ]) collect: [ :each |
-		  each name ]
-]
-
-{ #category : 'constants' }
 VGCairoReferenceScanner class >> benchmarksPackageSuffix [
 	^ '-Benchmarks'
 ]
@@ -56,6 +43,11 @@ VGCairoReferenceScanner class >> cairoPackageName [
 	^ 'Alexandrie-Cairo'
 ]
 
+{ #category : 'constants' }
+VGCairoReferenceScanner class >> conformancePackageSuffix [
+	^ '-Conformance'
+]
+
 { #category : 'instance creation' }
 VGCairoReferenceScanner class >> default [
 	"A scanner over every package of this project."
@@ -65,13 +57,12 @@ VGCairoReferenceScanner class >> default [
 
 { #category : 'constants' }
 VGCairoReferenceScanner class >> projectPackageNames [
-	"Every package of this project except the test packages, so a package added later is scanned
-	 without this list being edited. The tests are left out because the proof that no Cairo
-	 function runs needs a positive control, which calls Cairo on purpose."
-
+	"Every package of this project but the ones scanExemptPackageSuffixes names, so a package
+	 added later is scanned without this list being edited."
 	^ (PackageOrganizer default packages select: [ :each |
 		   (each name beginsWith: self projectPackagePrefix) and: [
-			   (each name endsWith: self testPackageSuffix) not ] ]) collect: [ :each |
+			   self scanExemptPackageSuffixes noneSatisfy: [ :suffix |
+				   each name endsWith: suffix ] ] ]) collect: [ :each |
 		  each name ]
 ]
 
@@ -81,6 +72,16 @@ VGCairoReferenceScanner class >> projectPackagePrefix [
 	 scan covers the whole repository and not only the backend."
 
 	^ 'VectorGraphics'
+]
+
+{ #category : 'constants' }
+VGCairoReferenceScanner class >> scanExemptPackageSuffixes [
+	"The packages of this project that name the alternatives on purpose, and are left out of
+	 every scan because of it: the suites, which call Cairo as the positive control of the
+	 proof that nothing else does; the conformance corpus, which is that control; and the
+	 benchmark harness, which drives every backend it measures. No group a user of one
+	 backend asks for loads any of the three."
+	^ { self testPackageSuffix. self conformancePackageSuffix. self benchmarksPackageSuffix }
 ]
 
 { #category : 'constants' }

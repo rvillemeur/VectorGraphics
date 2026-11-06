@@ -176,15 +176,14 @@ VGBackendSelectionTest >> testOnlyTheVulkanPackageNamesAVulkanClass [
 	"The engine must load on a machine with no Vulkan driver, so no package of it but the Vulkan
 	 backend itself may name a class of that backend or of PharoVulkan. Selection reaches the
 	 backend by reflection over the subclasses of VGBackend, which names nothing.
-	 The benchmarks are left out with the forbidden packages themselves: measuring the device
-	 path means naming it, and benchmarkPackageNames says why that is allowed."
+	 The benchmark harness drives the device path and names it, which is why
+	 scanExemptPackageSuffixes keeps it out of the scanned packages."
 	| scanner forbidden offenders |
 	scanner := VGCairoReferenceScanner default.
 	forbidden := VGCairoReferenceScanner vulkanPackageNames.
 	offenders := (VGCairoReferenceScanner projectPackageNames reject: [ :each |
-		              (forbidden includes: each) or: [
-			              VGCairoReferenceScanner benchmarkPackageNames includes: each ] ])
-		             flatCollect: [ :each | scanner offendersIn: each naming: forbidden ].
+		              forbidden includes: each ]) flatCollect: [ :each |
+		             scanner offendersIn: each naming: forbidden ].
 	self assertEmpty: offenders
 ]
 
