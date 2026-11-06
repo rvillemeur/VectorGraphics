@@ -1,13 +1,13 @@
 "
 I measure the area a drawing would cover, and paint nothing.
 
-A VectorCanvas holds two engines: one that paints and me. `VectorCanvas >> updatingMorphBoundsDo:` swaps me in, runs the drawing commands, and puts the painting engine back; `VectorCanvas >> measuredMorphBounds` then answers the rectangle the drawing would have covered. Morphic uses this to learn a morph's damage rectangle without touching the display.
+A VectorCanvas holds two engines: one that paints and me. `VectorCanvas >> updatingMorphBoundsDo:` swaps me in, runs the drawing commands, and puts the painting engine back; `VectorCanvas >> measuredMorphBounds` then answers the rectangle the drawing would have covered. The name comes from the Cuis port, where a morph learned its damage rectangle this way; here it is simply the box a drawing would touch.
 
-I walk every path exactly as my superclass does — the `prim…` methods, the hop counts and the arithmetic of `finishPath:` are inherited — so the bounds I answer are the bounds the painting engine reports for the same commands, not an estimate. What I override is only the writing: `updateAlphasForX:y:` writes no coverage, `updateEdgesAndBoundsForX:y:` keeps the blend box and counts no edge, `blendPath` runs no blend pass, and `pvtAllocateMorphIds` allocates nothing. I therefore own no buffer at all, where a painting engine of the same size owns three arrays of width times height.
+I walk every path exactly as my superclass does — the `prim…` methods, the hop counts and the arithmetic of `finishPath:` are inherited — so the bounds I answer are the bounds the painting engine reports for the same commands, not an estimate. What I override is only the writing: `updateAlphasForX:y:` writes no coverage, `updateEdgesAndBoundsForX:y:` keeps the blend box and counts no edge, and `blendPath` runs no blend pass. I therefore own no buffer at all, where a painting engine of the same size owns two arrays of width times height.
 
 The anti-aliasing width and the sub-pixel margin widen the box in `finishPath:`, and they differ between the whole-pixel and the sub-pixel engine. I take both from the engine I stand in for, through `mirror:`, so build me with `onForm:mirroring:` and rebuild me whenever the canvas replaces its painting engine.
 
-I cannot answer `morph:isAtPoint:`: that reads the morph id map, which I never write.
+
 "
 Class {
 	#name : 'VectorEngineBoundsFinder',
