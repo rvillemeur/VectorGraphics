@@ -1,3 +1,12 @@
+"
+I hold `FontFamily` to the registry it keeps on its class side and to the degenerate answers a reader is entitled to.
+
+The registry maps a family name to a family, so the tests state that `addFamily:` registers under the family's own name, that a second family joins rather than replaces, that the name list comes back sorted, and that `availableFamilies` is a collection even when nothing has been registered. Asking for an absent family, or for an absent family at a point size, answers `nil` rather than raising — the font code is expected to fall back, not to fail.
+
+Point sizes are remembered as they are asked for, and `releaseCachedState` is passed down to the families, which must work when nothing has been cached yet.
+
+The registry is global, so `setUp` saves it and `tearDown` puts it back: a test that leaves a family behind would change what every later test and every font-reading example sees.
+"
 Class {
 	#name : 'FontFamilyTest',
 	#superclass : 'TestCase',

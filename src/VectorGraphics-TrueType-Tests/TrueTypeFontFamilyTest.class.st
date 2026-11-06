@@ -1,3 +1,10 @@
+"
+I hold `TrueTypeFontFamily`, the family built from one parsed description that answers a `TrueTypeFont` at any point size.
+
+The family takes its name and its ASCII coverage from the description it was built with, and answers `isTrueTypeFontFamily` where `FontFamily` does not — the one place in the font code where the kind is asked rather than the behaviour. Asking for a point size builds a `TrueTypeFont` and remembers it, so the same size asked twice answers the same object and the point sizes asked for are the sizes the family lists.
+
+`folderName` is held here too, although nothing in the image sets it: it is what remains of loading a family from a directory, which was removed in the review of 2026-11. The fixture sets the instance variable directly for that reason.
+"
 Class {
 	#name : 'TrueTypeFontFamilyTest',
 	#superclass : 'TestCase',

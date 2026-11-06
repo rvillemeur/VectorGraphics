@@ -1,3 +1,10 @@
+"
+I hold `TTKernPair`, the two glyph indexes of a kerning pair and the mask that identifies the pair in one number.
+
+The mask is the key a layout looks the pair up by, so three facts are stated: it follows the formula the font format defines, two different pairs never produce the same mask, and it is computed once and kept on the instance — the second ask must answer the cached value, since kerning is looked up per character pair of every string drawn.
+
+The laziness is held in both directions: the mask is absent until it is asked for, and present afterwards.
+"
 Class {
 	#name : 'TTKernPairTest',
 	#superclass : 'TestCase',

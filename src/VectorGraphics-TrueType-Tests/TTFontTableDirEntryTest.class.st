@@ -1,3 +1,10 @@
+"
+I hold `TTFontTableDirEntry`, the cursor every table reader of the parser works through: a byte array plus an offset that advances as values are read.
+
+The facts are the primitive reads and what each does to the offset. A byte, an unsigned short and a signed short are read big-endian, as the format stores them, and a signed short must come back negative when the high bit is set — a glyph coordinate read unsigned is a glyph drawn off the page. `skip` moves the offset without reading, the offset can be set and asked for, and a string is read at a given position in its single-byte encoding.
+
+Each test builds the bytes it needs here, so a failure names the one read that is wrong rather than the table that happened to use it.
+"
 Class {
 	#name : 'TTFontTableDirEntryTest',
 	#superclass : 'TestCase',

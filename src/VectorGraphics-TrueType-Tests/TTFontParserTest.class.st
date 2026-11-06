@@ -1,3 +1,14 @@
+"
+I hold the table readers of the TrueType parser, one table at a time, against bytes built here rather than against a font file.
+
+Each test lays out the few fields of one table in a `ByteArray` with `putUShort:at:in:` and its siblings, then asserts what the reader makes of them: the units per em, the bounds and the index-to-location format from the font header; the ascent, the descent, the line gap and the metric count from the horizontal header; the glyph count from the maximum profile; the family name from the naming table; the glyph offsets from `loca`, which are stored halved in the short format and must be doubled; the advance widths from `hmtx`, where the last width read applies to every trailing glyph; and the kerning pairs, in both the Windows and the macOS layout of the same table.
+
+The character map is read in its format 0 and format 6 shapes, and the subtable is chosen by platform: a font with no platform-zero subtable answers `nil` instead of guessing one.
+
+Two tests are about fonts that are wrong rather than fonts that are unusual. A composite glyph whose arguments are not x and y values raises an error, which is the fault that used to open a debugger inside a font read. And the dash is chosen by preference: the wide minus when the face has one, the fallback when it has not.
+
+Building the bytes by hand is the point. A fault in a reader can be stated as the one field that was misread, and the suite needs no font installed on the machine to run.
+"
 Class {
 	#name : 'TTFontParserTest',
 	#superclass : 'TestCase',

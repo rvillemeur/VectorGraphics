@@ -82,7 +82,7 @@ PathCommand >> buildFromStream: aStream in: parentToBe [
 	coordinatesAreRelative := aStream next isLowercase
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'accessing' }
 PathCommand >> coordinatesAreRelative [
 
 	^ coordinatesAreRelative

@@ -1,3 +1,10 @@
+"
+I hold `Int16PointArray`, which stores a point as two signed 16-bit halves of one 32-bit word.
+
+The packing is the whole of the class and all of the risk, so the tests walk the four sign combinations — both coordinates positive, each one negative in turn, and both negative — then the two boundaries, the most positive and the most negative value a signed 16-bit field holds. A sign bit leaking from one half into the other shows up in exactly those cases and nowhere else.
+
+The rest states the collection protocol a glyph contour relies on: the size asked for is the size answered, an untouched slot reads back as the zero point, `putX` and `putY` reach one half without disturbing the other, and several elements keep their own values.
+"
 Class {
 	#name : 'Int16PointArrayTest',
 	#superclass : 'TestCase',

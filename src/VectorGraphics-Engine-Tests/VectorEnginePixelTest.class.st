@@ -1,3 +1,10 @@
+"
+I hold `VectorEnginePixel class >> computeStrokeRadii:antiAliasingWidth:`, the arithmetic that turns a stroke width and an anti-aliasing width into the four radii the inner loop compares a pixel against.
+
+The dilated half is the outer edge of the stroke and the eroded half the inner one, each kept squared as well, because the loop compares squared distances and must not take a square root per pixel.
+
+The case worth a test of its own is a stroke thinner than the anti-aliasing width, where the eroded half goes negative. The squared value then keeps the sign of the half it came from, so the comparison in the loop stays on the right side of zero; a plain squaring would make a hairline behave like a thick stroke with a hole in it.
+"
 Class {
 	#name : 'VectorEnginePixelTest',
 	#superclass : 'TestCase',

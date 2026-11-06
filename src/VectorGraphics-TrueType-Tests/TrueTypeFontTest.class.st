@@ -1,3 +1,12 @@
+"
+I hold `TrueTypeFont`, one face at one point size, and the emphasis it carries.
+
+Emphasis is a bit set, and each question about it is a test: bold, italic, underlined, struck through, superscript and subscript, with bold and italic held in both their true and their false state. Asking for emphasis code zero answers the font itself rather than building a copy.
+
+Which emphasis resets the glyph cache is the fact worth most here. Bold and italic are rendered by the engine from the same glyph form, so they leave the cache alone; underline and strike-through draw into the form, so they must clear it, or a word asked for underlined after being asked for plain would come back without its line.
+
+A font knows whether it is the base face or an emphasised derivative of one, by whether its base font is set. `releaseCachedState` clears the cache, and `makeUnderlinedGlyph:` grows a form too short to hold the underline instead of clipping it — that was a defect, and the test names it.
+"
 Class {
 	#name : 'TrueTypeFontTest',
 	#superclass : 'TestCase',

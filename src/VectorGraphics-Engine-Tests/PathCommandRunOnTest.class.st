@@ -1,3 +1,12 @@
+"
+I hold every `PathCommand >> runOn:` to the message it sends the canvas.
+
+A command carries no drawing code: it answers the canvas with one message naming the geometry it holds, and the engine behind the canvas does the work. So the fact to state per command is the selector, the relative flag as first argument, and the points after it — which is what each test here asserts against `RecordingCanvas`, a stub that remembers the last selector and arguments it was sent.
+
+The move-to and quadratic tests build their command with its real constructor, which makes them the only place the constructors of those two classes are held to the points they store. The older tests set `coordinatesAreRelative` and the points with `instVarNamed:put:` instead, which pins the instance variable names as well as the behaviour; prefer the constructor when adding a test here.
+
+I live in `VectorGraphics-Engine-Tests` rather than beside the commands because `RecordingCanvas` stands in for `VectorCanvas`, which is of the engine layer.
+"
 Class {
 	#name : 'PathCommandRunOnTest',
 	#superclass : 'TestCase',

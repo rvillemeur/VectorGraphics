@@ -1,3 +1,12 @@
+"
+I hold `VectorCanvas` to the three promises it makes to the code that draws through it.
+
+The first is the destination: a canvas is built on a 32-bit `Form`, answers that same form back, and refuses a form of any other depth — the engines write a word per pixel, so a shallower form would be corrupted rather than drawn on. The second is that the canvas is an `Object` and inherits nothing of Morphic; it stood in for `Canvas` in the Cuis original and does not here, and the test says so rather than leaving a reader to infer it from the class definition.
+
+The third is measuring. Asking the canvas for the bounds of a drawing swaps the painting engine for `VectorEngineBoundsFinder`, so the tests here state that the bounds answered are the bounds the same drawing really covers, that nothing is painted while measuring, that a second measurement forgets the first, that the measurement follows the canvas into sub-pixel anti-aliasing, and that the painting engine is the one in place afterwards.
+
+The remaining tests only drive the path and paint protocol and assert that it does not raise — thin, and deliberately so: what the pixels look like is held by the engine tests and the conformance corpus, not here.
+"
 Class {
 	#name : 'VectorCanvasTest',
 	#superclass : 'TestCase',

@@ -1,3 +1,10 @@
+"
+I hold `PathCommand >> buildFrom:stream:` to the coordinates it reads out of an SVG path.
+
+One test per command letter, absolute and relative, built from a stream of numbers: each one states which instance variables the command fills and in which order. A command that takes more numbers than one copy of its arguments repeats until the stream runs dry, which is how `M 10 10 20 20` becomes one command holding two points; the multiple-value tests of the line and horizontal-line commands pin that loop.
+
+The loops all stop on a `nil` from `nextNumber`, so the fixture is `MockNumberStream`, which answers its numbers and then `nil`. An arithmetic error inside the loop would read past the end instead, and that is the failure these tests are here to catch.
+"
 Class {
 	#name : 'PathCommandParseTest',
 	#superclass : 'TestCase',

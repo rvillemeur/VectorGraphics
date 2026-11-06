@@ -1,3 +1,10 @@
+"
+I hold `FormGlyph`, the rendered glyph: a `Form` of pixels plus the offsets that say where to put it.
+
+The offsets are what a caller cannot guess — the advance width, the left, right and top offsets, and the horizontal shift to the centre, which is `nil` until something sets it. One test per accessor, because a glyph laid out with the wrong offset draws text that looks almost right, which is the hardest kind of fault to see.
+
+`postCopy` is held too: a copied glyph must own its form, or two pieces of text drawn at different sizes would write into the same pixels.
+"
 Class {
 	#name : 'FormGlyphTest',
 	#superclass : 'TestCase',

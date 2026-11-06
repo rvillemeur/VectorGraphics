@@ -478,7 +478,7 @@ VectorEngineSubPixel >> updateEdgeCountAtX: x y: y [
 						edgeCounts bytesAt: bluePixelIndex put: countWord ] ] ]
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'primitive algorithms - aux' }
 VectorEngineSubPixel >> updateEdgesAndBoundsForX: x y: y [
 
 	"

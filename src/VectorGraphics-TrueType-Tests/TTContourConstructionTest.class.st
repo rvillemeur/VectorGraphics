@@ -1,3 +1,12 @@
+"
+I hold the step that turns one TrueType contour into path commands.
+
+A contour arrives from the font file as points with a flag each, saying on-curve or off-curve, and with coordinates stored as deltas. The tests state both halves of the conversion: making the points absolute accumulates the deltas and answers the last point reached, so the next contour starts where this one left off; and the commands produced are a move-to first and quadratic curves after it, with the off-curve point becoming the control point of the curve it belongs to.
+
+Two end points in a row have no control point between them, and the commands must then describe a straight edge — the test asserts the values, not only the count, because that case is the one where a reader of the font file is most tempted to invent a control point.
+
+A contour of one point is empty: it encloses nothing and must produce no command. `addContourDataTo:` skips it, and `printOn:` is held here as well, since a contour is read in the inspector far more often than it is drawn.
+"
 Class {
 	#name : 'TTContourConstructionTest',
 	#superclass : 'TestCase',

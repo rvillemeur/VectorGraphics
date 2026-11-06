@@ -1,3 +1,12 @@
+"
+I hold `TTGlyph`, the simple glyph: contours of its own, bounds, and the metrics a layout reads.
+
+The contour count is the fact most easily got wrong, so it is held empty, held over several contours, and held against contours that are empty — a contour of one point encloses nothing and must not be counted. Making the points absolute accumulates the deltas across the whole glyph, not within one contour.
+
+The metrics are the advance width, the bounds after they are set, the top side bearing, which is the maximum y, and the right side bearing, which is updated from the advance width and the bounds rather than stored independently.
+
+Two tests say what this class is by contrast with `TTCompositeGlyph`: a simple glyph answers `isComposite` false, and `replaceIndexesByComponentGlyphs` does nothing, since there are no component indexes to replace. `printOn:` and the state after `initialize` are held as well, because a glyph is read in the inspector more often than it is drawn.
+"
 Class {
 	#name : 'TTGlyphTest',
 	#superclass : 'TestCase',

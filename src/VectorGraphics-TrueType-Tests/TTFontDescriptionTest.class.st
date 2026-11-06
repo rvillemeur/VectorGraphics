@@ -1,3 +1,12 @@
+"
+I hold `TTFontDescription`, the parsed font: the strings, the vertical metrics and the glyph table a reader hands over once a file has been read.
+
+The strings say what the face is called and, through the subfamily name, what it is — bold, italic, bold italic, oblique or regular. Each is a test of its own, because the emphasis is derived from text written by a type foundry and a missing case would silently make an italic face regular.
+
+The metrics are the ascent, the descent and the line gap, with the line spacing derived from them. The glyph table is read by character: a known ASCII glyph answers its own contour position and its own width, and an unknown one falls back to position one rather than raising. `includesAscii` answers the question a layout asks before it uses the face at all, and is held in both its true and its false state.
+
+A description is built here by hand from the smallest set of values that makes it answerable, so that the tests say what the class promises rather than what one particular `.ttf` file happens to contain; `TTFontReaderTest` reads real files.
+"
 Class {
 	#name : 'TTFontDescriptionTest',
 	#superclass : 'TestCase',

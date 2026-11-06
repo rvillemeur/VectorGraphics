@@ -1,3 +1,10 @@
+"
+I hold the mapping between an SVG command letter and the `PathCommand` subclass that runs it.
+
+Two facts, both on the class side of the hierarchy. `classFor:` answers the class for each of the ten letters and `nil` for a letter SVG does not define, so a malformed path is refused rather than silently dropped. `svgName` answers the letter back, and no two subclasses claim the same one — the table is read in both directions, which is what keeps a new command from shadowing an old one.
+
+The case of the letter is the third fact: a lowercase letter means the coordinates are relative, an uppercase one that they are absolute, and `buildFrom:stream:` records that in `coordinatesAreRelative` for every command alike.
+"
 Class {
 	#name : 'PathCommandDispatchTest',
 	#superclass : 'TestCase',

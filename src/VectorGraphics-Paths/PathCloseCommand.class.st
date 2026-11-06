@@ -31,12 +31,6 @@ PathCloseCommand class >> svgName [
 	^ $Z
 ]
 
-{ #category : 'building' }
-PathCloseCommand >> buildFrom: commandChar stream: aStream [
-
-	super buildFrom: commandChar stream: aStream
-]
-
 { #category : 'initialization' }
 PathCloseCommand >> init [
 

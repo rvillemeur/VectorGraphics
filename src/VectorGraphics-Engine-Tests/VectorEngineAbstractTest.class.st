@@ -1,3 +1,10 @@
+"
+I hold the path state of `VectorEngineAbstract` — the part of an engine that has nothing to do with pixels.
+
+An engine remembers four coordinates while a path is built: the first point of the subpath, the current point, and the previous call's point and control point. The tests here state who writes them: `moveTo` sets all of the path state, a second `moveTo` moves the first point with it, `lineTo` moves only the current point, a relative line adds to the current point rather than replacing it, `closePath` brings the current point back to the first one, and initialising a path clears the lot.
+
+One test is a gate rather than a fact about a drawing: `testTheEngineKeepsNoMorphIdentityState` fails if the morph-id buffer and its accessors come back into the hierarchy. They were a feature of the Cuis original that no Pharo image could fill, and `doc/DEFECTS.md` records why they went.
+"
 Class {
 	#name : 'VectorEngineAbstractTest',
 	#superclass : 'TestCase',

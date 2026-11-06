@@ -1,3 +1,10 @@
+"
+I hold the two buffers of `VectorEngineWholePixel` to the form it draws on, and the engine to the pixels it writes.
+
+The alpha mask and the edge counts carry one entry per pixel of the target, so they are allocated from the form's extent and must be re-allocated when the engine is given another form: a buffer shorter than the form is a silent out-of-bounds in the inner loop. The test reads them with `instVarNamed:` because they are private to the engine and have no accessor, which is deliberate.
+
+The other test strokes a line and asserts that some pixel of the target changed, which is the thinnest possible end-to-end fact about the whole-pixel engine: the coverage values themselves are held by the conformance corpus of the Cairo layer, where they can be compared against a reference rasteriser.
+"
 Class {
 	#name : 'VectorEngineWholePixelTest',
 	#superclass : 'TestCase',

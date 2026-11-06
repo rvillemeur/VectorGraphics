@@ -1,3 +1,10 @@
+"
+I hold `TTCompositeGlyph`, the glyph that is built out of other glyphs — an accented letter whose outline is a base letter plus a mark, each with its own transformation.
+
+The facts are those of a composite: the sub-glyph list starts empty, adding a glyph puts it in the list, several glyphs keep their order, the contour count is the sum of the sub-glyphs' counts, and both `addContourDataTo:` and `txAndContoursDo:` reach the sub-glyphs rather than holding contours of their own.
+
+Two tests are about the kind rather than the contents. A composite answers `isComposite` and a plain `TTGlyph` does not — the contrast is asserted in one place so that the pair cannot drift. And `replaceIndexesByComponentGlyphs` is the step that turns the glyph indexes read from the font file into the glyph objects they name, which the reader must run before any drawing.
+"
 Class {
 	#name : 'TTCompositeGlyphTest',
 	#superclass : 'TestCase',

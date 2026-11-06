@@ -271,6 +271,17 @@ VectorGraphicsDocumentationTest >> repositoryName [
 	^ 'VectorGraphics'
 ]
 
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> siblingTestsPackage [
+	"The sibling package holding this package's tests — the package this gate itself lives in.
+	Read by name rather than from `self class package` so that the answer is the same whichever
+	subclass runs, and so that a gate misplaced into another package fails the gate below.
+	Not named for the package the way `examplesPackageUnderTest` is: a selector beginning with
+	`test` is built into the suite by SUnit and would run as a test of its own."
+
+	^ PackageOrganizer default packageNamed: self packageUnderTest name , '-Tests'
+]
+
 { #category : 'running' }
 VectorGraphicsDocumentationTest >> skipTheDocumentIsAbsent [
 	"The document is a file of the repository; an image that loaded the package from Metacello
@@ -453,6 +464,24 @@ VectorGraphicsDocumentationTest >> testEverySelectorTheArchitectureDocumentNames
 		assert: missing isEmpty
 		description: 'Named by the document, implemented nowhere: '
 			, missing asSet asSortedCollection asArray printString
+]
+
+{ #category : 'tests' }
+VectorGraphicsDocumentationTest >> testEveryTestClassOfThisPackageHasAClassComment [
+	"A test class is documentation: it says which facts about a subject are held. A reader opening
+	the test package sees the class list first, so a nameless entry there costs as much as an
+	undocumented class in the code package. The code packages are already held to this by the
+	class-comment rule of Renraku; the test packages were not held to anything until here."
+
+	| commentless |
+	commentless := (self siblingTestsPackage definedClasses select: [ :each |
+		                (each inheritsFrom: TestCase) and: [
+			                (each comment ifNil: [ '' ]) trimBoth isEmpty ] ]) collect: [
+		               :each | each name ].
+	self
+		assert: commentless isEmpty
+		description: 'test classes with no class comment: '
+			, commentless asSortedCollection asArray printString
 ]
 
 { #category : 'tests' }
