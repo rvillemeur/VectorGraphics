@@ -5,8 +5,9 @@ no Bloc, no Alexandrie, no device — so it loads on its own.
 
 Two ways in:
 
-- `VectorCanvas class >> onForm:` draws through Pharo's `Canvas` protocol, for Morphic.
-- `VectorEngineSubPixel onForm:` draws straight onto a `Form`, with no Morphic at all.
+- `VectorCanvas class >> onForm:` owns the destination `Form` and answers it with `form`.
+  It is an `Object`, not a `Canvas` subclass: Morphic is not a target.
+- `VectorEngineSubPixel onForm:` draws straight onto a `Form`, with no canvas at all.
 
 Tags:
 
