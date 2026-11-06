@@ -47,9 +47,7 @@ VectorCanvasExamples class >> boundsFinderAfterMeasuringATriangle [
 VectorCanvasExamples class >> canvasAfterADrawing [
 	"The canvas itself after something has painted through it, rather than the form it painted.
 	The Target view then shows what the canvas draws on, which engine draws and which measures,
-	the clip rectangle, the morph the pixels are filed under and the bounds the drawing covered.
-	No morph is named here because nothing in this image answers morphId, which is what
-	currentMorph: asks of one; the view shows that too.
+	the clip rectangle and the bounds the drawing covered.
 	VectorCanvasExamples canvasAfterADrawing inspect"
 
 	<sampleInstance>

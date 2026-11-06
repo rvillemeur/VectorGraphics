@@ -47,12 +47,9 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'targetForm',
-		'morphIds',
 		'targetWidth',
 		'antiAliasingWidth',
 		'strokeWidth',
-		'currentMorphId',
-		'clippingMorphId',
 		'morphBoundsLeft',
 		'morphBoundsTop',
 		'morphBoundsRight',
@@ -451,18 +448,6 @@ VectorEngineAbstract >> basicQuadraticBezierToX: xTo y: yTo controlX: xC y: yC [
 	pathCurrentY := yTo
 ]
 
-{ #category : 'accessing' }
-VectorEngineAbstract >> clippingMorph: aMorph [
-
-	clippingMorphId := aMorph ifNil: [ 0 ] ifNotNil: [ aMorph morphId ]
-]
-
-{ #category : 'accessing' }
-VectorEngineAbstract >> currentMorph: aMorph [
-
-	currentMorphId := aMorph ifNil: [ 0 ] ifNotNil: [ aMorph morphId ]
-]
-
 { #category : 'paths - absolute coordinates' }
 VectorEngineAbstract >> do_ClosePath [
 
@@ -500,11 +485,8 @@ VectorEngineAbstract >> geometryTransformation: aGeometryTransformation [
 	"No-op. AffineTransformation (Cuis-specific) removed; coordinates pass directly to rendering primitives."
 ]
 
-{ #category : 'private' }
+{ #category : 'initialization' }
 VectorEngineAbstract >> initializeOnForm: aForm [
-
-	clippingMorphId := 0.
-	currentMorphId := 0.
 	self pvtSetForm: aForm
 ]
 
@@ -524,16 +506,13 @@ VectorEngineAbstract >> initializePath [
 
 { #category : 'inspector' }
 VectorEngineAbstract >> inspectorDrawingStateEntries [
-	"The target and the widths a path is drawn with, and the two morph ids every pixel is gated
-	on, read when the row is drawn."
+	"The target and the widths a path is drawn with, read when the row is drawn."
 
 	^ {
 		  ('target form' -> [ targetForm ]) .
 		  ('stroke width' -> [ strokeWidth ]) .
 		  ('anti-aliasing width' -> [ antiAliasingWidth ]) .
 		  ('hops per pixel' -> [ hopsPerPixel ]) .
-		  ('morph being painted' -> [ currentMorphId ]) .
-		  ('morph the drawing is clipped to' -> [ clippingMorphId ]) .
 		  ('bounds the last drawing covered' -> [ self morphBoundsAfterDraw ]) }
 ]
 
@@ -569,15 +548,6 @@ VectorEngineAbstract >> inspectorPathStateEntries [
 	engine draws them with."
 
 	^ self inspectorPathPointEntries , self inspectorDrawingStateEntries
-]
-
-{ #category : 'morphic' }
-VectorEngineAbstract >> morph: aMorph isAtPoint: aPoint [
-
-	| index |
-	index := aPoint y * targetWidth + aPoint x + 1.
-	(index between: 1 and: morphIds size) ifFalse: [ ^ false ].
-	^ (morphIds at: index) = aMorph morphId
 ]
 
 { #category : 'accessing' }
@@ -618,15 +588,6 @@ VectorEngineAbstract >> primQuadraticBezierFromX: xFrom y: yFrom toX: xTo y: yTo
 	^self subclassResponsibility
 ]
 
-{ #category : 'private' }
-VectorEngineAbstract >> pvtAllocateMorphIds [
-
-	"A hook: an engine that writes no pixel, and therefore no morph id, overrides this
-	and keeps the map unallocated."
-
-	morphIds := WordArray new: targetForm width * targetForm height
-]
-
 { #category : 'abstract' }
 VectorEngineAbstract >> pvtFillColor: aFillColor [
 ^ self subclassResponsibility
@@ -636,7 +597,6 @@ VectorEngineAbstract >> pvtFillColor: aFillColor [
 VectorEngineAbstract >> pvtSetForm: aForm [
 
 	targetForm := aForm.
-	self pvtAllocateMorphIds.
 	targetWidth := targetForm width.
 	self resetMorphBounds.
 	self clipRect: targetForm boundingBox.

@@ -53,14 +53,13 @@ path state and the geometry, and a concrete engine owns the pixels. There are fo
 
 ## 3. The buffers — `VectorGraphics-Engine`
 
-`VectorEnginePixel` allocates one slot a pixel in each of three buffers, every time a `Form` is
+`VectorEnginePixel` allocates one slot a pixel in each of two buffers, every time a `Form` is
 installed. Width and height come from the target `Form`, so a resize means a new buffer.
 
 | Buffer | In `VectorEngineSubPixel` | In `VectorEngineWholePixel` | Holds |
 |---|---|---|---|
 | `alphaMask` | `WordArray`, one 32-bit word a pixel | `ByteArray`, one byte a pixel | distance from the figure, as coverage: `16r7F` is an opaque centre, `16r00` is fully transparent |
 | `edgeCounts` | `WordArray` | `ByteArray` | the winding number a fill is decided by, as a signed byte |
-| `morphIds` | `WordArray`, allocated in `VectorEngineAbstract` | the same | which morph painted the pixel, which is what `morph:isAtPoint:` reads |
 
 In the sub-pixel engine the three channel bytes of a word are little-endian, so byte 1 is blue,
 byte 2 green and byte 3 red. `WordArray >> bytesAt:` and `WordArray >> bytesAt:put:` are how the
@@ -135,45 +134,43 @@ The blend hooks follow the same three cases: `blendFillOnly`, `blendStrokeOnly` 
 
 `VectorCanvas` is independent of Morphic: in Cuis it stood in for `Canvas` and was handed to the
 morph tree, and that inheritance was dropped here because Morphic is not a target of this project.
-It holds **two** engines: `engine`, which draws, and `boundsFinderEngine`, which measures. `updatingMorphBoundsDo:` swaps the second in for the
-duration of a block and restores it in an `ensure:`, so a morph can be asked what it would paint
-without painting it, and `measuredMorphBounds` answers the box afterwards.
+It holds **two** engines: `engine`, which draws, and `boundsFinderEngine`, which measures.
+`updatingMorphBoundsDo:` swaps the second in for the duration of a block and restores it in an
+`ensure:`, so a caller can ask what a drawing would cover without painting it, and
+`measuredMorphBounds` answers the box afterwards.
 
 The measuring engine is a `VectorEngineBoundsFinder`, built by `setForm:` beside the drawing one.
 It is a subclass of `VectorEnginePixel` and inherits every `prim…` walk and the whole of
 `finishPath:`, so the box it answers is the box the drawing engine reports for the same commands,
 not an estimate. What it overrides is only the writing: `updateAlphasForX:y:` writes no coverage,
-`updateEdgesAndBoundsForX:y:` keeps the blend box and counts no edge, `blendPath` runs no blend
-pass and `pvtAllocateMorphIds` allocates nothing, so a finder owns no buffer at all where a
-painting engine of the same size owns three arrays of width times height. The margin `finishPath:`
-adds comes from the anti-aliasing width and the horizontal expansion, and both differ between the
-whole-pixel and the sub-pixel engine, so the finder takes them from the engine it stands in for
-through `mirror:`; `doSubPixelAntiAliasing` mirrors it again after replacing that engine.
-`updatingMorphBoundsDo:` resets the finder's bounds on entry, so each block measures its own
-drawing. A finder cannot answer `morph:isAtPoint:`: that reads the morph id map it never writes.
+`updateEdgesAndBoundsForX:y:` keeps the blend box and counts no edge, and `blendPath` runs no blend
+pass, so a finder owns no buffer at all where a painting engine of the same size owns two arrays of
+width times height. The margin `finishPath:` adds comes from the anti-aliasing width and the
+horizontal expansion, and both differ between the whole-pixel and the sub-pixel engine, so the
+finder takes them from the engine it stands in for through `mirror:`; `doSubPixelAntiAliasing`
+mirrors it again after replacing that engine. `updatingMorphBoundsDo:` resets the finder's bounds
+on entry, so each block measures its own drawing.
 
 `VectorCanvas class >> onForm:` installs a `VectorEngineWholePixel`, so a canvas is one byte a
 pixel in each buffer unless the engine is replaced by hand.
 
-Three pieces of state make a morph tree work on one `Form`:
+`morphBoundsAfterDraw` answers what the last drawing actually covered, in device space and before
+any clipping. It is valid only straight after the drawing. The name is the one the Cuis port used,
+where a morph stored that box as its own bounds; here it is simply the box a drawing touched.
 
-- `currentMorph:` sets the id written into `morphIds` for every pixel painted from here on, and
-  `morph:isAtPoint:` is the hit test that reads it back. A morph with an irregular outline is hit
-  tested against what it really painted, not against its bounds. **Nothing in a Pharo image
-  answers `morphId`**, which is what `currentMorph:` asks of the morph it is given, so the id
-  stays zero, `morphIds` stays empty and the hit test finds nothing until a morph class answers
-  it. The Target view of `VectorCanvas` reports that rather than describing it.
-- `clippingMorph:` names the morph whose painted pixels a drawing may touch, which is how a child
-  is clipped to a parent of any shape: the blend pass skips a pixel whose `morphIds` entry is
-  neither the clipping morph nor the current one.
-- `morphBoundsAfterDraw` answers what the last drawing actually covered, in device space and
-  before any clipping, which is what a morph stores as its own bounds. It is valid only straight
-  after the drawing.
+An engine once carried a second feature from that port: a buffer of morph ids, written one entry
+per painted pixel. A hit test read it back, so a morph with an irregular outline was hit tested
+against what it really painted rather than against its bounds, and a clipping morph was named the
+same way, so a child could be clipped to a parent of any shape. All of it was removed. The setter
+asked the morph for a morphId and **nothing in a Pharo image answers that**, so the buffer stayed
+all zero and the hit test never found anything, while every painted pixel paid for it: one buffer
+write in each of the eight blend methods, and one buffer read in the guard of every blend loop.
+`doc/DEFECTS.md` records the decision, and
+`VectorEngineAbstractTest >> testTheEngineKeepsNoMorphIdentityState` fails if the state comes back.
 
 `setClipRect:` is in device coordinates and its convention is worth stating once: the rectangle
 includes its left and top and excludes its right and bottom, so `clipRect:` keeps
 `right - 1` and `bottom - 1` as the last pixel it draws.
-
 ## 8. Text: two routes to a glyph — `VectorGraphics-Text`
 
 A glyph can be drawn as a figure or stamped as a picture, and the package does both.
@@ -254,13 +251,11 @@ about drawing. `VectorCanvas >> runPathCommands:` runs a whole sequence.
 - **The buffers are empty after a drawing**, as section 4 says. Inspect them during a path, not
   after one.
 - **The vector route re-walks the contour data on every draw.** Only the `Form` route is cached.
-- **A buffer belongs to one `Form` size.** Installing a `Form` reallocates all three buffers, and
-  an engine kept across a resize would index the old width.
+- **A buffer belongs to one `Form` size.** Installing a `Form` reallocates both buffers, and an
+  engine kept across a resize would index the old width.
 - **The clip rectangle excludes its right and bottom edge**, while the engine's `clipRight` and
   `clipBottom` are the last pixel drawn. An off-by-one here shows as a one-pixel seam between
   sibling morphs.
-- **A hit test needs the drawing it is asking about.** `morphIds` is written while painting, so
-  `morph:isAtPoint:` answers about the last frame drawn on that `Form` and nothing else.
 
 ## 13. Where to look in the image — all four packages
 
@@ -269,7 +264,7 @@ rebuilds its subject every call.
 
 | View | Example that feeds it | Shows |
 |---|---|---|
-| `VectorEnginePixel >> inspectorBuffers:` | `VectorCanvasExamples class >> engineDuringAFillPath` | the three buffers during a path, counted rather than described |
+| `VectorEnginePixel >> inspectorBuffers:` | `VectorCanvasExamples class >> engineDuringAFillPath` | both buffers during a path, counted rather than described |
 | `VectorEngineAbstract >> inspectorPathState:` | the same example | the path state, the two morph ids and the bounds of the last drawing |
 | `VectorCanvas >> inspectorTarget:` | `VectorCanvasExamples class >> canvasAfterADrawing` | the target form, which engine draws and which measures |
 | `VectorEngineBoundsFinder >> inspectorMeasurement:` | `VectorCanvasExamples class >> boundsFinderAfterMeasuringATriangle` | the box measured, the margins mirrored from the painting engine, and that nothing was painted and no buffer allocated |

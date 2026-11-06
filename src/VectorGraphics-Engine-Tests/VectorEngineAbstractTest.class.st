@@ -112,3 +112,17 @@ VectorEngineAbstractTest >> testRelativeLineAddsToCurrentPoint [
 	self assert: capturedX equals: 30.
 	self assert: capturedY equals: 25
 ]
+
+{ #category : 'tests - state' }
+VectorEngineAbstractTest >> testTheEngineKeepsNoMorphIdentityState [
+	"The hit test read a buffer of morph ids that no Pharo image could ever fill, because nothing
+	answers morphId. Every painted pixel paid for the buffer, so the state must not come back."
+
+	self assertEmpty: (VectorEngineAbstract allInstVarNames select: [ :each |
+			 each asLowercase includesSubstring: 'morphid' ]).
+	self assertEmpty: (VectorEngineAbstract withAllSubclasses flatCollect: [ :each |
+			 (each selectors select: [ :selector |
+				  #( currentMorph: clippingMorph: morph:isAtPoint: pvtAllocateMorphIds )
+					  includes: selector ]) collect: [ :selector |
+				 each name , '>>' , selector ] ])
+]

@@ -58,7 +58,7 @@ VectorEngineBoundsFinder >> inspectorAllocatedBufferNames [
 
 	"Ask the slots a painting engine fills, so the view cannot drift from the overrides."
 
-	^ (#( #alphaMask #edgeCounts #morphIds ) select: [ :each |
+	^ (#( #alphaMask #edgeCounts ) select: [ :each |
 		   (self instVarNamed: each) notNil ]) ifEmpty: [ #none ]
 ]
 
@@ -133,22 +133,6 @@ VectorEngineBoundsFinder >> mirror: aVectorEngine [
 
 	self antiAliasingWidth: aVectorEngine antiAliasingWidth.
 	horizontalExpansion := aVectorEngine blendHorizontalExpansion
-]
-
-{ #category : 'morphic' }
-VectorEngineBoundsFinder >> morph: aMorph isAtPoint: aPoint [
-
-	"Never: the hit test reads the morph id map, and this engine writes none. Ask the
-	engine that paints."
-
-	^ false
-]
-
-{ #category : 'private' }
-VectorEngineBoundsFinder >> pvtAllocateMorphIds [
-
-	"No morph id map: nothing here writes a pixel, so nothing writes an id. This saves
-	one array of width times height per canvas."
 ]
 
 { #category : 'primitive algorithms - aux' }

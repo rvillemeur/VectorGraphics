@@ -34,7 +34,7 @@ VectorEngineWholePixel class >> defaultAntiAliasingWidth [
 { #category : 'private - blend with mask' }
 VectorEngineWholePixel >> blendFillOnly [
 
-	| edgesUpToThisPixel edgesThisPixel pixelIndex morphAtThisPixelId |
+	| edgesUpToThisPixel edgesThisPixel pixelIndex |
 	blendTop to: blendBottom do: [ :displayY | 
 		edgesUpToThisPixel := 0.
 		pixelIndex := displayY * targetWidth + blendLeft.
@@ -46,15 +46,11 @@ VectorEngineWholePixel >> blendFillOnly [
 			edgesThisPixel > 127 ifTrue: [ 
 				edgesThisPixel := edgesThisPixel - 256 ].
 			edgesUpToThisPixel := edgesUpToThisPixel + edgesThisPixel.
-			(clippingMorphId = 0 or: [ 
-				 morphAtThisPixelId := morphIds at: pixelIndex.
-				 morphAtThisPixelId = clippingMorphId or: [ 
-					 morphAtThisPixelId = currentMorphId ] ]) ifTrue: [ 
-				self
-					blendFillOnlyAtX: displayX
-					y: displayY
-					pixelIndex: pixelIndex
-					isInside: edgesUpToThisPixel ~= 0 ].
+			self
+				blendFillOnlyAtX: displayX
+				y: displayY
+				pixelIndex: pixelIndex
+				isInside: edgesUpToThisPixel ~= 0.
 			alphaMask at: pixelIndex put: 0 ] ]
 ]
 
@@ -70,9 +66,7 @@ VectorEngineWholePixel >> blendFillOnlyAtX: x y: y pixelIndex: pixelIndex isInsi
 
 	"In this method, antiAliasAlphas are not used to blend stroke, but fill. This means that in the inside of the shape, and away from the stroke, they must be 1.0 (not 0.0)."
 	antiAliasAlpha := antiAliasAlpha / 127.0.
-	isInside ifTrue: [ 
-		antiAliasAlpha := 1.0 - antiAliasAlpha.
-		morphIds at: pixelIndex put: currentMorphId ].
+	isInside ifTrue: [ antiAliasAlpha := 1.0 - antiAliasAlpha ].
 
 	alpha := antiAliasAlpha * fillColor alpha.
 	unAlpha := 1.0 - alpha.
@@ -102,7 +96,7 @@ VectorEngineWholePixel >> blendFillOnlyAtX: x y: y pixelIndex: pixelIndex isInsi
 { #category : 'private - blend with mask' }
 VectorEngineWholePixel >> blendStrokeAndFill [
 
-	| edgesUpToThisPixel edgesThisPixel pixelIndex morphAtThisPixelId |
+	| edgesUpToThisPixel edgesThisPixel pixelIndex |
 	blendTop to: blendBottom do: [ :displayY | 
 		edgesUpToThisPixel := 0.
 		pixelIndex := displayY * targetWidth + blendLeft.
@@ -114,15 +108,11 @@ VectorEngineWholePixel >> blendStrokeAndFill [
 			edgesThisPixel > 127 ifTrue: [ 
 				edgesThisPixel := edgesThisPixel - 256 ].
 			edgesUpToThisPixel := edgesUpToThisPixel + edgesThisPixel.
-			(clippingMorphId = 0 or: [ 
-				 morphAtThisPixelId := morphIds at: pixelIndex.
-				 morphAtThisPixelId = clippingMorphId or: [ 
-					 morphAtThisPixelId = currentMorphId ] ]) ifTrue: [ 
-				self
-					blendStrokeAndFillAtX: displayX
-					y: displayY
-					pixelIndex: pixelIndex
-					isInside: edgesUpToThisPixel ~= 0 ].
+			self
+				blendStrokeAndFillAtX: displayX
+				y: displayY
+				pixelIndex: pixelIndex
+				isInside: edgesUpToThisPixel ~= 0.
 			alphaMask at: pixelIndex put: 0 ] ]
 ]
 
@@ -146,15 +136,12 @@ VectorEngineWholePixel >> blendStrokeAndFillAtX: x y: y pixelIndex: pixelIndex i
 			foreG := antiAliasAlpha * strokeColor green * 255
 			         + (1 - antiAliasAlpha * fillColor green * 255).
 			foreB := antiAliasAlpha * strokeColor blue * 255
-			         + (1 - antiAliasAlpha * fillColor blue * 255).
-			morphIds at: pixelIndex put: currentMorphId ]
+			         + (1 - antiAliasAlpha * fillColor blue * 255) ]
 		ifFalse: [ "Blend stroke over background"
 			alpha := antiAliasAlpha * strokeColor alpha.
 			foreR := strokeColor red * 255.
 			foreG := strokeColor green * 255.
-			foreB := strokeColor blue * 255.
-			antiAliasAlpha > 0.5 ifTrue: [ 
-				morphIds at: pixelIndex put: currentMorphId ] ].
+			foreB := strokeColor blue * 255 ].
 
 	unAlpha := 1.0 - alpha.
 	targetWord := targetForm bits bytesAt: pixelIndex.
@@ -214,10 +201,7 @@ VectorEngineWholePixel >> blendStrokeOnlyAtX: x y: y pixelIndex: pixelIndex [
 	resultB := resultB / resultAlpha.
 	targetWord at: 1 put: resultB rounded.
 
-	targetForm bits bytesAt: pixelIndex put: targetWord.
-
-	antiAliasAlpha > 0.5 ifTrue: [ 
-		morphIds at: pixelIndex put: currentMorphId ]
+	targetForm bits bytesAt: pixelIndex put: targetWord
 ]
 
 { #category : 'private' }

@@ -102,19 +102,12 @@ VectorEnginePixel >> blendPath [
 { #category : 'private - blend with mask' }
 VectorEnginePixel >> blendStrokeOnly [
 
-	| pixelIndex morphAtThisPixelId |
+	| pixelIndex |
 	blendTop to: blendBottom do: [ :displayY |
 		pixelIndex := displayY * targetWidth + blendLeft.
 		blendLeft to: blendRight do: [ :displayX |
 			pixelIndex := pixelIndex + 1.
-			(clippingMorphId = 0 or: [
-				 morphAtThisPixelId := morphIds at: pixelIndex.
-				 morphAtThisPixelId = clippingMorphId or: [
-					 morphAtThisPixelId = currentMorphId ] ]) ifTrue: [
-				self
-					blendStrokeOnlyAtX: displayX
-					y: displayY
-					pixelIndex: pixelIndex ].
+			self blendStrokeOnlyAtX: displayX y: displayY pixelIndex: pixelIndex.
 			alphaMask at: pixelIndex put: 0 ] ]
 ]
 
@@ -183,7 +176,7 @@ VectorEnginePixel >> initializePath [
 
 { #category : 'inspector' }
 VectorEnginePixel >> inspectorBufferContentEntries [
-	"One row per fact about what the three buffers hold, each holding the block that reads it, so
+	"One row per fact about what the two buffers hold, each holding the block that reads it, so
 	a row is measured when it is drawn and cannot drift from the engine."
 
 	^ {
@@ -192,8 +185,7 @@ VectorEnginePixel >> inspectorBufferContentEntries [
 		  ('alpha mask, pixels not zero' -> [ self inspectorPixelsSetIn: alphaMask ]) .
 		  ('alpha mask, largest value' -> [ alphaMask max ]) .
 		  ('edge counts' -> [ edgeCounts class name ]) .
-		  ('edge counts, pixels not zero' -> [ self inspectorPixelsSetIn: edgeCounts ]) .
-		  ('morph ids, pixels not zero' -> [ self inspectorPixelsSetIn: morphIds ]) }
+		  ('edge counts, pixels not zero' -> [ self inspectorPixelsSetIn: edgeCounts ]) }
 ]
 
 { #category : 'inspector' }
@@ -223,10 +215,9 @@ VectorEnginePixel >> inspectorBufferGeometryEntries [
 { #category : 'inspector' }
 VectorEnginePixel >> inspectorBuffers: aBuilder [
 	<inspectorPresentationOrder: 20 title: 'Buffers'>
-	"What the three buffers of this engine hold now, counted rather than described. The blend pass
+	"What the two buffers of this engine hold now, counted rather than described. The blend pass
 	zeroes alphaMask and edgeCounts at every pixel it visits, so after a finished drawing both are
-	empty and only morphIds still says anything: a reader who wants to see coverage must inspect
-	an engine during a path, which is what
+	empty: a reader who wants to see coverage must inspect an engine during a path, which is what
 	VectorCanvasExamples class >> engineDuringAFillPath answers."
 
 	^ aBuilder newTable

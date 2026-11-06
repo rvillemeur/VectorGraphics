@@ -50,9 +50,7 @@ Class {
 	#instVars : [
 		'boundsFinderEngine',
 		'form',
-		'engine',
-		'currentMorph',
-		'clippingMorphDisplayBounds'
+		'engine'
 	],
 	#category : 'VectorGraphics-Engine-Kernel',
 	#package : 'VectorGraphics-Engine',
@@ -209,23 +207,19 @@ VectorCanvas >> frameRectangle: aRectangle borderWidth: borderWidth color: borde
 
 { #category : 'inspector' }
 VectorCanvas >> inspectorEngineEntries [
-	"The two engines and the morph the pixels are filed under. The morph row asks the real
-	question rather than restating it: currentMorph: needs a morph that answers morphId."
+	"The two engines, which of them a drawing goes to now, and the box the last drawing covered."
 
 	^ {
 		  ('engine that draws' -> [ engine class name ]) .
 		  ('engine that measures' -> [ boundsFinderEngine class name ]) .
 		  ('engine in use now' -> [ self inspectorEngineInUse ]) .
-		  ('bounds the last drawing covered' -> [ engine morphBoundsAfterDraw ]) .
-		  ('morph the pixels are filed under' -> [ currentMorph ]) .
-		  ('that morph answers morphId' -> [ currentMorph notNil and: [ currentMorph respondsTo: #morphId ] ]) .
-		  ('display bounds of the clipping morph' -> [ clippingMorphDisplayBounds ]) }
+		  ('bounds the last drawing covered' -> [ engine morphBoundsAfterDraw ]) }
 ]
 
 { #category : 'inspector' }
 VectorCanvas >> inspectorEngineInUse [
 	"Which of the two engines a drawing would go to now. Inside updatingMorphBoundsDo: it is the
-	one that measures, which in this port is nil, since nothing ever builds one."
+	one that measures, which answers the box a drawing would cover without painting it."
 
 	engine == boundsFinderEngine ifTrue: [ ^ 'the one that measures' ].
 	^ 'the one that draws'
@@ -246,10 +240,7 @@ VectorCanvas >> inspectorFormEntries [
 VectorCanvas >> inspectorTarget: aBuilder [
 	<inspectorPresentationOrder: 20 title: 'Target'>
 	"What this canvas draws on and with. Two engines are held: engine draws, boundsFinderEngine
-	measures, and updatingMorphBoundsDo: swaps the second in for the duration of a block. The
-	morph row asks the real question rather than restating it: currentMorph: needs a morph that
-	answers morphId, and nothing in this image does, so a hit test over morphIds finds nothing
-	until a morph class answers it."
+	measures, and updatingMorphBoundsDo: swaps the second in for the duration of a block."
 
 	^ aBuilder newTable
 		  addColumn: ((SpStringTableColumn title: 'What' evaluated: [ :each | each key ]) width: 240);

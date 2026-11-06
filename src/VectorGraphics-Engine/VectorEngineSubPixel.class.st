@@ -45,7 +45,7 @@ VectorEngineSubPixel class >> defaultAntiAliasingWidth [
 { #category : 'private - blend with mask' }
 VectorEngineSubPixel >> blendFillOnly [
 
-	| edgesUpToThisPixelR edgesUpToThisPixelG edgesUpToThisPixelB edgesThisPixel edgesThisPixelR edgesThisPixelG edgesThisPixelB isRedInside isGreenInside isBlueInside pixelIndex morphAtThisPixelId |
+	| edgesUpToThisPixelR edgesUpToThisPixelG edgesUpToThisPixelB edgesThisPixel edgesThisPixelR edgesThisPixelG edgesThisPixelB isRedInside isGreenInside isBlueInside pixelIndex |
 	blendTop to: blendBottom do: [ :displayY | 
 		edgesUpToThisPixelR := 0.
 		edgesUpToThisPixelG := 0.
@@ -75,17 +75,13 @@ VectorEngineSubPixel >> blendFillOnly [
 			isGreenInside := edgesUpToThisPixelG ~= 0.
 			isBlueInside := edgesUpToThisPixelB ~= 0.
 
-			(clippingMorphId = 0 or: [ 
-				 morphAtThisPixelId := morphIds at: pixelIndex.
-				 morphAtThisPixelId = clippingMorphId or: [ 
-					 morphAtThisPixelId = currentMorphId ] ]) ifTrue: [ 
-				self
-					blendFillOnlyAtX: displayX
-					y: displayY
-					pixelIndex: pixelIndex
-					redIsInside: isRedInside
-					greenIsInside: isGreenInside
-					blueIsInside: isBlueInside ].
+			self
+				blendFillOnlyAtX: displayX
+				y: displayY
+				pixelIndex: pixelIndex
+				redIsInside: isRedInside
+				greenIsInside: isGreenInside
+				blueIsInside: isBlueInside.
 			alphaMask at: pixelIndex put: 0 ] ]
 ]
 
@@ -107,9 +103,7 @@ VectorEngineSubPixel >> blendFillOnlyAtX: x y: y pixelIndex: pixelIndex redIsIns
 	antiAliasRedAlpha := (antiAliasAlphasWord at: 3) / 127.0.
 	isRedInside ifTrue: [ antiAliasRedAlpha := 1.0 - antiAliasRedAlpha ].
 	antiAliasGreenAlpha := (antiAliasAlphasWord at: 2) / 127.0.
-	isGreenInside ifTrue: [ 
-		antiAliasGreenAlpha := 1.0 - antiAliasGreenAlpha.
-		morphIds at: pixelIndex put: currentMorphId ].
+	isGreenInside ifTrue: [ antiAliasGreenAlpha := 1.0 - antiAliasGreenAlpha ].
 	antiAliasBlueAlpha := (antiAliasAlphasWord at: 1) / 127.0.
 	isBlueInside ifTrue: [ 
 		antiAliasBlueAlpha := 1.0 - antiAliasBlueAlpha ].
@@ -157,7 +151,7 @@ VectorEngineSubPixel >> blendHorizontalExpansion [
 { #category : 'private - blend with mask' }
 VectorEngineSubPixel >> blendStrokeAndFill [
 
-	| edgesUpToThisPixelR edgesUpToThisPixelG edgesUpToThisPixelB edgesThisPixel edgesThisPixelR edgesThisPixelG edgesThisPixelB isRedInside isGreenInside isBlueInside pixelIndex morphAtThisPixelId |
+	| edgesUpToThisPixelR edgesUpToThisPixelG edgesUpToThisPixelB edgesThisPixel edgesThisPixelR edgesThisPixelG edgesThisPixelB isRedInside isGreenInside isBlueInside pixelIndex |
 	blendTop to: blendBottom do: [ :displayY | 
 		edgesUpToThisPixelR := 0.
 		edgesUpToThisPixelG := 0.
@@ -187,17 +181,13 @@ VectorEngineSubPixel >> blendStrokeAndFill [
 			isGreenInside := edgesUpToThisPixelG ~= 0.
 			isBlueInside := edgesUpToThisPixelB ~= 0.
 
-			(clippingMorphId = 0 or: [ 
-				 morphAtThisPixelId := morphIds at: pixelIndex.
-				 morphAtThisPixelId = clippingMorphId or: [ 
-					 morphAtThisPixelId = currentMorphId ] ]) ifTrue: [ 
-				self
-					blendStrokeAndFillAtX: displayX
-					y: displayY
-					pixelIndex: pixelIndex
-					redIsInside: isRedInside
-					greenIsInside: isGreenInside
-					blueIsInside: isBlueInside ].
+			self
+				blendStrokeAndFillAtX: displayX
+				y: displayY
+				pixelIndex: pixelIndex
+				redIsInside: isRedInside
+				greenIsInside: isGreenInside
+				blueIsInside: isBlueInside.
 			alphaMask at: pixelIndex put: 0 ] ]
 ]
 
@@ -236,13 +226,10 @@ VectorEngineSubPixel >> blendStrokeAndFillAtX: x y: y pixelIndex: pixelIndex red
 			alphaG := antiAliasGreenAlpha * strokeColor alpha
 			          + (1 - antiAliasGreenAlpha * fillColor alpha).
 			foreG := antiAliasGreenAlpha * strokeColor green * 255
-			         + (1 - antiAliasGreenAlpha * fillColor green * 255).
-			morphIds at: pixelIndex put: currentMorphId ]
+			         + (1 - antiAliasGreenAlpha * fillColor green * 255) ]
 		ifFalse: [ "Blend stroke over background"
 			alphaG := antiAliasGreenAlpha * strokeColor alpha.
-			foreG := strokeColor green * 255.
-			antiAliasGreenAlpha > 0.5 ifTrue: [ 
-				morphIds at: pixelIndex put: currentMorphId ] ].
+			foreG := strokeColor green * 255 ].
 
 	isBlueInside
 		ifTrue: [ "Do gradient between stroke and fill. Blend the result over background"
@@ -328,10 +315,7 @@ VectorEngineSubPixel >> blendStrokeOnlyAtX: x y: y pixelIndex: pixelIndex [
 		resultB := resultB / resultAlpha.
 		targetWord at: 1 put: resultB rounded ].
 
-	targetForm bits bytesAt: pixelIndex put: targetWord.
-
-	antiAliasGreenAlpha > 0.5 ifTrue: [ 
-		morphIds at: pixelIndex put: currentMorphId ]
+	targetForm bits bytesAt: pixelIndex put: targetWord
 ]
 
 { #category : 'private' }

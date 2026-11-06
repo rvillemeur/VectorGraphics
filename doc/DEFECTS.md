@@ -20,10 +20,11 @@ a method this project never promised:
 - **the two `super` sends to selectors `Canvas` lacks** — gone. `image:multipliedBy:at:` and
   `textComposition:bounds:color:selectionColor:` were Cuis canvas protocol with no Pharo equivalent,
   and step 3 of the review plan deleted them along with the ten other Morphic-chrome methods.
-- **morph identity** — gone. Nothing in a Pharo image answers `morphId`, so the `morphIds` buffer
-  stayed all zero and `morph:isAtPoint:` never found anything. Step 5 of the review plan removes the
-  buffer, the two setters and the per-pixel write that filled it, which is also a speed-up: the
-  blend pass stops touching a second buffer for every pixel it covers.
+- **morph identity** — gone. Nothing in a Pharo image answers `morphId`, so the buffer of morph
+  ids stayed all zero and the hit test over it never found anything. Step 5 of the review plan
+  removed the buffer, the two setters, the hit test and the per-pixel write that filled it, which
+  is also a speed-up: the blend pass no longer touches a second buffer for every pixel it covers,
+  and a canvas allocates one array fewer of width times height.
 
 ## What survives
 

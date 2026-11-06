@@ -97,20 +97,9 @@ VectorEngineBoundsFinderTest >> testAllocatesNoBuffer [
 		          onForm: self newWhiteForm
 		          mirroring: (VectorEngineWholePixel onForm: self newWhiteForm).
 	self drawTriangleOn: finder.
-	allocated := #( #alphaMask #edgeCounts #morphIds ) select: [ :each |
+	allocated := #( #alphaMask #edgeCounts ) select: [ :each |
 		             (finder instVarNamed: each) notNil ].
 	self assert: allocated isEmpty description: allocated printString
-]
-
-{ #category : 'tests' }
-VectorEngineBoundsFinderTest >> testAnswersNoHitTest [
-
-	| finder |
-	finder := VectorEngineBoundsFinder
-		          onForm: self newWhiteForm
-		          mirroring: (VectorEngineWholePixel onForm: self newWhiteForm).
-	self drawTriangleOn: finder.
-	self deny: (finder morph: nil isAtPoint: 30 @ 20)
 ]
 
 { #category : 'tests' }
