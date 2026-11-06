@@ -101,15 +101,6 @@ VectorCanvas >> doSubPixelAntiAliasing [
 ]
 
 { #category : 'drawing - icons' }
-VectorCanvas >> drawButtonIconFromCurrentMorph [
-
-	currentMorph iconName ifNotNil: [ :selector | 
-		self perform: selector.
-		^ true ].
-	^ false
-]
-
-{ #category : 'drawing - icons' }
 VectorCanvas >> drawCloseIcon [
 
 	self strokeWidth: 1.0 color: Color black do: [ 
@@ -118,48 +109,6 @@ VectorCanvas >> drawCloseIcon [
 			y: 9
 			rx: 6
 			ry: 6 ]
-]
-
-{ #category : 'drawing - icons' }
-VectorCanvas >> drawCollapseIcon [
-
-	self drawCloseIcon
-]
-
-{ #category : 'drawing - icons' }
-VectorCanvas >> drawDownIcon [
-
-	self drawCloseIcon
-]
-
-{ #category : 'drawing - icons' }
-VectorCanvas >> drawExpandIcon [
-
-	self drawCloseIcon
-]
-
-{ #category : 'drawing - icons' }
-VectorCanvas >> drawLeftIcon [
-
-	self drawCloseIcon
-]
-
-{ #category : 'drawing - icons' }
-VectorCanvas >> drawMenuIcon [
-
-	self drawCloseIcon
-]
-
-{ #category : 'drawing - icons' }
-VectorCanvas >> drawRightIcon [
-
-	self drawCloseIcon
-]
-
-{ #category : 'drawing - icons' }
-VectorCanvas >> drawUpIcon [
-
-	self drawCloseIcon
 ]
 
 { #category : 'paths' }
@@ -212,43 +161,6 @@ VectorCanvas >> fillRectangle: aRectangle color: aColor [
 ]
 
 { #category : 'drawing - FormCanvas protocol' }
-VectorCanvas >> fillRectangle: aRectangle color: aColor borderWidth: morphStrokeWidth borderStyleSymbol: aSymbol baseColorForBorder: baseColorForBorder [
-
-	"For BitBltCanvas protocol, aRectangle:
-	- means the bounding rectangle of the affected pixels, not the rectangle followed by the tip
-	- uses Squeak / Smalltalk-80 convention: do include topLeft, but don't include bottomRight. (too pixel oriented for M3 taste)"
-
-	| brColor tlColor d1 d2 |
-	d1 := morphStrokeWidth * 0.5 - 0.5.
-	d2 := morphStrokeWidth * 0.5 + 0.5.
-	tlColor := baseColorForBorder.
-	aSymbol == #raised ifTrue: [ 
-		tlColor := baseColorForBorder quiteWhiter.
-		brColor := baseColorForBorder quiteBlacker ].
-
-	aSymbol == #inset ifTrue: [ 
-		tlColor := baseColorForBorder quiteBlacker.
-		brColor := baseColorForBorder quiteWhiter ].
-
-	self
-		strokeWidth: morphStrokeWidth
-		color: tlColor
-		fillColor: aColor
-		do: [ 
-			self
-				rectangleMinX: aRectangle left + d1
-				maxX: aRectangle right - d2
-				minY: aRectangle top + d1
-				maxY: aRectangle bottom - d2 ].
-
-	brColor ifNotNil: [ 
-		self strokeWidth: morphStrokeWidth color: brColor do: [ 
-			self moveToX: aRectangle left + d1 y: aRectangle bottom - d2.
-			self lineToX: (aRectangle right - d2) y: (aRectangle bottom - d2).
-			self lineToX: (aRectangle right - d2) y: (aRectangle top + d1) ] ]
-]
-
-{ #category : 'drawing - FormCanvas protocol' }
 VectorCanvas >> frameAndFillRectangle: aRectangle fillColor: aColor borderWidth: borderWidth borderColor: borderColor [
 
 	"For BitBltCanvas protocol, aRectangle:
@@ -283,18 +195,6 @@ VectorCanvas >> frameRectangle: aRectangle borderWidth: borderWidth color: borde
 			maxX: aRectangle right - d2
 			minY: aRectangle top + d1
 			maxY: aRectangle bottom - d2 ]
-]
-
-{ #category : 'drawing - FormCanvas protocol' }
-VectorCanvas >> image: aForm multipliedBy: aColor at: aPoint [
-
-	"NO quiero usar imagenes en M3... ver como hacer... quizas meter un servicio en el canvas que en m2 use imagenes y en m3 no..."
-
-	"no!!!!"
-
-	"	self halt"
-
-	super image: aForm multipliedBy: aColor at: aPoint
 ]
 
 { #category : 'inspector' }
@@ -746,20 +646,6 @@ VectorCanvas >> strokeWidth: morphStrokeWidth color: aStrokeColor fillColor: aFi
 		do: pathCommandsBlock
 ]
 
-{ #category : 'drawing - FormCanvas protocol' }
-VectorCanvas >> textComposition: aTextComposition bounds: boundddsRect color: c selectionColor: sc [
-
-	"ojo que es un quad, o sea un rect en coordenadas del morph..."
-
-	"	self halt"
-
-	super
-		textComposition: aTextComposition
-		bounds: boundddsRect
-		color: c
-		selectionColor: sc
-]
-
 { #category : 'private' }
 VectorCanvas >> updatingMorphBoundsDo: aBlock [
 
@@ -769,56 +655,4 @@ VectorCanvas >> updatingMorphBoundsDo: aBlock [
 	engine := boundsFinderEngine.
 	boundsFinderEngine resetMorphBounds.
 	aBlock value ] ensure: [ engine := prevEngine ]
-]
-
-{ #category : 'drawing - FormCanvas protocol' }
-VectorCanvas >> windowFrame: aRectangle color: aColor radius: r border: morphStrokeWidth labelHeight: lh gradientTop: topFactor gradientBottom: bottomFactor insideColor: insideColor [
-
-	"For BitBltCanvas protocol, aRectangle:
-	- means the bounding rectangle of the affected pixels, not the rectangle followed by the tip
-	- uses Squeak / Smalltalk-80 convention: do include topLeft, but don't include bottomRight. (too pixel oriented for M3 taste)"
-
-	"
-	Display getCanvas windowFrame: (10@10 extent: 200@100) color: Color red radius: 10  border: 5 labelHeight: 25 gradientTop: 1.0 gradientBottom: 0.5 insideColor: Color green.
-	VectorCanvas onForm: Display :: into: self runningWorld; windowFrame: (210@10 extent: 200@100) color: Color red radius: 10  border: 5 labelHeight: 25 gradientTop: 1.0 gradientBottom: 0.5 insideColor: Color green.
-	Display forceToScreen
-	"
-
-	"
-	| hbw |
-	self strokeWidth: morphStrokeWidth color: aColor fillColor: insideColor do: [
-		self roundRectangleMinX: aRectangle left maxX: aRectangle right minY: aRectangle top maxY: aRectangle bottom rx: r ry: r ].
-	hbw := morphStrokeWidth *0.5.
-	self fillColor: aColor do: [
-		self rectangleMinX: aRectangle left+hbw maxX: aRectangle right-hbw minY: aRectangle top+hbw maxY: aRectangle top + lh-hbw ].
-	"
-
-	| d1 d2 |
-	d1 := morphStrokeWidth * 0.5 - 0.5.
-	d2 := morphStrokeWidth * 0.5 + 0.5.
-
-	self
-		strokeWidth: morphStrokeWidth
-		color: aColor
-		fillColor: aColor
-		do: [ 
-			self
-				roundTopRectangleMinX: aRectangle left + d1
-				maxX: aRectangle right - d2
-				minY: aRectangle top + d1
-				maxY: aRectangle top + lh - d2
-				rx: r
-				ry: r ].
-	self
-		strokeWidth: morphStrokeWidth
-		color: aColor
-		fillColor: insideColor
-		do: [ 
-			self
-				roundBottomRectangleMinX: aRectangle left + d1
-				maxX: aRectangle right - d2
-				minY: aRectangle top + lh - d2
-				maxY: aRectangle bottom - d2
-				rx: r
-				ry: r ]
 ]
