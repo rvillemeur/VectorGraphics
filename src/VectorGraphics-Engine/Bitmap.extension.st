@@ -26,14 +26,14 @@ Bitmap >> byteAt: byteAddress put: byte [
 { #category : '*VectorGraphics-Engine' }
 Bitmap >> bytesAt: index [
 	"Answer a ByteArray of 4 elements.
-	The 32-bit word is split in 4 bytes, in little endian format
-	((WordArray with: 16rFF32791B) bytesAt: 1) hex
-	"
-
+	 The 32-bit word is split in 4 bytes, in little endian format
+	 ((WordArray with: 16rFF32791B) bytesAt: 1) hex
+	 "
 	| bytes word |
 	bytes := ByteArray new: 4.
-	word := self at: index. "Usually a SmallInteger, but may be a Large Integer in 32-bit images"
-	1 to: 4 do: [ :i | bytes at: i put: (word digitAt: i) ].
+	word := self at: index. "Usually a SmallInteger, but may be a Large Integer in 32-bit images,
+	which is why the byte comes from #byteAt:, implemented by every integer class of the kernel"
+	1 to: 4 do: [ :i | bytes at: i put: (word byteAt: i) ].
 	^ bytes
 ]
 

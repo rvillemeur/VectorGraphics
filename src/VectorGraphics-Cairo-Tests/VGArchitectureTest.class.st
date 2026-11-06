@@ -611,6 +611,23 @@ VGArchitectureTest >> testNoClassOfThisProjectInheritsFromAnObsoleteClass [
 	self assert: strays asSortedCollection asArray equals: #(  )
 ]
 
+{ #category : 'tests - hierarchy' }
+VGArchitectureTest >> testNoMethodOfThisProjectExtendsANumberClass [
+	"Pixels live in a `Bitmap` and in a `WordArray`, and this project extends those two because it
+	 reads and writes them. A number is not a thing this project owns any part of, and a method
+	 added to one is visible to every package in the image under a selector this project does not
+	 control: the `SmallInteger >> digitAt:` that made this test fail was Pharo's own method kept
+	 under the name Pharo renamed away, so the project was the only thing in the image answering an
+	 obsolete selector. Ask Pharo for `byteAt:`, which every integer class implements."
+	| offenders |
+	offenders := OrderedCollection new.
+	self class projectPackageNames do: [ :packageName |
+		(PackageOrganizer default packageNamed: packageName) methods do: [ :each |
+			(each methodClass instanceSide includesBehavior: Number) ifTrue: [
+				offenders add: each methodClass name , ' >> ' , each selector ] ] ].
+	self assertEmpty: offenders
+]
+
 { #category : 'tests' }
 VGArchitectureTest >> testNoPackageOfTheDefaultGroupNamesAClassOfTheStackItReplaces [
 	"Loading this project with no group named must not reach Bloc or Alexandrie. The engine and

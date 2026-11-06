@@ -64,10 +64,10 @@ installed. Width and height come from the target `Form`, so a resize means a new
 In the sub-pixel engine the three channel bytes of a word are little-endian, so byte 1 is blue,
 byte 2 green and byte 3 red. `WordArray >> bytesAt:` and `WordArray >> bytesAt:put:` are how the
 engine reads and writes one pixel as four bytes, and both are extension methods of this package —
-as are `Bitmap >> bytesAt:`, `ByteArray >> bitAt:bitPosition:`, `SmallInteger >> digitAt:`,
-`Character class >> utf8BytesOf:` and `Character class >> evaluate:withUtf8BytesOf:`. Fifteen such
-methods on base classes belong to this package; none of them may be moved upstream without a
-reason, and none of them is a patch of existing behaviour.
+as are `Bitmap >> bytesAt:`, `ByteArray >> bitAt:bitPosition:`, `Character class >> utf8BytesOf:`
+and `Character class >> evaluate:withUtf8BytesOf:`. Fourteen such methods on base classes belong
+to this package; none of them may be moved upstream without a reason, and none of them is a patch
+of existing behaviour.
 
 Four more numbers are precomputed per stroke by
 `VectorEnginePixel class >> computeStrokeRadii:antiAliasingWidth:`, which answers the dilated half
