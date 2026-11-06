@@ -29,7 +29,7 @@ VGVulkanCoverageKernel class >> inspectorKernel: aBuilder [
 	rows add: 'local size' -> annotation localSize.
 	annotation params do: [ :each |
 		rows add: 'parameter ' , each name -> each type ].
-	rows add: 'SPIR-V bytes' -> (PVKernelCompiler compile: method) size.
+	rows add: 'SPIR-V bytes' -> (PVKernelCompiler compileMethod: method) size.
 	^ aBuilder newTable
 		  items: rows asArray;
 		  addColumn:
