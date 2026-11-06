@@ -205,7 +205,7 @@ FontFamily                            registry, class-side, by family name
             → FormGlyph               one glyph pre-rendered into a Form
 ```
 
-Three details the chain depends on:
+Two details the chain depends on:
 
 - `TTContourConstruction >> quadraticBeziersDo:` is where the TrueType flags become geometry: two
   consecutive end points are a straight segment, an end point and a control point and an end point
@@ -215,14 +215,11 @@ Three details the chain depends on:
 - A composite glyph holds indexes rather than contours until
   `TTGlyph >> replaceIndexesByComponentGlyphsIn:` resolves them, and `TTGlyph >> isComposite`
   answers whether it had any.
-- `TTFontDescription class >> read:` walks a directory of `.ttf` files and files each face under
-  its family name and emphasis.
 
-## 10. The four caches, and who clears them — `VectorGraphics-TrueType`
+## 10. The three caches, and who clears them — `VectorGraphics-TrueType`
 
 | Cache | Lives in | Cleared by |
 |---|---|---|
-| every face read from disk, by family name and emphasis | the `Descriptions` class variable of `TTFontDescription` | nothing: it is the image's font library |
 | the available families | the `AvailableFamilies` class variable of `FontFamily` | `FontFamily class >> releaseClassCachedState` |
 | the faces of one family, by emphasis | the `ttFontDescriptionsByEmphasis` instance variable of `TrueTypeFontFamily` | `TrueTypeFontFamily >> clearCache` |
 | one rendered `FormGlyph` per code point | the `glyphFormsByUtf8` instance variable of `TrueTypeFont`, a four-level tree 64 wide, one level a UTF-8 byte | `TrueTypeFont >> releaseCachedState`, which also walks the derivative fonts |

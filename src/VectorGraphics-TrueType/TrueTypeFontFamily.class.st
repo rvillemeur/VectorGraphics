@@ -5,9 +5,11 @@ TrueTypeFontFamily holds the TTFontDescription objects for all emphasis variants
 typeface. The regular (emphasis=0) variant is the `baseTTFontDescription`; others are stored
 in `ttFontDescriptionsByEmphasis`.
 
-Instances are created by `readAllTrueTypeFontsIn: aDirectoryEntry` which scans a directory
-for .ttf files, calls TTFontDescription >> read:, groups results by family name, and registers
-each family into FontFamily's AvailableFamilies dictionary.
+An instance is built from one description with `baseTTFontDescription:` and learns its other
+faces through `addTTFontDescription:`; `FontFamily class >> addFamily:` registers it under its
+family name. Reading a whole directory of .ttf files was a Cuis entry point that went with the
+`DirectoryEntry` protocol Pharo does not have, so a caller reads a file with `TTFontReader` and
+registers the family itself.
 
 ## Key instVars
 - `baseTTFontDescription`        TTFontDescription — the regular (emphasis 0) variant
@@ -17,7 +19,6 @@ each family into FontFamily's AvailableFamilies dictionary.
 - `baseTTFontDescription: aTTFontDescription` — initialiser
 - `addTTFontDescription: aTTFontDescription`  — registers a variant by its emphasis code
 - `ttFontDescriptionForEmphasis: anEmphasis`  — retrieves the appropriate variant
-- `readAllTrueTypeFontsIn: aDirectoryEntry`   — class-side font loading entry point
 "
 Class {
 	#name : 'TrueTypeFontFamily',
@@ -35,23 +36,6 @@ Class {
 TrueTypeFontFamily class >> baseTTFontDescription: aTTFontDescription [
 
 	^ self new baseTTFontDescription: aTTFontDescription
-]
-
-{ #category : 'instance creation' }
-TrueTypeFontFamily class >> readAllTrueTypeFontsIn: aDirectoryEntry [
-
-	| readFamilyNames |
-	readFamilyNames := TTFontDescription read: aDirectoryEntry.
-	readFamilyNames do: [ :aFamilyName |
-		| ttDescriptions baseTTDescription family |
-		ttDescriptions := TTFontDescription withFamilyName: aFamilyName.
-		baseTTDescription := ttDescriptions at: 0.
-		family := TrueTypeFontFamily baseTTFontDescription: baseTTDescription.
-		ttDescriptions do: [ :ttfDesc |
-			ttfDesc emphasis = 0 ifFalse: [
-				family addTTFontDescription: ttfDesc ] ].
-		FontFamily addFamily: family ].
-	^ readFamilyNames
 ]
 
 { #category : 'initialization' }

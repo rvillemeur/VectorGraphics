@@ -22,7 +22,6 @@ off-screen VectorCanvas (using VectorEngineSubPixel) and caches the result.
 - `formGlyphForUtf8Byte1:byte2:byte3:byte4:pixelSize:` — rasterizes and returns a FormGlyph
 - `contourDataPositionForByte1:byte2:byte3:byte4:` — fast UTF-8 to contour offset lookup
 - `glyphsByUtf8Bytes:unknownGlyph:` — stores the glyph-index map (called by TTFontReader)
-- `read: aDirectoryEntry` (class side) — loads all .ttf files from a directory
 
 See: https://www.freetype.org/freetype2/docs/glyphs/glyphs-3.html
 "
@@ -49,9 +48,6 @@ Class {
 		'lineGap',
 		'letterMTopSideBearing'
 	],
-	#classVars : [
-		'Descriptions'
-	],
 	#category : 'VectorGraphics-TrueType-Fonts',
 	#package : 'VectorGraphics-TrueType',
 	#tag : 'Fonts'
@@ -63,14 +59,6 @@ TTFontDescription class >> highestCodePointShownInInspector [
 	 the whole of Unicode, but the Basic Multilingual Plane is what a .ttf of this kind maps."
 
 	^ 16rFFFF
-]
-
-{ #category : 'class initialization' }
-TTFontDescription class >> initialize [
-
-	"	TTFontDescription initialize 	"
-
-	Descriptions := nil
 ]
 
 { #category : 'constants' }
@@ -88,27 +76,6 @@ TTFontDescription class >> isUtf8ContinuationByte: aByte [
 	 draws a glyph of its own."
 
 	^ (aByte bitAnd: self utf8ContinuationByteMask) = self utf8ContinuationBytePrefix
-]
-
-{ #category : 'instance creation' }
-TTFontDescription class >> read: aDirectoryEntry [
-
-	"	TTFontDescription read: DirectoryEntry smalltalkImageDirectory / 'TrueTypeFonts'	"
-
-	| readFamilyNames |
-	Descriptions ifNil: [ Descriptions := Dictionary new ].
-	readFamilyNames := Set new.
-	aDirectoryEntry
-		allFilesDo: [ :file |
-			| ttf |
-			ttf := TTFontReader readTTFFrom: file binaryContents.
-			ttf folderName: file parent name.
-			(Descriptions at: ttf familyName ifAbsentPut: [ Dictionary new ])
-				at: ttf emphasis
-				put: ttf.
-			readFamilyNames add: ttf familyName ]
-		matches: [ :file | '*.ttf' match: file name ].
-	^ readFamilyNames
 ]
 
 { #category : 'constants' }
@@ -132,14 +99,6 @@ TTFontDescription class >> utf8ContinuationBytePrefix [
 	"What those bits hold in every byte that continues a code point: 10xxxxxx."
 
 	^ 2r10000000
-]
-
-{ #category : 'instance accessing' }
-TTFontDescription class >> withFamilyName: aString [
-
-	"	TTFontDescription withFamilyName: 'DejaVu Sans'	"
-
-	^ Descriptions at: aString
 ]
 
 { #category : 'private-initialization' }

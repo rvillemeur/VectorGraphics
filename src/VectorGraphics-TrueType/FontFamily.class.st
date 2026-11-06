@@ -16,7 +16,6 @@ size. Subclass TrueTypeFontFamily extends this with TrueType-specific loading an
 - `familyNamed: aString` — looks up an already-registered family
 - `defaultFamilyAndPointSize` — returns the default family at the default size
 - `addFamily: aFontFamily` — registers a new family in AvailableFamilies
-- `readIfNeeded: dir` — loads TrueType fonts from a directory if not yet loaded
 
 ## Key instance methods
 - `atPointSize: aNumber` — returns a TrueTypeFont at the requested size (creating it if needed)
@@ -140,20 +139,6 @@ FontFamily class >> pointSizesFor: aString [
 	| family |
 	family := AvailableFamilies at: aString ifAbsent: [ ^ nil ].
 	^ family pointSizes
-]
-
-{ #category : 'ui' }
-FontFamily class >> readIfNeeded: dir [
-	"Read from disk if not in memory"
-
-	| fontNameFile fontName |
-	fontNameFile := dir // 'fontName.txt'.
-	fontName := fontNameFile exists
-		            ifTrue: [ fontNameFile textContents ]
-		            ifFalse: [ dir name ].
-	(FontFamily familyNamed: fontName) ifNotNil: [ :it | ^ it ].
-	TrueTypeFontFamily readAllTrueTypeFontsIn: dir.
-	^ FontFamily familyNamed: fontName
 ]
 
 { #category : 'cached state access' }
