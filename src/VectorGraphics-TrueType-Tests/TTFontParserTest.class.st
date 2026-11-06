@@ -89,6 +89,26 @@ TTFontParserTest >> testCmapProcessReturnsNilWhenNoPlatformZero [
 	self assert: ((TTCmapTableParser on: entry) process) isNil
 ]
 
+{ #category : 'tests - glyf' }
+TTFontParserTest >> testCompositeGlyphWithoutXYValuesRaisesAnError [
+	"A composite glyph whose ARGS_ARE_XY_VALUES bit (2) is clear matches points instead of
+	offsetting, which this parser does not support. It must raise, not open a debugger."
+
+	| bytes entry parser |
+	bytes := ByteArray new: 16.
+	self putShort: -10 at: 1 in: bytes.
+	self putShort: 10 at: 3 in: bytes.
+	self putShort: 10 at: 5 in: bytes.
+	self putShort: -10 at: 7 in: bytes.
+	self putUShort: 1 at: 9 in: bytes.
+	self putUShort: 0 at: 11 in: bytes.
+	self putShort: 0 at: 13 in: bytes.
+	self putShort: 0 at: 15 in: bytes.
+	entry := TTFontTableDirEntry onBytes: bytes.
+	parser := TTGlyfTableParser on: entry nGlyphs: 0 offsets: #( ).
+	self should: [ parser parseCompositeGlyph ] raise: Error
+]
+
 { #category : 'tests - hmtx' }
 TTFontParserTest >> testHmtxReusesLastAdvanceWidthForTrailingGlyphs [
 

@@ -43,10 +43,9 @@ TTGlyfTableParser >> initWithEntry: anEntry nGlyphs: n offsets: offsetArray [
 	glyphOffsets := offsetArray
 ]
 
-{ #category : 'parsing - private' }
+{ #category : 'reading' }
 TTGlyfTableParser >> parseCompositeGlyph [
-
-	| glyph flags glyphIndex hasInstructions ofsX ofsY iLen geometryTransformation bb bl br bt |
+	| glyph flags glyphIndex hasInstructions iLen bb bl br bt |
 	glyph := TTCompositeGlyph new.
 	bl := entry nextShort.
 	bt := entry nextShort.
@@ -61,33 +60,34 @@ TTGlyfTableParser >> parseCompositeGlyph [
 	[
 	flags := entry nextUShort.
 	glyphIndex := entry nextUShort + 1.
-
+	"The component offset is consumed and dropped: sub-transformations are not applied, so the
+	only thing that matters here is leaving the stream on the next field. ARG_1_AND_2_ARE_WORDS
+	says whether it is two shorts or two bytes."
 	(flags allMask: 1)
-		ifTrue: [ "'Hay Offset short x@y'"
-			ofsX := entry nextShort.
-			ofsY := entry nextShort ]
-		ifFalse: [ "'Hay Offset byte x@y'"
-			(ofsX := entry nextByte) > 127 ifTrue: [ ofsX := ofsX - 256 ].
-			(ofsY := entry nextByte) > 127 ifTrue: [ ofsY := ofsY - 256 ] ]. "ARG_1_AND_2_ARE_WORDS"
-
-	(flags allMask: 2) ifFalse: [ self halt ]. "ARGS_ARE_XY_VALUES — unsupported"
+		ifTrue: [
+			entry nextShort.
+			entry nextShort ]
+		ifFalse: [
+			entry nextByte.
+			entry nextByte ].
+	(flags allMask: 2) ifFalse: [
+		"ARGS_ARE_XY_VALUES is clear: the two arguments are point numbers to match rather than
+		an offset. Raising here is the whole support this parser has for that format."
+		self error: 'composite glyph matches points instead of offsetting, which is unsupported' ].
 	"ROUND_XY_TO_GRID = 4. Ignored"
-	"AffineTransformation removed. Composite sub-transformations not applied — passed as nil.
-	Flags 8 (WE_HAVE_A_SCALE), 64 (WE_HAVE_AN_X_AND_Y_SCALE), 128 (WE_HAVE_A_TWO_BY_TWO)
-	still consume the correct number of bytes from the stream."
-	(flags anyMask: 8 + 64 + 128) ifFalse: [
-		geometryTransformation := nil ].
-	(flags allMask: 8) ifTrue: [
-		entry nextShort. "consume WE_HAVE_A_SCALE bytes"
-		geometryTransformation := nil ].
+	"The sub-transformation is never applied — the component is added with nil — but its bytes
+	must still leave the stream on the next field: WE_HAVE_A_SCALE one short,
+	WE_HAVE_AN_X_AND_Y_SCALE two, WE_HAVE_A_TWO_BY_TWO four."
+	(flags allMask: 8) ifTrue: [ entry nextShort ].
 	(flags allMask: 64) ifTrue: [
-		entry nextShort. entry nextShort. "consume WE_HAVE_AN_X_AND_Y_SCALE bytes"
-		geometryTransformation := nil ].
+		entry nextShort.
+		entry nextShort ].
 	(flags allMask: 128) ifTrue: [
-		entry nextShort. entry nextShort. entry nextShort. entry nextShort. "consume 2x2 bytes"
-		geometryTransformation := nil ].
-
-	glyph addGlyph: glyphIndex transformation: geometryTransformation.
+		entry nextShort.
+		entry nextShort.
+		entry nextShort.
+		entry nextShort ].
+	glyph addGlyph: glyphIndex transformation: nil.
 	hasInstructions := hasInstructions or: [ flags allMask: 256 "WE_HAVE_INSTRUCTIONS" ].
 	"Continue as long as the MORE_COMPONENTS bit is set"
 	flags allMask: 32 "MORE_COMPONENTS" ] whileTrue.
