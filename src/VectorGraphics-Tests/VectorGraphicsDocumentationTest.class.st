@@ -475,16 +475,23 @@ VectorGraphicsDocumentationTest >> testNoInspectorViewOfThisPackageChangesWhatIt
 					, (instance class allInstVarNames at: index) , ' while a view was built' ] ]
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests - hierarchy' }
 VectorGraphicsDocumentationTest >> testTheGateHierarchyFindsEveryDocumentedPackage [
 	"The document covers the whole project, so a gate must see the packages the other gates name,
 	whichever subclass is running. The hierarchy is walked, not listed, so adding a gate adds its
-	package here."
+	package here.
+	The count is held against the gates this image really has, not against four: a load proof
+	asks for one layer's tests group on its own, which brings one gate, and that image must
+	still be able to run it. What has to hold in either image is that the walk finds the gate
+	that is running, that every gate names a package, and that no two name the same one."
 
 	self assert: self class concreteGates size equals: self documentedPackages size.
-	self assert: self documentedPackages size > 1.
+	self assert: (self class concreteGates includes: self class).
 	self assert: (self documentedPackages includes: self packageUnderTest).
 	self deny: (self documentedPackages includes: nil).
+	self
+		assert: self documentedPackages asSet size
+		equals: self documentedPackages size.
 	self assert: (self class concreteGates noneSatisfy: [ :each | each isAbstract ])
 ]
 
