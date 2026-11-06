@@ -58,14 +58,6 @@ PathMoveToCommand >> buildFrom: commandChar stream: aStream [
 		          py notNil ] whileTrue: [ strm nextPut: px @ py ] ]
 ]
 
-{ #category : 'private' }
-PathMoveToCommand >> privatePointsDo: aBlock [
-
-	"evaluate aBlock with the x and y coordinates for our defining points."
-
-	points do: aBlock
-]
-
 { #category : 'drawing' }
 PathMoveToCommand >> runOn: aCanvas [
 

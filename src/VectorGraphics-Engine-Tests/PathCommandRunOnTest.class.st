@@ -121,6 +121,30 @@ PathCommandRunOnTest >> testLineToRunOn [
 ]
 
 { #category : 'tests' }
+PathCommandRunOnTest >> testMoveToRelativeRunOn [
+
+	| cmd canvas |
+	cmd := PathMoveToCommand new toRelativePoint: 5 @ 7.
+	canvas := self canvas.
+	cmd runOn: canvas.
+	self assert: canvas lastSelector equals: #multiMoveTo:points:.
+	self assert: (canvas lastArguments at: 1) equals: true.
+	self assert: (canvas lastArguments at: 2) asArray equals: { 5 @ 7 }
+]
+
+{ #category : 'tests' }
+PathCommandRunOnTest >> testMoveToRunOn [
+
+	| cmd canvas |
+	cmd := PathMoveToCommand new toPoint: 30 @ 40.
+	canvas := self canvas.
+	cmd runOn: canvas.
+	self assert: canvas lastSelector equals: #multiMoveTo:points:.
+	self assert: (canvas lastArguments at: 1) equals: false.
+	self assert: (canvas lastArguments at: 2) asArray equals: { 30 @ 40 }
+]
+
+{ #category : 'tests' }
 PathCommandRunOnTest >> testQuadraticCurveSmoothRunOn [
 
 	| cmd canvas pts |
@@ -133,6 +157,44 @@ PathCommandRunOnTest >> testQuadraticCurveSmoothRunOn [
 	self assert: canvas lastSelector equals: #multiQuadraticCurveToSmooth:toPoints:.
 	self assert: (canvas lastArguments at: 1) equals: false.
 	self assert: (canvas lastArguments at: 2) equals: pts
+]
+
+{ #category : 'tests' }
+PathCommandRunOnTest >> testQuadraticCurveToRelativeRunOn [
+
+	| cmd canvas |
+	cmd := PathQuadraticCurveToCommand new
+		       toRelativePoints: { 3 @ 4 }
+		       controlPoints: { 1 @ 2 }.
+	canvas := self canvas.
+	cmd runOn: canvas.
+	self
+		assert: canvas lastSelector
+		equals: #multiQuadraticCurveTo:toPoints:controlPoints:.
+	self assert: (canvas lastArguments at: 1) equals: true.
+	self assert: (canvas lastArguments at: 2) asArray equals: { 3 @ 4 }.
+	self assert: (canvas lastArguments at: 3) asArray equals: { 1 @ 2 }
+]
+
+{ #category : 'tests' }
+PathCommandRunOnTest >> testQuadraticCurveToRunOn [
+
+	| cmd canvas |
+	cmd := PathQuadraticCurveToCommand new
+		       toPoints: { 10 @ 20. 30 @ 40 }
+		       controlPoints: { 5 @ 5. 15 @ 15 }.
+	canvas := self canvas.
+	cmd runOn: canvas.
+	self
+		assert: canvas lastSelector
+		equals: #multiQuadraticCurveTo:toPoints:controlPoints:.
+	self assert: (canvas lastArguments at: 1) equals: false.
+	self
+		assert: (canvas lastArguments at: 2) asArray
+		equals: { 10 @ 20. 30 @ 40 }.
+	self
+		assert: (canvas lastArguments at: 3) asArray
+		equals: { 5 @ 5. 15 @ 15 }
 ]
 
 { #category : 'tests' }

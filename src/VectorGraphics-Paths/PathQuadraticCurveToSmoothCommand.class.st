@@ -40,14 +40,6 @@ PathQuadraticCurveToSmoothCommand >> buildFrom: commandChar stream: aStream [
 	y notNil ] whileTrue: [ toPoints add: x @ y ]
 ]
 
-{ #category : 'private' }
-PathQuadraticCurveToSmoothCommand >> privatePointsDo: aBlock [
-
-	"evaluate aBlock with the x and y coordinates for our defining points."
-
-	toPoints do: aBlock
-]
-
 { #category : 'drawing' }
 PathQuadraticCurveToSmoothCommand >> runOn: aCanvas [
 

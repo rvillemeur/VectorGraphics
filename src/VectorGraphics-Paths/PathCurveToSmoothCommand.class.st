@@ -49,14 +49,6 @@ PathCurveToSmoothCommand >> buildFrom: commandChar stream: aStream [
 		control2Points add: x2 @ y2 ]
 ]
 
-{ #category : 'private' }
-PathCurveToSmoothCommand >> privatePointsDo: aBlock [
-
-	"evaluate aBlock with the x and y coordinates for our defining points."
-
-	toPoints do: aBlock
-]
-
 { #category : 'drawing' }
 PathCurveToSmoothCommand >> runOn: aCanvas [
 

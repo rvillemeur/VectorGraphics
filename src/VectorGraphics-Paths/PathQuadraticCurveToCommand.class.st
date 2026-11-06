@@ -52,14 +52,6 @@ PathQuadraticCurveToCommand >> buildFrom: commandChar stream: aStream [
 		controlPoints add: x1 @ y1 ]
 ]
 
-{ #category : 'private' }
-PathQuadraticCurveToCommand >> privatePointsDo: aBlock [
-
-	"evaluate aBlock with the x and y coordinates for our defining points."
-
-	toPoints do: aBlock
-]
-
 { #category : 'drawing' }
 PathQuadraticCurveToCommand >> runOn: aCanvas [
 

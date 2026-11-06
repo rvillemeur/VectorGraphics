@@ -77,15 +77,6 @@ PathArcCommand >> buildFrom: commandChar stream: aStream [
 		toPoints add: x @ y ]
 ]
 
-{ #category : 'private' }
-PathArcCommand >> privatePointsDo: aBlock [
-	"evaluate aBlock with the x and y coordinates for our defining points."
-	
-"si los puntos son relativos, tirar una excepcion...
-Y completar los que falten!"
-	toPoints do: aBlock
-]
-
 { #category : 'drawing' }
 PathArcCommand >> runOn: aCanvas [
 	aCanvas multiArc: coordinatesAreRelative rs: rs xAxisRotations: xAxisRotations toPoints: toPoints doLargerArcs: doLargerArcs useIncreasingAngless: useIncreasingAngless

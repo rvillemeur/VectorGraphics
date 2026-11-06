@@ -88,14 +88,6 @@ PathCommand >> coordinatesAreRelative [
 	^ coordinatesAreRelative
 ]
 
-{ #category : 'private' }
-PathCommand >> privatePointsDo: aBlock [
-
-	"evaluate aBlock with the x and y coordinates for our defining points."
-
-	self subclassResponsibility
-]
-
 { #category : 'drawing' }
 PathCommand >> runOn: aCanvas [
 

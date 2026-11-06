@@ -43,14 +43,6 @@ PathCloseCommand >> init [
 	coordinatesAreRelative := false
 ]
 
-{ #category : 'private' }
-PathCloseCommand >> privatePointsDo: aBlock [
-
-	"evaluate aBlock with the x and y coordinates for our defining points."
-
-	
-]
-
 { #category : 'drawing' }
 PathCloseCommand >> runOn: aCanvas [
 

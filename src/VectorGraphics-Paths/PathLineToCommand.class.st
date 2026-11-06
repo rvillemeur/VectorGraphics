@@ -61,16 +61,6 @@ PathLineToCommand >> buildFrom: commandChar stream: aStream [
 		          py notNil ] whileTrue: [ strm nextPut: px @ py ] ]
 ]
 
-{ #category : 'private' }
-PathLineToCommand >> privatePointsDo: aBlock [
-
-	"evaluate aBlock with the x and y coordinates for our defining points."
-
-	"Atencion: Si son relativas todo esto esta mal... Igual, lo que quiero es reimplementar todo"
-
-	points do: aBlock
-]
-
 { #category : 'drawing' }
 PathLineToCommand >> runOn: aCanvas [
 
