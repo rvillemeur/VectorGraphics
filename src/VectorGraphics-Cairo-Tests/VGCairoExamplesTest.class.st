@@ -84,14 +84,15 @@ VGCairoExamplesTest >> exampleSubjects [
 { #category : 'private' }
 VGCairoExamplesTest >> projectDefines: aCompiledMethod [
 	"Whether this project wrote the method. An example answers an ordinary Pharo object as often
-	 as one of ours — a `Form`, a `ByteArray` — and Pharo's own inspector views on those objects
-	 are not ours to gate or to hold to this project's rules. The names are compared as symbols
-	 because that is what the organiser answers, and `#'a' = 'a'` is false."
-
+	 as one of ours — a `Form`, a `ByteArray` — and Pharo''s own inspector views on those objects
+	 are not ours to gate or to hold to this project''s rules. Every package of the project
+	 counts, not only the ones the Cairo reference scan covers: that scan skips the suites, the
+	 conformance corpus and the benchmark harness because they name the alternatives on purpose,
+	 and a view written there is still a view an example opens with one click."
 	| package |
 	package := aCompiledMethod package.
 	^ package notNil and: [
-		  VGCairoReferenceScanner projectPackageNames includes: package name asSymbol ]
+		  package name beginsWith: VGCairoReferenceScanner projectPackagePrefix ]
 ]
 
 { #category : 'tests' }

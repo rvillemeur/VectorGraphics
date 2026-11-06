@@ -236,8 +236,9 @@ VGKernelVisitCensusTest >> testTheRecordsOfATileAreReadOnceAWorkgroup [
 	 workgroup stages the records in shared memory once and every invocation reads them from
 	 there. The record reads of a frame whose entries fit the staged block are therefore the
 	 reads the frame needs, one a workgroup, where they were that many times the invocations of
-	 a tile before."
-
+	 a tile before. Since unit 3.9 an invocation owns `pixelsPerInvocation` pixels rather than
+	 one, so the invocations of a workgroup cover the tile by that factor; the factor is asked
+	 of the kernel, which is where it is decided."
 	| encoding census |
 	encoding := self
 		            encodingOfExtent: 64 @ 64
@@ -250,6 +251,6 @@ VGKernelVisitCensusTest >> testTheRecordsOfATileAreReadOnceAWorkgroup [
 	self assert: census neededRecordReads > 0.
 	self assert: census recordReads equals: census neededRecordReads.
 	self
-		assert: census invocationsPerTile
+		assert: census invocationsPerTile * VGTiledFillKernel pixelsPerInvocation
 		equals: encoding grid tileExtent x * encoding grid tileExtent y
 ]
