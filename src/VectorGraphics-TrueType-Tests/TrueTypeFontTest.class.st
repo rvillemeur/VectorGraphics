@@ -144,6 +144,23 @@ TrueTypeFontTest >> testIsUnderlined [
 ]
 
 { #category : 'tests' }
+TrueTypeFontTest >> testMakeUnderlinedGlyphGrowsAFormTooShortForTheUnderline [
+	"The underline sits one pixel below the baseline, so a glyph whose form stops at the
+	baseline has to be grown before the line can be drawn in it."
+
+	| font glyph |
+	font := self makeFontWithEmphasis: 4.
+	glyph := FormGlyph
+		         form: (Form extent: 4 @ 4 depth: 32)
+		         leftOffset: 0
+		         topOffset: 4
+		         advanceWidth: 4.
+	font makeUnderlinedGlyph: glyph.
+	self assert: glyph form height equals: 6.
+	self assert: (glyph form colorAt: 0 @ 5) equals: Color black
+]
+
+{ #category : 'tests' }
 TrueTypeFontTest >> testPrintOn [
 
 	| font family stream |

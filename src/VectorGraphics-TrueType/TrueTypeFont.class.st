@@ -238,9 +238,8 @@ TrueTypeFont >> makeStruckThroughGlyph: aFormGlyph [
 		(0 @ (aFormGlyph topOffset - self descent) extent: form width @ 1)
 ]
 
-{ #category : 'synthetic derivatives' }
+{ #category : 'emphasis' }
 TrueTypeFont >> makeUnderlinedGlyph: aFormGlyph [
-
 	| height y oldForm form d |
 	d := (self descent / 4) ceiling.
 	y := aFormGlyph topOffset + d.
@@ -250,12 +249,14 @@ TrueTypeFont >> makeUnderlinedGlyph: aFormGlyph [
 		oldForm := form.
 		form := Form extent: oldForm width @ height depth: oldForm depth.
 		form fillWhite.
+		"Pharo spells this selector with a fillColor:, which only a halftone rule reads."
 		form
 			copyBits: oldForm boundingBox
 			from: oldForm
 			at: 0 @ 0
 			clippingBox: form boundingBox
-			rule: Form over.
+			rule: Form over
+			fillColor: nil.
 		aFormGlyph form: form ].
 	form fillBlack: (0 @ y extent: form width @ d)
 ]
