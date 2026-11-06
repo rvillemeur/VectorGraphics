@@ -34,7 +34,7 @@ Metacello new
 
 Every layer above that is a group: `bloc` brings the renderer and Bloc itself, `cairo-tests` brings
 the conformance corpus without Bloc, `vulkan` brings the device path and needs PharoVulkan loaded
-by hand, because it is not published. `README.md` lists all thirteen groups and `doc/USAGE.md` says
+by hand, because it is not published. `README.md` lists every group and `doc/USAGE.md` says
 which group each level of use needs. Change a group or an edge in `BaselineOfVectorGraphics` only
 together with the test that states it.
 
@@ -78,15 +78,17 @@ Ten packages, source layout `src/<PackageName>/` in Tonel format. Iceberg manage
 | `VectorGraphics-Vulkan` | 36 | The device path: `Backend`, `Tiles`, `Kernels`, `Blur`, `Budget`, `Present` |
 | `VectorGraphics-Cairo-Examples` | 25 | One `<Subject>Examples` class per subject of the Cairo layer |
 | `VectorGraphics-Bloc-Examples` | 3 | The canvas, the renderer and the host examples |
-| `VectorGraphics-Vulkan-Examples` | 12 | The device, tile, kernel and benchmark examples |
-| `VectorGraphics-Cairo-Tests` | 33 | Tags `Tests`, `Fixtures` and `Conformance`, which holds the Alexandrie corpus and the comparison |
+| `VectorGraphics-Vulkan-Examples` | 13 | The device, tile, kernel and benchmark examples |
+| `VectorGraphics-Cairo-Tests` | 26 | Tags `Tests`, `Fixtures` and `Conformance`, which holds `VGConformanceTest`, the gate that reads the corpus |
 | `VectorGraphics-Bloc-Tests` | 6 | The renderer, canvas and frame profile suites |
-| `VectorGraphics-Vulkan-Tests` | 23 | Tags `Tests`, `Fixtures` and `Budget`, which holds the two benchmarks |
+| `VectorGraphics-Vulkan-Tests` | 22 | Tags `Tests` and `Fixtures` |
+| `VectorGraphics-Conformance` | 7 | The corpus every backend is compared against: the cases, the ported Alexandrie corpus, the `Form` comparison. No `TestCase` |
+| `VectorGraphics-Benchmarks` | 3 | The frame harness: the drawing kit, the stage benchmark and the device benchmark. No `TestCase` |
 
 ## Which package may name which
 
 This file does not say. `VGArchitectureTest class >> allowedDependencies` does, with one entry per
-package, and its 24 tests hold the code, the baseline and the table to each other: a package absent
+package, and its 45 tests hold the code, the baseline and the table to each other: a package absent
 from the table fails a test, and so does a reference no entry allows. Adding a dependency means
 stating it in the table and in `BaselineOfVectorGraphics`, in the commit that needs it.
 
@@ -95,9 +97,11 @@ Four facts of that table are easy to get wrong.
 - The engine depends on nothing. The default group — the engine and the Cairo replacement — names
   no class of Bloc or of Alexandrie, and two tests hold that in both directions, by literal and by
   superclass.
-- `VectorGraphics-Cairo-Examples` and `VectorGraphics-Cairo-Tests` name each other, because the
-  subjects of three examples holders are fixtures of the conformance gate. The baseline states one
-  direction only, since a cycle has no load order.
+- `VectorGraphics-Cairo-Examples` and `VectorGraphics-Cairo-Tests` name each other, because
+  `VGArchitectureExamples` has the architecture gate itself for a subject. The baseline states
+  one direction only, since a cycle has no load order. It is the one pair left: the conformance
+  corpus and the benchmark harness moved into packages of their own in the review of 2026-11,
+  which ended the second cycle.
 - The Cairo tests do name Alexandrie, on purpose: proving this rasteriser matches live Cairo byte
   for byte needs that positive control. No other package may.
 - Only the Vulkan family may name a PharoVulkan class. That rule lives in
@@ -188,7 +192,7 @@ those measurements is `VGOffscreen instance textMeasurer`.
 ### The Vulkan backend (`VectorGraphics-Vulkan`)
 
 The display list is binned into tiles and filled by a SPIR-V kernel compiled through PharoVulkan,
-with its own present host and an SDL2 host beside it. The budget tag holds the benchmarks that
+with its own present host and an SDL2 host beside it. `VectorGraphics-Benchmarks` holds the benchmarks that
 compare device, software and Cairo on one frame.
 
 ## The development cycle

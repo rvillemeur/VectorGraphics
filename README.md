@@ -24,6 +24,8 @@ neither is present. Every layer above them is a group of its own.
 | `VectorGraphics-Cairo` | The replacement for the Cairo layer, same calling API as `Alexandrie-Cairo` |
 | `VectorGraphics-Bloc` | `VGCanvas` and `VGRenderer`, the Bloc backend, plus the pixel buffer host |
 | `VectorGraphics-Vulkan` | The GPU backend: device session, tiled fill, the present host and its SDL2 host |
+| `VectorGraphics-Conformance` | The corpus every backend is compared against: the cases, the ported Alexandrie corpus, the `Form` comparison |
+| `VectorGraphics-Benchmarks` | The frame harness: the drawing kit, the stage benchmark and the device benchmark |
 | `VectorGraphics-Engine-Examples`, `VectorGraphics-Paths-Examples`, `VectorGraphics-TrueType-Examples`, `VectorGraphics-Text-Examples` | One `<sampleInstance>` example per subject of the rasteriser |
 | `VectorGraphics-Cairo-Examples`, `VectorGraphics-Bloc-Examples`, `VectorGraphics-Vulkan-Examples` | One `<sampleInstance>` example per subject of the layers above it |
 | `VectorGraphics-Tests` | `VectorGraphicsDocumentationTest`, the abstract documentation gate the four suites below subclass |
@@ -48,6 +50,8 @@ neither is present. Every layer above them is a group of its own.
 | `bloc-examples`, `bloc-tests` | the examples and the suites of the Bloc backend |
 | `vulkan` | `core` and `VectorGraphics-Vulkan`. PharoVulkan is not published, so load it before asking for this group |
 | `vulkan-examples`, `vulkan-tests` | the examples and the suites of the GPU backend |
+| `conformance` | the corpus alone. It names `cairo` and no test package, so a comparison can be drawn with no suite loaded |
+| `benchmarks` | the frame harness, which names the corpus it draws and the three backends it measures |
 | `examples`, `tests` | the union of the seven layer groups, so they reach Bloc and PharoVulkan |
 | `dev` | the group to work on this project from: `default`, the suites of its five layers, and MuTalk from `github://pharo-contributions/mutalk:v3.0.8/src`. It names the five test groups one by one, so it still loads in a plain Pharo image |
 
@@ -61,7 +65,8 @@ Metacello new
 ```
 
 `cairo-tests` requires `cairo-examples`, which requires `cairo`, which requires the font reader and
-the path commands, so that one name brings five packages in — and neither the scan-line engine nor
+the path commands, so that one name brings six packages in — the sixth is
+`VectorGraphics-Conformance`, the corpus the gate reads — and neither the scan-line engine nor
 the text glue, which the Cairo layer does not name. They do name Alexandrie's Cairo bindings, on
 purpose:
 the conformance gate proves this rasteriser matches live Cairo byte for byte, and a comparison

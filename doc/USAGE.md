@@ -14,7 +14,9 @@ The groups of the baseline follow these levels, and the default load stops below
 |---|---|---|
 | A surface and a context | the default load | `VectorGraphics` and `VectorGraphics-Cairo`, which name no class of Bloc or of Alexandrie |
 | A canvas, and all of Bloc | `bloc` | `VectorGraphics-Bloc`, and Bloc itself from `github://pharo-graphics/Bloc:master` |
-| The experiment corpus | `cairo-tests` | `VectorGraphics-Cairo-Tests`, and the Cairo examples below it, still without Bloc |
+| The experiment corpus | `conformance` | `VectorGraphics-Conformance`, with no test package and no Bloc |
+| The corpus and the suites that read it | `cairo-tests` | `VectorGraphics-Cairo-Tests`, the Cairo examples and the corpus below them, still without Bloc |
+| The frame benchmarks | `benchmarks` | `VectorGraphics-Benchmarks`, which drives the Cairo, Bloc and Vulkan paths over one frame |
 
 ```smalltalk
 Metacello new
@@ -95,7 +97,9 @@ measurements is `VGOffscreen instance textMeasurer`.
 `AlexandrieCairoExperiment` belongs to the BookletGraphics package and holds 82 drawings.
 This baseline does not load BookletGraphics, so load it from its own repository before a walk of
 the corpus; Alexandrie itself ships with Pharo.
-The corpus is in `VectorGraphics-Cairo-Tests`, which the `cairo-tests` group brings without Bloc.
+The corpus is in `VectorGraphics-Conformance`, which the `conformance` group brings on its own:
+it holds no `TestCase`, so a comparison can be drawn with no suite in the image. `cairo-tests`
+brings it too, for the gate that reads it.
 The classes there do name Alexandrie, on purpose: a comparison against live Cairo needs that
 positive control, and `VGArchitectureTest` states the exception.
 

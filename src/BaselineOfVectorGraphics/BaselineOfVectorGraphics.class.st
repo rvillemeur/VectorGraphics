@@ -15,9 +15,9 @@ Class {
 { #category : 'baselines' }
 BaselineOfVectorGraphics >> baseline: spec [
 	<baseline>
-	"The load declaration of this project, in four parts so that no one method holds a block
+	"The load declaration of this project, in five parts so that no one method holds a block
 	 per package: the external projects a layer needs, the rasteriser's own twelve packages,
-	 the three backends above it, and the groups.
+	 the three backends above it, the corpus and the benchmarks beside them, and the groups.
 	 The default group is the rasteriser and the Cairo backend. The Bloc renderer is a group of
 	 its own because this project is Alexandrie's replacement inside Bloc, not a part of Bloc:
 	 loading the default group must work in an image where no Bloc class exists, and VGRenderer
@@ -27,6 +27,7 @@ BaselineOfVectorGraphics >> baseline: spec [
 		self declareExternalProjectsOn: spec.
 		self declareRasteriserPackagesOn: spec.
 		self declareBackendPackagesOn: spec.
+		self declareSupportPackagesOn: spec.
 		self declareGroupsOn: spec ]
 ]
 
@@ -38,14 +39,19 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 	 holds this declaration against the references the code makes. The one edge it cannot state
 	 is Cairo-Examples on Cairo-Tests, because the reverse is stated and a cycle has no load
 	 order. The Cairo backend names the font reader alone out of the four rasteriser packages,
-	 which is why loading 'cairo' brings neither the scan-line engine nor the front page."
+	 which is why loading 'cairo' brings neither the scan-line engine nor the front page.
+	 The corpus and the benchmark harness are declared by declareSupportPackagesOn:."
 
 	spec
 		package: 'VectorGraphics-Cairo'
 		with: [ spec requires: #( 'VectorGraphics-TrueType' ) ];
-		package: 'VectorGraphics-Cairo-Examples' with: [ spec requires: #( 'VectorGraphics-Cairo' ) ];
+		package: 'VectorGraphics-Cairo-Examples'
+		with: [ spec requires: #( 'VectorGraphics-Cairo' 'VectorGraphics-Conformance' ) ];
 		package: 'VectorGraphics-Cairo-Tests'
-		with: [ spec requires: #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples' ) ];
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
+					   'VectorGraphics-Conformance' ) ];
 		package: 'VectorGraphics-Bloc' with: [ spec requires: #( 'Bloc' 'VectorGraphics-Cairo' ) ];
 		package: 'VectorGraphics-Bloc-Examples'
 		with: [ spec requires: #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ) ];
@@ -59,12 +65,14 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 		package: 'VectorGraphics-Vulkan-Examples'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Vulkan' ) ];
+					#( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc' 'VectorGraphics-Cairo'
+					   'VectorGraphics-Vulkan' ) ];
 		package: 'VectorGraphics-Vulkan-Tests'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Tests'
-					   'VectorGraphics-Vulkan' 'VectorGraphics-Vulkan-Examples' ) ]
+					#( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc' 'VectorGraphics-Cairo'
+					   'VectorGraphics-Cairo-Tests' 'VectorGraphics-Conformance' 'VectorGraphics-Vulkan'
+					   'VectorGraphics-Vulkan-Examples' ) ]
 ]
 
 { #category : 'baselines' }
@@ -105,7 +113,10 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 	 keep bringing it: the backend itself names only the font reader.
 	 'dev' is the group to work on this project from: the default stack, the tests of those
 	 same layers, and MuTalk. It names the five test groups one by one rather than the
-	 project-wide 'tests' group, so that it still loads in a plain Pharo image."
+	 project-wide 'tests' group, so that it still loads in a plain Pharo image.
+	 'conformance' is the corpus the backends are compared against and 'benchmarks' the
+	 harness that measures them. Neither holds a TestCase, and each is a group of its own so
+	 that it loads with no test package at all."
 
 	spec
 		group: 'paths' with: #( 'VectorGraphics-Paths' );
@@ -130,6 +141,8 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 		group: 'vulkan' with: #( 'core' 'VectorGraphics-Vulkan' );
 		group: 'vulkan-examples' with: #( 'VectorGraphics-Vulkan-Examples' );
 		group: 'vulkan-tests' with: #( 'VectorGraphics-Vulkan-Tests' );
+		group: 'conformance' with: #( 'VectorGraphics-Conformance' );
+		group: 'benchmarks' with: #( 'VectorGraphics-Benchmarks' );
 		group: 'examples'
 		with: #( 'paths-examples' 'engine-examples' 'truetype-examples' 'text-examples'
 			   'cairo-examples' 'bloc-examples' 'vulkan-examples' );
@@ -192,4 +205,21 @@ BaselineOfVectorGraphics >> declareRasteriserPackagesOn: spec [
 			spec requires:
 					#( 'VectorGraphics-Engine' 'VectorGraphics-Tests' 'VectorGraphics-Text'
 					   'VectorGraphics-Text-Examples' 'VectorGraphics-TrueType' ) ]
+]
+
+{ #category : 'baselines' }
+BaselineOfVectorGraphics >> declareSupportPackagesOn: spec [
+	"The two packages that hold neither a layer nor a suite: the corpus every backend is
+	 compared against, and the harness that measures a frame through each of them. Both lived
+	 in a -Tests package until the review of 2026-11, which made an examples package depend
+	 on a test package; neither holds a TestCase, and each is a group of its own so that it
+	 loads with no suite in the image."
+	spec
+		package: 'VectorGraphics-Conformance'
+		with: [ spec requires: #( 'VectorGraphics-Cairo' ) ];
+		package: 'VectorGraphics-Benchmarks'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Conformance'
+					   'VectorGraphics-Vulkan' ) ]
 ]

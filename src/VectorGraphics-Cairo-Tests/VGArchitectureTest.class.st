@@ -74,13 +74,16 @@ VGArchitectureTest class >> allowedDependencies [
 			  "The Cairo backend draws text through the font reader and knows nothing of the
 			   other three packages of the rasteriser."
 			  'VectorGraphics-Cairo' -> #( 'VectorGraphics-TrueType' ).
-			  "An examples class names its subject, and the subjects of these three examples
-			   holders — the two corpora, the comparison and the font lifetime — live in the test
-			   package, because they are fixtures of the conformance gate and of nothing else."
+			  "An examples class names its subject. These examples open the conformance corpora,
+			   the Form comparison and the font lifetime, which live in VectorGraphics-Conformance
+			   since the review of 2026-11. The one edge left from the examples to the test package
+			   is VGArchitectureExamples, whose subject is the architecture gate itself."
 			  'VectorGraphics-Cairo-Examples'
-			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Tests' ).
+			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Tests'
+				    'VectorGraphics-Conformance' ).
 			  'VectorGraphics-Cairo-Tests'
-			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples' ).
+			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
+				    'VectorGraphics-Conformance' ).
 			  'VectorGraphics-Bloc' -> #( 'VectorGraphics-Cairo' ).
 			  'VectorGraphics-Bloc-Examples'
 			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ).
@@ -89,20 +92,28 @@ VGArchitectureTest class >> allowedDependencies [
 			  "The device path reads the frame unit 1.11 profiles, which is drawn through the Bloc
 			   renderer, so binning and the budget name that package as well as the display list."
 			  'VectorGraphics-Vulkan' -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ).
-			  "The budget — the two benchmarks and the drawing kit — lives in the test package,
-			   because measuring this project against Cairo means naming Alexandrie's classes and
-			   a package the failover loads may name none. So the examples that open a benchmark
-			   name the test package, as the Cairo examples name theirs."
+			  "The budget — the two benchmarks and the drawing kit — lives in
+			   VectorGraphics-Benchmarks, a package of its own since the review of 2026-11, so the
+			   examples that open a benchmark name no test package."
 			  'VectorGraphics-Vulkan-Examples'
-			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Vulkan'
-				    'VectorGraphics-Vulkan-Tests' ).
+			  -> #( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc' 'VectorGraphics-Cairo'
+				    'VectorGraphics-Vulkan' ).
 			  "The edge to the Cairo tests is the one edge this project allows between two test
 			   packages: VGVulkanExamplesTest subclasses VGCairoExamplesTest and the backend tests
 			   draw the frame fixture the engine tests draw, rather than keeping a second copy of
 			   either."
 			  'VectorGraphics-Vulkan-Tests'
-			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Tests'
-				    'VectorGraphics-Vulkan' 'VectorGraphics-Vulkan-Examples' ) }
+			  -> #( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc' 'VectorGraphics-Cairo'
+				    'VectorGraphics-Cairo-Tests' 'VectorGraphics-Conformance' 'VectorGraphics-Vulkan'
+				    'VectorGraphics-Vulkan-Examples' ).
+			  "Neither of these two holds a TestCase, and both were filed in a -Tests package until
+			   the review of 2026-11, which made an examples package depend on a test package. The
+			   corpus names the backend it is compared against; the benchmarks name the corpus they
+			   measure and the backends they drive."
+			  'VectorGraphics-Conformance' -> #( 'VectorGraphics-Cairo' ).
+			  'VectorGraphics-Benchmarks'
+			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Conformance'
+				    'VectorGraphics-Vulkan' ) }
 ]
 
 { #category : 'layering' }
@@ -154,15 +165,15 @@ VGArchitectureTest class >> edgesOf: aPackageName [
 VGArchitectureTest class >> edgesTheBaselineCannotDeclare [
 	"The edges of allowedDependencies that BaselineOfVectorGraphics may not state, because the
 	 reverse edge is stated and Metacello loads requires in order: a pair declared both ways is
-	 a cycle and no load order exists for it. Only these two pairs qualify, both of them an
-	 examples package on the test package its subjects live in, and the two packages of each
-	 pair always load together, so nothing is lost by leaving one half out.
+	 a cycle and no load order exists for it. One pair qualifies, since the review of 2026-11
+	 moved the conformance corpus and the benchmarks out of the test packages: the Cairo
+	 examples name VGArchitectureTest, whose own examples holder they are, and the Cairo tests
+	 name that holder. The two packages always load together, so nothing is lost by leaving
+	 one half out.
 	 Every entry is held by testEveryEdgeTheBaselineCannotDeclareIsOneHalfOfACycle, which reads
 	 the reverse from the baseline rather than taking this comment on trust."
-
 	^ {
-		  ('VectorGraphics-Cairo-Examples' -> 'VectorGraphics-Cairo-Tests').
-		  ('VectorGraphics-Vulkan-Examples' -> 'VectorGraphics-Vulkan-Tests') }
+		  ('VectorGraphics-Cairo-Examples' -> 'VectorGraphics-Cairo-Tests') }
 ]
 
 { #category : 'layering' }
@@ -390,6 +401,11 @@ VGArchitectureTest >> assertEdgesOfPackageNamed: aPackageName [
 ]
 
 { #category : 'tests' }
+VGArchitectureTest >> testBenchmarksStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Benchmarks'
+]
+
+{ #category : 'tests' }
 VGArchitectureTest >> testBlocExamplesStayInsideTheirAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Bloc-Examples'
 ]
@@ -417,6 +433,11 @@ VGArchitectureTest >> testCairoStaysInsideItsAllowedDependencies [
 { #category : 'tests' }
 VGArchitectureTest >> testCairoTestsStayInsideTheirAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Cairo-Tests'
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testConformanceStaysInsideItsAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Conformance'
 ]
 
 { #category : 'tests - dependencies' }
@@ -688,7 +709,9 @@ VGArchitectureTest >> testTheCairoExampleAndTestGroupsNameNoBlocClass [
 	 its own: the project-wide examples and tests groups span every layer, so asking for them
 	 fetches Bloc and wants PharoVulkan, which a user of the Cairo backend wants neither of.
 	 Neither group brings the front page or the other three packages of the rasteriser, because
-	 the Cairo backend names the font reader alone. Alexandrie is not asked about here —
+	 the Cairo backend names the font reader alone. The conformance corpus arrives with both
+	 groups, because the examples open it and the gate reads it. Alexandrie is not asked
+	 about here —
 	 blocPackageNames says why. A group that does not exist would pass on an empty scan, so the
 	 packages each one must bring in are named first."
 
@@ -696,12 +719,13 @@ VGArchitectureTest >> testTheCairoExampleAndTestGroupsNameNoBlocClass [
 	scanner := VGCairoReferenceScanner new.
 	self
 		assert: (self class packagesLoadedByGroupNamed: 'cairo-examples')
-		equals: #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples' 'VectorGraphics-Paths'
-			   'VectorGraphics-TrueType' ) asSet.
+		equals: #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
+			   'VectorGraphics-Conformance' 'VectorGraphics-Paths' 'VectorGraphics-TrueType' ) asSet.
 	self
 		assert: (self class packagesLoadedByGroupNamed: 'cairo-tests')
 		equals: #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
-			   'VectorGraphics-Cairo-Tests' 'VectorGraphics-Paths' 'VectorGraphics-TrueType' ) asSet.
+			   'VectorGraphics-Cairo-Tests' 'VectorGraphics-Conformance' 'VectorGraphics-Paths'
+			   'VectorGraphics-TrueType' ) asSet.
 	offenders := #( 'cairo-examples' 'cairo-tests' ) flatCollect: [ :group |
 		             (self class packagesLoadedByGroupNamed: group) asSortedCollection asArray
 			             flatCollect: [ :package |

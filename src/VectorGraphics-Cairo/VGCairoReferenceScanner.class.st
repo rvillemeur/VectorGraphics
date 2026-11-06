@@ -25,6 +25,24 @@ Class {
 }
 
 { #category : 'constants' }
+VGCairoReferenceScanner class >> benchmarkPackageNames [
+	"The packages of this project that measure it against the alternatives. A benchmark names
+	 every backend it drives, on purpose, the way a test package names Alexandrie as a
+	 positive control, and no group a user of one backend asks for loads it — so it is left
+	 out of the scan that keeps the driver out of the engine. The prefix is asked for as well
+	 as the suffix, because other projects in the image have a -Benchmarks package too."
+	^ (PackageOrganizer default packages select: [ :each |
+		   (each name beginsWith: self projectPackagePrefix) and: [
+			   each name endsWith: self benchmarksPackageSuffix ] ]) collect: [ :each |
+		  each name ]
+]
+
+{ #category : 'constants' }
+VGCairoReferenceScanner class >> benchmarksPackageSuffix [
+	^ '-Benchmarks'
+]
+
+{ #category : 'constants' }
 VGCairoReferenceScanner class >> blocBackendPackageName [
 	"The Bloc backend built on Cairo, whose canvas this project subclasses."
 
