@@ -1,38 +1,52 @@
 "
-A Morphic Canvas subclass that renders vector graphics using the VectorEngine pipeline.
+A drawing surface over a 32-bit `Form` that renders vector graphics through the VectorEngine
+pipeline. It is independent of Morphic: in Cuis it stood in for `Canvas` and was handed to the
+morph tree, and the inheritance was dropped here because Morphic is not a target of this project.
+Coordinates are pixel-direct — there is no transformation state.
 
-VectorCanvas bridges Pharo's Morphic drawing protocol to the VectorEngineAbstract path API.
-It owns a VectorEngineWholePixel by default; calling `doSubPixelAntiAliasing` replaces it
-with VectorEngineSubPixel for higher-quality text rendering (TTFontDescription does this
-automatically when rendering glyphs).
+It owns a VectorEngineWholePixel by default; calling `doSubPixelAntiAliasing` replaces it with
+VectorEngineSubPixel for higher-quality text rendering (TTFontDescription does this automatically
+when rendering glyphs).
 
 ## Relationships
-- Wraps a VectorEngineWholePixel or VectorEngineSubPixel.
+
+- Wraps a VectorEngineWholePixel or VectorEngineSubPixel, plus a VectorEngineBoundsFinder that
+  measures without painting.
 - PathCommand >> runOn: sends canvas messages (multiLineTo:, closePath, etc.) to VectorCanvas,
-  which delegates them to the engine's abs_*/do_* methods.
+  which delegates them to the engine's basic walks.
 - TTFontDescription uses VectorCanvas to rasterize glyph outlines into FormGlyph instances.
-- Subclasses Pharo's Canvas; Morphic calls standard methods (drawString:, fillRect:, etc.).
 
 ## Entry point
-`VectorCanvas class >> onForm: aForm` — creates a canvas backed by the given Form.
+
+`VectorCanvas class >> onForm:` — creates a canvas backed by the given Form, which it answers back
+through `form`.
 
 ## Key methods
-- `doSubPixelAntiAliasing`          — switch to sub-pixel engine (called before text rendering)
-- `strokeWidth: color: do:`         — stroke a path at the given width and color
-- `fillColor: do:`                  — fill a closed path
-- `strokeWidth: color: fillColor: do:` — combined stroke + fill
+
+- `doSubPixelAntiAliasing`            — switch to sub-pixel engine (called before text rendering)
+- `strokeWidth:color:do:`             — stroke a path at the given width and colour
+- `fillColor:do:`                     — fill a closed path
+- `strokeWidth:color:fillColor:do:`   — combined stroke and fill
 - `multiLineTo:points:`, `multiMoveTo:points:`, `multiCurveTo:...`, `closePath`, etc.
-                                    — path construction messages received from PathCommand >> runOn:
-- `fullDraw: aMorph`                — renders a Morph and all sub-morphs onto the backing Form
+                                      — path construction messages received from
+                                        PathCommand >> runOn:
+- `updatingMorphBoundsDo:`            — run a block through the measuring engine instead of the
+                                        painting one, then read `measuredMorphBounds`
 
 Example:
-  (VectorCanvas onForm: Display) strokeWidth: 1.0 color: Color black do: [ :c |
-      c abs_MoveTo: 10 @ 10; abs_LineTo: 100 @ 100 ].
-  Display forceToScreen
+
+```smalltalk
+| target canvas |
+target := Form extent: 64 @ 64 depth: 32.
+canvas := VectorCanvas onForm: target.
+canvas fillColor: Color red do: [
+	canvas moveToX: 8 y: 8; lineToX: 56 y: 8; lineToX: 32 y: 56; closePath ].
+canvas form
+```
 "
 Class {
 	#name : 'VectorCanvas',
-	#superclass : 'Canvas',
+	#superclass : 'Object',
 	#instVars : [
 		'boundsFinderEngine',
 		'form',
@@ -100,24 +114,13 @@ VectorCanvas >> doSubPixelAntiAliasing [
 	boundsFinderEngine mirror: engine
 ]
 
-{ #category : 'drawing - icons' }
-VectorCanvas >> drawCloseIcon [
-
-	self strokeWidth: 1.0 color: Color black do: [ 
-		self
-			ellipseCenterX: 9
-			y: 9
-			rx: 6
-			ry: 6 ]
-]
-
 { #category : 'paths' }
 VectorCanvas >> ellipseCenterX: mcx y: mcy rx: mrx ry: mry [
 
 	engine abs_EllipseCenter: mcx @ mcy radiusX: mrx radiusY: mry
 ]
 
-{ #category : 'drawing - FormCanvas protocol' }
+{ #category : 'drawing - shapes' }
 VectorCanvas >> ellipseCenterX: mcx y: mcy rx: mrx ry: mry borderWidth: morphStrokeWidth borderColor: strokeColorOrGradient fillColor: fillColorOrGradient [
 
 	self
@@ -146,7 +149,7 @@ VectorCanvas >> fillColor: aFillColor do: pathCommandsBlock [
 	engine fillColor: aFillColor do: pathCommandsBlock
 ]
 
-{ #category : 'drawing - FormCanvas protocol' }
+{ #category : 'drawing - shapes' }
 VectorCanvas >> fillRectangle: aRectangle color: aColor [
 
 	"For BitBltCanvas protocol, aRectangle:
@@ -160,7 +163,14 @@ VectorCanvas >> fillRectangle: aRectangle color: aColor [
 			maxY: aRectangle bottom - 0.5 ]
 ]
 
-{ #category : 'drawing - FormCanvas protocol' }
+{ #category : 'accessing' }
+VectorCanvas >> form [
+	"The form the two engines paint on. Reading the pixels back is how a drawing ends."
+
+	^ form
+]
+
+{ #category : 'drawing - shapes' }
 VectorCanvas >> frameAndFillRectangle: aRectangle fillColor: aColor borderWidth: borderWidth borderColor: borderColor [
 
 	"For BitBltCanvas protocol, aRectangle:
@@ -178,7 +188,7 @@ VectorCanvas >> frameAndFillRectangle: aRectangle fillColor: aColor borderWidth:
 				maxY: aRectangle bottom - 0.5 ]
 ]
 
-{ #category : 'drawing - FormCanvas protocol' }
+{ #category : 'drawing - shapes' }
 VectorCanvas >> frameRectangle: aRectangle borderWidth: borderWidth color: borderColor [
 
 	"For BitBltCanvas protocol, aRectangle:
@@ -255,7 +265,7 @@ VectorCanvas >> inspectorTargetEntries [
 	^ self inspectorFormEntries , self inspectorEngineEntries
 ]
 
-{ #category : 'drawing - FormCanvas protocol' }
+{ #category : 'drawing - shapes' }
 VectorCanvas >> line: pt1 to: pt2 width: morphStrokeWidth color: aStrokeColor [
 
 	self strokeWidth: morphStrokeWidth color: aStrokeColor do: [ 
@@ -498,7 +508,7 @@ VectorCanvas >> roundBottomRectangleMinX: xMin maxX: xMax minY: yMin maxY: yMax 
 		do_ClosePath
 ]
 
-{ #category : 'drawing - FormCanvas protocol' }
+{ #category : 'drawing - shapes' }
 VectorCanvas >> roundRect: aRectangle color: aColor radius: r [
 
 	"For BitBltCanvas protocol, aRectangle:

@@ -131,10 +131,11 @@ passes the figure needs before any pixel is touched:
 The blend hooks follow the same three cases: `blendFillOnly`, `blendStrokeOnly` and
 `blendStrokeAndFill`.
 
-## 7. Morphic integration — `VectorGraphics-Engine`
+## 7. The canvas and the two engines — `VectorGraphics-Engine`
 
-`VectorCanvas` is a subclass of Pharo's `Canvas` and holds **two** engines: `engine`, which draws,
-and `boundsFinderEngine`, which measures. `updatingMorphBoundsDo:` swaps the second in for the
+`VectorCanvas` is independent of Morphic: in Cuis it stood in for `Canvas` and was handed to the
+morph tree, and that inheritance was dropped here because Morphic is not a target of this project.
+It holds **two** engines: `engine`, which draws, and `boundsFinderEngine`, which measures. `updatingMorphBoundsDo:` swaps the second in for the
 duration of a block and restores it in an `ensure:`, so a morph can be asked what it would paint
 without painting it, and `measuredMorphBounds` answers the box afterwards.
 

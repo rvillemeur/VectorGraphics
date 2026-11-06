@@ -165,6 +165,29 @@ VectorCanvasTest >> testStrokeAndFillDoesNotError [
 ]
 
 { #category : 'tests' }
+VectorCanvasTest >> testTheCanvasAnswersTheFormItDrawsOn [
+	"Reading the pixels back is the normal end of a drawing, so the canvas hands out the form
+	it was given rather than leaving the caller to keep its own reference."
+
+	| target canvas |
+	target := Form extent: 8 @ 8 depth: 32.
+	canvas := VectorCanvas onForm: target.
+	self assert: canvas form identicalTo: target
+]
+
+{ #category : 'tests' }
+VectorCanvasTest >> testTheCanvasIsIndependentOfMorphic [
+	"In Cuis this class stood in for Canvas and was handed to Morphic. Morphic is not a target
+	of this project: the canvas is independent, and inheriting from Canvas only promised a
+	protocol it does not implement."
+
+	self assert: VectorCanvas superclass identicalTo: Object.
+	self
+		deny: (VectorCanvas allSuperclasses anySatisfy: [ :each | each name = #Canvas ])
+		description: 'the canvas must not inherit a Morphic protocol it cannot honour'
+]
+
+{ #category : 'tests' }
 VectorCanvasTest >> testThePaintingEngineComesBackAfterMeasuring [
 
 	| form canvas painting |
