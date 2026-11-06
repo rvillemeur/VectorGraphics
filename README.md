@@ -49,6 +49,7 @@ neither is present. Every layer above them is a group of its own.
 | `vulkan` | `core` and `VectorGraphics-Vulkan`. PharoVulkan is not published, so load it before asking for this group |
 | `vulkan-examples`, `vulkan-tests` | the examples and the suites of the GPU backend |
 | `examples`, `tests` | the union of the seven layer groups, so they reach Bloc and PharoVulkan |
+| `dev` | the group to work on this project from: `default`, the suites of its five layers, and MuTalk from `github://pharo-contributions/mutalk:v3.0.8/src`. It names the five test groups one by one, so it still loads in a plain Pharo image |
 
 The Cairo examples and suites load without Bloc:
 
@@ -69,6 +70,24 @@ needs that positive control.
 `VGArchitectureTest` holds every sentence above — which package may name which, what each group
 loads, and that no package the Cairo groups load names or inherits from a Bloc class. Its
 class-side `Groups` tab shows the three columns live.
+
+## Working on this project
+
+```smalltalk
+Metacello new
+	baseline: 'VectorGraphics';
+	repository: 'github://rvillemeur/VectorGraphics:main/src';
+	load: 'dev'.
+```
+
+That brings the default stack, the suite of each of its layers, and MuTalk, the mutation tester.
+MuTalk rewrites a production method and asks whether a test notices, so it needs the tests of the
+code under test in the image — which is why `dev` is not simply `default` plus MuTalk. It is pinned
+to a tag rather than to `master`: the version doing the rewriting is part of this project's setup.
+
+Mutate the classes of the task in hand, not a whole package: a package-wide run takes orders of
+magnitude longer and says nothing about the work. Commit first, because a run that is interrupted
+leaves its rewrites in the image, and only a clean checkout tells them from your own edits.
 
 ## Drawing Bloc through this project
 

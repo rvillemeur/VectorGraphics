@@ -642,6 +642,19 @@ VGArchitectureTest >> testTextTestsStayInsideTheirAllowedDependencies [
 ]
 
 { #category : 'tests' }
+VGArchitectureTest >> testTheBaselineNamesOnlyBlocAndMuTalkAsExternalProjects [
+	"Every project outside this repository that a load can reach, named here so one cannot be
+	 added without saying which group needs it: Bloc for the renderer group, MuTalk for the dev
+	 group. PharoVulkan is deliberately not among them — it is unpublished, and the vulkan
+	 group expects it loaded by hand."
+
+	self
+		assert: (BaselineOfVectorGraphics project version projects collect: [ :each |
+				 each name ]) asSortedCollection asArray
+		equals: #( 'Bloc' 'MuTalk' )
+]
+
+{ #category : 'tests' }
 VGArchitectureTest >> testTheBlocGroupLoadsEverythingTheDefaultGroupLoadsAndTheRenderer [
 	"Using this project as Alexandrie's replacement stays one load: the bloc group brings the
 	 renderer and everything the default group brings. Dropping the renderer out of the default
@@ -657,17 +670,16 @@ VGArchitectureTest >> testTheBlocGroupLoadsEverythingTheDefaultGroupLoadsAndTheR
 { #category : 'tests' }
 VGArchitectureTest >> testTheBlocLayerRequiresTheExternalBlocProject [
 	"The renderer subclasses BARenderer, so the group that loads it must fetch Bloc rather than
-	 assume an image that already holds it. The default group declares no external project at
-	 all, which is the other half of the same fact."
+	 assume an image that already holds it. No package of the default stack requires Bloc,
+	 which is the other half of the same fact."
 
 	| requires |
 	requires := Dictionary new.
 	BaselineOfVectorGraphics project version packages do: [ :each |
 		requires at: each name put: each requires asSet ].
 	self assert: ((requires at: 'VectorGraphics-Bloc') includes: 'Bloc').
-	self assert: (BaselineOfVectorGraphics project version projects
-			 collect: [ :each | each name ]) asSortedCollection asArray
-		equals: #( 'Bloc' )
+	(self class packagesLoadedByGroupNamed: 'default') do: [ :each |
+		self deny: ((requires at: each) includes: 'Bloc') ]
 ]
 
 { #category : 'tests - groups' }
@@ -714,6 +726,43 @@ VGArchitectureTest >> testTheDefaultGroupLoadsTheRasteriserAndTheCairoBackendAlo
 			   'VectorGraphics-Paths' 'VectorGraphics-Text' 'VectorGraphics-TrueType' )
 ]
 
+{ #category : 'tests - groups' }
+VGArchitectureTest >> testTheDevGroupBringsNoBlocAndNoVulkanPackage [
+	"The dev group must load in a plain Pharo image. The renderer layers are the two that need
+	 something outside this repository — Bloc from its own repository, PharoVulkan by hand — so
+	 a dev group that reached them would make a mutation run depend on a machine with a Vulkan
+	 driver."
+
+	| loaded |
+	loaded := self class packagesLoadedByGroupNamed: 'dev'.
+	self assert: (loaded reject: [ :each |
+			 (each includesSubstring: 'Bloc') or: [
+				 each includesSubstring: 'Vulkan' ] ]) equals: loaded.
+	self assert: (loaded includes: 'VectorGraphics-Cairo-Tests').
+	#( 'Paths' 'Engine' 'TrueType' 'Text' ) do: [ :layer |
+		self assert: (loaded includes: 'VectorGraphics-' , layer , '-Tests') ]
+]
+
+{ #category : 'tests - groups' }
+VGArchitectureTest >> testTheDevGroupLoadsTheDefaultStackItsTestsAndMuTalk [
+	"The group a developer of this project loads: what `default` loads, the tests of those same
+	 layers, and MuTalk. MuTalk mutates production methods and asks whether a test notices, so a
+	 dev group without the tests of the code under test would report everything as survived.
+	 The four layer test groups and cairo-tests are named one by one rather than through the
+	 project-wide `tests` group, because that one spans every layer: it fetches Bloc and wants
+	 PharoVulkan, neither of which a mutation run of the Cairo stack needs."
+
+	| groups |
+	groups := Dictionary new.
+	BaselineOfVectorGraphics project version groups do: [ :each |
+		groups at: each name put: each includes ].
+	self assert: (groups includesKey: 'dev').
+	self
+		assert: (groups at: 'dev') asSortedCollection asArray
+		equals: #( 'MuTalk' 'cairo-tests' 'default' 'engine-tests' 'paths-tests'
+			   'text-tests' 'truetype-tests' )
+]
+
 { #category : 'tests - dependencies' }
 VGArchitectureTest >> testTheDocumentationGatePackageStaysInsideItsAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Tests'
@@ -747,6 +796,21 @@ VGArchitectureTest >> testTheExamplesAndTestsGroupsAreTheUnionOfTheirLayerGroups
 { #category : 'tests - dependencies' }
 VGArchitectureTest >> testTheFrontPagePackageStaysInsideItsAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics'
+]
+
+{ #category : 'tests - groups' }
+VGArchitectureTest >> testTheMuTalkProjectIsPinnedToATagAndNotToMaster [
+	"MuTalk is a development tool that rewrites production methods in the image, so the version
+	 it rewrites with is part of this project's own setup: a tag, never the moving `master`.
+	 Bloc is pinned to master on purpose and is the exception — it has no release tags."
+
+	| repositories |
+	repositories := Dictionary new.
+	BaselineOfVectorGraphics project version projects do: [ :each |
+		repositories at: each name put: each repositories map keys asSortedCollection asArray ].
+	self
+		assert: (repositories at: 'MuTalk')
+		equals: #( 'github://pharo-contributions/mutalk:v3.0.8/src' )
 ]
 
 { #category : 'tests' }

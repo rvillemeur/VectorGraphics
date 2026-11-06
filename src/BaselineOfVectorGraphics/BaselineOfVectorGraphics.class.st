@@ -69,13 +69,20 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 
 { #category : 'baselines' }
 BaselineOfVectorGraphics >> declareExternalProjectsOn: spec [
-	"The projects outside this repository that a layer of it needs. Bloc is the only one: the
+	"The projects outside this repository that a layer or a group of it needs. Bloc: the
 	 renderer of the bloc group subclasses BARenderer, so that group fetches Bloc rather than
-	 assume an image that already holds it. The vulkan group names no project, because
-	 PharoVulkan is not published; load it by hand before asking for that group."
+	 assume an image that already holds it. MuTalk: the mutation tester the dev group brings,
+	 pinned to a tag because it rewrites production methods in the image and the version doing
+	 the rewriting is part of this project's setup — Bloc is pinned to master only because it
+	 publishes no release tags. The vulkan group names no project, because PharoVulkan is not
+	 published; load it by hand before asking for that group."
 
-	spec baseline: 'Bloc' with: [
-		spec repository: 'github://pharo-graphics/Bloc:master' ]
+	spec
+		baseline: 'Bloc'
+		with: [ spec repository: 'github://pharo-graphics/Bloc:master' ];
+		baseline: 'MuTalk'
+		with: [
+		spec repository: 'github://pharo-contributions/mutalk:v3.0.8/src' ]
 ]
 
 { #category : 'baselines' }
@@ -95,7 +102,10 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 	 layer's test package requires it, so it arrives with whichever tests are asked for.
 	 'bloc' and 'vulkan' name 'core' as well as their own package, because before the split the
 	 whole rasteriser arrived through the Cairo backend's requires and loading a backend must
-	 keep bringing it: the backend itself names only the font reader."
+	 keep bringing it: the backend itself names only the font reader.
+	 'dev' is the group to work on this project from: the default stack, the tests of those
+	 same layers, and MuTalk. It names the five test groups one by one rather than the
+	 project-wide 'tests' group, so that it still loads in a plain Pharo image."
 
 	spec
 		group: 'paths' with: #( 'VectorGraphics-Paths' );
@@ -126,7 +136,10 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 		group: 'tests'
 		with: #( 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests' 'cairo-tests'
 			   'bloc-tests' 'vulkan-tests' );
-		group: 'default' with: #( 'core' 'cairo' )
+		group: 'default' with: #( 'core' 'cairo' );
+		group: 'dev'
+		with: #( 'default' 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests'
+			   'cairo-tests' 'MuTalk' )
 ]
 
 { #category : 'baselines' }
