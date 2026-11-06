@@ -141,12 +141,13 @@ VGFrameProfile class >> stageByPackageAndTag [
 	 covers, `paintSource` the colour a pattern answers at a pixel, `compositing` the operators,
 	 and `pixelAccess` the surface and its pixel format, which is both the reading and writing of
 	 a pixel and the byte arithmetic that quantises a colour or a coverage into one. Then `text`,
-	 `blur` and `handover`. `harness` is this class, which runs inside the frame it measures.
-	 `notInTheFrame` is code that cannot appear in a frame: the exporters, the reflection and
-	 inventory helpers, the examples, the budget measurement that weighs a device round trip
-	 against a frame of this profile, and the classes this project inherited from the earlier pure
-	 Pharo VectorGraphics package."
-
+	 `blur` and `handover`. `text` holds the three tags of `VectorGraphics-TrueType` as well as
+	 the Cairo font code, because `VGFontFace` reads a face and its glyphs through that layer.
+	 `harness` is this class, which runs inside the frame it measures. `notInTheFrame` is code
+	 that cannot appear in a frame: the exporters, the reflection and inventory helpers, the
+	 examples, the package manifests, the budget measurement that weighs a device round trip
+	 against a frame of this profile, and the pure Pharo rasteriser and path commands of
+	 `VectorGraphics-Engine` and `VectorGraphics-Paths`, which no frame of this profile enters."
 	^ Dictionary newFrom: {
 			  ('VectorGraphics-Cairo/Context' -> #canvasApi).
 			  ('VectorGraphics-Cairo/Skeleton' -> #canvasApi).
@@ -164,7 +165,9 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Cairo/Compositing' -> #compositing).
 			  ('VectorGraphics-Cairo/Surface' -> #pixelAccess).
 			  ('VectorGraphics-Cairo/Text' -> #text).
-			  ('VectorGraphics/TrueType' -> #text).
+			  ('VectorGraphics-TrueType/Fonts' -> #text).
+			  ('VectorGraphics-TrueType/Glyphs' -> #text).
+			  ('VectorGraphics-TrueType/Reading' -> #text).
 			  ('VectorGraphics-Cairo/Blur' -> #blur).
 			  ('VectorGraphics-Vulkan/Blur' -> #blur).
 			  ('VectorGraphics-Bloc/Hosts' -> #handover).
@@ -178,12 +181,18 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Cairo-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics-Vulkan/Budget' -> #notInTheFrame).
 			  ('VectorGraphics-Vulkan-Examples/Examples' -> #notInTheFrame).
-			  ('VectorGraphics/Examples' -> #notInTheFrame).
-			  ('VectorGraphics/Kernel' -> #notInTheFrame).
-			  ('VectorGraphics/Manifest' -> #notInTheFrame).
-			  ('VectorGraphics/PathCommands' -> #notInTheFrame).
-			  ('VectorGraphics/SVG' -> #notInTheFrame).
-			  ('VectorGraphics/Tests' -> #notInTheFrame) }
+			  ('VectorGraphics-Engine/Kernel' -> #notInTheFrame).
+			  ('VectorGraphics-Engine/Manifest' -> #notInTheFrame).
+			  ('VectorGraphics-Engine-Examples/Examples' -> #notInTheFrame).
+			  ('VectorGraphics-Paths/Commands' -> #notInTheFrame).
+			  ('VectorGraphics-Paths/SVG' -> #notInTheFrame).
+			  ('VectorGraphics-Paths/Manifest' -> #notInTheFrame).
+			  ('VectorGraphics-Paths-Examples/Examples' -> #notInTheFrame).
+			  ('VectorGraphics-Text/Manifest' -> #notInTheFrame).
+			  ('VectorGraphics-Text-Examples/Examples' -> #notInTheFrame).
+			  ('VectorGraphics-TrueType/Manifest' -> #notInTheFrame).
+			  ('VectorGraphics-TrueType-Examples/Examples' -> #notInTheFrame).
+			  ('VectorGraphics/Manifest' -> #notInTheFrame) }
 ]
 
 { #category : 'stages' }

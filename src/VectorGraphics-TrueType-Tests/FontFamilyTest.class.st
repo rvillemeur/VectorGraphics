@@ -29,7 +29,7 @@ FontFamilyTest >> makeFamilyNamed: aString [
 
 { #category : 'running' }
 FontFamilyTest >> setUp [
-
+	super setUp.
 	savedEntries := FontFamily availableFamilies copy.
 	FontFamily availableFamilies keys asArray do: [ :k |
 		FontFamily availableFamilies removeKey: k ]
@@ -37,11 +37,11 @@ FontFamilyTest >> setUp [
 
 { #category : 'running' }
 FontFamilyTest >> tearDown [
-
 	FontFamily availableFamilies keys asArray do: [ :k |
 		FontFamily availableFamilies removeKey: k ].
 	savedEntries keysAndValuesDo: [ :k :v |
-		FontFamily availableFamilies at: k put: v ]
+		FontFamily availableFamilies at: k put: v ].
+	super tearDown
 ]
 
 { #category : 'tests' }
