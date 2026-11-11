@@ -59,6 +59,14 @@ TTFontTableDirEntry class >> onBytes: aByteArray [
 ]
 
 { #category : 'accessing' }
+TTFontTableDirEntry >> length [
+	"The length in bytes of the table I point at, as the font's own directory records it. A
+	 reader that only names fonts reads this to say what it did not read."
+
+	^ length
+]
+
+{ #category : 'accessing' }
 TTFontTableDirEntry >> nextByte [
 
 	| value |

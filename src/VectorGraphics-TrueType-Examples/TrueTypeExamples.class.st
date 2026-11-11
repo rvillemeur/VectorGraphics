@@ -42,6 +42,20 @@ TrueTypeExamples class >> defaultFontPath [
 	^ '/home/renaud/Downloads/Digital7Mono-Yz9J4.ttf'
 ]
 
+{ #category : 'constants' }
+TrueTypeExamples class >> fontDirectories [
+	"Where this machine keeps its fonts. Unit 1.4 of FONT-PLAN.md gives TTFontCatalogue the
+	 scan and this list with it; until that exists the list lives here, so that the example
+	 below runs with one click rather than needing a path typed into it."
+
+	^ {
+		  (FileLocator home / '.fonts').
+		  (FileLocator home / '.local/share/fonts').
+		  '/usr/share/fonts' asFileReference.
+		  '/usr/local/share/fonts' asFileReference.
+		  (FileLocator imageDirectory / 'Fonts') }
+]
+
 { #category : 'examples' }
 TrueTypeExamples class >> fontMetadata [
 	"Load a TTF file and inspect its metadata.
@@ -60,6 +74,27 @@ TrueTypeExamples class >> fontMetadata [
 	info at: 'lineGap'     put: font lineGap.
 	info at: 'bounds'      put: font bounds.
 	^ info
+]
+
+{ #category : 'examples' }
+TrueTypeExamples class >> fontNamesWithoutParsingGlyphs [
+	"One click: the family and the style of every TrueType file on this machine, read by
+	 TTFontMetadataReader — the table directory and the name table only, with no glyph parsed.
+	 This is what a font manager needs in order to name every face it can offer, and it is the
+	 one of the two services Alexandrie takes from FreeType that costs a scan of the whole
+	 filesystem. A file the reader refuses is kept with the reason it gave, because a scan that
+	 drops a file silently cannot be read against the directory it walked.
+	 TrueTypeExamples fontNamesWithoutParsingGlyphs inspect"
+
+	<sampleInstance>
+	| names |
+	names := Dictionary new.
+	self fontDirectories do: [ :directory |
+		directory exists ifTrue: [
+			directory allChildren do: [ :each |
+				(each isFile and: [ each basename asLowercase endsWith: '.ttf' ])
+					ifTrue: [ names at: each fullName put: (self metadataOrReasonFor: each) ] ] ] ].
+	^ names
 ]
 
 { #category : 'examples' }
@@ -101,6 +136,21 @@ TrueTypeExamples class >> loadFontFrom: aPathString [
 	| bytes |
 	bytes := aPathString asFileReference binaryReadStreamDo: [ :s | s contents ].
 	^ TTFontReader readTTFFrom: bytes
+]
+
+{ #category : 'private' }
+TrueTypeExamples class >> metadataOrReasonFor: aFileReference [
+	"The metadata of one font file, or the message of the error reading it raised. The reader
+	 pulls the offset table, the directory and the name table off the stream, so a 2 MB font
+	 costs a few hundred bytes of disk. Unit 1.3 of FONT-PLAN.md gives the reader a refusal
+	 that answers a reason instead of raising, and this handler goes when it lands; until then
+	 a file the reader cannot read must still be named here, with what it said, rather than
+	 stopping the scan."
+
+	^ [ aFileReference binaryReadStreamDo: [ :stream |
+		  TTFontMetadataReader readStream: stream ] ]
+		  on: Error
+		  do: [ :error | error messageText ]
 ]
 
 { #category : 'examples' }

@@ -403,7 +403,7 @@ VGFontFace >> readBytes: aByteArray [
 	| tables headData glyphCount |
 	bytes := aByteArray.
 	outlines := Dictionary new.
-	tables := TTFontReader new buildTableDirectory: aByteArray offset: 0.
+	tables := TTFontReader buildTableDirectory: aByteArray offset: 0.
 	self class requiredTableTags do: [ :tag |
 		(tables includesKey: tag) ifFalse: [
 			^ Error signal: 'the font has no ' , tag , ' table' ] ].

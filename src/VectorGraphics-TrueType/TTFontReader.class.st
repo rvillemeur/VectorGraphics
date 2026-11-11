@@ -33,14 +33,8 @@ Class {
 	#tag : 'Reading'
 }
 
-{ #category : 'instance creation' }
-TTFontReader class >> readTTFFrom: aByteArray [
-
-	^ self new readTTFFrom: aByteArray
-]
-
-{ #category : 'private' }
-TTFontReader >> buildTableDirectory: fontData offset: anOffset [
+{ #category : 'reading' }
+TTFontReader class >> buildTableDirectory: fontData offset: anOffset [
 
 	"Scan the font's table directory and return a Dictionary mapping 4-char tag strings
 	to TTFontTableDirEntry instances. Each entry in the directory is 16 bytes."
@@ -55,6 +49,12 @@ TTFontReader >> buildTableDirectory: fontData offset: anOffset [
 		directory at: tagStr put: (TTFontTableDirEntry on: fontData at: pos).
 		pos := pos + 16 ].
 	^ directory
+]
+
+{ #category : 'instance creation' }
+TTFontReader class >> readTTFFrom: aByteArray [
+
+	^ self new readTTFFrom: aByteArray
 ]
 
 { #category : 'private' }
@@ -107,7 +107,7 @@ TTFontReader >> mapAndStoreGlyphsUsing: characterMap glyphs: glyphs [
 TTFontReader >> readFrom: fontData fromOffset: offset [
 
 	| tables headData nGlyphs hheaData glyphOffsets glyphs characterMap |
-	tables := self buildTableDirectory: fontData offset: offset.
+	tables := self class buildTableDirectory: fontData offset: offset.
 
 	"Validate required tables are present"
 	#( 'head' 'maxp' 'name' 'hhea' 'loca' 'cmap' 'glyf' 'hmtx' ) do: [ :tag |
