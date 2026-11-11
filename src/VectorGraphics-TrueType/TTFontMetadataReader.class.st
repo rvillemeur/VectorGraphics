@@ -56,6 +56,18 @@ TTFontMetadataReader class >> directoryRecordSize [
 ]
 
 { #category : 'reading' }
+TTFontMetadataReader class >> directoryRejectionFor: aDirectory inFileOfSize: anInteger [
+	"Why the tables a directory points at cannot be read in a file of anInteger bytes, or nil
+	 when they can. A font cut short — half downloaded, half copied — points past its own end,
+	 and the parser that followed such a record would raise rather than answer."
+
+	^ (aDirectory allSatisfy: [ :entry |
+		   entry offset + entry length - 1 <= anInteger ])
+		  ifTrue: [ nil ]
+		  ifFalse: [ #notAnSfntFont ]
+]
+
+{ #category : 'reading' }
 TTFontMetadataReader class >> directorySizeOf: anOffsetTable [
 	"How many bytes of directory records the offset table promises, one per table."
 
@@ -173,16 +185,20 @@ TTFontMetadataReader class >> normalWidthClass [
 ]
 
 { #category : 'reading' }
-TTFontMetadataReader class >> offsetTableRejection: aByteArray [
-	"What the twelve-byte offset table says before a single table is read: a file too short to
-	 hold one, a version word this reader does not know, and a collection are all files it reads
-	 no further."
+TTFontMetadataReader class >> offsetTableRejection: anOffsetTable inFileOfSize: anInteger [
+	"What the twelve-byte offset table says before a single table is read, in a file of anInteger
+	 bytes: too short to hold an offset table, a version word this reader does not know, a
+	 collection, or too short to hold the directory the offset table promises. Nil when the
+	 directory can be read."
 
-	aByteArray size < self offsetTableSize ifTrue: [ ^ #notAnSfntFont ].
-	(aByteArray first: 4) = self collectionVersion ifTrue: [ ^ #fontCollection ].
-	^ (self sfntVersions includes: (aByteArray first: 4))
-		  ifTrue: [ nil ]
-		  ifFalse: [ #notAnSfntFont ]
+	| version |
+	anOffsetTable size < self offsetTableSize ifTrue: [ ^ #notAnSfntFont ].
+	version := anOffsetTable first: 4.
+	version = self collectionVersion ifTrue: [ ^ #fontCollection ].
+	(self sfntVersions includes: version) ifFalse: [ ^ #notAnSfntFont ].
+	anInteger < (self offsetTableSize + (self directorySizeOf: anOffsetTable)) ifTrue: [
+		^ #notAnSfntFont ].
+	^ nil
 ]
 
 { #category : 'constants' }
@@ -216,13 +232,11 @@ TTFontMetadataReader class >> readBytes: aByteArray [
 	 cannot walk."
 
 	| rejection directory |
-	rejection := self offsetTableRejection: aByteArray.
+	rejection := self offsetTableRejection: aByteArray inFileOfSize: aByteArray size.
 	rejection ifNotNil: [ ^ self rejectedMetadata: rejection ].
-	aByteArray size < (self offsetTableSize + (self directorySizeOf: aByteArray)) ifTrue: [
-		^ self rejectedMetadata: #notAnSfntFont ].
 	directory := TTFontReader buildTableDirectory: aByteArray offset: 0.
-	(self tablesFitIn: aByteArray size directory: directory) ifFalse: [
-		^ self rejectedMetadata: #notAnSfntFont ].
+	rejection := self directoryRejectionFor: directory inFileOfSize: aByteArray size.
+	rejection ifNotNil: [ ^ self rejectedMetadata: rejection ].
 	^ self metadataFromEntries: directory lengths: (self lengthsFrom: directory)
 ]
 
@@ -247,19 +261,16 @@ TTFontMetadataReader class >> readStream: aStream [
 	 their name tables. A file this reader cannot walk answers a rejected metadata, since the
 	 catalogue meets every file a font directory holds."
 
-	| offsetTable directoryBytes directory rejection promised |
+	| offsetTable directory rejection |
 	offsetTable := aStream next: self offsetTableSize.
-	rejection := self offsetTableRejection: offsetTable.
+	rejection := self offsetTableRejection: offsetTable inFileOfSize: aStream size.
 	rejection ifNotNil: [ ^ self rejectedMetadata: rejection ].
-	promised := self directorySizeOf: offsetTable.
-	directoryBytes := aStream next: promised.
-	directoryBytes size = promised ifFalse: [
-		^ self rejectedMetadata: #notAnSfntFont ].
 	directory := TTFontReader
-		             buildTableDirectory: offsetTable , directoryBytes
+		             buildTableDirectory:
+			             offsetTable , (aStream next: (self directorySizeOf: offsetTable))
 		             offset: 0.
-	(self tablesFitIn: aStream size directory: directory) ifFalse: [
-		^ self rejectedMetadata: #notAnSfntFont ].
+	rejection := self directoryRejectionFor: directory inFileOfSize: aStream size.
+	rejection ifNotNil: [ ^ self rejectedMetadata: rejection ].
 	^ self
 		  metadataFromEntries: (self entriesFrom: aStream directory: directory)
 		  lengths: (self lengthsFrom: directory)
@@ -340,16 +351,6 @@ TTFontMetadataReader class >> tableCountOffset [
 	"Where the table count sits in the offset table, one-based: after the four-byte version."
 
 	^ 5
-]
-
-{ #category : 'reading' }
-TTFontMetadataReader class >> tablesFitIn: anInteger directory: aDirectory [
-	"Whether every table the directory points at lies inside a file of anInteger bytes. A font
-	 cut short — half downloaded, half copied — points past its own end, and the parser that
-	 followed such a record would raise rather than answer."
-
-	^ aDirectory allSatisfy: [ :entry |
-		  entry offset + entry length - 1 <= anInteger ]
 ]
 
 { #category : 'private' }
