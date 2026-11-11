@@ -135,6 +135,68 @@ VGTrueTypeExamplesTest >> testEveryExampleTakesNoArgumentAndIsOnTheClassSide [
 					printString
 ]
 
+{ #category : 'tests' }
+VGTrueTypeExamplesTest >> testTheDefaultFontOfTheExamplesIsAFaceThisProjectCanDraw [
+	"An example that draws a glyph needs outlines. A face the reader refuses — a CFF font, a
+	 collection, a file that is not a font at all — makes the example fail on the face rather
+	 than on what it means to show."
+
+	| metadata |
+	metadata := TrueTypeExamples defaultFontPath asFileReference
+		            binaryReadStreamDo: [ :stream |
+		            TTFontMetadataReader readStream: stream ].
+	self deny: metadata isRejected
+]
+
+{ #category : 'tests' }
+VGTrueTypeExamplesTest >> testTheDefaultFontOfTheExamplesIsOneThisImageFound [
+	"The font the examples draw with must be one this image discovered in the font directories
+	 of the machine it runs on. A literal path to one person's download folder makes every
+	 example that uses it fail on every other machine."
+
+	| path |
+	path := TrueTypeExamples defaultFontPath asFileReference.
+	self assert: path exists.
+	self assert: (TTFontCatalogue defaultFontDirectories anySatisfy: [ :each |
+			 path fullName beginsWith: each fullName ])
+]
+
+{ #category : 'tests' }
+VGTrueTypeExamplesTest >> testTheDefaultFontOfTheExamplesIsThePreferredFamilyThisMachineHas [
+	"The examples draw Latin letters and digits, which an icon font does not carry, so the font
+	 they pick is the best-placed family of preferredFontFamilyNames this machine installed, not
+	 whichever file a scan meets first. A machine with none of them falls back to any drawable
+	 face, and there is nothing to state here."
+
+	| catalogue available chosen |
+	catalogue := TTFontCatalogue new
+		             scanDefaultDirectories;
+		             yourself.
+	available := TrueTypeExamples preferredFontFamilyNames select: [ :each |
+		             (catalogue entryOfFamilyNamed: each) isNotNil ].
+	available ifEmpty: [ ^ self skip ].
+	chosen := TrueTypeExamples defaultFontPath asFileReference
+		          binaryReadStreamDo: [ :stream |
+		          TTFontMetadataReader readStream: stream ].
+	self assert: chosen familyName equals: available first
+]
+
+{ #category : 'tests' }
+VGTrueTypeExamplesTest >> testTheDefaultFontPathIsFoundOnceAndForgottenOnDemand [
+	"A scan of the font directories costs some 85 ms and the examples ask for the path a dozen
+	 times over a suite run, so the answer is found once and kept. Forgetting it makes the next
+	 asker scan again, which is how a font installed since the image started is picked up."
+
+	| first second third |
+	first := TrueTypeExamples defaultFontPath.
+	second := TrueTypeExamples defaultFontPath.
+	self assert: first == second.
+	TrueTypeExamples forgetDefaultFontPath.
+	third := TrueTypeExamples defaultFontPath.
+	self assert: third equals: first.
+	self deny: third == first
+]
+
 { #category : 'accessing' }
 VGTrueTypeExamplesTest >> windowExampleMethods [
 	"The examples that open a window, which a suite must not run: an error inside one opens a

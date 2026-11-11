@@ -80,6 +80,14 @@ TTFontCatalogue >> addSource: anObject metadata: aFontMetadata [
 ]
 
 { #category : 'accessing' }
+TTFontCatalogue >> drawableEntries [
+	"The faces I met and will answer for, in the order I met them. A consumer picking a face to
+	 draw with asks me this; refusedEntries is the other side of the same selection."
+
+	^ entries reject: [ :each | each isRejected ]
+]
+
+{ #category : 'accessing' }
 TTFontCatalogue >> entries [
 	"Every file I have met, in the order I met it, each one an entry carrying its source and its
 	 metadata. The ones I refused are among them."
@@ -93,6 +101,23 @@ TTFontCatalogue >> entriesByFamilyName [
 	 class and width class that tell two faces of one family apart. Refused files are not here."
 
 	^ entriesByFamilyName
+]
+
+{ #category : 'accessing' }
+TTFontCatalogue >> entryOfFamilyNamed: aString [
+	"One face of a family, named the way a font states it rather than the way I key it, in any
+	 case. The plainest face when the family has one — upright, normal weight, normal width —
+	 since a consumer that names only a family means the ordinary face of it; any face of the
+	 family otherwise. nil when I hold no such family."
+
+	| faces |
+	faces := entriesByFamilyName at: aString asLowercase ifAbsent: [ ^ nil ].
+	^ faces
+		  at: {
+				  #normal.
+				  TTFontMetadataReader normalWeightClass.
+				  TTFontMetadataReader normalWidthClass }
+		  ifAbsent: [ faces anyOne ]
 ]
 
 { #category : 'accessing' }

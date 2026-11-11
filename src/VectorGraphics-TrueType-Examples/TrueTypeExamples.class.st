@@ -15,6 +15,9 @@ Only the examples that need no canvas are here. Rendering a glyph to a Form goes
 Class {
 	#name : 'TrueTypeExamples',
 	#superclass : 'Object',
+	#classVars : [
+		'DefaultFontPath'
+	],
 	#category : 'VectorGraphics-TrueType-Examples-Examples',
 	#package : 'VectorGraphics-TrueType-Examples',
 	#tag : 'Examples'
@@ -53,11 +56,54 @@ TrueTypeExamples class >> characterWidths [
 	^ widths
 ]
 
-{ #category : 'private' }
+{ #category : 'examples' }
+TrueTypeExamples class >> defaultFontChoice [
+	"Why the examples draw with the font they draw with: the families they ask for, which of
+	 them this machine installed, and the path the choice lands on."
+
+	<sampleInstance>
+	| catalogue choice |
+	catalogue := TTFontCatalogue new
+		             scanDefaultDirectories;
+		             yourself.
+	choice := Dictionary new.
+	choice at: 'asked for' put: self preferredFontFamilyNames.
+	choice
+		at: 'installed here'
+		put: (self preferredFontFamilyNames select: [ :each |
+				 (catalogue entryOfFamilyNamed: each) isNotNil ]).
+	choice at: 'drawable faces found' put: catalogue drawableEntries size.
+	choice at: 'chosen' put: self findDefaultFontPath.
+	^ choice
+]
+
+{ #category : 'accessing' }
 TrueTypeExamples class >> defaultFontPath [
-	"Override this or pass a path directly to loadFontFrom:.
-	Set this to the absolute path of any .ttf file on your system."
-	^ '/home/renaud/Downloads/Digital7Mono-Yz9J4.ttf'
+	"The absolute path of a font the examples draw with: the plainest face of the best-placed
+	 family of preferredFontFamilyNames this machine has, or any drawable face a scan meets when
+	 it has none of them. Found once and kept, since a scan costs some 85 ms and every example
+	 that draws asks for it; send forgetDefaultFontPath after installing a font. Pass a path of
+	 your own to loadFontFrom: to draw with another."
+
+	^ DefaultFontPath ifNil: [ DefaultFontPath := self findDefaultFontPath ]
+]
+
+{ #category : 'accessing' }
+TrueTypeExamples class >> findDefaultFontPath [
+	"Scan this machine''s font directories and answer the path of the face the examples should
+	 draw with: the plainest face of the best-placed family of preferredFontFamilyNames it has,
+	 or any drawable face otherwise."
+
+	| catalogue |
+	catalogue := TTFontCatalogue new
+		             scanDefaultDirectories;
+		             yourself.
+	self preferredFontFamilyNames do: [ :each |
+		(catalogue entryOfFamilyNamed: each) ifNotNil: [ :entry |
+			^ entry source fullName ] ].
+	catalogue drawableEntries ifEmpty: [
+		^ self error: 'no drawable font in the default font directories' ].
+	^ catalogue drawableEntries first source fullName
 ]
 
 { #category : 'examples' }
@@ -96,6 +142,15 @@ TrueTypeExamples class >> fontNamesWithoutParsingGlyphs [
 	self catalogueOfTheInstalledFonts entries do: [ :each |
 		names at: each source fullName put: each metadata ].
 	^ names
+]
+
+{ #category : 'initialization' }
+TrueTypeExamples class >> forgetDefaultFontPath [
+	"Throw away the path I found, so the next asker scans the font directories again. The
+	 fonts of a machine change while an image runs, and the image itself can be carried to
+	 another machine."
+
+	DefaultFontPath := nil
 ]
 
 { #category : 'examples' }
@@ -151,6 +206,19 @@ TrueTypeExamples class >> newContourFromAbsolutePoints: anArrayOfPairs [
 		points at: index putX: pair first.
 		points at: index putY: pair second ].
 	^ TTContourConstruction on: points
+]
+
+{ #category : 'accessing' }
+TrueTypeExamples class >> preferredFontFamilyNames [
+	"The families the examples would rather draw with, best first. The first two are the faces
+	 Pharo itself defaults to, through AeFontManager defaultFontFamilyName and
+	 defaultCodeFontFamilyName; they ship inside the image rather than in a font directory, so
+	 a scan finds them only on a machine that installed them as well. The rest are the text
+	 families a desktop usually carries. Every one of them maps the Latin letters and digits the
+	 examples draw, which an icon font does not."
+
+	^ #( 'Source Sans Pro' 'Source Code Pro' 'DejaVu Sans' 'Liberation Sans'
+	     'Noto Sans' )
 ]
 
 { #category : 'examples' }

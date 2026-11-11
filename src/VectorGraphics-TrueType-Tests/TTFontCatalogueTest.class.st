@@ -54,6 +54,23 @@ TTFontCatalogueTest >> directoryOfSixFacesTwoFamiliesAndTwoRefusals [
 ]
 
 { #category : 'tests' }
+TTFontCatalogueTest >> testAFamilyIsFoundByTheNameItStatesWhateverTheCaseAndAnswersItsPlainestFace [
+	"A consumer names a family the way a reader spells it, not the way I key it. It means the
+	 plain face of that family when it does not say which one: upright, normal weight, normal
+	 width. A family I never met answers nothing rather than raising."
+
+	| catalogue entry |
+	catalogue := self catalogueScannedOverTheFixtureDirectory.
+	entry := catalogue entryOfFamilyNamed: 'source SANS pro'.
+	self assert: entry familyName equals: 'Source Sans Pro'.
+	self assert: entry styleKey equals: {
+			#normal.
+			TTFontMetadataReader normalWeightClass.
+			TTFontMetadataReader normalWidthClass }.
+	self assert: (catalogue entryOfFamilyNamed: 'Helvetica') isNil
+]
+
+{ #category : 'tests' }
 TTFontCatalogueTest >> testAFontHeldInMemoryIsCatalogued [
 	"The second door: a font nobody wrote to disk. The entry answers the very bytes it was given
 	 for its whole font, so a consumer cannot tell where the face came from."
@@ -177,6 +194,22 @@ TTFontCatalogueTest >> testScanningADirectoryAnswersAFamilyPerNameAndAnEntryPerF
 		assert: (catalogue refusedEntries collect: [ :each |
 				 each metadata rejectionReason ]) asArray asSet
 		equals: #( #notAnSfntFont ) asSet
+]
+
+{ #category : 'tests' }
+TTFontCatalogueTest >> testTheDrawableEntriesAreTheOnesLeftWhenTheRefusalsAreTakenAway [
+	"The other side of refusedEntries, and the question a consumer asks to pick a face to draw
+	 with. Six of the eight files of the fixture directory carry outlines and a name; the two
+	 refusals are not among them, and an empty catalogue answers nothing."
+
+	| catalogue |
+	catalogue := self catalogueScannedOverTheFixtureDirectory.
+	self assert: catalogue drawableEntries size equals: 6.
+	self
+		assert: catalogue drawableEntries size + catalogue refusedEntries size
+		equals: catalogue entries size.
+	self deny: (catalogue drawableEntries anySatisfy: [ :each | each isRejected ]).
+	self assert: TTFontCatalogue new drawableEntries isEmpty
 ]
 
 { #category : 'tests' }
