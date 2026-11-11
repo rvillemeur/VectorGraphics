@@ -70,9 +70,9 @@ TTFontCatalogue >> addSource: anObject metadata: aFontMetadata [
 		         metadata: aFontMetadata;
 		         yourself.
 	entries add: entry.
-	aFontMetadata isRejected ifFalse: [
+	entry isRejected ifFalse: [
 		(entriesByFamilyName
-			 at: aFontMetadata familyName asLowercase
+			 at: entry familyName asLowercase
 			 ifAbsentPut: [ Dictionary new ])
 			at: entry styleKey
 			ifAbsentPut: [ entry ] ].
@@ -103,7 +103,7 @@ TTFontCatalogue >> familyNames [
 	| result |
 	result := SortedCollection new.
 	entriesByFamilyName valuesDo: [ :each |
-		result add: each anyOne metadata familyName ].
+		result add: each anyOne familyName ].
 	^ result
 ]
 
@@ -127,7 +127,7 @@ TTFontCatalogue >> inspectorFamilies: aBuilder [
 	^ aBuilder newTable
 		  addColumn: ((SpStringTableColumn
 				    title: 'Family'
-				    evaluated: [ :each | each value anyOne metadata familyName ])
+				    evaluated: [ :each | each value anyOne familyName ])
 				   width: 220);
 		  addColumn: ((SpStringTableColumn
 				    title: 'Faces'
@@ -176,7 +176,7 @@ TTFontCatalogue >> refusedEntries [
 	"The files I met and will not answer for, each carrying the reason it gave. Derived from my
 	 entries rather than kept beside them, so no second collection can fall out of step."
 
-	^ entries select: [ :each | each metadata isRejected ]
+	^ entries select: [ :each | each isRejected ]
 ]
 
 { #category : 'scanning' }

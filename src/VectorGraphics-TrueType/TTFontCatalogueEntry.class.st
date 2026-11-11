@@ -27,6 +27,14 @@ TTFontCatalogueEntry >> bytes [
 	^ source fontBytes
 ]
 
+{ #category : 'accessing' }
+TTFontCatalogueEntry >> familyName [
+	"The family my face states, as its own name table spells it. The catalogue keys me by this
+	 name in lower case, and answers this one to a reader."
+
+	^ metadata familyName
+]
+
 { #category : 'inspecting' }
 TTFontCatalogueEntry >> inspectorSource: aBuilder [
 	"Where my bytes are, how many there are, and how few of them the scan read to know what
@@ -48,6 +56,14 @@ TTFontCatalogueEntry >> inspectorSource: aBuilder [
 				  ('bytes' -> source size printString).
 				  ('read by the scan' -> read printString) };
 		  yourself
+]
+
+{ #category : 'testing' }
+TTFontCatalogueEntry >> isRejected [
+	"Whether my face carries a reason not to draw it. Asked of me rather than of my metadata,
+	 so a caller sorting entries does not have to know where the reason is kept."
+
+	^ metadata isRejected
 ]
 
 { #category : 'accessing' }
