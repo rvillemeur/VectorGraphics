@@ -18,6 +18,18 @@ TTFontMetadataReader class >> boldWeightClass [
 	^ 700
 ]
 
+{ #category : 'reading' }
+TTFontMetadataReader class >> bytesReadForTableLengths: aDictionary [
+	"How many bytes a door of mine reads from a font whose directory records these table
+	 lengths: the offset table, one directory record per table the font carries, and the whole
+	 of the tables of classifiedTableTags. A view says this figure, and asks me for it so it
+	 cannot drift from what I do."
+
+	^ self offsetTableSize + (self directoryRecordSize * aDictionary size)
+	  + (self classifiedTableTags inject: 0 into: [ :sum :tag |
+			   sum + (aDictionary at: tag ifAbsent: [ 0 ]) ])
+]
+
 { #category : 'constants' }
 TTFontMetadataReader class >> classifiedTableTags [
 	"The three tables a face is named and classified from. Together they are under a kilobyte of
@@ -159,7 +171,7 @@ TTFontMetadataReader class >> metadataFromEntries: anEntryByTag lengths: aDictio
 	| metadata |
 	metadata := TTFontMetadata new.
 	metadata tableLengthsByTag: aDictionary.
-	metadata rejectionReason: (self rejectionFromTags: aDictionary keys).
+	metadata rejectionReason: (self rejectionFromTags: metadata tableTags).
 	(anEntryByTag includesKey: self nameTableTag) ifTrue: [
 		self readNamesInto: metadata fromEntries: anEntryByTag ].
 	self readStyleInto: metadata fromEntries: anEntryByTag.

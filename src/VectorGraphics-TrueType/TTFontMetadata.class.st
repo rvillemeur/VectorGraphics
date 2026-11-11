@@ -32,6 +32,15 @@ TTFontMetadata >> familyName: aString [
 	familyName := aString
 ]
 
+{ #category : 'initialization' }
+TTFontMetadata >> initialize [
+	"A face states no table until the reader walks the directory. An empty census, never nil, so
+	 no reader of mine has to guard against one."
+
+	super initialize.
+	tableLengthsByTag := Dictionary new
+]
+
 { #category : 'inspector' }
 TTFontMetadata >> inspectorIdentity: aBuilder [
 	"What a font manager keys a face by: the family it belongs to, its style within that family,
@@ -61,7 +70,7 @@ TTFontMetadata >> inspectorIdentity: aBuilder [
 		  yourself
 ]
 
-{ #category : 'inspector' }
+{ #category : 'inspecting' }
 TTFontMetadata >> inspectorTables: aBuilder [
 	"Every table the font carries, and which of them was read to name it. The Read column asks
 	 TTFontMetadataReader nameTableTag, the same constant both doors of the reader ask, so it
@@ -69,8 +78,6 @@ TTFontMetadata >> inspectorTables: aBuilder [
 	 or twenty tables, glyf and loca are the large ones, and neither is read."
 
 	<inspectorPresentationOrder: 20 title: 'Tables'>
-	| lengths |
-	lengths := tableLengthsByTag ifNil: [ Dictionary new ].
 	^ aBuilder newTable
 		  addColumn:
 			  ((SpStringTableColumn title: 'Tag' evaluated: [ :each | each key ])
@@ -84,7 +91,7 @@ TTFontMetadata >> inspectorTables: aBuilder [
 					   each key = TTFontMetadataReader nameTableTag
 						   ifTrue: [ 'yes' ]
 						   ifFalse: [ '' ] ]);
-		  items: (lengths associations asSortedCollection: [ :a :b |
+		  items: (tableLengthsByTag associations asSortedCollection: [ :a :b |
 					   a key <= b key ]) asArray;
 		  yourself
 ]
@@ -167,6 +174,15 @@ TTFontMetadata >> tableLengthsByTag [
 { #category : 'accessing' }
 TTFontMetadata >> tableLengthsByTag: aDictionary [
 	tableLengthsByTag := aDictionary
+]
+
+{ #category : 'accessing' }
+TTFontMetadata >> tableTags [
+	"The four-character tags of every table the font's directory records, read or not. The
+	 question asked of me twice: by the reader, to find the first reason not to draw the face,
+	 and by a view, to say what was passed over."
+
+	^ tableLengthsByTag keys
 ]
 
 { #category : 'accessing' }

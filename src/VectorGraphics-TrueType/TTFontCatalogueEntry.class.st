@@ -30,17 +30,13 @@ TTFontCatalogueEntry >> bytes [
 { #category : 'inspecting' }
 TTFontCatalogueEntry >> inspectorSource: aBuilder [
 	"Where my bytes are, how many there are, and how few of them the scan read to know what
-	 face I am. The read figure is computed from the reader's own constants and from the table
-	 directory my metadata kept, so it cannot drift from what the reader does: the offset table,
-	 one record per table the font carries, and the tables of classifiedTableTags."
+	 face I am. The read figure comes from the reader itself, over the table directory my
+	 metadata kept, so it cannot drift from what the reader does."
 
 	<inspectorPresentationOrder: 10 title: 'Source'>
-	| lengths read |
-	lengths := metadata tableLengthsByTag ifNil: [ Dictionary new ].
-	read := TTFontMetadataReader offsetTableSize
-	        + (TTFontMetadataReader directoryRecordSize * lengths size)
-	        + ((TTFontMetadataReader classifiedTableTags inject: 0 into: [ :sum :tag |
-			          sum + (lengths at: tag ifAbsent: [ 0 ]) ])).
+	| read |
+	read := TTFontMetadataReader bytesReadForTableLengths:
+		        metadata tableLengthsByTag.
 	^ aBuilder newTable
 		  addColumn:
 			  ((SpStringTableColumn title: 'Name' evaluated: [ :each | each key ])
