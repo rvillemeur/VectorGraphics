@@ -63,6 +63,23 @@ TTFontMetadataReader class >> directorySizeOf: anOffsetTable [
 	  * self directoryRecordSize
 ]
 
+{ #category : 'reading' }
+TTFontMetadataReader class >> entriesFrom: aStream directory: aDirectory [
+	"The tables of classifiedTableTags, pulled off the stream one seek at a time and wrapped as
+	 entries over their own bytes rather than over the whole font. A table the font does not
+	 carry is left out, which is how a missing head or OS/2 reaches the classifying step."
+
+	| entries |
+	entries := Dictionary new.
+	self classifiedTableTags do: [ :tag |
+		(aDirectory at: tag ifAbsent: [ nil ]) ifNotNil: [ :entry |
+			aStream position: entry offset - 1.
+			entries
+				at: tag
+				put: (TTFontTableDirEntry onBytes: (aStream next: entry length)) ] ].
+	^ entries
+]
+
 { #category : 'constants' }
 TTFontMetadataReader class >> fsSelectionItalicMask [
 	^ 2r1
@@ -230,26 +247,22 @@ TTFontMetadataReader class >> readStream: aStream [
 	 their name tables. A file this reader cannot walk answers a rejected metadata, since the
 	 catalogue meets every file a font directory holds."
 
-	| offsetTable directoryBytes directory entries rejection |
+	| offsetTable directoryBytes directory rejection promised |
 	offsetTable := aStream next: self offsetTableSize.
 	rejection := self offsetTableRejection: offsetTable.
 	rejection ifNotNil: [ ^ self rejectedMetadata: rejection ].
-	directoryBytes := aStream next: (self directorySizeOf: offsetTable).
-	directoryBytes size = (self directorySizeOf: offsetTable) ifFalse: [
+	promised := self directorySizeOf: offsetTable.
+	directoryBytes := aStream next: promised.
+	directoryBytes size = promised ifFalse: [
 		^ self rejectedMetadata: #notAnSfntFont ].
 	directory := TTFontReader
 		             buildTableDirectory: offsetTable , directoryBytes
 		             offset: 0.
 	(self tablesFitIn: aStream size directory: directory) ifFalse: [
 		^ self rejectedMetadata: #notAnSfntFont ].
-	entries := Dictionary new.
-	self classifiedTableTags do: [ :tag |
-		(directory at: tag ifAbsent: [ nil ]) ifNotNil: [ :entry |
-			aStream position: entry offset - 1.
-			entries
-				at: tag
-				put: (TTFontTableDirEntry onBytes: (aStream next: entry length)) ] ].
-	^ self metadataFromEntries: entries lengths: (self lengthsFrom: directory)
+	^ self
+		  metadataFromEntries: (self entriesFrom: aStream directory: directory)
+		  lengths: (self lengthsFrom: directory)
 ]
 
 { #category : 'reading' }
