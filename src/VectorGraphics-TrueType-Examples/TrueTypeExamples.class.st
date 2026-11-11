@@ -57,6 +57,20 @@ TrueTypeExamples class >> fontDirectories [
 ]
 
 { #category : 'examples' }
+TrueTypeExamples class >> fontFiles [
+	"Every TrueType file this machine holds, in the directories above. Unit 1.4 of FONT-PLAN.md
+	 moves the walk into TTFontCatalogue; it lives here so the examples below run with one click."
+
+	^ Array streamContents: [ :stream |
+		  self fontDirectories do: [ :directory |
+			  directory exists ifTrue: [
+				  directory allChildren do: [ :each |
+					  (each isFile and: [
+						   each basename asLowercase endsWith: '.ttf' ]) ifTrue: [
+						  stream nextPut: each ] ] ] ] ]
+]
+
+{ #category : 'examples' }
 TrueTypeExamples class >> fontMetadata [
 	"Load a TTF file and inspect its metadata.
 	TrueTypeExamples fontMetadata inspect"
@@ -79,21 +93,18 @@ TrueTypeExamples class >> fontMetadata [
 { #category : 'examples' }
 TrueTypeExamples class >> fontNamesWithoutParsingGlyphs [
 	"One click: the family and the style of every TrueType file on this machine, read by
-	 TTFontMetadataReader — the table directory and the name table only, with no glyph parsed.
-	 This is what a font manager needs in order to name every face it can offer, and it is the
-	 one of the two services Alexandrie takes from FreeType that costs a scan of the whole
-	 filesystem. A file the reader refuses is kept with the reason it gave, because a scan that
-	 drops a file silently cannot be read against the directory it walked.
+	 TTFontMetadataReader — the table directory and three small tables, with no glyph parsed.
+	 This is what a font manager needs in order to name every face it can offer, and it is one of
+	 the two services Alexandrie takes from FreeType that costs a scan of the whole filesystem. A
+	 file the reader refuses is kept with the reason it gave, because a scan that drops a file
+	 silently cannot be read against the directory it walked.
 	 TrueTypeExamples fontNamesWithoutParsingGlyphs inspect"
 
 	<sampleInstance>
 	| names |
 	names := Dictionary new.
-	self fontDirectories do: [ :directory |
-		directory exists ifTrue: [
-			directory allChildren do: [ :each |
-				(each isFile and: [ each basename asLowercase endsWith: '.ttf' ])
-					ifTrue: [ names at: each fullName put: (self metadataOrReasonFor: each) ] ] ] ].
+	self fontFiles do: [ :each |
+		names at: each fullName put: (self metadataOrReasonFor: each) ].
 	^ names
 ]
 
@@ -165,4 +176,29 @@ TrueTypeExamples class >> newContourFromAbsolutePoints: anArrayOfPairs [
 		points at: index putX: pair first.
 		points at: index putY: pair second ].
 	^ TTContourConstruction on: points
+]
+
+{ #category : 'examples' }
+TrueTypeExamples class >> styleCountsOfTheInstalledFonts [
+	"One click: how the fonts on this machine classify themselves, as a count for every weight
+	 class, width class and slant found. Each fact is read from the font's own OS/2 and head
+	 tables. Alexandrie reaches the same three facts by splitting the style name on spaces and
+	 matching the tokens against word lists, so what shows here is information the chain does not
+	 have today: a face whose style name says nothing of its width still states its width class.
+	 TrueTypeExamples styleCountsOfTheInstalledFonts inspect"
+
+	<sampleInstance>
+	| counts |
+	counts := Dictionary new.
+	self fontFiles do: [ :each |
+		| metadata |
+		metadata := self metadataOrReasonFor: each.
+		metadata isString ifFalse: [
+			| key |
+			key := {
+				       metadata weightClass.
+				       metadata widthClass.
+				       metadata slant }.
+			counts at: key put: (counts at: key ifAbsent: [ 0 ]) + 1 ] ].
+	^ counts
 ]

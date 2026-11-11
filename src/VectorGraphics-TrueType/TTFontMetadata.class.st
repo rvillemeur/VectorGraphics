@@ -9,6 +9,9 @@ Class {
 	#instVars : [
 		'familyName',
 		'styleName',
+		'weightClass',
+		'widthClass',
+		'slant',
 		'tableLengthsByTag'
 	],
 	#category : 'VectorGraphics-TrueType-Reading',
@@ -30,9 +33,10 @@ TTFontMetadata >> familyName: aString [
 
 { #category : 'inspector' }
 TTFontMetadata >> inspectorIdentity: aBuilder [
-	"What a font manager keys a face by: the family it belongs to and its style within that
-	 family. Both are read from the font's own name table, so what shows here is what the font
-	 calls itself, not what its file is called."
+	"What a font manager keys a face by: the family it belongs to, its style within that family,
+	 and the three facts it is matched on. The names come from the font's own name table and the
+	 three facts from its OS/2 and head tables, so what shows here is what the font says about
+	 itself, not what its file is called nor what the words of its style name suggest."
 
 	<inspectorPresentationOrder: 10 title: 'Identity'>
 	^ aBuilder newTable
@@ -43,7 +47,13 @@ TTFontMetadata >> inspectorIdentity: aBuilder [
 			  (SpStringTableColumn title: 'Value' evaluated: [ :each | each value ]);
 		  items: {
 				  ('family' -> (familyName ifNil: [ '' ])).
-				  ('style' -> (styleName ifNil: [ '' ])) };
+				  ('style' -> (styleName ifNil: [ '' ])).
+				  ('weight class' -> (weightClass ifNil: [ '' ] ifNotNil: [ :each |
+						    each printString ])).
+				  ('width class' -> (widthClass ifNil: [ '' ] ifNotNil: [ :each |
+						    each printString ])).
+				  ('slant' -> (slant ifNil: [ '' ] ifNotNil: [ :each |
+						    each asString ])) };
 		  yourself
 ]
 
@@ -88,6 +98,19 @@ TTFontMetadata >> printOn: aStream [
 ]
 
 { #category : 'accessing' }
+TTFontMetadata >> slant [
+	"#normal, #italic or #oblique: a true italic and a sheared roman are drawn differently and
+	 AeFontSlant keeps them apart."
+
+	^ slant
+]
+
+{ #category : 'accessing' }
+TTFontMetadata >> slant: aSymbol [
+	slant := aSymbol
+]
+
+{ #category : 'accessing' }
 TTFontMetadata >> styleName [
 	"The name of this face within its family — Regular, Bold Italic, Condensed Light — as the
 	 font's own name table spells it, in the record TrueType calls the subfamily."
@@ -111,4 +134,32 @@ TTFontMetadata >> tableLengthsByTag [
 { #category : 'accessing' }
 TTFontMetadata >> tableLengthsByTag: aDictionary [
 	tableLengthsByTag := aDictionary
+]
+
+{ #category : 'accessing' }
+TTFontMetadata >> weightClass [
+	"The weight on the OS/2 scale, 100 thin to 1000 extra-black, 400 normal and 700 bold. It is
+	 the scale AeFontWeight already answers from value, so the Bloc layer maps it with no
+	 arithmetic."
+
+	^ weightClass
+]
+
+{ #category : 'accessing' }
+TTFontMetadata >> weightClass: anInteger [
+	weightClass := anInteger
+]
+
+{ #category : 'accessing' }
+TTFontMetadata >> widthClass [
+	"The width on the OS/2 scale, 1 ultra-condensed to 9 ultra-expanded, 5 normal. AeFontStretch
+	 numbers the same nine steps from zero, so the Bloc layer maps it by subtracting one; this is
+	 the font format's own number and not Alexandrie's, which is why it is named for the field."
+
+	^ widthClass
+]
+
+{ #category : 'accessing' }
+TTFontMetadata >> widthClass: anInteger [
+	widthClass := anInteger
 ]

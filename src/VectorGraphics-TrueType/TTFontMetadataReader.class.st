@@ -14,10 +14,45 @@ Class {
 }
 
 { #category : 'constants' }
+TTFontMetadataReader class >> boldWeightClass [
+	^ 700
+]
+
+{ #category : 'constants' }
+TTFontMetadataReader class >> classifiedTableTags [
+	"The three tables a face is named and classified from. Together they are under a kilobyte of
+	 a file that is megabytes, which is what makes the stream door worth having."
+
+	^ { self nameTableTag. self headTableTag. self os2TableTag }
+]
+
+{ #category : 'constants' }
+TTFontMetadataReader class >> condensedWidthClass [
+	^ 3
+]
+
+{ #category : 'constants' }
 TTFontMetadataReader class >> directoryRecordSize [
 	"One table directory record: tag, checksum, offset, length, four bytes each."
 
 	^ 16
+]
+
+{ #category : 'constants' }
+TTFontMetadataReader class >> fsSelectionItalicMask [
+	^ 2r1
+]
+
+{ #category : 'constants' }
+TTFontMetadataReader class >> fsSelectionObliqueMask [
+	^ 2r1000000000
+]
+
+{ #category : 'constants' }
+TTFontMetadataReader class >> headTableTag [
+	"head carries macStyle, which is all a font with no OS/2 table says about its style."
+
+	^ 'head'
 ]
 
 { #category : 'private' }
@@ -29,17 +64,30 @@ TTFontMetadataReader class >> lengthsFrom: aDirectory [
 	^ aDirectory collect: [ :entry | entry length ]
 ]
 
-{ #category : 'private' }
-TTFontMetadataReader class >> metadataFromNameTableEntry: anEntry [
-	"The eight strings TTNameTableParser answers are indexed by name identifier plus one, so
-	 the family is the second and the subfamily — which every font manager calls the style —
-	 is the third."
+{ #category : 'constants' }
+TTFontMetadataReader class >> macStyleBoldMask [
+	^ 2r1
+]
 
-	| strings metadata |
-	strings := (TTNameTableParser on: anEntry) process.
+{ #category : 'constants' }
+TTFontMetadataReader class >> macStyleCondensedMask [
+	^ 2r100000
+]
+
+{ #category : 'constants' }
+TTFontMetadataReader class >> macStyleItalicMask [
+	^ 2r10
+]
+
+{ #category : 'private' }
+TTFontMetadataReader class >> metadataFromEntries: anEntryByTag lengths: aDictionary [
+	"My one answer: a TTFontMetadata named from the name table and classified from OS/2 and head."
+
+	| metadata |
 	metadata := TTFontMetadata new.
-	metadata familyName: (strings at: 2).
-	metadata styleName: (strings at: 3).
+	metadata tableLengthsByTag: aDictionary.
+	self readNamesInto: metadata fromEntries: anEntryByTag.
+	self readStyleInto: metadata fromEntries: anEntryByTag.
 	^ metadata
 ]
 
@@ -52,6 +100,16 @@ TTFontMetadataReader class >> nameTableTag [
 ]
 
 { #category : 'constants' }
+TTFontMetadataReader class >> normalWeightClass [
+	^ 400
+]
+
+{ #category : 'constants' }
+TTFontMetadataReader class >> normalWidthClass [
+	^ 5
+]
+
+{ #category : 'constants' }
 TTFontMetadataReader class >> offsetTableSize [
 	"The sfnt offset table: version, table count, and three fields a reader that only names a
 	 font does not use."
@@ -59,26 +117,45 @@ TTFontMetadataReader class >> offsetTableSize [
 	^ 12
 ]
 
+{ #category : 'constants' }
+TTFontMetadataReader class >> os2TableTag [
+	"The tag is written with the solidus: four characters, O, S, slash, 2."
+
+	^ 'OS/2'
+]
+
 { #category : 'reading' }
 TTFontMetadataReader class >> readBytes: aByteArray [
-	"Read a whole font's bytes: walk the table directory, read the name table and stop.
-	 Prefer readStream: when the font is a file on disk — reading the file whole is the cost."
+	"Read a whole font's bytes: walk the table directory, read the tables that name and classify
+	 the face, and stop. Prefer readStream: when the font is a file on disk — reading the file
+	 whole is the cost."
 
-	| directory metadata |
+	| directory |
 	directory := TTFontReader buildTableDirectory: aByteArray offset: 0.
-	metadata := self metadataFromNameTableEntry:
-		            (directory at: self nameTableTag).
-	metadata tableLengthsByTag: (self lengthsFrom: directory).
-	^ metadata
+	^ self metadataFromEntries: directory lengths: (self lengthsFrom: directory)
+]
+
+{ #category : 'private' }
+TTFontMetadataReader class >> readNamesInto: aMetadata fromEntries: anEntryByTag [
+	"The eight strings TTNameTableParser answers are indexed by name identifier plus one, so the
+	 family is the second and the subfamily — which every font manager calls the style — is the
+	 third."
+
+	| strings |
+	strings := (TTNameTableParser on: (anEntryByTag at: self nameTableTag))
+		           process.
+	aMetadata familyName: (strings at: 2).
+	aMetadata styleName: (strings at: 3)
 ]
 
 { #category : 'reading' }
 TTFontMetadataReader class >> readStream: aStream [
-	"Pull the offset table, the table directory and the name table, and nothing else. A font
-	 file is megabytes and its name table is a few hundred bytes: the 362 fonts installed on
-	 this machine are 262 MB and 4.6 s of disk, against 14 ms to parse all their name tables."
+	"Pull the offset table, the table directory and the three tables of classifiedTableTags, and
+	 nothing else. A font file is megabytes and those three tables are under a kilobyte: the 362
+	 fonts installed on this machine are 262 MB and 4.6 s of disk, against 14 ms to parse all
+	 their name tables."
 
-	| offsetTable directoryBytes directory nameEntry metadata |
+	| offsetTable directoryBytes directory entries |
 	offsetTable := aStream next: self offsetTableSize.
 	directoryBytes := aStream next:
 		                  (offsetTable shortAt: self tableCountOffset bigEndian: true)
@@ -86,12 +163,56 @@ TTFontMetadataReader class >> readStream: aStream [
 	directory := TTFontReader
 		             buildTableDirectory: offsetTable , directoryBytes
 		             offset: 0.
-	nameEntry := directory at: self nameTableTag.
-	aStream position: nameEntry offset - 1.
-	metadata := self metadataFromNameTableEntry:
-		            (TTFontTableDirEntry onBytes: (aStream next: nameEntry length)).
-	metadata tableLengthsByTag: (self lengthsFrom: directory).
-	^ metadata
+	entries := Dictionary new.
+	self classifiedTableTags do: [ :tag |
+		(directory at: tag ifAbsent: [ nil ]) ifNotNil: [ :entry |
+			aStream position: entry offset - 1.
+			entries
+				at: tag
+				put: (TTFontTableDirEntry onBytes: (aStream next: entry length)) ] ].
+	^ self metadataFromEntries: entries lengths: (self lengthsFrom: directory)
+]
+
+{ #category : 'private' }
+TTFontMetadataReader class >> readStyleInto: aMetadata fromEntries: anEntryByTag [
+	"Weight, width and slant from the font's own tables and not from the words of its style name,
+	 which is how AeFaceEntry guesses them. OS/2 is the authority; head's macStyle answers for a
+	 font that carries no OS/2 table, and for the fields OS/2 left at zero."
+
+	| macStyle os2 |
+	macStyle := (anEntryByTag at: self headTableTag ifAbsent: [ nil ])
+		            ifNil: [ 0 ]
+		            ifNotNil: [ :entry |
+			            (TTHeadTableParser on: entry) process at: #macStyle ].
+	os2 := (anEntryByTag at: self os2TableTag ifAbsent: [ nil ]) ifNotNil: [
+		       :entry | (TTOS2TableParser on: entry) process ].
+	aMetadata weightClass: (self weightClassFrom: os2 macStyle: macStyle).
+	aMetadata widthClass: (self widthClassFrom: os2 macStyle: macStyle).
+	aMetadata slant: (self slantFrom: os2 macStyle: macStyle)
+]
+
+{ #category : 'private' }
+TTFontMetadataReader class >> slantFrom: aDictionaryOrNil macStyle: anInteger [
+	"A font that sets both bits is oblique: bit 0 is set for the benefit of readers that know
+	 nothing of bit 9, so the narrower claim wins."
+
+	| selection |
+	selection := self statedIn: aDictionaryOrNil at: #fsSelection.
+	(selection anyMask: self fsSelectionObliqueMask) ifTrue: [ ^ #oblique ].
+	((selection anyMask: self fsSelectionItalicMask) or: [
+		 anInteger anyMask: self macStyleItalicMask ]) ifTrue: [ ^ #italic ].
+	^ #normal
+]
+
+{ #category : 'private' }
+TTFontMetadataReader class >> statedIn: aDictionaryOrNil at: aSymbol [
+	"What OS/2 says about one of its three fields, or zero when there is no OS/2 table. Zero is
+	 outside every one of the three scales, so a field left at zero and a missing table are the
+	 same thing: the font has not stated it."
+
+	^ aDictionaryOrNil
+		  ifNil: [ 0 ]
+		  ifNotNil: [ :os2Fields | os2Fields at: aSymbol ]
 ]
 
 { #category : 'constants' }
@@ -99,4 +220,30 @@ TTFontMetadataReader class >> tableCountOffset [
 	"Where the table count sits in the offset table, one-based: after the four-byte version."
 
 	^ 5
+]
+
+{ #category : 'private' }
+TTFontMetadataReader class >> weightClassFrom: aDictionaryOrNil macStyle: anInteger [
+	"The 100 to 1000 scale OS/2 states outright. Without it, macStyle's bold bit leaves a choice
+	 of two."
+
+	| stated |
+	stated := self statedIn: aDictionaryOrNil at: #usWeightClass.
+	stated = 0 ifFalse: [ ^ stated ].
+	^ (anInteger anyMask: self macStyleBoldMask)
+		  ifTrue: [ self boldWeightClass ]
+		  ifFalse: [ self normalWeightClass ]
+]
+
+{ #category : 'private' }
+TTFontMetadataReader class >> widthClassFrom: aDictionaryOrNil macStyle: anInteger [
+	"macStyle holds one condensed bit against the nine steps of usWidthClass, so without OS/2 a
+	 face is condensed or it is normal."
+
+	| stated |
+	stated := self statedIn: aDictionaryOrNil at: #usWidthClass.
+	stated = 0 ifFalse: [ ^ stated ].
+	^ (anInteger anyMask: self macStyleCondensedMask)
+		  ifTrue: [ self condensedWidthClass ]
+		  ifFalse: [ self normalWidthClass ]
 ]

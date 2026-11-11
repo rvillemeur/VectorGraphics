@@ -19,17 +19,18 @@ Class {
 
 { #category : 'parsing' }
 TTHeadTableParser >> process [
-
-	| units origin corner indexToLocFormat |
+	| units origin corner indexToLocFormat macStyle |
 	entry skip: 18. "version(4) + revision(4) + checkSumAdj(4) + magic(4) + flags(2)"
 	units := entry nextUShort.
 	entry skip: 16. "created(8) + modified(8)"
 	origin := entry nextShort @ entry nextShort.
 	corner := entry nextShort @ entry nextShort.
-	entry skip: 6. "macStyle(2) + lowestRecPPEM(2) + fontDirHint(2)"
+	macStyle := entry nextUShort.
+	entry skip: 4. "lowestRecPPEM(2) + fontDirHint(2)"
 	indexToLocFormat := entry nextShort.
-	^ Dictionary
-		  with: #units -> units
-		  with: #bounds -> (origin corner: corner)
-		  with: #indexToLocFormat -> indexToLocFormat
+	^ Dictionary newFrom: {
+			  (#units -> units).
+			  (#bounds -> (origin corner: corner)).
+			  (#indexToLocFormat -> indexToLocFormat).
+			  (#macStyle -> macStyle) }
 ]

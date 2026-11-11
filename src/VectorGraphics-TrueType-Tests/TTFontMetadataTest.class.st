@@ -25,10 +25,10 @@ TTFontMetadataTest >> testPrintingNamesTheFamilyAndTheStyle [
 ]
 
 { #category : 'tests' }
-TTFontMetadataTest >> testTheIdentityViewOfAFaceWithNoNamesYetBuildsAndShowsEmptyStrings [
-	"The degenerate state: a metadata object whose names have not been set. A table column
-	 answering nil draws nothing and raises nothing, so only running the column blocks over
-	 the rows catches it — which is what the inspector does per drawn row."
+TTFontMetadataTest >> testTheIdentityViewOfAFaceWithNothingReadYetBuildsAndShowsEmptyStrings [
+	"The degenerate state: a metadata object whose names and style have not been set. A table
+	 column answering nil draws nothing and raises nothing, so only running the column blocks
+	 over the rows catches it — which is what the inspector does per drawn row."
 
 	| builder presenter values |
 	builder := SpPresenterBuilder newApplication: SpApplication new.
@@ -40,7 +40,30 @@ TTFontMetadataTest >> testTheIdentityViewOfAFaceWithNoNamesYetBuildsAndShowsEmpt
 	presenter columns do: [ :column |
 		presenter items do: [ :item | values add: (column evaluation value: item) ] ].
 	self assert: (values allSatisfy: [ :each | each isString ]).
-	self assert: presenter items size equals: 2
+	self assert: presenter items size equals: 5
+]
+
+{ #category : 'tests' }
+TTFontMetadataTest >> testTheIdentityViewShowsTheThreeFactsAFaceIsMatchedOn [
+	"A reader opening a face must see what a font manager will match it on, in the font's own
+	 numbers: the OS/2 weight class, the OS/2 width class and the slant."
+
+	| builder metadata presenter values |
+	metadata := TTFontMetadata new.
+	metadata
+		familyName: 'Source Sans Pro';
+		styleName: 'Bold Italic';
+		weightClass: 700;
+		widthClass: 3;
+		slant: #italic.
+	builder := SpPresenterBuilder newApplication: SpApplication new.
+	presenter := (StInspectionContext new
+		              inspectedObject: metadata;
+		              methodSelector: #inspectorIdentity:;
+		              yourself) basicNewInspectionPresenter: builder.
+	values := presenter items collect: [ :item |
+		          (presenter columns last evaluation value: item) ].
+	self assert: values asArray equals: #( 'Source Sans Pro' 'Bold Italic' '700' '3' 'italic' )
 ]
 
 { #category : 'tests' }
