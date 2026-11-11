@@ -152,10 +152,8 @@ TTFontCatalogue >> inspectorRefusals: aBuilder [
 
 	<inspectorPresentationOrder: 20 title: 'Refusals'>
 	| byReason |
-	byReason := Dictionary new.
-	self refusedEntries do: [ :each |
-		(byReason at: each metadata rejectionReason ifAbsentPut: [
-			 OrderedCollection new ]) add: each ].
+	byReason := self refusedEntries groupedBy: [ :each |
+		            each metadata rejectionReason ].
 	^ aBuilder newTable
 		  addColumn: ((SpStringTableColumn
 				    title: 'Reason'
