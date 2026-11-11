@@ -27,6 +27,23 @@ TTFontMetadataReader class >> classifiedTableTags [
 ]
 
 { #category : 'constants' }
+TTFontMetadataReader class >> collectionVersion [
+	"The tag of a font collection, a file holding several fonts behind offsets. It is not a font
+	 and has no table directory of its own."
+
+	^ 'ttcf' asByteArray
+]
+
+{ #category : 'constants' }
+TTFontMetadataReader class >> colourTableTags [
+	"The tables a colour font carries its glyphs in: embedded bitmaps, Apple's bitmaps, and SVG
+	 documents. The tag of the last is three letters and a space, as every sfnt tag is four
+	 bytes."
+
+	^ #( 'CBDT' 'sbix' 'SVG ' )
+]
+
+{ #category : 'constants' }
 TTFontMetadataReader class >> condensedWidthClass [
 	^ 3
 ]
@@ -38,6 +55,14 @@ TTFontMetadataReader class >> directoryRecordSize [
 	^ 16
 ]
 
+{ #category : 'reading' }
+TTFontMetadataReader class >> directorySizeOf: anOffsetTable [
+	"How many bytes of directory records the offset table promises, one per table."
+
+	^ (anOffsetTable shortAt: self tableCountOffset bigEndian: true)
+	  * self directoryRecordSize
+]
+
 { #category : 'constants' }
 TTFontMetadataReader class >> fsSelectionItalicMask [
 	^ 2r1
@@ -46,6 +71,14 @@ TTFontMetadataReader class >> fsSelectionItalicMask [
 { #category : 'constants' }
 TTFontMetadataReader class >> fsSelectionObliqueMask [
 	^ 2r1000000000
+]
+
+{ #category : 'constants' }
+TTFontMetadataReader class >> glyfTableTag [
+	"The table holding TrueType outlines. A font without it has CFF outlines, which this project
+	 cannot draw."
+
+	^ 'glyf'
 ]
 
 { #category : 'constants' }
@@ -89,14 +122,17 @@ TTFontMetadataReader class >> macStyleItalicMask [
 	^ 2r10
 ]
 
-{ #category : 'private' }
+{ #category : 'reading' }
 TTFontMetadataReader class >> metadataFromEntries: anEntryByTag lengths: aDictionary [
-	"My one answer: a TTFontMetadata named from the name table and classified from OS/2 and head."
+	"My one answer: a TTFontMetadata named from the name table, classified from OS/2 and head,
+	 and carrying the first reason the directory gives not to draw the face."
 
 	| metadata |
 	metadata := TTFontMetadata new.
 	metadata tableLengthsByTag: aDictionary.
-	self readNamesInto: metadata fromEntries: anEntryByTag.
+	metadata rejectionReason: (self rejectionFromTags: aDictionary keys).
+	(anEntryByTag includesKey: self nameTableTag) ifTrue: [
+		self readNamesInto: metadata fromEntries: anEntryByTag ].
 	self readStyleInto: metadata fromEntries: anEntryByTag.
 	^ metadata
 ]
@@ -117,6 +153,19 @@ TTFontMetadataReader class >> normalWeightClass [
 { #category : 'constants' }
 TTFontMetadataReader class >> normalWidthClass [
 	^ 5
+]
+
+{ #category : 'reading' }
+TTFontMetadataReader class >> offsetTableRejection: aByteArray [
+	"What the twelve-byte offset table says before a single table is read: a file too short to
+	 hold one, a version word this reader does not know, and a collection are all files it reads
+	 no further."
+
+	aByteArray size < self offsetTableSize ifTrue: [ ^ #notAnSfntFont ].
+	(aByteArray first: 4) = self collectionVersion ifTrue: [ ^ #fontCollection ].
+	^ (self sfntVersions includes: (aByteArray first: 4))
+		  ifTrue: [ nil ]
+		  ifFalse: [ #notAnSfntFont ]
 ]
 
 { #category : 'constants' }
@@ -146,10 +195,17 @@ TTFontMetadataReader class >> os2TableTag [
 TTFontMetadataReader class >> readBytes: aByteArray [
 	"Read a whole font's bytes: walk the table directory, read the tables that name and classify
 	 the face, and stop. Prefer readStream: when the font is a file on disk — reading the file
-	 whole is the cost."
+	 whole is the cost. Answers a rejected metadata rather than raising for a file this reader
+	 cannot walk."
 
-	| directory |
+	| rejection directory |
+	rejection := self offsetTableRejection: aByteArray.
+	rejection ifNotNil: [ ^ self rejectedMetadata: rejection ].
+	aByteArray size < (self offsetTableSize + (self directorySizeOf: aByteArray)) ifTrue: [
+		^ self rejectedMetadata: #notAnSfntFont ].
 	directory := TTFontReader buildTableDirectory: aByteArray offset: 0.
+	(self tablesFitIn: aByteArray size directory: directory) ifFalse: [
+		^ self rejectedMetadata: #notAnSfntFont ].
 	^ self metadataFromEntries: directory lengths: (self lengthsFrom: directory)
 ]
 
@@ -171,16 +227,21 @@ TTFontMetadataReader class >> readStream: aStream [
 	"Pull the offset table, the table directory and the three tables of classifiedTableTags, and
 	 nothing else. A font file is megabytes and those three tables are under a kilobyte: the 362
 	 fonts installed on this machine are 262 MB and 4.6 s of disk, against 14 ms to parse all
-	 their name tables."
+	 their name tables. A file this reader cannot walk answers a rejected metadata, since the
+	 catalogue meets every file a font directory holds."
 
-	| offsetTable directoryBytes directory entries |
+	| offsetTable directoryBytes directory entries rejection |
 	offsetTable := aStream next: self offsetTableSize.
-	directoryBytes := aStream next:
-		                  (offsetTable shortAt: self tableCountOffset bigEndian: true)
-		                  * self directoryRecordSize.
+	rejection := self offsetTableRejection: offsetTable.
+	rejection ifNotNil: [ ^ self rejectedMetadata: rejection ].
+	directoryBytes := aStream next: (self directorySizeOf: offsetTable).
+	directoryBytes size = (self directorySizeOf: offsetTable) ifFalse: [
+		^ self rejectedMetadata: #notAnSfntFont ].
 	directory := TTFontReader
 		             buildTableDirectory: offsetTable , directoryBytes
 		             offset: 0.
+	(self tablesFitIn: aStream size directory: directory) ifFalse: [
+		^ self rejectedMetadata: #notAnSfntFont ].
 	entries := Dictionary new.
 	self classifiedTableTags do: [ :tag |
 		(directory at: tag ifAbsent: [ nil ]) ifNotNil: [ :entry |
@@ -203,6 +264,38 @@ TTFontMetadataReader class >> readStyleInto: aMetadata fromEntries: anEntryByTag
 	aMetadata weightClass: (self weightClassFrom: os2 macStyle: macStyle).
 	aMetadata widthClass: (self widthClassFrom: os2 macStyle: macStyle).
 	aMetadata slant: (self slantFrom: os2 macStyle: macStyle)
+]
+
+{ #category : 'reading' }
+TTFontMetadataReader class >> rejectedMetadata: aSymbol [
+	"A face read no further than its reason: a collection and a file that is not a font state
+	 nothing a reader could name them by."
+
+	^ TTFontMetadata new
+		  rejectionReason: aSymbol;
+		  yourself
+]
+
+{ #category : 'reading' }
+TTFontMetadataReader class >> rejectionFromTags: aCollection [
+	"Why a font whose directory was read cannot be drawn, or nil when it can: no name to match
+	 the face by, no outlines to draw, or glyphs that are colour bitmaps or SVG documents rather
+	 than outlines. The first cause answers; the others are not looked for."
+
+	(aCollection includes: self nameTableTag) ifFalse: [ ^ #noNameTable ].
+	(aCollection includes: self glyfTableTag) ifFalse: [ ^ #noGlyfTable ].
+	(self colourTableTags anySatisfy: [ :tag | aCollection includes: tag ]) ifTrue: [
+		^ #colourFont ].
+	^ nil
+]
+
+{ #category : 'constants' }
+TTFontMetadataReader class >> sfntVersions [
+	"The version words of an sfnt file this reader can walk: 0x00010000 for TrueType outlines,
+	 Apple's 'true', and 'OTTO' for CFF outlines, whose directory is ordinary even though its
+	 glyphs are not."
+
+	^ { #[ 0 1 0 0 ]. 'true' asByteArray. 'OTTO' asByteArray }
 ]
 
 { #category : 'private' }
@@ -234,6 +327,16 @@ TTFontMetadataReader class >> tableCountOffset [
 	"Where the table count sits in the offset table, one-based: after the four-byte version."
 
 	^ 5
+]
+
+{ #category : 'reading' }
+TTFontMetadataReader class >> tablesFitIn: anInteger directory: aDirectory [
+	"Whether every table the directory points at lies inside a file of anInteger bytes. A font
+	 cut short — half downloaded, half copied — points past its own end, and the parser that
+	 followed such a record would raise rather than answer."
+
+	^ aDirectory allSatisfy: [ :entry |
+		  entry offset + entry length - 1 <= anInteger ]
 ]
 
 { #category : 'private' }

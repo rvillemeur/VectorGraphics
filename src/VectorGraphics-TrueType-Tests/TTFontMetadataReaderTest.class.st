@@ -14,6 +14,18 @@ Class {
 }
 
 { #category : 'fixtures' }
+TTFontMetadataReaderTest >> colourFontBytes [
+	"A font with glyph outlines and a CBDT table of colour bitmaps beside them. The outlines are
+	 there, so nothing but the colour table tells this face apart from a renderable one."
+
+	^ self fontBytesWithTables: {
+			  ('CBDT' -> (ByteArray new: 32)).
+			  ('glyf' -> (ByteArray new: 32)).
+			  (TTFontMetadataReader nameTableTag
+			   -> (self nameTableWithFamilyName: 'Noto Color Emoji' styleName: 'Regular')) }
+]
+
+{ #category : 'fixtures' }
 TTFontMetadataReaderTest >> fontBytesWithFamilyName: aFamilyName styleName: aStyleName [
 	"An sfnt file holding a name table and nothing else: the names are readable from a font that
 	 carries no glyph data at all."
@@ -61,16 +73,39 @@ TTFontMetadataReaderTest >> fontBytesWithTables: anArray [
 	 A font with no glyf, no loca, no cmap and no hmtx is what tells a metadata reader apart from
 	 TTFontReader, which refuses a font missing any of the eight tables it needs."
 
+	^ self fontBytesWithVersion: #[ 0 1 0 0 ] tables: anArray
+]
+
+{ #category : 'fixtures' }
+TTFontMetadataReaderTest >> fontBytesWithVersion: aByteArray tables: anArray [
+	"A minimal sfnt file whose version word is given: #[0 1 0 0] for TrueType outlines, 'OTTO'
+	 for the CFF outlines of an OpenType font, and anything else for a file this reader knows
+	 nothing of."
+
 	| offsets |
 	offsets := self offsetsOfTables: anArray.
 	^ ByteArray streamContents: [ :stream |
-		  self putOffsetTableFor: anArray on: stream.
+		  self putOffsetTableFor: anArray version: aByteArray on: stream.
 		  (anArray asSortedCollection: [ :a :b | a key <= b key ]) do: [ :each |
 			  self
 				  putDirectoryRecordFor: each
 				  at: (offsets at: each key)
 				  on: stream ].
 		  anArray do: [ :each | stream nextPutAll: each value ] ]
+]
+
+{ #category : 'fixtures' }
+TTFontMetadataReaderTest >> fontCollectionBytes [
+	"A ttcf header: the tag, a version, the number of fonts it holds and one offset per font. A
+	 collection has no table directory of its own at byte twelve, which is why reading one as a
+	 font raises KeyNotFound today."
+
+	^ ByteArray streamContents: [ :stream |
+		  stream nextPutAll: 'ttcf' asByteArray.
+		  self putLong: 16r00010000 on: stream.
+		  self putLong: 2 on: stream.
+		  self putLong: 24 on: stream.
+		  self putLong: 1024 on: stream ]
 ]
 
 { #category : 'fixtures' }
@@ -125,6 +160,14 @@ TTFontMetadataReaderTest >> nameTableWithFamilyName: aFamilyName styleName: aSty
 ]
 
 { #category : 'fixtures' }
+TTFontMetadataReaderTest >> namelessFontBytes [
+	"A font carrying outlines and no name table. A face with no name cannot be matched by family,
+	 which is the one thing a font manager asks of it."
+
+	^ self fontBytesWithTables: { ('glyf' -> (ByteArray new: 32)) }
+]
+
+{ #category : 'fixtures' }
 TTFontMetadataReaderTest >> offsetsOfTables: anArray [
 	"Where the data of each table lands: after the offset table and one record per table, then in
 	 the order the tables were given."
@@ -162,6 +205,19 @@ TTFontMetadataReaderTest >> os2TableWithWeightClass: aWeightClass widthClass: aW
 ]
 
 { #category : 'fixtures' }
+TTFontMetadataReaderTest >> otfFontBytes [
+	"An OTTO file: a valid sfnt wrapper whose outlines are CFF, so it carries a CFF table and no
+	 glyf. Its name table is ordinary, which is why the reader can name a face it cannot render."
+
+	^ self
+		  fontBytesWithVersion: 'OTTO' asByteArray
+		  tables: {
+				  ('CFF ' -> (ByteArray new: 64)).
+				  (TTFontMetadataReader nameTableTag
+				   -> (self nameTableWithFamilyName: 'Waree' styleName: 'Oblique')) }
+]
+
+{ #category : 'fixtures' }
 TTFontMetadataReaderTest >> putDirectoryRecordFor: anAssociation at: anInteger on: aStream [
 	"One sixteen-byte directory record: the four-character tag, a checksum nothing here verifies,
 	 the offset of the table's data in the file and its length."
@@ -181,12 +237,12 @@ TTFontMetadataReaderTest >> putLong: anInteger on: aStream [
 ]
 
 { #category : 'fixtures' }
-TTFontMetadataReaderTest >> putOffsetTableFor: anArray on: aStream [
+TTFontMetadataReaderTest >> putOffsetTableFor: anArray version: aByteArray on: aStream [
 	"The twelve-byte offset table. The search range, the entry selector and the range shift are
 	 the fields a binary search over the directory would read; nothing in this project reads them,
 	 so they are written and not computed."
 
-	self putLong: 16r00010000 on: aStream.
+	aStream nextPutAll: aByteArray.
 	self putShort: anArray size on: aStream.
 	self putShort: 16 on: aStream.
 	self putShort: 0 on: aStream.
@@ -202,6 +258,78 @@ TTFontMetadataReaderTest >> putShort: anInteger on: aStream [
 		nextPut: (anInteger bitAnd: 16rFF)
 ]
 
+{ #category : 'fixtures' }
+TTFontMetadataReaderTest >> renderableFontBytes [
+	"The shape of a font this reader accepts: glyph outlines, and a name table to name them by."
+
+	^ self fontBytesWithTables: {
+			  ('glyf' -> (ByteArray new: 32)).
+			  (TTFontMetadataReader nameTableTag
+			   -> (self nameTableWithFamilyName: 'Source Sans Pro' styleName: 'Regular')) }
+]
+
+{ #category : 'tests' }
+TTFontMetadataReaderTest >> testAColourFontIsRejectedThoughItCarriesOutlines [
+
+	| metadata |
+	metadata := TTFontMetadataReader readBytes: self colourFontBytes.
+	self assert: metadata rejectionReason equals: #colourFont.
+	self assert: metadata familyName equals: 'Noto Color Emoji'
+]
+
+{ #category : 'tests' }
+TTFontMetadataReaderTest >> testAFileThatIsNotAFontIsRejected [
+	"The catalogue of unit 1.4 walks every file in the font directories, as AeFontScanner does,
+	 which skips only dotfiles and names ending .gz. /home/renaud/.fonts/.uuid is 36 bytes of
+	 text and raises SubscriptOutOfBounds today."
+
+	self
+		assert: (TTFontMetadataReader readBytes:
+				 'ff50d0e4-b750-484f-9f92-c029839b4076' asByteArray) rejectionReason
+		equals: #notAnSfntFont.
+	self
+		assert: (TTFontMetadataReader readBytes: #[ 0 1 0 0 ]) rejectionReason
+		equals: #notAnSfntFont
+]
+
+{ #category : 'tests' }
+TTFontMetadataReaderTest >> testAFontCollectionIsRejectedAndNotRead [
+	"A ttcf file holds several fonts behind offsets. Its header carries no table directory, so
+	 there is nothing to name the face from: the reason is all the reader answers."
+
+	| metadata |
+	metadata := TTFontMetadataReader readBytes: self fontCollectionBytes.
+	self assert: metadata rejectionReason equals: #fontCollection.
+	self assert: metadata familyName isNil
+]
+
+{ #category : 'tests' }
+TTFontMetadataReaderTest >> testAFontTruncatedBeforeItsDirectoryIsRejectedRatherThanRaising [
+	"The offset table promises two directory records and the file stops inside the first."
+
+	self
+		assert: (TTFontMetadataReader readBytes: (self renderableFontBytes first: 20))
+				rejectionReason
+		equals: #notAnSfntFont
+]
+
+{ #category : 'tests' }
+TTFontMetadataReaderTest >> testAFontTruncatedInsideATableIsRejectedRatherThanRaising [
+	"The directory is whole and points past the end of the file: a font half downloaded or half
+	 copied. Reading the table it points at raises SubscriptOutOfBounds, so the reader checks
+	 the records against the size of the file before following one."
+
+	| bytes truncated |
+	bytes := self renderableFontBytes.
+	truncated := bytes first: bytes size - 20.
+	self
+		assert: (TTFontMetadataReader readBytes: truncated) rejectionReason
+		equals: #notAnSfntFont.
+	self
+		assert: (TTFontMetadataReader readStream: truncated readStream) rejectionReason
+		equals: #notAnSfntFont
+]
+
 { #category : 'tests' }
 TTFontMetadataReaderTest >> testAFontWithNeitherOS2NorHeadIsNormalRatherThanNil [
 	"The degenerate state: a font that says nothing about its style. A scan classifies every
@@ -214,6 +342,16 @@ TTFontMetadataReaderTest >> testAFontWithNeitherOS2NorHeadIsNormalRatherThanNil 
 	self assert: metadata weightClass equals: 400.
 	self assert: metadata widthClass equals: 5.
 	self assert: metadata slant equals: #normal
+]
+
+{ #category : 'tests' }
+TTFontMetadataReaderTest >> testAFontWithNoNameTableIsRejected [
+	"The name table is the only table this reader needs, and the one TTFontReader also demands.
+	 Without it the reader answers a reason rather than raising KeyNotFound."
+
+	self
+		assert: (TTFontMetadataReader readBytes: self namelessFontBytes) rejectionReason
+		equals: #noNameTable
 ]
 
 { #category : 'tests' }
@@ -248,6 +386,15 @@ TTFontMetadataReaderTest >> testAPlainFaceIsNormalInEveryRespect [
 ]
 
 { #category : 'tests' }
+TTFontMetadataReaderTest >> testARenderableFontIsNotRejected [
+
+	| metadata |
+	metadata := TTFontMetadataReader readBytes: self renderableFontBytes.
+	self assert: metadata rejectionReason isNil.
+	self deny: metadata isRejected
+]
+
+{ #category : 'tests' }
 TTFontMetadataReaderTest >> testAWeightClassOfZeroFallsBackToMacStyle [
 	"Fonts in the wild leave usWeightClass at zero. Zero is outside the 100 to 1000 scale, so it
 	 is not a weight but a missing field, and head's bold bit is then what the font says."
@@ -261,6 +408,34 @@ TTFontMetadataReaderTest >> testAWeightClassOfZeroFallsBackToMacStyle [
 			            macStyle: 16r21).
 	self assert: metadata weightClass equals: 700.
 	self assert: metadata widthClass equals: 3
+]
+
+{ #category : 'tests' }
+TTFontMetadataReaderTest >> testAnOtfFontIsRejectedForHavingNoGlyfTable [
+	"101 of the 466 font files on this machine are OTTO: readable names, CFF outlines this
+	 project cannot draw. The reader names the face and says why it is not renderable, and
+	 raises nothing."
+
+	| metadata |
+	metadata := TTFontMetadataReader readBytes: self otfFontBytes.
+	self assert: metadata rejectionReason equals: #noGlyfTable.
+	self assert: metadata isRejected.
+	self assert: metadata familyName equals: 'Waree'.
+	self assert: metadata styleName equals: 'Oblique'
+]
+
+{ #category : 'tests' }
+TTFontMetadataReaderTest >> testBothDoorsRejectTheSameFontsForTheSameReason [
+	"The stream door and the bytes door answer the same reason about the same bytes, which is
+	 what lets the catalogue read from disk and a test read from memory."
+
+	#( #otfFontBytes #fontCollectionBytes #colourFontBytes #namelessFontBytes
+	   #renderableFontBytes ) do: [ :each |
+		| bytes |
+		bytes := self perform: each.
+		self
+			assert: (TTFontMetadataReader readStream: bytes readStream) rejectionReason
+			equals: (TTFontMetadataReader readBytes: bytes) rejectionReason ]
 ]
 
 { #category : 'tests' }

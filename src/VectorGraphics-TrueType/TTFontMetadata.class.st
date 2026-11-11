@@ -12,6 +12,7 @@ Class {
 		'weightClass',
 		'widthClass',
 		'slant',
+		'rejectionReason',
 		'tableLengthsByTag'
 	],
 	#category : 'VectorGraphics-TrueType-Reading',
@@ -34,9 +35,10 @@ TTFontMetadata >> familyName: aString [
 { #category : 'inspector' }
 TTFontMetadata >> inspectorIdentity: aBuilder [
 	"What a font manager keys a face by: the family it belongs to, its style within that family,
-	 and the three facts it is matched on. The names come from the font's own name table and the
-	 three facts from its OS/2 and head tables, so what shows here is what the font says about
-	 itself, not what its file is called nor what the words of its style name suggest."
+	 the three facts it is matched on, and the reason not to draw it when there is one. The names
+	 come from the font's own name table and the three facts from its OS/2 and head tables, so
+	 what shows here is what the font says about itself, not what its file is called nor what the
+	 words of its style name suggest. The last row is empty for a face this project can draw."
 
 	<inspectorPresentationOrder: 10 title: 'Identity'>
 	^ aBuilder newTable
@@ -53,6 +55,8 @@ TTFontMetadata >> inspectorIdentity: aBuilder [
 				  ('width class' -> (widthClass ifNil: [ '' ] ifNotNil: [ :each |
 						    each printString ])).
 				  ('slant' -> (slant ifNil: [ '' ] ifNotNil: [ :each |
+						    each asString ])).
+				  ('rejection' -> (rejectionReason ifNil: [ '' ] ifNotNil: [ :each |
 						    each asString ])) };
 		  yourself
 ]
@@ -85,6 +89,13 @@ TTFontMetadata >> inspectorTables: aBuilder [
 		  yourself
 ]
 
+{ #category : 'accessing' }
+TTFontMetadata >> isRejected [
+	"Whether this face carries a reason not to draw it."
+
+	^ rejectionReason isNotNil
+]
+
 { #category : 'printing' }
 TTFontMetadata >> printOn: aStream [
 	"Family then style, which is how a font manager keys a face and how a reader names one."
@@ -95,6 +106,22 @@ TTFontMetadata >> printOn: aStream [
 		print: familyName;
 		nextPutAll: ' ';
 		print: styleName
+]
+
+{ #category : 'accessing' }
+TTFontMetadata >> rejectionReason [
+	"Why this face cannot be drawn by this project, as a symbol, or nil when it can.
+	 #notAnSfntFont, #fontCollection, #noNameTable, #noGlyfTable or #colourFont: the first cause
+	 the reader met, in that order. A rejected face still carries every name and class the file
+	 did state, so a catalogue can say which font it passed over."
+
+	^ rejectionReason
+]
+
+{ #category : 'accessing' }
+TTFontMetadata >> rejectionReason: aSymbolOrNil [
+
+	rejectionReason := aSymbolOrNil
 ]
 
 { #category : 'accessing' }

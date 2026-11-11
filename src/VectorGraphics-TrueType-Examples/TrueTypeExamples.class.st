@@ -42,6 +42,22 @@ TrueTypeExamples class >> defaultFontPath [
 	^ '/home/renaud/Downloads/Digital7Mono-Yz9J4.ttf'
 ]
 
+{ #category : 'examples' }
+TrueTypeExamples class >> filesInFontDirectories [
+	"Every file the font directories hold, as AeFontScanner sees them: it skips only dotfiles and
+	 names ending .gz and hands FreeType the rest. Nothing here tests an extension, because the
+	 reader's refusal names what a file is — on this machine 362 TrueType faces, 101 OpenType
+	 files with CFF outlines, 3 collections and 78 files that are not fonts at all. Unit 1.4 of
+	 FONT-PLAN.md moves the walk into TTFontCatalogue; it lives here so the examples below run
+	 with one click."
+
+	^ Array streamContents: [ :stream |
+		  self fontDirectories do: [ :directory |
+			  directory exists ifTrue: [
+				  directory allChildren do: [ :each |
+					  each isFile ifTrue: [ stream nextPut: each ] ] ] ] ]
+]
+
 { #category : 'constants' }
 TrueTypeExamples class >> fontDirectories [
 	"Where this machine keeps its fonts. Unit 1.4 of FONT-PLAN.md gives TTFontCatalogue the
@@ -54,20 +70,6 @@ TrueTypeExamples class >> fontDirectories [
 		  '/usr/share/fonts' asFileReference.
 		  '/usr/local/share/fonts' asFileReference.
 		  (FileLocator imageDirectory / 'Fonts') }
-]
-
-{ #category : 'examples' }
-TrueTypeExamples class >> fontFiles [
-	"Every TrueType file this machine holds, in the directories above. Unit 1.4 of FONT-PLAN.md
-	 moves the walk into TTFontCatalogue; it lives here so the examples below run with one click."
-
-	^ Array streamContents: [ :stream |
-		  self fontDirectories do: [ :directory |
-			  directory exists ifTrue: [
-				  directory allChildren do: [ :each |
-					  (each isFile and: [
-						   each basename asLowercase endsWith: '.ttf' ]) ifTrue: [
-						  stream nextPut: each ] ] ] ] ]
 ]
 
 { #category : 'examples' }
@@ -92,19 +94,19 @@ TrueTypeExamples class >> fontMetadata [
 
 { #category : 'examples' }
 TrueTypeExamples class >> fontNamesWithoutParsingGlyphs [
-	"One click: the family and the style of every TrueType file on this machine, read by
-	 TTFontMetadataReader — the table directory and three small tables, with no glyph parsed.
-	 This is what a font manager needs in order to name every face it can offer, and it is one of
-	 the two services Alexandrie takes from FreeType that costs a scan of the whole filesystem. A
-	 file the reader refuses is kept with the reason it gave, because a scan that drops a file
-	 silently cannot be read against the directory it walked.
+	"One click: the family and the style of every file in the font directories of this machine,
+	 read by TTFontMetadataReader — the table directory and three small tables, with no glyph
+	 parsed. This is what a font manager needs in order to name every face it can offer, and it
+	 is one of the two services Alexandrie takes from FreeType that costs a scan of the whole
+	 filesystem. A file the reader refuses is kept with the metadata carrying its reason, because
+	 a scan that drops a file silently cannot be read against the directory it walked.
 	 TrueTypeExamples fontNamesWithoutParsingGlyphs inspect"
 
 	<sampleInstance>
 	| names |
 	names := Dictionary new.
-	self fontFiles do: [ :each |
-		names at: each fullName put: (self metadataOrReasonFor: each) ].
+	self filesInFontDirectories do: [ :each |
+		names at: each fullName put: (self metadataFor: each) ].
 	^ names
 ]
 
@@ -149,19 +151,15 @@ TrueTypeExamples class >> loadFontFrom: aPathString [
 	^ TTFontReader readTTFFrom: bytes
 ]
 
-{ #category : 'private' }
-TrueTypeExamples class >> metadataOrReasonFor: aFileReference [
-	"The metadata of one font file, or the message of the error reading it raised. The reader
-	 pulls the offset table, the directory and the name table off the stream, so a 2 MB font
-	 costs a few hundred bytes of disk. Unit 1.3 of FONT-PLAN.md gives the reader a refusal
-	 that answers a reason instead of raising, and this handler goes when it lands; until then
-	 a file the reader cannot read must still be named here, with what it said, rather than
-	 stopping the scan."
+{ #category : 'examples' }
+TrueTypeExamples class >> metadataFor: aFileReference [
+	"The metadata of one file, read off the stream: the offset table, the directory and three
+	 small tables, so a 2 MB font costs a few hundred bytes of disk. A file that is not a font
+	 this project can draw answers a metadata carrying a rejectionReason, and nothing is raised,
+	 which is what lets a scan walk a whole directory without a handler."
 
-	^ [ aFileReference binaryReadStreamDo: [ :stream |
-		  TTFontMetadataReader readStream: stream ] ]
-		  on: Error
-		  do: [ :error | error messageText ]
+	^ aFileReference binaryReadStreamDo: [ :stream |
+		  TTFontMetadataReader readStream: stream ]
 ]
 
 { #category : 'examples' }
@@ -179,21 +177,42 @@ TrueTypeExamples class >> newContourFromAbsolutePoints: anArrayOfPairs [
 ]
 
 { #category : 'examples' }
+TrueTypeExamples class >> rejectionReasonsOfTheInstalledFonts [
+	"One click: what the reader makes of every file the font directories hold, as a count per
+	 reason, with nil counting the files it would draw. On this machine: 362 nil, 101
+	 #noGlyfTable — OpenType files whose outlines are CFF, which FreeType draws today and this
+	 project does not — 3 #fontCollection and 78 #notAnSfntFont, metrics and bitmap fonts that
+	 live beside the real ones. Nothing raises over the 544 files, which is the point of the
+	 refusal: a scan reads a whole directory without a handler.
+	 TrueTypeExamples rejectionReasonsOfTheInstalledFonts inspect"
+
+	<sampleInstance>
+	| counts |
+	counts := Dictionary new.
+	self filesInFontDirectories do: [ :each |
+		| reason |
+		reason := (self metadataFor: each) rejectionReason.
+		counts at: reason put: (counts at: reason ifAbsent: [ 0 ]) + 1 ].
+	^ counts
+]
+
+{ #category : 'examples' }
 TrueTypeExamples class >> styleCountsOfTheInstalledFonts [
-	"One click: how the fonts on this machine classify themselves, as a count for every weight
-	 class, width class and slant found. Each fact is read from the font's own OS/2 and head
-	 tables. Alexandrie reaches the same three facts by splitting the style name on spaces and
-	 matching the tokens against word lists, so what shows here is information the chain does not
-	 have today: a face whose style name says nothing of its width still states its width class.
+	"One click: how the drawable fonts on this machine classify themselves, as a count for every
+	 weight class, width class and slant found. Each fact is read from the font's own OS/2 and
+	 head tables. Alexandrie reaches the same three facts by splitting the style name on spaces
+	 and matching the tokens against word lists, so what shows here is information the chain does
+	 not have today: a face whose style name says nothing of its width still states its width
+	 class. A rejected file is left out, and rejectionReasonsOfTheInstalledFonts counts those.
 	 TrueTypeExamples styleCountsOfTheInstalledFonts inspect"
 
 	<sampleInstance>
 	| counts |
 	counts := Dictionary new.
-	self fontFiles do: [ :each |
+	self filesInFontDirectories do: [ :each |
 		| metadata |
-		metadata := self metadataOrReasonFor: each.
-		metadata isString ifFalse: [
+		metadata := self metadataFor: each.
+		metadata isRejected ifFalse: [
 			| key |
 			key := {
 				       metadata weightClass.
