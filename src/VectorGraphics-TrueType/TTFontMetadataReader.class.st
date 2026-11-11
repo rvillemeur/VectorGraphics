@@ -74,6 +74,16 @@ TTFontMetadataReader class >> macStyleCondensedMask [
 	^ 2r100000
 ]
 
+{ #category : 'reading' }
+TTFontMetadataReader class >> macStyleFrom: anEntryByTag [
+	"The macStyle word of the head table, or zero — every bit clear, the normal face — when the
+	 font carries no head table."
+
+	^ (anEntryByTag at: self headTableTag ifAbsent: [ nil ])
+		  ifNil: [ 0 ]
+		  ifNotNil: [ :entry | (TTHeadTableParser on: entry) process at: #macStyle ]
+]
+
 { #category : 'constants' }
 TTFontMetadataReader class >> macStyleItalicMask [
 	^ 2r10
@@ -115,6 +125,14 @@ TTFontMetadataReader class >> offsetTableSize [
 	 font does not use."
 
 	^ 12
+]
+
+{ #category : 'reading' }
+TTFontMetadataReader class >> os2FieldsFrom: anEntryByTag [
+	"The three fields of the OS/2 table, or nil when the font carries no OS/2 table."
+
+	^ (anEntryByTag at: self os2TableTag ifAbsent: [ nil ]) ifNotNil: [ :entry |
+		  (TTOS2TableParser on: entry) process ]
 ]
 
 { #category : 'constants' }
@@ -173,19 +191,15 @@ TTFontMetadataReader class >> readStream: aStream [
 	^ self metadataFromEntries: entries lengths: (self lengthsFrom: directory)
 ]
 
-{ #category : 'private' }
+{ #category : 'reading' }
 TTFontMetadataReader class >> readStyleInto: aMetadata fromEntries: anEntryByTag [
 	"Weight, width and slant from the font's own tables and not from the words of its style name,
 	 which is how AeFaceEntry guesses them. OS/2 is the authority; head's macStyle answers for a
 	 font that carries no OS/2 table, and for the fields OS/2 left at zero."
 
 	| macStyle os2 |
-	macStyle := (anEntryByTag at: self headTableTag ifAbsent: [ nil ])
-		            ifNil: [ 0 ]
-		            ifNotNil: [ :entry |
-			            (TTHeadTableParser on: entry) process at: #macStyle ].
-	os2 := (anEntryByTag at: self os2TableTag ifAbsent: [ nil ]) ifNotNil: [
-		       :entry | (TTOS2TableParser on: entry) process ].
+	macStyle := self macStyleFrom: anEntryByTag.
+	os2 := self os2FieldsFrom: anEntryByTag.
 	aMetadata weightClass: (self weightClassFrom: os2 macStyle: macStyle).
 	aMetadata widthClass: (self widthClassFrom: os2 macStyle: macStyle).
 	aMetadata slant: (self slantFrom: os2 macStyle: macStyle)
