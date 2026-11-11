@@ -12,6 +12,28 @@ Class {
 }
 
 { #category : 'tests' }
+TTFontMetadataTest >> testPrintingAFaceThatIsRefusedNamesTheReason [
+	"More files in a font directory are not drawable fonts than are — 182 of the 544 on this
+	 machine — and fontNamesWithoutParsingGlyphs makes a reader inspect all of them at once. A
+	 face that prints its reason can be read in that list; one printing two nils cannot."
+
+	| named nameless |
+	named := TTFontMetadata new.
+	named
+		familyName: 'Waree';
+		styleName: 'Oblique';
+		rejectionReason: #noGlyfTable.
+	nameless := TTFontMetadata new.
+	nameless rejectionReason: #fontCollection.
+	self
+		assert: named printString
+		equals: 'a TTFontMetadata ''Waree'' ''Oblique'' #noGlyfTable'.
+	self
+		assert: nameless printString
+		equals: 'a TTFontMetadata nil nil #fontCollection'
+]
+
+{ #category : 'tests' }
 TTFontMetadataTest >> testPrintingNamesTheFamilyAndTheStyle [
 	"A reader of a font list sees many of these at once, so the printed form has to say which
 	 face it is without being opened."

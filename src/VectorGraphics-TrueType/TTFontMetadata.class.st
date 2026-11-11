@@ -98,14 +98,20 @@ TTFontMetadata >> isRejected [
 
 { #category : 'printing' }
 TTFontMetadata >> printOn: aStream [
-	"Family then style, which is how a font manager keys a face and how a reader names one."
+	"Family then style, which is how a font manager keys a face and how a reader names one, then
+	 the reason not to draw the face when there is one. A font directory holds more files that
+	 are not drawable fonts than files that are, and an example prints them all in one list."
 
 	super printOn: aStream.
 	aStream
 		nextPutAll: ' ';
 		print: familyName;
 		nextPutAll: ' ';
-		print: styleName
+		print: styleName.
+	rejectionReason ifNotNil: [ :each |
+		aStream
+			nextPutAll: ' ';
+			print: each ]
 ]
 
 { #category : 'accessing' }
