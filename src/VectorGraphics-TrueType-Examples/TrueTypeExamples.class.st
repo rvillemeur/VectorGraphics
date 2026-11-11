@@ -21,6 +21,24 @@ Class {
 }
 
 { #category : 'examples' }
+TrueTypeExamples class >> catalogueOfTheInstalledFonts [
+	"One click: the fonts of this machine, discovered once and read for what they say about
+	 themselves. On this machine 544 files in 138 ms — 362 faces this project draws, 208
+	 families, 357 of those faces indexed and five dropped as a second copy of a face already
+	 met, and 182 files refused with the reason each one gave.
+	 This is the one discovery two registries read: a font manager for the Bloc and Cairo route,
+	 FontFamily for the VectorCanvas route. It builds no face of either kind, so nothing here
+	 parses a glyph.
+	 TrueTypeExamples catalogueOfTheInstalledFonts inspect"
+
+	<sampleInstance>
+	| catalogue |
+	catalogue := TTFontCatalogue new.
+	catalogue scanDefaultDirectories.
+	^ catalogue
+]
+
+{ #category : 'examples' }
 TrueTypeExamples class >> characterWidths [
 	"Inspect the advance widths of printable ASCII characters.
 	TrueTypeExamples characterWidths inspect"
@@ -40,36 +58,6 @@ TrueTypeExamples class >> defaultFontPath [
 	"Override this or pass a path directly to loadFontFrom:.
 	Set this to the absolute path of any .ttf file on your system."
 	^ '/home/renaud/Downloads/Digital7Mono-Yz9J4.ttf'
-]
-
-{ #category : 'examples' }
-TrueTypeExamples class >> filesInFontDirectories [
-	"Every file the font directories hold, as AeFontScanner sees them: it skips only dotfiles and
-	 names ending .gz and hands FreeType the rest. Nothing here tests an extension, because the
-	 reader's refusal names what a file is — on this machine 362 TrueType faces, 101 OpenType
-	 files with CFF outlines, 3 collections and 78 files that are not fonts at all. Unit 1.4 of
-	 FONT-PLAN.md moves the walk into TTFontCatalogue; it lives here so the examples below run
-	 with one click."
-
-	^ Array streamContents: [ :stream |
-		  self fontDirectories do: [ :directory |
-			  directory exists ifTrue: [
-				  directory allChildren do: [ :each |
-					  each isFile ifTrue: [ stream nextPut: each ] ] ] ] ]
-]
-
-{ #category : 'constants' }
-TrueTypeExamples class >> fontDirectories [
-	"Where this machine keeps its fonts. Unit 1.4 of FONT-PLAN.md gives TTFontCatalogue the
-	 scan and this list with it; until that exists the list lives here, so that the example
-	 below runs with one click rather than needing a path typed into it."
-
-	^ {
-		  (FileLocator home / '.fonts').
-		  (FileLocator home / '.local/share/fonts').
-		  '/usr/share/fonts' asFileReference.
-		  '/usr/local/share/fonts' asFileReference.
-		  (FileLocator imageDirectory / 'Fonts') }
 ]
 
 { #category : 'examples' }
@@ -105,8 +93,8 @@ TrueTypeExamples class >> fontNamesWithoutParsingGlyphs [
 	<sampleInstance>
 	| names |
 	names := Dictionary new.
-	self filesInFontDirectories do: [ :each |
-		names at: each fullName put: (self metadataFor: each) ].
+	self catalogueOfTheInstalledFonts entries do: [ :each |
+		names at: each source fullName put: each metadata ].
 	^ names
 ]
 
@@ -152,17 +140,6 @@ TrueTypeExamples class >> loadFontFrom: aPathString [
 ]
 
 { #category : 'examples' }
-TrueTypeExamples class >> metadataFor: aFileReference [
-	"The metadata of one file, read off the stream: the offset table, the directory and three
-	 small tables, so a 2 MB font costs a few hundred bytes of disk. A file that is not a font
-	 this project can draw answers a metadata carrying a rejectionReason, and nothing is raised,
-	 which is what lets a scan walk a whole directory without a handler."
-
-	^ aFileReference binaryReadStreamDo: [ :stream |
-		  TTFontMetadataReader readStream: stream ]
-]
-
-{ #category : 'examples' }
 TrueTypeExamples class >> newContourFromAbsolutePoints: anArrayOfPairs [
 	"Build one contour of a glyph. Every control point flag is left clear, so each segment is a
 	straight line rather than a quadratic Bezier, and the points are already absolute, as the
@@ -178,20 +155,20 @@ TrueTypeExamples class >> newContourFromAbsolutePoints: anArrayOfPairs [
 
 { #category : 'examples' }
 TrueTypeExamples class >> rejectionReasonsOfTheInstalledFonts [
-	"One click: what the reader makes of every file the font directories hold, as a count per
+	"One click: what the scan made of every file the font directories hold, as a count per
 	 reason, with nil counting the files it would draw. On this machine: 362 nil, 101
 	 #noGlyfTable — OpenType files whose outlines are CFF, which FreeType draws today and this
 	 project does not — 3 #fontCollection and 78 #notAnSfntFont, metrics and bitmap fonts that
 	 live beside the real ones. Nothing raises over the 544 files, which is the point of the
-	 refusal: a scan reads a whole directory without a handler.
+	 refusal: a catalogue walks a whole directory without a handler.
 	 TrueTypeExamples rejectionReasonsOfTheInstalledFonts inspect"
 
 	<sampleInstance>
 	| counts |
 	counts := Dictionary new.
-	self filesInFontDirectories do: [ :each |
+	self catalogueOfTheInstalledFonts entries do: [ :each |
 		| reason |
-		reason := (self metadataFor: each) rejectionReason.
+		reason := each metadata rejectionReason.
 		counts at: reason put: (counts at: reason ifAbsent: [ 0 ]) + 1 ].
 	^ counts
 ]
@@ -199,25 +176,20 @@ TrueTypeExamples class >> rejectionReasonsOfTheInstalledFonts [
 { #category : 'examples' }
 TrueTypeExamples class >> styleCountsOfTheInstalledFonts [
 	"One click: how the drawable fonts on this machine classify themselves, as a count for every
-	 weight class, width class and slant found. Each fact is read from the font's own OS/2 and
+	 weight class, width class and slant found. Each fact is read from the font''s own OS/2 and
 	 head tables. Alexandrie reaches the same three facts by splitting the style name on spaces
 	 and matching the tokens against word lists, so what shows here is information the chain does
 	 not have today: a face whose style name says nothing of its width still states its width
-	 class. A rejected file is left out, and rejectionReasonsOfTheInstalledFonts counts those.
+	 class. A refused file is left out, and rejectionReasonsOfTheInstalledFonts counts those.
 	 TrueTypeExamples styleCountsOfTheInstalledFonts inspect"
 
 	<sampleInstance>
 	| counts |
 	counts := Dictionary new.
-	self filesInFontDirectories do: [ :each |
-		| metadata |
-		metadata := self metadataFor: each.
-		metadata isRejected ifFalse: [
+	self catalogueOfTheInstalledFonts entries do: [ :each |
+		each metadata isRejected ifFalse: [
 			| key |
-			key := {
-				       metadata weightClass.
-				       metadata widthClass.
-				       metadata slant }.
+			key := each styleKey.
 			counts at: key put: (counts at: key ifAbsent: [ 0 ]) + 1 ] ].
 	^ counts
 ]

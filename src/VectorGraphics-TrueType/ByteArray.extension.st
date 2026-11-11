@@ -49,6 +49,22 @@ ByteArray >> bitBooleanAt: bitIndex [
 ]
 
 { #category : '*VectorGraphics-TrueType' }
+ByteArray >> fontBytes [
+	"Myself: a font held in memory is already its own bytes. An extension of this project, the
+	 other half of the message a catalogue entry sends its source."
+
+	^ self
+]
+
+{ #category : '*VectorGraphics-TrueType' }
+ByteArray >> fontSourceName [
+	"How I name myself when I am the source of a font: my size, since a font held in memory has
+	 no name of its own. An extension of this project, the companion of fontBytes."
+
+	^ self size printString , ' bytes'
+]
+
+{ #category : '*VectorGraphics-TrueType' }
 ByteArray class >> newBits: bitCount [
 	"
 	(ByteArray newBits: 8) bitAt: 8 put: 1; bitAt: 8
