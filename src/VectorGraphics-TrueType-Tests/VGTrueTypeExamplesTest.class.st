@@ -172,8 +172,7 @@ VGTrueTypeExamplesTest >> testTheDefaultFontOfTheExamplesIsThePreferredFamilyThi
 	catalogue := TTFontCatalogue new
 		             scanDefaultDirectories;
 		             yourself.
-	available := TrueTypeExamples preferredFontFamilyNames select: [ :each |
-		             (catalogue entryOfFamilyNamed: each) isNotNil ].
+	available := TrueTypeExamples installedPreferredFamilyNamesIn: catalogue.
 	available ifEmpty: [ ^ self skip ].
 	chosen := TrueTypeExamples defaultFontPath asFileReference
 		          binaryReadStreamDo: [ :stream |

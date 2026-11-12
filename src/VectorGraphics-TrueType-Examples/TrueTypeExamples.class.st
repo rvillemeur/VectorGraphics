@@ -70,8 +70,7 @@ TrueTypeExamples class >> defaultFontChoice [
 	choice at: 'asked for' put: self preferredFontFamilyNames.
 	choice
 		at: 'installed here'
-		put: (self preferredFontFamilyNames select: [ :each |
-				 (catalogue entryOfFamilyNamed: each) isNotNil ]).
+		put: (self installedPreferredFamilyNamesIn: catalogue).
 	choice at: 'drawable faces found' put: catalogue drawableEntries size.
 	choice at: 'chosen' put: self findDefaultFontPath.
 	^ choice
@@ -94,16 +93,17 @@ TrueTypeExamples class >> findDefaultFontPath [
 	 draw with: the plainest face of the best-placed family of preferredFontFamilyNames it has,
 	 or any drawable face otherwise."
 
-	| catalogue |
+	| catalogue found |
 	catalogue := TTFontCatalogue new
 		             scanDefaultDirectories;
 		             yourself.
-	self preferredFontFamilyNames do: [ :each |
-		(catalogue entryOfFamilyNamed: each) ifNotNil: [ :entry |
-			^ entry source fullName ] ].
-	catalogue drawableEntries ifEmpty: [
+	found := (self installedPreferredFamilyNamesIn: catalogue)
+		         ifNotEmpty: [ :names |
+			         catalogue entryOfFamilyNamed: names first ]
+		         ifEmpty: [ catalogue drawableEntries ifNotEmpty: [ :all | all first ] ].
+	found ifNil: [
 		^ self error: 'no drawable font in the default font directories' ].
-	^ catalogue drawableEntries first source fullName
+	^ found source fullName
 ]
 
 { #category : 'examples' }
@@ -184,6 +184,16 @@ TrueTypeExamples class >> glyphWithContours [
 		boundsTop: 0
 		boundsBottom: 700.
 	^ glyph
+]
+
+{ #category : 'accessing' }
+TrueTypeExamples class >> installedPreferredFamilyNamesIn: aCatalogue [
+	"Which of preferredFontFamilyNames that catalogue holds, best first. The one rule for what
+	 the examples would rather draw with, asked by the choice, by the example that shows it and
+	 by the test that pins it."
+
+	^ self preferredFontFamilyNames select: [ :each |
+		  (aCatalogue entryOfFamilyNamed: each) isNotNil ]
 ]
 
 { #category : 'private' }
