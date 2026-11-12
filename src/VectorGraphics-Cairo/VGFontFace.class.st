@@ -418,19 +418,16 @@ VGFontFace >> printOn: aStream [
 
 { #category : 'reading' }
 VGFontFace >> readBytes: aByteArray [
-	"Read the tables I need from the font's own bytes. A font with no glyf table carries its
-	 outlines in some other format, CFF for an OpenType font, and I would draw nothing for it,
-	 so it is refused here rather than at the first glyph. The metadata reader keeps its own
-	 judgement: I store what it answers whether or not it would have refused this font, since
-	 what I need to draw and what it needs to name are not the same tables."
+	"Read the tables I need from the font's own bytes, each step one table or one refusal. The
+	 metadata reader keeps its own judgement: I store what it answers whether or not it would
+	 have refused this font, since what I need to draw and what it needs to name are not the
+	 same tables."
 
 	| tables headData glyphCount |
 	bytes := aByteArray.
 	outlines := Dictionary new.
 	tables := TTFontReader buildTableDirectory: aByteArray offset: 0.
-	self class requiredTableTags do: [ :tag |
-		(tables includesKey: tag) ifFalse: [
-			^ Error signal: 'the font has no ' , tag , ' table' ] ].
+	self refuseIfATableIsMissingFrom: tables.
 	metadata := TTFontMetadataReader readBytes: aByteArray.
 	headData := (TTHeadTableParser on: (tables at: 'head')) process.
 	unitsPerEm := headData at: #units.
@@ -556,6 +553,18 @@ VGFontFace >> readOutlineOfGlyphAt: aGlyphIndex [
 		  (glyph boundsLeft @ glyph boundsTop
 		   corner: glyph boundsRight @ glyph boundsBottom)
 		  contours: (self contoursOfGlyphAt: aGlyphIndex)
+]
+
+{ #category : 'reading' }
+VGFontFace >> refuseIfATableIsMissingFrom: aTableDictionary [
+	"The tables I read every glyph and every metric from have to be there before I read any of
+	 them. A font with no glyf table carries its outlines in some other format, CFF for an
+	 OpenType font, and I would draw nothing for it, so it is refused here rather than at the
+	 first glyph. Raises; the caller reads nothing further."
+
+	self class requiredTableTags do: [ :tag |
+		(aTableDictionary includesKey: tag) ifFalse: [
+			Error signal: 'the font has no ' , tag , ' table' ] ]
 ]
 
 { #category : 'accessing' }
