@@ -19,6 +19,7 @@ Class {
 VGBlocExamplesTest >> exampleHolders [
 	^ {
 		  VGCanvasExamples.
+		  VGFontManagerExamples.
 		  VGFrameProfileExamples.
 		  VGRendererExamples }
 ]
