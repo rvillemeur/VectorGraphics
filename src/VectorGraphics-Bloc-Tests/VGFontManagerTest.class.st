@@ -138,3 +138,48 @@ VGFontManagerTest >> testTheFaceLookupReachesTheCacheRatherThanTheEmptyInherited
 				ifNone: [ self fail: 'the entry is there to be found' ] ]
 		raise: KeyNotFound
 ]
+
+{ #category : 'tests' }
+VGFontManagerTest >> testTheFilesRefusedAreKeptWithTheirReasonAndAFreshManagerRefusedNone [
+	"A file I met and will not draw with is not dropped: I answer for it, with the reason the
+	 reader gave, so a reader asking why a family is missing has somewhere to look. A manager
+	 that has met nothing refuses nothing."
+
+	| directory manager |
+	self assert: VGFontManager new rejectedFiles isEmpty.
+	directory := FileSystem memory root / 'fonts'.
+	directory ensureCreateDirectory.
+	(directory / 'face.bin') binaryWriteStreamDo: [ :stream |
+		stream nextPutAll: AeSourceSansPro_Regular fontContentsData ].
+	(directory / 'readme.txt') writeStreamDo: [ :stream |
+		stream nextPutAll: 'not a font' ].
+	manager := VGFontManager new.
+	manager scanDirectory: directory.
+	self assert: manager rejectedFiles size equals: 1.
+	self
+		assert: (manager rejectedFiles anyOne metadata rejectionReason)
+		equals: #notAnSfntFont.
+	self
+		assert: manager rejectedFiles anyOne source basename
+		equals: 'readme.txt'
+]
+
+{ #category : 'tests' }
+VGFontManagerTest >> testTheStateViewCountsTheFamiliesTheCatalogueHolds [
+	"The State view reads me through my own readers, not through the slot upstream keeps the
+	 index in: that slot stays empty for ever, so a row that reads it directly answers zero
+	 whatever I hold."
+
+	| manager rows |
+	manager := VGFontManager new.
+	AeEmbeddedFontFile allSubclassesDo: [ :each |
+		manager registerFacesOnMemory: each fontContentsData ].
+	rows := (manager inspectorState:
+		         (SpPresenterBuilder newApplication: SpApplication new)) items.
+	self
+		assert: (rows detect: [ :each | each key = 'Families registered' ]) value
+		equals: 2.
+	self
+		assert: (rows detect: [ :each | each key = 'Entries registered' ]) value
+		equals: 6
+]

@@ -136,13 +136,15 @@ VGFontManager >> inspectionFacesContext: aContext [
 	aContext active: self faceEntries notEmpty
 ]
 
-{ #category : 'inspector' }
+{ #category : 'inspecting' }
 VGFontManager >> inspectorState: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'State'>
 	"What a session of mine holds. Every row asks the real object rather than restating what reset
 	 writes, so a row cannot drift from the code: the library row prints the slot, the cache rows
-	 print its class and its size, and the family row counts the registry. A fresh manager shows
-	 nil, a Dictionary, and three zeroes, which is the whole of what this unit claims."
+	 print its class and its size, and the registry rows go through my own readers, which read the
+	 catalogue — not through the slot upstream keeps its index in, which stays empty for ever.
+	 The three file rows reconcile: every file met is either an entry registered or a file
+	 refused. A fresh manager shows nil, a Dictionary, and zeroes throughout."
 
 	^ aBuilder newTable
 		  items: {
@@ -150,8 +152,10 @@ VGFontManager >> inspectorState: aBuilder [
 				  ('FreeType library' -> freetypeLibrary).
 				  ('Face cache' -> faceByEntryCache class).
 				  ('Faces kept' -> faceByEntryCache size).
-				  ('Families registered' -> entriesByFamilyName size).
+				  ('Families registered' -> self entriesByFamilyName size).
+				  ('Files met' -> catalogue entries size).
 				  ('Entries registered' -> self faceEntries size).
+				  ('Files refused' -> self rejectedFiles size).
 				  ('Default face' -> defaultFace).
 				  ('Default code face' -> defaultCodeFace) };
 		  addColumn: (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
@@ -187,6 +191,16 @@ VGFontManager >> registerFacesOnMemory: aByteArray [
 	 override of its own. Answers the entry, like registerFacesOnFile:."
 
 	^ catalogue addBytes: aByteArray
+]
+
+{ #category : 'accessing' }
+VGFontManager >> rejectedFiles [
+	"The files I met and will not draw with, each carrying the reason the reader gave. A font
+	 this project cannot read is refused by name rather than passed over in silence, so a
+	 reader who cannot find a family can ask why. The catalogue derives the list from the
+	 entries it kept, so this is not a second collection that could fall out of step."
+
+	^ catalogue refusedEntries
 ]
 
 { #category : 'initialization' }

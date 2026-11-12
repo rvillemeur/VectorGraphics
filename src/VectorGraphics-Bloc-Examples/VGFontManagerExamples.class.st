@@ -9,6 +9,21 @@ Class {
 }
 
 { #category : 'examples' }
+VGFontManagerExamples class >> managerThatScannedTheInstalledFonts [
+	<sampleInstance>
+	"A font manager that met every font file this machine has installed, read by the catalogue
+	 and not by FreeType. Open the State tab: the files met split into the entries registered,
+	 which are the faces with a glyf table we can draw, and the files refused, which are the
+	 OpenType CFF fonts, the Type 1 fonts and the collections this project does not read yet.
+	 Dive into the catalogue for the Refusals tab, which groups those files by the reason they
+	 gave. The numbers are this machine's, so they differ from one reader to the next."
+
+	^ VGFontManager new
+		  scanDefaultDirectories;
+		  yourself
+]
+
+{ #category : 'examples' }
 VGFontManagerExamples class >> managerWithTheEmbeddedFontsRegistered [
 	<sampleInstance>
 	"A font manager holding the six faces a package carries with it, read by the catalogue and
