@@ -78,6 +78,30 @@ VGFontManager >> entryForFamilyName: aFamilyName slant: aSlant weight: aWeight s
 ]
 
 { #category : 'accessing' }
+VGFontManager >> faceAt: anEntry [
+	"The face a consumer draws with, read from the entry's own bytes and kept for the session.
+	 Upstream's answers whatever its LRU cache holds and builds nothing, since its cache was
+	 given a factory that calls FreeType; mine builds the face here, so the only thing that ever
+	 reads a font is our own reader.
+
+	 The bytes are read at this point and not before: a scan reads a few hundred of them per
+	 file to say what the file is, and the fonts of this machine are 262 MB in all, so a face is
+	 parsed when something draws with it and never again.
+
+	 A refused entry is named rather than parsed. The reader of 1.3 has already said no to those
+	 bytes, and since 3.3 a reader holds the refused files and can hand one back."
+
+	anEntry isRejected ifTrue: [
+		^ Error signal:
+			  'The font reader refused ' , anEntry source fontSourceName , ': '
+			  , anEntry metadata rejectionReason asString
+			  , '. No face can be built for it.' ].
+	^ faceByEntryCache
+		  at: anEntry
+		  ifAbsentPut: [ VGFontFace newForBytes: anEntry bytes ]
+]
+
+{ #category : 'accessing' }
 VGFontManager >> faceEntries [
 	"Every face I answer for, refusals left out. Upstream collects these out of its own index;
 	 the catalogue selects them out of everything it met, so a refused file is still there to
@@ -108,8 +132,10 @@ VGFontManager >> inspectionFaces: aBuilder [
 	"The faces I answer for, each row reading the entry rather than a copy of it. Upstream's
 	 table of the same name shows the slant, weight and stretch its style-name parser guessed;
 	 these columns show what the font itself states in its OS/2 table, which is where my key
-	 comes from, so a row says why a face answers the triple it answers. Sorted the way upstream
-	 sorts, family first, then by the style name the font states."
+	 comes from, so a row says why a face answers the triple it answers. The last column asks
+	 the cache, so it says which of these entries something has drawn with: a face is parsed at
+	 the first demand and never again. Sorted the way upstream sorts, family first, then by the
+	 style name the font states."
 
 	^ aBuilder newTable
 		  items: (self faceEntries asArray sorted:
@@ -125,6 +151,12 @@ VGFontManager >> inspectionFaces: aBuilder [
 		  addColumn: (SpStringTableColumn
 				   title: 'Width class'
 				   evaluated: [ :each | each metadata widthClass ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Face built'
+				   evaluated: [ :each |
+					   (faceByEntryCache includesKey: each)
+						   ifTrue: [ 'yes' ]
+						   ifFalse: [ '' ] ]);
 		  yourself
 ]
 
@@ -134,6 +166,39 @@ VGFontManager >> inspectionFacesContext: aContext [
 	 tab says all there is to say about it."
 
 	aContext active: self faceEntries notEmpty
+]
+
+{ #category : 'inspecting' }
+VGFontManager >> inspectorCache: aBuilder [
+	<inspectorPresentationOrder: 5 title: 'Cache'>
+	"The faces something has drawn with, and what each one parsed out of its font. Every row
+	 asks the face itself, so a row cannot claim a font was read that was not: a glyph count and
+	 an em square come from the font's own tables. The faces are kept for the session, as unit
+	 1.4 decided, so this table only grows."
+
+	^ aBuilder newTable
+		  items: (faceByEntryCache values asArray sorted:
+					   (#familyName ascending , #styleName ascending));
+		  addColumn: (SpStringTableColumn title: 'Family name' evaluated: #familyName);
+		  addColumn: (SpStringTableColumn title: 'Style' evaluated: #styleName);
+		  addColumn: (SpStringTableColumn
+				   title: 'Glyphs'
+				   evaluated: [ :each | each glyphCount ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Units per em'
+				   evaluated: [ :each | each unitsPerEm ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Outlines read'
+				   evaluated: [ :each | each cachedGlyphCount ]);
+		  yourself
+]
+
+{ #category : 'inspecting' }
+VGFontManager >> inspectorCacheContext: aContext [
+	"Shown only once something has drawn. A manager whose cache is empty has nothing to list,
+	 and the Faces tab already says which entries are waiting to be parsed."
+
+	aContext active: faceByEntryCache notEmpty
 ]
 
 { #category : 'inspecting' }

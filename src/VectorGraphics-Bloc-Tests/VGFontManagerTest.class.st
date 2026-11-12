@@ -35,6 +35,25 @@ VGFontManagerTest >> testADirectoryScanReadsEveryFileAndJudgesItByItsContent [
 ]
 
 { #category : 'tests' }
+VGFontManagerTest >> testAFaceIsBuiltOnceForAnEntryAndNoFreeTypeFaceIsBuiltAtAll [
+	"The face a consumer draws with is ours, read from the entry's own bytes, and kept for the
+	 session: asking twice answers the same object rather than parsing the font again. No
+	 FreeType face is built on the way, which is the whole point of this plan."
+
+	| manager entry first second faceCount |
+	manager := VGFontManager new.
+	entry := manager registerFacesOnMemory:
+		         AeSourceSansPro_Regular fontContentsData.
+	faceCount := AeFTFace allInstances size.
+	first := manager faceAt: entry.
+	second := manager faceAt: entry.
+	self assert: first class equals: VGFontFace.
+	self assert: first identicalTo: second.
+	self assert: first familyName equals: 'Source Sans Pro'.
+	self assert: AeFTFace allInstances size equals: faceCount
+]
+
+{ #category : 'tests' }
 VGFontManagerTest >> testAFreshManagerOwnsNoFreeTypeLibraryAndHoldsAPermanentFaceCache [
 	"The point of this manager is that it owns no foreign handle and parses a face once. So the
 	 FreeType slot upstream fills with an AeFTLibrary stays empty, and the LRU cache upstream
@@ -87,6 +106,68 @@ VGFontManagerTest >> testAManagerThatHoldsNothingAnswersTheAbsentBlockRatherThan
 ]
 
 { #category : 'tests' }
+VGFontManagerTest >> testAskingForTheFaceOfARefusedFileSaysWhichFileAndWhy [
+	"A reader holds my refused files since unit 3.3, so one of them can be handed back to me.
+	 The reader of 1.3 has already said no to those bytes, so I say so by name rather than
+	 letting the font parser run off the end of them, and rather than the cache's own
+	 KeyNotFound, which says nothing of the refusal."
+
+	| directory manager error |
+	directory := FileSystem memory root / 'fonts'.
+	directory ensureCreateDirectory.
+	(directory / 'readme.txt') writeStreamDo: [ :stream |
+		stream nextPutAll: 'not a font' ].
+	manager := VGFontManager new.
+	manager scanDirectory: directory.
+	error := [
+	         manager faceAt: manager rejectedFiles anyOne.
+	         nil ]
+		         on: Error
+		         do: [ :each | each ].
+	self assert: error notNil.
+	self deny: (error isKindOf: KeyNotFound).
+	self assert: (error messageText includesSubstring: 'refused').
+	self assert: (error messageText includesSubstring: 'readme.txt').
+	self assert: (error messageText includesSubstring: 'notAnSfntFont').
+	self assert: manager faceByEntryCache isEmpty
+]
+
+{ #category : 'tests' }
+VGFontManagerTest >> testTheCacheViewListsWhatAFaceReadAndTheFacesViewSaysWhichAreBuilt [
+	"The two tables that show the laziness of unit 3.4: the Faces tab marks the one entry
+	 something has drawn with, and the Cache tab lists the face itself, asking the face for what
+	 it parsed. A manager that has drawn with nothing offers no Cache tab at all."
+
+	| manager builder faceTable built cacheRows context |
+	manager := VGFontManager new.
+	AeEmbeddedFontFile allSubclassesDo: [ :each |
+		manager registerFacesOnMemory: each fontContentsData ].
+	context := StInspectionContext new.
+	manager inspectorCacheContext: context.
+	self deny: context isActive.
+	manager
+		detectFamilyName: 'Source Sans Pro'
+		slant: AeFontSlant normal
+		weight: AeFontWeight normal
+		stretch: AeFontStretch normal
+		ifNone: [ self fail: 'the entry is there to be found' ].
+	builder := SpPresenterBuilder newApplication: SpApplication new.
+	faceTable := manager inspectionFaces: builder.
+	built := faceTable items select: [ :each |
+		         (faceTable columns last evaluation value: each) = 'yes' ].
+	self assert: faceTable items size equals: 6.
+	self assert: (built collect: [ :each | each styleName ]) asArray equals: #( 'Regular' ).
+	self assert: built first familyName equals: 'Source Sans Pro'.
+	cacheRows := (manager inspectorCache: builder) items.
+	self assert: cacheRows size equals: 1.
+	self assert: cacheRows first familyName equals: 'Source Sans Pro'.
+	self assert: cacheRows first unitsPerEm equals: 1000.
+	context := StInspectionContext new.
+	manager inspectorCacheContext: context.
+	self assert: context isActive
+]
+
+{ #category : 'tests' }
 VGFontManagerTest >> testTheEmbeddedFontsRegisterAsTwoFamiliesFoundByTheirAlexandrieTriple [
 	"Registration goes through the catalogue, and a consumer still asks the way Alexandrie asks:
 	 a family name and a triple of AeFontSlant, AeFontWeight and AeFontStretch. The six embedded
@@ -119,24 +200,23 @@ VGFontManagerTest >> testTheEmbeddedFontsRegisterAsTwoFamiliesFoundByTheirAlexan
 
 { #category : 'tests' }
 VGFontManagerTest >> testTheFaceLookupReachesTheCacheRatherThanTheEmptyInheritedIndex [
-	"detectFamilyName:slant:weight:stretch:ifNone: is the one door a consumer of faces knocks on,
-	 and upstream's reads the instance variable this manager leaves empty, so it would answer the
-	 absent block for a family the catalogue holds. It has to ask the catalogue and then the
-	 cache. Until unit 3.4 fills the cache, reaching it is what proves the lookup found the
-	 entry: a registered family raises on the cache instead of answering the block."
+	"The whole route a consumer takes: a family and Alexandrie's three category objects in, the
+	 face out. It reaches the catalogue's index and then my cache, not the slot upstream keeps
+	 its index in, which stays empty — a lookup through that slot would answer the absent block
+	 for every family I hold. Until unit 3.4 it stopped at the cache and signalled KeyNotFound."
 
-	| manager |
+	| manager entry face |
 	manager := VGFontManager new.
-	manager registerFacesOnMemory: AeSourceSansPro_Regular fontContentsData.
-	self
-		should: [
-			manager
-				detectFamilyName: 'Source Sans Pro'
-				slant: AeFontSlant normal
-				weight: AeFontWeight normal
-				stretch: AeFontStretch normal
-				ifNone: [ self fail: 'the entry is there to be found' ] ]
-		raise: KeyNotFound
+	entry := manager registerFacesOnMemory:
+		         AeSourceSansPro_Regular fontContentsData.
+	face := manager
+		        detectFamilyName: 'Source Sans Pro'
+		        slant: AeFontSlant normal
+		        weight: AeFontWeight normal
+		        stretch: AeFontStretch normal
+		        ifNone: [ self fail: 'the entry is there to be found' ].
+	self assert: face identicalTo: (manager faceAt: entry).
+	self assert: face styleName equals: 'Regular'
 ]
 
 { #category : 'tests' }

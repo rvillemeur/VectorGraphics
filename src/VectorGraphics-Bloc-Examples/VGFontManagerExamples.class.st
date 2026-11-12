@@ -24,6 +24,21 @@ VGFontManagerExamples class >> managerThatScannedTheInstalledFonts [
 ]
 
 { #category : 'examples' }
+VGFontManagerExamples class >> managerWithAFaceBuiltForEveryEmbeddedFont [
+	<sampleInstance>
+	"A font manager that has drawn with every font a package carries with it: the six faces are
+	 parsed out of their own bytes, by our reader and not by FreeType, and kept for the session.
+	 Open the Cache tab for what each face read out of its font, and the Faces tab, where the
+	 last column now says yes on every row. The manager of managerWithTheEmbeddedFontsRegistered
+	 is the same one before anything drew with it: entries registered, no face built."
+
+	| manager |
+	manager := self managerWithTheEmbeddedFontsRegistered.
+	manager faceEntries do: [ :each | manager faceAt: each ].
+	^ manager
+]
+
+{ #category : 'examples' }
 VGFontManagerExamples class >> managerWithTheEmbeddedFontsRegistered [
 	<sampleInstance>
 	"A font manager holding the six faces a package carries with it, read by the catalogue and
