@@ -53,6 +53,18 @@ VGTrueTypeExamplesTest >> exampleMethods [
 ]
 
 { #category : 'tests' }
+VGTrueTypeExamplesTest >> testAKeptPathThatNoLongerNamesAFileIsFoundAgain [
+	"The kept path outlives what it names: a font is uninstalled, or the image file itself is
+	 carried to another machine. The next asker must scan again rather than answer a path that
+	 names nothing."
+
+	| found |
+	found := TrueTypeExamples defaultFontPath.
+	TrueTypeExamples defaultFontPath: '/no/such/directory/NoSuchFont.ttf'.
+	self assert: TrueTypeExamples defaultFontPath equals: found
+]
+
+{ #category : 'tests' }
 VGTrueTypeExamplesTest >> testAnExampleThatOpensAWindowIsNamedForItAndNoGateRunsIt [
 	"An example that opens a window cannot run in a suite, so it is named for what it does and
 	the gate skips it. The naming rule is read from the class, not restated here."

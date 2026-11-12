@@ -81,10 +81,23 @@ TrueTypeExamples class >> defaultFontPath [
 	"The absolute path of a font the examples draw with: the plainest face of the best-placed
 	 family of preferredFontFamilyNames this machine has, or any drawable face a scan meets when
 	 it has none of them. Found once and kept, since a scan costs some 85 ms and every example
-	 that draws asks for it; send forgetDefaultFontPath after installing a font. Pass a path of
-	 your own to loadFontFrom: to draw with another."
+	 that draws asks for it. A kept path that no longer names a file is found again, so an
+	 uninstalled font or an image carried to another machine needs nothing done; send
+	 forgetDefaultFontPath to look again for any other reason, or defaultFontPath: to draw with
+	 a font of your own."
 
-	^ DefaultFontPath ifNil: [ DefaultFontPath := self findDefaultFontPath ]
+	(DefaultFontPath isNil or: [ DefaultFontPath asFileReference exists not ])
+		ifTrue: [ DefaultFontPath := self findDefaultFontPath ].
+	^ DefaultFontPath
+]
+
+{ #category : 'accessing' }
+TrueTypeExamples class >> defaultFontPath: aString [
+	"Draw with this font from now on, in place of the one I would find. The door the comment of
+	 defaultFontPath points at: a reader trying another face sets it here rather than editing an
+	 example. A path that names no file is dropped at the next asking."
+
+	DefaultFontPath := aString
 ]
 
 { #category : 'accessing' }
