@@ -67,6 +67,35 @@ VGFontManagerTest >> testAFreshManagerOwnsNoFreeTypeLibraryAndHoldsAPermanentFac
 ]
 
 { #category : 'tests' }
+VGFontManagerTest >> testAManagerLeftOverFromAnotherSessionRebuildsItselfBeforeAnsweringAnything [
+	"Upstream resets a manager whose session is not this one, because the faces of a dead
+	 session are handles into a library that is gone. Mine holds no handle, but the rule is the
+	 same and checkSession is what keeps it. So every reader of mine asks through an accessor
+	 that checks, the catalogue included, and so does every row of my views. The cache is asked
+	 last here on purpose: asking it first would reset the manager and the other readers would
+	 then answer empty whether they check or not."
+
+	| manager entry rows |
+	manager := VGFontManager new.
+	entry := manager registerFacesOnMemory:
+		         AeSourceSansPro_Regular fontContentsData.
+	manager faceAt: entry.
+	manager instVarNamed: 'session' put: Object new.
+	self assert: manager faceEntries isEmpty.
+	self assert: manager familyNames isEmpty.
+	self assert: manager rejectedFiles isEmpty.
+	rows := (manager inspectorState:
+		         (SpPresenterBuilder newApplication: SpApplication new)) items.
+	self
+		assert: (rows detect: [ :each | each key = 'Files met' ]) value
+		equals: 0.
+	self
+		assert: (rows detect: [ :each | each key = 'Faces kept' ]) value
+		equals: 0.
+	self assert: manager faceByEntryCache isEmpty
+]
+
+{ #category : 'tests' }
 VGFontManagerTest >> testAManagerThatHoldsNothingAnswersTheAbsentBlockRatherThanRaising [
 	"The degenerate state, on both doors that take an absent block. A fresh manager holds no
 	 family, so an entry is not found; a manager that holds the family is asked for a weight no

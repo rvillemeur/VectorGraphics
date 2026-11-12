@@ -25,8 +25,13 @@ VGFontManager >> catalogue [
 	"The one index I answer from: which families exist, where the bytes of each face are, and
 	 the slant, weight class and width class that tell two faces of one family apart. Mine for
 	 the session, read-only from outside, and the reader a consumer of my own faces shares when
-	 it wants the same discovery without going through me."
+	 it wants the same discovery without going through me.
+	 Checks the session first, as upstream's four accessors do with the slots they guard. An
+	 entry met in another session names bytes nobody here has read, so a manager left over from
+	 a dead session rebuilds before it answers. Every reader and every writer of mine asks
+	 through this accessor rather than the slot, so the check cannot be walked around."
 
+	self checkSession.
 	^ catalogue
 ]
 
@@ -54,7 +59,7 @@ VGFontManager >> entriesByFamilyName [
 	 between the two lives in entryForFamilyName:slant:weight:stretch:ifNone:, the one place a
 	 consumer asks in Alexandrie's vocabulary."
 
-	^ catalogue entriesByFamilyName
+	^ self catalogue entriesByFamilyName
 ]
 
 { #category : 'accessing' }
@@ -68,7 +73,7 @@ VGFontManager >> entryForFamilyName: aFamilyName slant: aSlant weight: aWeight s
 	 it from one. The catalogue does the looking up: how it keys a family and a style is its
 	 own."
 
-	^ catalogue
+	^ self catalogue
 		  entryOfFamilyNamed: aFamilyName
 		  styleKey: {
 				  aSlant name.
@@ -79,24 +84,19 @@ VGFontManager >> entryForFamilyName: aFamilyName slant: aSlant weight: aWeight s
 
 { #category : 'accessing' }
 VGFontManager >> faceAt: anEntry [
-	"The face a consumer draws with, read from the entry's own bytes and kept for the session.
-	 Upstream's answers whatever its LRU cache holds and builds nothing, since its cache was
-	 given a factory that calls FreeType; mine builds the face here, so the only thing that ever
-	 reads a font is our own reader.
+	"The face of one entry, parsed once and then kept. Upstream's answers whatever its LRU
+	 cache holds and builds nothing, since its cache was given a factory that calls FreeType;
+	 mine builds the face here, out of the bytes the entry names.
+	 The bytes are read at this point and not before: a catalogue that scanned this machine
+	 knows 544 files and 262 MB in all, and a session draws with a handful of them.
+	 A refused entry is named rather than parsed. The reader already said why it would not
+	 read the file, so the error repeats that reason instead of letting a parse fail a second
+	 time, deeper, on the same bytes.
+	 The cache is asked through its accessor, which checks the session first, as upstream's
+	 does."
 
-	 The bytes are read at this point and not before: a scan reads a few hundred of them per
-	 file to say what the file is, and the fonts of this machine are 262 MB in all, so a face is
-	 parsed when something draws with it and never again.
-
-	 A refused entry is named rather than parsed. The reader of 1.3 has already said no to those
-	 bytes, and since 3.3 a reader holds the refused files and can hand one back."
-
-	anEntry isRejected ifTrue: [
-		^ Error signal:
-			  'The font reader refused ' , anEntry source fontSourceName , ': '
-			  , anEntry metadata rejectionReason asString
-			  , '. No face can be built for it.' ].
-	^ faceByEntryCache
+	anEntry isRejected ifTrue: [ ^ self refuseFaceFor: anEntry ].
+	^ self faceByEntryCache
 		  at: anEntry
 		  ifAbsentPut: [ VGFontFace newForBytes: anEntry bytes ]
 ]
@@ -107,7 +107,7 @@ VGFontManager >> faceEntries [
 	 the catalogue selects them out of everything it met, so a refused file is still there to
 	 report and is not one of these."
 
-	^ catalogue drawableEntries
+	^ self catalogue drawableEntries
 ]
 
 { #category : 'accessing' }
@@ -115,7 +115,7 @@ VGFontManager >> familyNames [
 	"The families I hold, as their own fonts spell them rather than as the catalogue keys them,
 	 sorted. A consumer shows these to a reader."
 
-	^ catalogue familyNames
+	^ self catalogue familyNames
 ]
 
 { #category : 'testing' }
@@ -123,7 +123,7 @@ VGFontManager >> includesFamilyName: aString [
 	"Whether a family is here to be drawn with. Upstream's reads the instance variable this
 	 manager leaves empty; the catalogue holds the index and answers in any case."
 
-	^ catalogue includesFamilyNamed: aString
+	^ self catalogue includesFamilyNamed: aString
 ]
 
 { #category : 'inspecting' }
@@ -154,7 +154,7 @@ VGFontManager >> inspectionFaces: aBuilder [
 		  addColumn: (SpStringTableColumn
 				   title: 'Face built'
 				   evaluated: [ :each |
-					   (faceByEntryCache includesKey: each)
+					   (self faceByEntryCache includesKey: each)
 						   ifTrue: [ 'yes' ]
 						   ifFalse: [ '' ] ]);
 		  yourself
@@ -177,7 +177,7 @@ VGFontManager >> inspectorCache: aBuilder [
 	 1.4 decided, so this table only grows."
 
 	^ aBuilder newTable
-		  items: (faceByEntryCache values asArray sorted:
+		  items: (self faceByEntryCache values asArray sorted:
 					   (#familyName ascending , #styleName ascending));
 		  addColumn: (SpStringTableColumn title: 'Family name' evaluated: #familyName);
 		  addColumn: (SpStringTableColumn title: 'Style' evaluated: #styleName);
@@ -198,32 +198,36 @@ VGFontManager >> inspectorCacheContext: aContext [
 	"Shown only once something has drawn. A manager whose cache is empty has nothing to list,
 	 and the Faces tab already says which entries are waiting to be parsed."
 
-	aContext active: faceByEntryCache notEmpty
+	aContext active: self faceByEntryCache notEmpty
 ]
 
-{ #category : 'inspecting' }
+{ #category : 'inspector' }
 VGFontManager >> inspectorState: aBuilder [
-	<inspectorPresentationOrder: 10 title: 'State'>
-	"What a session of mine holds. Every row asks the real object rather than restating what reset
-	 writes, so a row cannot drift from the code: the library row prints the slot, the cache rows
-	 print its class and its size, and the registry rows go through my own readers, which read the
-	 catalogue — not through the slot upstream keeps its index in, which stays empty for ever.
-	 The three file rows reconcile: every file met is either an entry registered or a file
-	 refused. A fresh manager shows nil, a Dictionary, and zeroes throughout."
 
+	<inspectorPresentationOrder: 10 title: 'State'>
+	"What I am made of, in one table. Three slots upstream fills stay nil or empty here, and
+	 the registry rows go through my own readers, which read the catalogue — not through the
+	 slot upstream keeps its index in, which stays empty for ever. The three file rows
+	 reconcile: every file met is either an entry registered or a file refused.
+	 Every row asks through an accessor, so a manager left over from a dead session shows what
+	 it would answer now, rebuilt, rather than what it held then."
+
+	| cache |
+	cache := self faceByEntryCache.
 	^ aBuilder newTable
 		  items: {
 				  ('Session' -> session).
-				  ('FreeType library' -> freetypeLibrary).
-				  ('Face cache' -> faceByEntryCache class).
-				  ('Faces kept' -> faceByEntryCache size).
+				  ('FreeType library' -> self freetypeLibrary).
+				  ('Face cache' -> cache class).
+				  ('Faces kept' -> cache size).
 				  ('Families registered' -> self entriesByFamilyName size).
-				  ('Files met' -> catalogue entries size).
+				  ('Files met' -> self catalogue entries size).
 				  ('Entries registered' -> self faceEntries size).
 				  ('Files refused' -> self rejectedFiles size).
-				  ('Default face' -> defaultFace).
-				  ('Default code face' -> defaultCodeFace) };
-		  addColumn: (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
+				  ('Default face' -> self defaultFace).
+				  ('Default code face' -> self defaultCodeFace) };
+		  addColumn:
+			  (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
 		  addColumn: (SpStringTableColumn
 				   title: 'Value'
 				   evaluated: [ :each | each value printString ]);
@@ -238,6 +242,18 @@ VGFontManager >> inspectorStateContext: aContext [
 	aContext active: true
 ]
 
+{ #category : 'accessing' }
+VGFontManager >> refuseFaceFor: anEntry [
+	"Signal that no face can be built for a file the reader refused, naming the file and the
+	 reason the reader gave. Separate from faceAt: so that the one answers a face and this one
+	 states the refusal."
+
+	^ Error signal:
+		  'The font reader refused ' , anEntry source fontSourceName , ': '
+		  , anEntry metadata rejectionReason asString
+		  , '. No face can be built for it.'
+]
+
 { #category : 'registering' }
 VGFontManager >> registerFacesOnFile: aFileReference [
 	"Meet the face of one file. The catalogue reads its metadata off the stream, a few hundred
@@ -246,7 +262,7 @@ VGFontManager >> registerFacesOnFile: aFileReference [
 	 index upstream iterates is always zero. Answers the entry, refused or not, which upstream
 	 had nothing to answer."
 
-	^ catalogue addFile: aFileReference
+	^ self catalogue addFile: aFileReference
 ]
 
 { #category : 'registering' }
@@ -255,7 +271,7 @@ VGFontManager >> registerFacesOnMemory: aByteArray [
 	 in a test. scanEmbeddedFonts reaches the registry through this method, so it needs no
 	 override of its own. Answers the entry, like registerFacesOnFile:."
 
-	^ catalogue addBytes: aByteArray
+	^ self catalogue addBytes: aByteArray
 ]
 
 { #category : 'accessing' }
@@ -265,7 +281,7 @@ VGFontManager >> rejectedFiles [
 	 reader who cannot find a family can ask why. The catalogue derives the list from the
 	 entries it kept, so this is not a second collection that could fall out of step."
 
-	^ catalogue refusedEntries
+	^ self catalogue refusedEntries
 ]
 
 { #category : 'initialization' }
@@ -302,7 +318,7 @@ VGFontManager >> scanDefaultDirectories [
 	"Meet every font this machine has installed, through the catalogue's own list of the places
 	 a platform keeps them. A directory that does not exist is passed over."
 
-	^ catalogue scanDefaultDirectories
+	^ self catalogue scanDefaultDirectories
 ]
 
 { #category : 'scanning' }
@@ -313,5 +329,5 @@ VGFontManager >> scanDirectory: aFileReference [
 	 and it is the refusal by content, so a font with an unexpected name is read and a file that
 	 is not a font becomes a refused entry rather than a file silently passed over."
 
-	^ catalogue scanDirectory: aFileReference
+	^ self catalogue scanDirectory: aFileReference
 ]
