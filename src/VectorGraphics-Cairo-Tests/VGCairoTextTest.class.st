@@ -237,6 +237,20 @@ VGCairoTextTest >> testAFaceBuiltFromAFreeTypeFaceReadsTheFontTheManagerHolds [
 ]
 
 { #category : 'tests' }
+VGCairoTextTest >> testAFaceNamesTheFamilyAndStyleItsOwnTablesState [
+	"The face reads its own name table, so a consumer naming a font does not need a second
+	 reader beside it. The names the class side states for the bundled face are the same names,
+	 so the fixture constants and the reader cannot drift apart."
+
+	| face |
+	face := VGFontFace newForBytes: VGFontFace defaultBytes.
+	self assert: face familyName equals: 'Source Sans Pro'.
+	self assert: face styleName equals: 'Regular'.
+	self assert: face familyName equals: VGFontFace defaultFamilyName.
+	self assert: face styleName equals: VGFontFace defaultStyleName
+]
+
+{ #category : 'tests' }
 VGCairoTextTest >> testAFaceParsesAGlyphOnceAndKeepsIt [
 	"A page of text asks for the same few glyphs again and again, so a glyph is parsed once. The
 	 same outline object comes back, and the face says how many it holds."
@@ -250,6 +264,21 @@ VGCairoTextTest >> testAFaceParsesAGlyphOnceAndKeepsIt [
 	self assert: face cachedGlyphCount equals: 1.
 	face outlineOfGlyphAt: 28.
 	self assert: face cachedGlyphCount equals: 2
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFaceWithNoNameTableStillReadsAndNamesNothing [
+	"What I need to draw and what the metadata reader needs to name are not the same tables:
+	 the name table is in neither requiredTableTags nor what any glyph is read from. So a font
+	 stripped of it is still a face, draws as before, and answers nil for both its names."
+
+	| face |
+	face := VGFontFace newForBytes:
+		        (self fixtureFontBytesWithTheTableTagsRenamed: 'name').
+	self assert: face glyphCount equals:
+		(VGFontFace newForBytes: self fixtureFontBytes) glyphCount.
+	self assert: face familyName isNil.
+	self assert: face styleName isNil
 ]
 
 { #category : 'tests' }

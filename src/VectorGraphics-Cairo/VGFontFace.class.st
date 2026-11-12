@@ -21,7 +21,8 @@ Class {
 		'outlines',
 		'glyfEntry',
 		'glyfStart',
-		'glyphDataOffsets'
+		'glyphDataOffsets',
+		'metadata'
 	],
 	#classInstVars : [
 		'defaultFace'
@@ -249,6 +250,14 @@ VGFontFace >> descent [
 ]
 
 { #category : 'accessing' }
+VGFontFace >> familyName [
+	"The family the font names itself, as its own name table states it. nil for a font that
+	 carries no name table: I can draw such a font, so I read it, and only naming it fails."
+
+	^ metadata familyName
+]
+
+{ #category : 'accessing' }
 VGFontFace >> glyphCount [
 	"How many glyphs the font holds, index zero included: that one is the glyph a code point the
 	 font does not map is drawn with."
@@ -311,10 +320,12 @@ VGFontFace >> inspectorFace: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Face'>
 	"What the font's own tables say, read through the public readers rather than restated. No row
 	 reports the outline memo cache, so a glyph a later view reads cannot change what this one
-	 shows."
+	 shows. The two name rows are nil for a font carrying no name table, which I still draw."
 
 	^ aBuilder newTable
 		  items: {
+				  ('Family' -> self familyName).
+				  ('Style' -> self styleName).
 				  ('Glyphs' -> self glyphCount).
 				  ('Units per em' -> self unitsPerEm).
 				  ('Ascent' -> self ascent).
@@ -398,7 +409,9 @@ VGFontFace >> printOn: aStream [
 VGFontFace >> readBytes: aByteArray [
 	"Read the tables I need from the font's own bytes. A font with no glyf table carries its
 	 outlines in some other format, CFF for an OpenType font, and I would draw nothing for it,
-	 so it is refused here rather than at the first glyph."
+	 so it is refused here rather than at the first glyph. The metadata reader keeps its own
+	 judgement: I store what it answers whether or not it would have refused this font, since
+	 what I need to draw and what it needs to name are not the same tables."
 
 	| tables headData glyphCount |
 	bytes := aByteArray.
@@ -407,6 +420,7 @@ VGFontFace >> readBytes: aByteArray [
 	self class requiredTableTags do: [ :tag |
 		(tables includesKey: tag) ifFalse: [
 			^ Error signal: 'the font has no ' , tag , ' table' ] ].
+	metadata := TTFontMetadataReader readBytes: aByteArray.
 	headData := (TTHeadTableParser on: (tables at: 'head')) process.
 	unitsPerEm := headData at: #units.
 	boundsRectangle := headData at: #bounds.
@@ -516,6 +530,14 @@ VGFontFace >> readOutlineOfGlyphAt: aGlyphIndex [
 		  (glyph boundsLeft @ glyph boundsTop
 		   corner: glyph boundsRight @ glyph boundsBottom)
 		  contours: (self contoursOfGlyphAt: aGlyphIndex)
+]
+
+{ #category : 'accessing' }
+VGFontFace >> styleName [
+	"The style the font names itself — 'Regular', 'Bold Italic' — as its own name table states
+	 it. nil for a font that carries no name table, like familyName."
+
+	^ metadata styleName
 ]
 
 { #category : 'accessing' }

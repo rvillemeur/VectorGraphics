@@ -84,7 +84,8 @@ VGScaledFontExamples class >> fontFace [
 VGScaledFontExamples class >> fontFaceOfASystemFont [
 	<sampleInstance>
 	"The TrueType tables of a system font, read with no help from any other package: the glyph
-	 count, the units per em, the cmap and the outlines all come from the file itself."
+	 count, the units per em, the cmap, the outlines and the family and style the font names
+	 itself all come from the file itself. Open the Face tab to read the names back."
 
 	^ self fontFace
 ]
