@@ -257,6 +257,17 @@ VGFontFace >> familyName [
 	^ metadata familyName
 ]
 
+{ #category : 'reading' }
+VGFontFace >> fillGlyphAdvancesFrom: aTableDictionary numHMetrics: anInteger [
+	"The advances the hmtx table states, written into the glyphs the glyf table gave. The glyphs
+	 have to be read first: hmtx fills them rather than answering anything of its own."
+
+	(TTHmtxTableParser
+		 on: (aTableDictionary at: 'hmtx')
+		 glyphs: glyphs
+		 numHMetrics: anInteger) process
+]
+
 { #category : 'accessing' }
 VGFontFace >> glyphCount [
 	"How many glyphs the font holds, index zero included: that one is the glyph a code point the
@@ -475,12 +486,36 @@ VGFontFace >> readComponentWithFlags: aFlagWord [
 ]
 
 { #category : 'reading' }
+VGFontFace >> readGlyphRecordsFrom: aTableDictionary count: aGlyphCount [
+	"The glyphs the glyf table holds, read at the offsets loca gave. The glyf entry and its start
+	 are kept because a composite glyph is read from the table again: TTGlyfTableParser keeps the
+	 component glyphs of a composite and discards the offsets that place them."
+
+	glyfEntry := aTableDictionary at: 'glyf'.
+	glyfStart := glyfEntry offset.
+	glyphs := (TTGlyfTableParser
+		           on: glyfEntry
+		           nGlyphs: aGlyphCount
+		           offsets: glyphDataOffsets) process
+]
+
+{ #category : 'reading' }
 VGFontFace >> readGlyphsAndHorizontalMetricsFrom: aTableDictionary count: aGlyphCount [
-	"The outlines and the advances, which are read together because hmtx fills the glyphs the glyf
-	 table gave. The maximum advance is read before TTHheaTableParser runs, because that parser
-	 reads from the entry's current offset. The glyf entry and its start are kept because a
-	 composite glyph is read from the table again: TTGlyfTableParser keeps the component glyphs of
-	 a composite and discards the offsets that place them."
+	"The outlines and the advances, which are read together because hmtx fills the glyphs the
+	 glyf table gave. The order is the whole of what this method says: hhea states how many
+	 metrics hmtx holds, and hmtx needs the glyphs to write into."
+
+	| numHMetrics |
+	numHMetrics := self readHorizontalMetricsFrom: aTableDictionary.
+	self readGlyphRecordsFrom: aTableDictionary count: aGlyphCount.
+	self fillGlyphAdvancesFrom: aTableDictionary numHMetrics: numHMetrics
+]
+
+{ #category : 'reading' }
+VGFontFace >> readHorizontalMetricsFrom: aTableDictionary [
+	"The metrics the hhea table states, and the count of glyphs hmtx holds a metric for, which
+	 the caller needs to read hmtx. The maximum advance is read before TTHheaTableParser runs,
+	 because that parser reads from the entry's current offset."
 
 	| hheaEntry hheaData |
 	hheaEntry := aTableDictionary at: 'hhea'.
@@ -489,16 +524,7 @@ VGFontFace >> readGlyphsAndHorizontalMetricsFrom: aTableDictionary count: aGlyph
 	ascent := hheaData at: #ascent.
 	descent := hheaData at: #descent.
 	lineGap := hheaData at: #lineGap.
-	glyfEntry := aTableDictionary at: 'glyf'.
-	glyfStart := glyfEntry offset.
-	glyphs := (TTGlyfTableParser
-		           on: glyfEntry
-		           nGlyphs: aGlyphCount
-		           offsets: glyphDataOffsets) process.
-	(TTHmtxTableParser
-		 on: (aTableDictionary at: 'hmtx')
-		 glyphs: glyphs
-		 numHMetrics: (hheaData at: #numHMetrics)) process
+	^ hheaData at: #numHMetrics
 ]
 
 { #category : 'initialization' }
