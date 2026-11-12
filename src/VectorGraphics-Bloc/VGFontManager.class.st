@@ -48,20 +48,20 @@ VGFontManager >> inspectorStateContext: aContext [
 
 { #category : 'registering' }
 VGFontManager >> refuseUntilTheCatalogueRegisters [
-	"The one refusal the three inherited ways into the registry share. It names the catalogue,
-	 because that is what will do the reading, and it is this whole method that unit 3.2 of the
-	 font plan deletes."
+	"The one refusal the three inherited ways into the registry share, and the one place the plan
+	 is named: it is this whole method that unit 3.2 of the font plan deletes. The message says
+	 only what holds for a reader of this manager, so it names the catalogue, which is what will
+	 do the reading, and no unit of a plan that reader has never seen."
 
 	^ Error signal:
-		  'this manager registers nothing yet: the catalogue reads the fonts, and that route '
-		  , 'arrives with unit 3.2'
+		  'this manager registers no font yet: the font catalogue reads the fonts, and this '
+		  , 'manager does not read it yet'
 ]
 
 { #category : 'registering' }
 VGFontManager >> registerFacesOnFile: aFileReference [
 	"Refused: the inherited method reads the faces of the file through the FreeType library this
-	 manager does not have. The catalogue reads them instead, and this method is replaced by that
-	 route in unit 3.2 of the font plan."
+	 manager does not have. The catalogue reads them instead."
 
 	^ self refuseUntilTheCatalogueRegisters
 ]
@@ -101,7 +101,7 @@ VGFontManager >> reset [
 VGFontManager >> scanDefaultDirectories [
 	"Refused: the inherited method drives an AeFontScanner, which registers every file it meets
 	 through the library this manager does not have. TTFontCatalogue already scans those same
-	 directories, and unit 3.2 of the font plan joins the two."
+	 directories."
 
 	^ self refuseUntilTheCatalogueRegisters
 ]
