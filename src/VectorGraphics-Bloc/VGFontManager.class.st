@@ -1,9 +1,13 @@
 "
 I am the font registry Bloc asks for its faces, and I hold no FreeType library.
 
-Upstream `AeFontManager` keeps an `AeFTLibrary`, reads every font through it, and caches the `AeFTFace` handles it builds in an `LRUCache` capped at twenty. I keep the same registry of entries by family name, so what Bloc asks of me it would ask of upstream, and I answer it from `VGFontFace`, which reads a font's own bytes in Pharo and owns no handle at all. That is why my face cache is a plain `Dictionary`: what it holds costs to parse again and nothing to release, so a face lives for the session rather than being evicted.
+Upstream `AeFontManager` keeps an `AeFTLibrary`, reads every font through it, and caches the `AeFTFace` handles it builds in an `LRUCache` capped at twenty. I answer the same questions, so what Bloc asks of me it would ask of upstream, and I answer them from `VGFontFace`, which reads a font's own bytes in Pharo and owns no handle at all. That is why my face cache is a plain `Dictionary`: what it holds costs to parse again and nothing to release, so a face lives for the session rather than being evicted.
 
-What I register is still ahead of me. The three inherited ways into the registry — `registerFacesOnFile:`, `registerFacesOnMemory:` and, through the second of them, `scanEmbeddedFonts` — all read a font through the library I do not have, and `scanDefaultDirectories` drives a scanner that does the same. Each refuses by name until `TTFontCatalogue` takes that job over, which is unit 3.2 of the font plan. `faceAt:` is likewise still the inherited one, which answers from my cache and raises on a miss, until unit 3.4 builds the face.
+What I register, I register through `TTFontCatalogue`, which I own for the session. Every inherited way into the registry delegates to it — `registerFacesOnFile:` to `addFile:`, `registerFacesOnMemory:` to `addBytes:`, `scanDirectory:` and `scanDefaultDirectories` to its own, and `scanEmbeddedFonts` through the second of those without an override. The catalogue reads a few hundred bytes of each file, never the whole face, and judges a file by its content rather than by its name, so a font under an unexpected name is registered and a file that is not a font is a refusal it keeps.
+
+The catalogue is my only index, which is why the four inherited readers of `entriesByFamilyName` are overridden: each one reads that instance variable directly, and mine stays empty. It keys a family by name in lower case and then by what the font states of itself — its slant, its OS/2 weight class, its width class. Alexandrie keys by `AeFontSlant`, `AeFontWeight` and `AeFontStretch` read off the style name instead, and `entryForFamilyName:slant:weight:stretch:ifNone:` is the one place the two vocabularies meet.
+
+`faceAt:` is still the inherited one, which answers from my cache and raises on a miss, until unit 3.4 of the font plan builds the face.
 "
 Class {
 	#name : 'VGFontManager',
