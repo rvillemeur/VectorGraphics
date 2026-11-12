@@ -84,7 +84,11 @@ VGArchitectureTest class >> allowedDependencies [
 			  'VectorGraphics-Cairo-Tests'
 			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
 				    'VectorGraphics-Conformance' ).
-			  'VectorGraphics-Bloc' -> #( 'VectorGraphics-Cairo' ).
+			  "The Bloc renderer names the font reader as well as the Cairo backend since
+			   unit 3.2 of the font plan: VGFontManager is an adapter onto TTFontCatalogue,
+			   which reads the fonts the FreeType library used to read."
+			  'VectorGraphics-Bloc'
+			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-TrueType' ).
 			  'VectorGraphics-Bloc-Examples'
 			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ).
 			  'VectorGraphics-Bloc-Tests'

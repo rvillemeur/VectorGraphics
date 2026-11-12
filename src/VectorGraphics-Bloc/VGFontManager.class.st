@@ -8,10 +8,135 @@ What I register is still ahead of me. The three inherited ways into the registry
 Class {
 	#name : 'VGFontManager',
 	#superclass : 'AeFontManager',
+	#instVars : [
+		'catalogue'
+	],
 	#category : 'VectorGraphics-Bloc-Fonts',
 	#package : 'VectorGraphics-Bloc',
 	#tag : 'Fonts'
 }
+
+{ #category : 'accessing' }
+VGFontManager >> catalogue [
+	"The one index I answer from: which families exist, where the bytes of each face are, and
+	 the slant, weight class and width class that tell two faces of one family apart. Mine for
+	 the session, read-only from outside, and the reader a consumer of my own faces shares when
+	 it wants the same discovery without going through me."
+
+	^ catalogue
+]
+
+{ #category : 'accessing' }
+VGFontManager >> detectFamilyName: aFamilyName slant: aSlant weight: aWeight stretch: aStretch ifNone: absentBlock [
+	"The face a consumer draws with, asked for by family and by Alexandrie's three category
+	 objects. Upstream's reads the instance variable this manager leaves empty, so it would
+	 answer the absent block for every family the catalogue holds."
+
+	| entry |
+	entry := self
+		         entryForFamilyName: aFamilyName
+		         slant: aSlant
+		         weight: aWeight
+		         stretch: aStretch
+		         ifNone: [ ^ absentBlock value ].
+	^ self faceAt: entry
+]
+
+{ #category : 'accessing' }
+VGFontManager >> entriesByFamilyName [
+	"The faces I answer for, keyed as the catalogue keys them: family name in lower case, then
+	 the slant, weight class and width class of the face. Not upstream's key, which is a triple
+	 of AeFontSlant, AeFontWeight and AeFontStretch read off the style name; the translation
+	 between the two lives in entryForFamilyName:slant:weight:stretch:ifNone:, the one place a
+	 consumer asks in Alexandrie's vocabulary."
+
+	^ catalogue entriesByFamilyName
+]
+
+{ #category : 'accessing' }
+VGFontManager >> entryForFamilyName: aFamilyName slant: aSlant weight: aWeight stretch: aStretch ifNone: absentBlock [
+	"One face of a family, asked for the way Alexandrie asks: a family name and three of its
+	 font category objects. This is the one place the two vocabularies meet, and the three
+	 translations are exact rather than approximate, which is why they run in this direction
+	 only. A slant answers its name, the same symbol the metadata reader states. An AeFontWeight
+	 answers the OS/2 weight class itself — normal is 400, bold is 700. An AeFontStretch answers
+	 the OS/2 width class less one, since it counts ultraCondensed from zero where OS/2 counts
+	 it from one."
+
+	| entriesByStyle |
+	entriesByStyle := catalogue entriesByFamilyName
+		                  at: aFamilyName asLowercase
+		                  ifAbsent: [ ^ absentBlock value ].
+	^ entriesByStyle
+		  at: {
+				  aSlant name.
+				  aWeight value.
+				  aStretch value + 1 }
+		  ifAbsent: [ ^ absentBlock value ]
+]
+
+{ #category : 'accessing' }
+VGFontManager >> faceEntries [
+	"Every face I answer for, refusals left out. Upstream collects these out of its own index;
+	 the catalogue selects them out of everything it met, so a refused file is still there to
+	 report and is not one of these."
+
+	^ catalogue drawableEntries
+]
+
+{ #category : 'accessing' }
+VGFontManager >> familyNames [
+	"The families I hold, as their own fonts spell them rather than as the catalogue keys them,
+	 sorted. A consumer shows these to a reader."
+
+	^ catalogue familyNames
+]
+
+{ #category : 'testing' }
+VGFontManager >> includesFamilyName: aString [
+	"Whether I hold a family of this name, in any case, as upstream answers it."
+
+	^ catalogue entriesByFamilyName includesKey: aString asLowercase
+]
+
+{ #category : 'inspecting' }
+VGFontManager >> inspectionFaces: aBuilder [
+	<inspectorPresentationOrder: 1 title: 'Faces'>
+	"The faces I answer for, each row reading the entry rather than a copy of it. Upstream's
+	 table of the same name shows the slant, weight and stretch its style-name parser guessed;
+	 these columns show what the font itself states in its OS/2 table, which is where my key
+	 comes from, so a reader comparing the two sees the same face described twice rather than a
+	 translation of one into the other. Sorted the way upstream sorts, family first, so the
+	 three faces of a family stay together."
+
+	^ aBuilder newTable
+		  items: (self faceEntries asArray sorted: [ :one :other |
+					   one familyName , one metadata styleName
+					   <= (other familyName , other metadata styleName) ]);
+		  addColumn:
+			  (SpStringTableColumn title: 'Family name' evaluated: #familyName);
+		  addColumn: (SpStringTableColumn
+				   title: 'Style'
+				   evaluated: [ :each | each metadata styleName ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Slant'
+				   evaluated: [ :each | each metadata slant ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Weight class'
+				   evaluated: [ :each | each metadata weightClass ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Width class'
+				   evaluated: [ :each | each metadata widthClass ]);
+		  yourself
+]
+
+{ #category : 'inspecting' }
+VGFontManager >> inspectionFacesContext: aContext [
+	"Shown only when I hold a face. A fresh manager has an empty table to offer and the State
+	 tab says all there is to say about it."
+
+	aContext active: self faceEntries notEmpty
+]
 
 { #category : 'inspector' }
 VGFontManager >> inspectorState: aBuilder [
@@ -47,44 +172,41 @@ VGFontManager >> inspectorStateContext: aContext [
 ]
 
 { #category : 'registering' }
-VGFontManager >> refuseUntilTheCatalogueRegisters [
-	"The one refusal the three inherited ways into the registry share, and the one place the plan
-	 is named: it is this whole method that unit 3.2 of the font plan deletes. The message says
-	 only what holds for a reader of this manager, so it names the catalogue, which is what will
-	 do the reading, and no unit of a plan that reader has never seen."
-
-	^ Error signal:
-		  'this manager registers no font yet: the font catalogue reads the fonts, and this '
-		  , 'manager does not read it yet'
-]
-
-{ #category : 'registering' }
 VGFontManager >> registerFacesOnFile: aFileReference [
-	"Refused: the inherited method reads the faces of the file through the FreeType library this
-	 manager does not have. The catalogue reads them instead."
+	"Meet the face of one file. The catalogue reads its metadata off the stream, a few hundred
+	 bytes of a file that may be megabytes, where upstream read the whole face through FreeType.
+	 One face per file, never several: 1.3 of the font plan refuses a ttcf collection, so the
+	 index upstream iterates is always zero. Answers the entry, refused or not, which upstream
+	 had nothing to answer."
 
-	^ self refuseUntilTheCatalogueRegisters
+	^ catalogue addFile: aFileReference
 ]
 
 { #category : 'registering' }
 VGFontManager >> registerFacesOnMemory: aByteArray [
-	"Refused, like registerFacesOnFile:, and for the same reason. scanEmbeddedFonts reaches the
-	 registry through this method, so it refuses with it and needs no override of its own."
+	"Meet the face of a font nobody wrote to disk: the embedded faces of a package, a font built
+	 in a test. scanEmbeddedFonts reaches the registry through this method, so it needs no
+	 override of its own. Answers the entry, like registerFacesOnFile:."
 
-	^ self refuseUntilTheCatalogueRegisters
+	^ catalogue addBytes: aByteArray
 ]
 
 { #category : 'initialization' }
 VGFontManager >> reset [
-	"The state a session owns, built without a foreign library. Two slots differ from upstream.
+	"The state a session owns, built without a foreign library. Three slots differ from upstream.
 
 	 freetypeLibrary stays nil: there is no FreeType to initialise, and nothing here owns a
-	 handle that would have to be released.
+	 handle that would have to be released. A catalogue reads the fonts instead, and it is mine
+	 for the session, as 1.4 of the font plan decided: no singleton and no global catalogue.
 
 	 faceByEntryCache is a plain Dictionary where upstream keeps an LRUCache capped at twenty
 	 faces. Upstream has to cap, because what it caches is an AeFTFace, a handle; what is cached
 	 here is a VGFontFace, parsed tables and a glyph memo in object memory, which costs to read
 	 again and nothing to let go of. So a face is kept for the session rather than evicted.
+
+	 entriesByFamilyName stays empty: the catalogue holds the only index, and the four inherited
+	 readers of this slot are overridden to read it. The slot cannot be removed, since it is
+	 upstream's.
 
 	 session is set because checkSession resets whenever it differs, and would reset forever if
 	 this method left it alone."
@@ -94,14 +216,25 @@ VGFontManager >> reset [
 	defaultFace := nil.
 	defaultCodeFace := nil.
 	freetypeLibrary := nil.
-	faceByEntryCache := Dictionary new
+	faceByEntryCache := Dictionary new.
+	catalogue := TTFontCatalogue new
 ]
 
 { #category : 'scanning' }
 VGFontManager >> scanDefaultDirectories [
-	"Refused: the inherited method drives an AeFontScanner, which registers every file it meets
-	 through the library this manager does not have. TTFontCatalogue already scans those same
-	 directories."
+	"Meet every font this machine has installed, through the catalogue's own list of the places
+	 a platform keeps them. A directory that does not exist is passed over."
 
-	^ self refuseUntilTheCatalogueRegisters
+	^ catalogue scanDefaultDirectories
+]
+
+{ #category : 'scanning' }
+VGFontManager >> scanDirectory: aFileReference [
+	"Meet every file under this directory. The catalogue hands each one to its reader and reads
+	 no file name, where upstream drives an AeFontScanner whose shouldIgnoreFile: decides from
+	 the name and the extension. Decision 6 of unit 1.4 of the font plan: one rule is enough,
+	 and it is the refusal by content, so a font with an unexpected name is read and a file that
+	 is not a font becomes a refused entry rather than a file silently passed over."
+
+	^ catalogue scanDirectory: aFileReference
 ]

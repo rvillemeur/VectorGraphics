@@ -38,8 +38,9 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 	 depends on, and not only the nearest one that would drag the rest in: VGArchitectureTest
 	 holds this declaration against the references the code makes. The one edge it cannot state
 	 is Cairo-Examples on Cairo-Tests, because the reverse is stated and a cycle has no load
-	 order. The Cairo backend names the font reader alone out of the four rasteriser packages,
-	 which is why loading 'cairo' brings neither the scan-line engine nor the front page.
+	 order. The Cairo backend and the Bloc renderer name the font reader alone out of the four
+	 rasteriser packages, which is why loading 'cairo' or 'bloc' brings neither the
+	 scan-line engine nor the front page.
 	 The corpus and the benchmark harness are declared by declareSupportPackagesOn:."
 
 	spec
@@ -52,7 +53,9 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 			spec requires:
 					#( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
 					   'VectorGraphics-Conformance' ) ];
-		package: 'VectorGraphics-Bloc' with: [ spec requires: #( 'Bloc' 'VectorGraphics-Cairo' ) ];
+		package: 'VectorGraphics-Bloc'
+		with: [
+			spec requires: #( 'Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Bloc-Examples'
 		with: [ spec requires: #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ) ];
 		package: 'VectorGraphics-Bloc-Tests'
