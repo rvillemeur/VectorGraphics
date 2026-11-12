@@ -118,3 +118,11 @@ TTFontCatalogueEntry >> styleKey [
 		  metadata weightClass.
 		  metadata widthClass }
 ]
+
+{ #category : 'accessing' }
+TTFontCatalogueEntry >> styleName [
+	"The style my face states, as its own name table spells it — 'Regular', 'Bold Italic'. The
+	 pair with familyName: what a reader of a catalogue sorts and groups by."
+
+	^ metadata styleName
+]

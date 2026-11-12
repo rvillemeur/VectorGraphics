@@ -54,6 +54,34 @@ TTFontCatalogueTest >> directoryOfSixFacesTwoFamiliesAndTwoRefusals [
 ]
 
 { #category : 'tests' }
+TTFontCatalogueTest >> testAFaceIsFoundByItsStyleKeyAndBothMissesAnswerTheAbsentBlock [
+	"A consumer that knows which face it wants names the family and the style key. A family I
+	 never met and a style that family does not hold are both misses, and a miss answers the
+	 block rather than raising."
+
+	| catalogue |
+	catalogue := self catalogueScannedOverTheFixtureDirectory.
+	self
+		assert: ((catalogue
+				  entryOfFamilyNamed: 'source SANS pro'
+				  styleKey: #( #normal 700 5 )
+				  ifNone: [ nil ]) metadata styleName)
+		equals: 'Bold'.
+	self
+		assert: (catalogue
+				 entryOfFamilyNamed: 'Helvetica'
+				 styleKey: #( #normal 700 5 )
+				 ifNone: [ #noSuchFamily ])
+		equals: #noSuchFamily.
+	self
+		assert: (catalogue
+				 entryOfFamilyNamed: 'Source Sans Pro'
+				 styleKey: #( #normal 900 5 )
+				 ifNone: [ #noSuchStyle ])
+		equals: #noSuchStyle
+]
+
+{ #category : 'tests' }
 TTFontCatalogueTest >> testAFamilyIsFoundByTheNameItStatesWhateverTheCaseAndAnswersItsPlainestFace [
 	"A consumer names a family the way a reader spells it, not the way I key it. It means the
 	 plain face of that family when it does not say which one: upright, normal weight, normal
@@ -68,6 +96,20 @@ TTFontCatalogueTest >> testAFamilyIsFoundByTheNameItStatesWhateverTheCaseAndAnsw
 			TTFontMetadataReader normalWeightClass.
 			TTFontMetadataReader normalWidthClass }.
 	self assert: (catalogue entryOfFamilyNamed: 'Helvetica') isNil
+]
+
+{ #category : 'tests' }
+TTFontCatalogueTest >> testAFamilyIsRecognisedByTheNameItStatesWhateverTheCase [
+	"A consumer asks whether I hold a family before asking for one of its faces, and spells it
+	 the way a reader spells it. The lower-case key is mine alone, so the question is mine to
+	 answer."
+
+	| catalogue |
+	catalogue := self catalogueScannedOverTheFixtureDirectory.
+	self assert: (catalogue includesFamilyNamed: 'Source Sans Pro').
+	self assert: (catalogue includesFamilyNamed: 'source SANS pro').
+	self deny: (catalogue includesFamilyNamed: 'Helvetica').
+	self deny: (TTFontCatalogue new includesFamilyNamed: 'Source Sans Pro')
 ]
 
 { #category : 'tests' }
@@ -119,6 +161,22 @@ TTFontCatalogueTest >> testARefusedFileIsKeptWithItsReasonAndIsNotIndexed [
 	self assert: entry metadata familyName equals: 'Waree'.
 	self assert: catalogue entriesByFamilyName isEmpty.
 	self assert: catalogue familyNames isEmpty
+]
+
+{ #category : 'tests' }
+TTFontCatalogueTest >> testAnEntryAnswersTheFamilyAndTheStyleItsFontStates [
+	"The two names a reader sorts and groups a catalogue by. An entry answers both itself, so a
+	 table of faces does not reach through it into the metadata for one of the pair and not the
+	 other."
+
+	| entry |
+	entry := (self catalogueScannedOverTheFixtureDirectory
+		          entryOfFamilyNamed: 'Source Sans Pro'
+		          styleKey: #( #normal 700 5 )
+		          ifNone: [ nil ]).
+	self assert: entry familyName equals: 'Source Sans Pro'.
+	self assert: entry styleName equals: 'Bold'.
+	self assert: entry styleName equals: entry metadata styleName
 ]
 
 { #category : 'tests' }

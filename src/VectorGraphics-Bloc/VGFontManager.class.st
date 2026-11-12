@@ -65,18 +65,16 @@ VGFontManager >> entryForFamilyName: aFamilyName slant: aSlant weight: aWeight s
 	 only. A slant answers its name, the same symbol the metadata reader states. An AeFontWeight
 	 answers the OS/2 weight class itself — normal is 400, bold is 700. An AeFontStretch answers
 	 the OS/2 width class less one, since it counts ultraCondensed from zero where OS/2 counts
-	 it from one."
+	 it from one. The catalogue does the looking up: how it keys a family and a style is its
+	 own."
 
-	| entriesByStyle |
-	entriesByStyle := catalogue entriesByFamilyName
-		                  at: aFamilyName asLowercase
-		                  ifAbsent: [ ^ absentBlock value ].
-	^ entriesByStyle
-		  at: {
+	^ catalogue
+		  entryOfFamilyNamed: aFamilyName
+		  styleKey: {
 				  aSlant name.
 				  aWeight value.
 				  aStretch value + 1 }
-		  ifAbsent: [ ^ absentBlock value ]
+		  ifNone: absentBlock
 ]
 
 { #category : 'accessing' }
@@ -98,9 +96,10 @@ VGFontManager >> familyNames [
 
 { #category : 'testing' }
 VGFontManager >> includesFamilyName: aString [
-	"Whether I hold a family of this name, in any case, as upstream answers it."
+	"Whether a family is here to be drawn with. Upstream's reads the instance variable this
+	 manager leaves empty; the catalogue holds the index and answers in any case."
 
-	^ catalogue entriesByFamilyName includesKey: aString asLowercase
+	^ catalogue includesFamilyNamed: aString
 ]
 
 { #category : 'inspecting' }
@@ -109,19 +108,14 @@ VGFontManager >> inspectionFaces: aBuilder [
 	"The faces I answer for, each row reading the entry rather than a copy of it. Upstream's
 	 table of the same name shows the slant, weight and stretch its style-name parser guessed;
 	 these columns show what the font itself states in its OS/2 table, which is where my key
-	 comes from, so a reader comparing the two sees the same face described twice rather than a
-	 translation of one into the other. Sorted the way upstream sorts, family first, so the
-	 three faces of a family stay together."
+	 comes from, so a row says why a face answers the triple it answers. Sorted the way upstream
+	 sorts, family first, then by the style name the font states."
 
 	^ aBuilder newTable
-		  items: (self faceEntries asArray sorted: [ :one :other |
-					   one familyName , one metadata styleName
-					   <= (other familyName , other metadata styleName) ]);
-		  addColumn:
-			  (SpStringTableColumn title: 'Family name' evaluated: #familyName);
-		  addColumn: (SpStringTableColumn
-				   title: 'Style'
-				   evaluated: [ :each | each metadata styleName ]);
+		  items: (self faceEntries asArray sorted:
+					   (#familyName ascending , #styleName ascending));
+		  addColumn: (SpStringTableColumn title: 'Family name' evaluated: #familyName);
+		  addColumn: (SpStringTableColumn title: 'Style' evaluated: #styleName);
 		  addColumn: (SpStringTableColumn
 				   title: 'Slant'
 				   evaluated: [ :each | each metadata slant ]);

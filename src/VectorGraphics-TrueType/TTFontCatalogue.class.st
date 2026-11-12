@@ -121,6 +121,17 @@ TTFontCatalogue >> entryOfFamilyNamed: aString [
 ]
 
 { #category : 'accessing' }
+TTFontCatalogue >> entryOfFamilyNamed: aString styleKey: aStyleKey ifNone: absentBlock [
+	"The one face of a family that a style key names, the family spelled in any case. Both a
+	 family I never met and a style the family does not hold answer the block. The shape of the
+	 key is mine, as addSource:metadata: builds it; a client states a style, not an index."
+
+	^ (entriesByFamilyName at: aString asLowercase ifAbsent: [ ^ absentBlock value ])
+		  at: aStyleKey
+		  ifAbsent: [ ^ absentBlock value ]
+]
+
+{ #category : 'accessing' }
 TTFontCatalogue >> familyNames [
 	"The families I hold, as their own fonts spell them rather than as I key them, sorted. A
 	 consumer shows these to a reader; the lower-case keys are mine alone."
@@ -130,6 +141,14 @@ TTFontCatalogue >> familyNames [
 	entriesByFamilyName valuesDo: [ :each |
 		result add: each anyOne familyName ].
 	^ result
+]
+
+{ #category : 'accessing' }
+TTFontCatalogue >> includesFamilyNamed: aString [
+	"Whether I hold a family of that name, in any case. The lower-case key is mine, so the
+	 question is answered here rather than by a client folding the case itself."
+
+	^ entriesByFamilyName includesKey: aString asLowercase
 ]
 
 { #category : 'initialization' }
