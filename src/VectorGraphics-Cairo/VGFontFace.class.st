@@ -1,5 +1,5 @@
 "
-I am one font file, read with the VectorGraphics TrueType parsers, and I answer what the font itself says: its metrics in font units, the glyph index of a code point, and the outline of a glyph.
+I am one font file, read with the VectorGraphics TrueType parsers, and I answer what the font itself says: the family and style it names itself, its metrics in font units, the glyph index of a code point, and the outline of a glyph.
 
 I am the replacement for AeCairoFreetypeFontFace, but I carry no FreeType face and no handle: I read the glyf, loca, cmap, head, hhea, hmtx and maxp tables of the bytes I am given. A font with no glyf table, a CFF OpenType font for instance, is refused rather than drawn wrongly.
 
