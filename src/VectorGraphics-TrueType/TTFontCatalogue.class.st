@@ -196,8 +196,7 @@ TTFontCatalogue >> inspectorRefusals: aBuilder [
 
 	<inspectorPresentationOrder: 20 title: 'Refusals'>
 	| byReason |
-	byReason := self refusedEntries groupedBy: [ :each |
-		            each metadata rejectionReason ].
+	byReason := self refusedEntries groupedBy: [ :each | each rejectionReason ].
 	^ aBuilder newTable
 		  addColumn: ((SpStringTableColumn
 				    title: 'Reason'
@@ -209,7 +208,7 @@ TTFontCatalogue >> inspectorRefusals: aBuilder [
 				   width: 70);
 		  addColumn: (SpStringTableColumn
 				   title: 'First one'
-				   evaluated: [ :each | each value first source fontSourceName ]);
+				   evaluated: [ :each | each value first fontSourceName ]);
 		  items: (byReason associations asSortedCollection: [ :a :b |
 					   a key <= b key ]) asArray;
 		  yourself

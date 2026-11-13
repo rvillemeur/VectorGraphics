@@ -35,6 +35,15 @@ TTFontCatalogueEntry >> familyName [
 	^ metadata familyName
 ]
 
+{ #category : 'accessing' }
+TTFontCatalogueEntry >> fontSourceName [
+	"What to call the font I name in a sentence a reader sees: a basename for a file, a byte
+	 count for a font held in memory. Asked of me rather than of my source, so a caller naming
+	 me does not have to know where my bytes are, as isRejected does for my reason."
+
+	^ source fontSourceName
+]
+
 { #category : 'inspecting' }
 TTFontCatalogueEntry >> inspectorSource: aBuilder [
 	"Where my bytes are, how many there are, and how few of them the scan read to know what
@@ -52,7 +61,7 @@ TTFontCatalogueEntry >> inspectorSource: aBuilder [
 		  addColumn:
 			  (SpStringTableColumn title: 'Value' evaluated: [ :each | each value ]);
 		  items: {
-				  ('source' -> source fontSourceName).
+				  ('source' -> self fontSourceName).
 				  ('bytes' -> source size printString).
 				  ('read by the scan' -> read printString) };
 		  yourself
@@ -91,7 +100,15 @@ TTFontCatalogueEntry >> printOn: aStream [
 		nextPutAll: ' ';
 		print: metadata;
 		nextPutAll: ' from ';
-		nextPutAll: source fontSourceName
+		nextPutAll: self fontSourceName
+]
+
+{ #category : 'accessing' }
+TTFontCatalogueEntry >> rejectionReason [
+	"Why my face carries a reason not to draw it, or nil when it does not. Asked of me rather
+	 than of my metadata, for the reason isRejected gives."
+
+	^ metadata rejectionReason
 ]
 
 { #category : 'accessing' }

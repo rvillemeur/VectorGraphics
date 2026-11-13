@@ -23,7 +23,7 @@ TTFontCatalogueEntry >> inspectorShaping: aBuilder [
 		          yourself.
 	buffer shapeWithFont: font.
 	rows := OrderedCollection new.
-	rows add: 'blob source' -> source fontSourceName.
+	rows add: 'blob source' -> self fontSourceName.
 	rows add: 'scale, 26.6 of 22 px' -> font scale printString.
 	buffer cairoGlyphArray doWithIndex: [ :each :index |
 		rows add: 'glyph ' , index printString
@@ -69,8 +69,8 @@ TTFontCatalogueEntry >> newHbFontScaledTo: aSize [
 
 	self isRejected ifTrue: [
 		^ Error signal:
-			  'The font reader refused ' , self source fontSourceName , ': '
-			  , self metadata rejectionReason asString
+			  'The font reader refused ' , self fontSourceName , ': '
+			  , self rejectionReason asString
 			  , '. Nothing can be shaped with it.' ].
 	^ (self source newHbBlob newHbFaceAtIndex: 0) newHbFont
 		  scaleX: aSize * 64 y: aSize * 64;
