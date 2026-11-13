@@ -30,38 +30,51 @@ VGScaledFont >> cairoMaskAtlas [
 { #category : '*VectorGraphics-Bloc' }
 VGScaledFont >> cairoMaskForGlyph: aGlyphIndex atPhase: aPhasePoint underMatrix: aLinearMatrix onAeContext: aContext [
 	"One glyph rasterised by Cairo itself into an A8 surface of its own, with its origin at the
-	 sub-pixel phase the atlas keyed on. The box is whole pixels, so blitting the mask at a whole
-	 pixel offset keeps that phase. Nil for a glyph that inks nothing, a space for instance.
+	 sub-pixel phase the atlas keyed on. The box is whole pixels, so blitting the mask at a
+	 whole pixel offset keeps that phase. Nil for a glyph that inks nothing, a space for
+	 instance. The contours are placed once and then moved to the box, because transforming the
+	 outline is the work of a mask that misses the atlas."
 
-	 The surface is externally allocated, which is what the mask has to be: Cairo keeps the
-	 address of the pixels while it composites them, and the garbage collector may move a
-	 ByteArray. Alpha is the coverage and nothing else, so the mask is filled with opaque white,
-	 with the winding rule a glyph outline is drawn with and the antialiasing the drawing context
-	 asks for."
-
-	| contours box maskSurface maskContext |
+	| contours box |
 	contours := self
 		            deviceContoursOfGlyphAt: aGlyphIndex
 		            underMatrix: aLinearMatrix
 		            at: aPhasePoint.
 	contours ifEmpty: [ ^ nil ].
 	box := self wholePixelBoxOfContours: contours.
+	^ VGGlyphMask
+		  surface: (self
+				   cairoMaskSurfaceOfContours: (contours collect: [ :contour |
+						    contour collect: [ :point | point - box origin ] ])
+				   extent: box extent
+				   onAeContext: aContext)
+		  offset: box origin
+]
+
+{ #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> cairoMaskSurfaceOfContours: aContourCollection extent: anExtent onAeContext: aContext [
+	"An A8 surface of its own holding the coverage Cairo rasterises for a set of device space
+	 contours, which are placed for this surface already.
+	 The surface is externally allocated, which is what the mask has to be: Cairo keeps the
+	 address of the pixels while it composites them, and the garbage collector may move a
+	 ByteArray. Alpha is the coverage and nothing else, so the mask is filled with opaque white,
+	 with the winding rule a glyph outline is drawn with and the antialiasing the drawing
+	 context asks for."
+
+	| maskSurface maskContext |
 	maskSurface := AeCairoImageSurface
-		               extent: box extent
+		               extent: anExtent
 		               format: AeCairoSurfaceFormat a8.
 	maskContext := AeCairoContext newFor: maskSurface.
 	maskContext
 		antialias: aContext antialias;
 		useFillRuleWinding;
 		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
-	(self
-		 deviceContoursOfGlyphAt: aGlyphIndex
-		 underMatrix: aLinearMatrix
-		 at: aPhasePoint - box origin) do: [ :contour |
+	aContourCollection do: [ :contour |
 		self appendContour: contour toAeContext: maskContext ].
 	maskContext fill.
 	maskSurface flush.
-	^ VGGlyphMask surface: maskSurface offset: box origin
+	^ maskSurface
 ]
 
 { #category : '*VectorGraphics-Bloc' }
