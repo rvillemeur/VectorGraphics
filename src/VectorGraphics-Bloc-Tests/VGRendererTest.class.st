@@ -92,14 +92,6 @@ VGRendererTest >> exportersWithNoOverrideYet [
 	^ #( #BAJpgExporter #BAPdfExporter #BASvgExporter )
 ]
 
-{ #category : 'private' }
-VGRendererTest >> foreignPackagePrefixes [
-	"The packages this project subclasses and must not touch: Bloc, its Alexandrie backend, and
-	 Alexandrie itself."
-
-	^ #( 'Bloc' 'Alexandrie' )
-]
-
 { #category : 'running' }
 VGRendererTest >> setUp [
 	"`BlHostRenderer class >> preferableClass` caches the renderer the whole image draws through,
@@ -238,20 +230,6 @@ VGRendererTest >> testMeasuringAParagraphWithoutAWindowUsesOurCanvas [
 	paragraph := VGTextParagraphStub new.
 	VGRenderer offscreenMeasureTextParagraph: paragraph.
 	self assert: paragraph measurer canvas class equals: VGCanvas
-]
-
-{ #category : 'tests' }
-VGRendererTest >> testNoMethodOfThisProjectNamesACairoClass [
-	"The failover is only real if nothing in this project reaches for a Cairo class, because a
-	 named class would be looked up and its library loaded as soon as the method ran. The scanner
-	 reads the literal frame of every method of every package of the project, blocks included."
-
-	| offenders |
-	offenders := VGCairoReferenceScanner default offenders.
-	self
-		assert: offenders isEmpty
-		description: 'these methods name a Cairo class: '
-			, (offenders collect: [ :each | each key printString ]) asArray printString
 ]
 
 { #category : 'tests' }
@@ -422,26 +400,4 @@ VGRendererTest >> testTheRendererNamesItself [
 
 	self assert: VGRenderer label equals: 'VectorGraphics'.
 	self deny: VGRenderer label equals: BARenderer label
-]
-
-{ #category : 'tests' }
-VGRendererTest >> testThisProjectDefinesNoMethodOnABlocOrAlexandrieClass [
-	"The failover is a set of subclasses and nothing else: no method of this project is installed
-	 on a class of Bloc or of Alexandrie. An extension method there would change the behaviour of
-	 the image that loads this project, which is the opposite of a failover that can be chosen."
-
-	| offenders |
-	offenders := VGCairoReferenceScanner projectPackageNames flatCollect: [
-		             :packageName |
-		             (PackageOrganizer default packageNamed: packageName) methods
-			             select: [ :each |
-				             | owner |
-				             owner := each methodClass instanceSide package.
-				             owner notNil and: [
-					             self foreignPackagePrefixes anySatisfy: [ :prefix |
-						             owner name beginsWith: prefix ] ] ] ].
-	self
-		assert: offenders isEmpty
-		description: 'these methods are installed on a foreign class: '
-			, (offenders collect: [ :each | each printString ]) asArray printString
 ]

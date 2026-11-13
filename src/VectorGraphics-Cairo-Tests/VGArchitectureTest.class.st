@@ -637,6 +637,29 @@ VGArchitectureTest >> testNoMethodOfThisProjectExtendsANumberClass [
 ]
 
 { #category : 'tests' }
+VGArchitectureTest >> testNoPackageOfTheDefaultGroupDefinesAMethodOnTheStackItReplaces [
+	"Loading this project with no group named must not need Bloc or Alexandrie, so a package of
+	 the default group installs no method on a class of either: the extension would have no
+	 class to go on. The Bloc packages extend both by design since phases 3 and 4 of the font
+	 plan — a scaled font of ours answers an Alexandrie context, and a Cairo surface answers a
+	 context of ours — and what they may name is stated by #allowedDependencies. This rule spoke
+	 for the whole project, as a gate of VGRendererTest, until that design landed."
+
+	| stack offenders |
+	stack := self class replacedStackPackageNames asSet.
+	offenders := (self class packagesLoadedByGroupNamed: 'default')
+		             asSortedCollection asArray flatCollect: [ :packageName |
+			             ((PackageOrganizer default packageNamed: packageName)
+				              methods select: [ :each |
+				              | owner |
+				              owner := each methodClass instanceSide package.
+				              owner notNil and: [
+					              stack includes: owner name asString ] ]) collect: [
+				             :each | packageName , ': ' , each printString ] ].
+	self assert: offenders asSortedCollection asArray equals: #(  )
+]
+
+{ #category : 'tests' }
 VGArchitectureTest >> testNoPackageOfTheDefaultGroupNamesAClassOfTheStackItReplaces [
 	"Loading this project with no group named must not reach Bloc or Alexandrie. The engine and
 	 the Cairo backend are what a user loads to rasterise; the Bloc renderer is the opt-in layer
