@@ -1039,7 +1039,6 @@ VGCairoContext >> renderedGlyphMaskFor: aGlyphIndex atPhase: aPhasePoint [
 	"One glyph rasterised into a surface of its own, with its origin at the sub-pixel phase the
 	 atlas keyed on. The box is whole pixels, so blitting the mask at a whole pixel offset keeps
 	 that phase.
-
 	 The mask is filled with opaque white, so its alpha is the coverage and nothing else, and it
 	 is filled with the winding rule whatever rule the context carries, because that is the rule
 	 a glyph outline is drawn with. The antialiasing mode is the context's, so a context that
@@ -1048,7 +1047,7 @@ VGCairoContext >> renderedGlyphMaskFor: aGlyphIndex atPhase: aPhasePoint [
 	| contours box maskSurface maskContext |
 	contours := self deviceContoursOfGlyph: aGlyphIndex at: aPhasePoint.
 	contours ifEmpty: [ ^ nil ].
-	box := self wholePixelBoxOfContours: contours.
+	box := self currentScaledFont wholePixelBoxOfContours: contours.
 	maskSurface := VGCairoImageSurface
 		               newFormat: VGCairoSurfaceFormat argb32
 		               extent: box extent.
@@ -1528,19 +1527,4 @@ VGCairoContext >> useStrokeJoinRound [
 { #category : 'private' }
 VGCairoContext >> userPointFor: aPoint [
 	^ state matrix inverted value: aPoint
-]
-
-{ #category : 'private' }
-VGCairoContext >> wholePixelBoxOfContours: aContourCollection [
-	"The whole pixel box that holds a set of device space contours, with a pixel of margin on
-	 every side. A control point lies outside the curve it bends, so a box over every point of a
-	 contour holds the curve too; the margin keeps an edge pixel the rasteriser shades from
-	 falling outside the mask."
-
-	| points xs ys |
-	points := aContourCollection flatCollect: [ :each | each ].
-	xs := points collect: [ :each | each x ].
-	ys := points collect: [ :each | each y ].
-	^ xs min floor - 1 @ (ys min floor - 1)
-	  corner: xs max ceiling + 1 @ (ys max ceiling + 1)
 ]

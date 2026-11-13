@@ -214,18 +214,3 @@ VGScaledFont >> showOneGlyph: aGlyph underMatrix: aMatrix linearPart: aLinearMat
 		x: (whole + mask offset) x
 		y: (whole + mask offset) y
 ]
-
-{ #category : '*VectorGraphics-Bloc' }
-VGScaledFont >> wholePixelBoxOfContours: aContourCollection [
-	"The whole pixel box that holds a set of device space contours, with a pixel of margin on
-	 every side. A control point lies outside the curve it bends, so a box over every point of a
-	 contour holds the curve too; the margin keeps an edge pixel the rasteriser shades from
-	 falling outside the mask."
-
-	| points xs ys |
-	points := aContourCollection flatCollect: [ :each | each ].
-	xs := points collect: [ :each | each x ].
-	ys := points collect: [ :each | each y ].
-	^ xs min floor - 1 @ (ys min floor - 1)
-	  corner: xs max ceiling + 1 @ (ys max ceiling + 1)
-]
