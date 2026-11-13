@@ -65,10 +65,10 @@ VGFontManager class >> inspectorInstallationContext: aContext [
 
 	"The Installation view reads installedInstance, a class-instance variable: every subclass
 	 would get its own copy, always nil, and the tab would say nothing true of it. So the tab
-	 belongs to the class that installs, and the rule is asked of the class rather than
-	 restated — the view is offered where installGlobally is defined."
+	 belongs to the class that installs, and the rule is asked rather than restated — the view
+	 is offered where installGlobally is defined."
 
-	aContext active: self = VGFontManager
+	aContext active: (self includesSelector: #installGlobally)
 ]
 
 { #category : 'installing' }
