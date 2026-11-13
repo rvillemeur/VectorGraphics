@@ -99,6 +99,16 @@ VGScaledFont >> extentTextOfCairoMask: anAssociation [
 ]
 
 { #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> glyphExtentsOf: aGlyphArray size: aNumberOfGlyphs into: aTextExtents onAeContext: aContext [
+	"The measuring site: cairo_glyph_extents upstream, my own metrics here. The numbers are in
+	 user space, as Cairo answers them, so the context's matrix takes no part and the argument is
+	 unused; it is kept because the five text sites dispatch the same way."
+
+	^ (self glyphExtentsOf: (self glyphsOf: aGlyphArray size: aNumberOfGlyphs))
+		  writeInto: aTextExtents
+]
+
+{ #category : '*VectorGraphics-Bloc' }
 VGScaledFont >> glyphsOf: aGlyphArray size: aNumberOfGlyphs [
 	"The first aNumberOfGlyphs glyphs of an array, as a collection I can walk. Alexandrie hands
 	 over an opaque external array that answers its size and nothing else; the indexable

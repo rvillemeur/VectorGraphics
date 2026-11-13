@@ -546,17 +546,10 @@ VGCairoContext >> getGlyphExtentsOf: aGlyphArray size: aNumberOfGlyphs into: aTe
 	 AeCanvas keeps one record and reads it afterwards, so the record is filled through its own
 	 setters and may be anything that answers them."
 
-	| extents |
 	self isInError ifTrue: [ ^ self ].
-	extents := self currentScaledFont glyphExtentsOf:
-		           (self glyphsOf: aGlyphArray size: aNumberOfGlyphs).
-	aTextExtentsRecord
-		bearingX: extents bearingX;
-		bearingY: extents bearingY;
-		width: extents width;
-		height: extents height;
-		advanceX: extents advanceX;
-		advanceY: extents advanceY
+	(self currentScaledFont glyphExtentsOf:
+		 (self glyphsOf: aGlyphArray size: aNumberOfGlyphs)) writeInto:
+		aTextExtentsRecord
 ]
 
 { #category : 'private' }

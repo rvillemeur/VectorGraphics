@@ -153,3 +153,15 @@ VGScaledFontExamples class >> scaledFontBuiltTheWayCairoSpellsIt [
 				   subpixelOrder: VGCairoSubpixelOrder default;
 				   yourself)
 ]
+
+{ #category : 'examples' }
+VGScaledFontExamples class >> textExtentsOfARun [
+	<sampleInstance>
+	"The geometry of a laid out run: the inked box relative to the origin of the first glyph, and
+	 the advance to where the next run would start. This is the record a text backend reads to
+	 place a line, and the one our fonts hand to Bloc."
+
+	| font |
+	font := self scaledFontAtAReadableSize.
+	^ font glyphExtentsOf: (font glyphArrayForString: self exampleRun)
+]

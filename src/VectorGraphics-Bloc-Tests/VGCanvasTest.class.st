@@ -14,6 +14,19 @@ Class {
 	#package : 'VectorGraphics-Bloc-Tests'
 }
 
+{ #category : 'fixture' }
+VGCanvasTest >> scaledFontOfTheFixture [
+	"Source Sans Pro regular at a readable size, with the identity as the user to device matrix,
+	 so a measured number is a pixel count. The bytes are the bundled ones: measuring must not
+	 depend on a FreeType face, which is what the canvas route still builds its own faces from."
+
+	^ VGScaledFont
+		  fontFace: (VGFontFace newForBytes: AeSourceSansPro_Regular fontContentsData)
+		  fontMatrix: (VGCairoMatrix newScalingBy: 24 asPoint)
+		  userToDeviceMatrix: VGCairoMatrix newIdentity
+		  options: VGFontOptions new
+]
+
 { #category : 'tests - font bridge' }
 VGCanvasTest >> testAFaceBuiltFromAFreeTypeFaceReadsTheFontTheManagerHolds [
 	"A drawing that picks its font by family name holds a FreeType face and no canvas, so the
@@ -73,6 +86,32 @@ VGCanvasTest >> testARadialGradientSourceIsOurOwnPattern [
 		outerCenter: 5 @ 5
 		outerRadius: 5.
 	self assert: canvas privateAeCairoContext source class equals: VGCairoRadialGradientPattern
+]
+
+{ #category : 'tests' }
+VGCanvasTest >> testARunMeasuredThroughTheCanvasCarriesOurOwnExtents [
+	"Unit 4.3 of the font plan, the measuring site. AeCanvas asks the context it holds for the
+	 extents of a laid out run and reads six numbers back; a font of ours answers them from its
+	 own metrics, with no FreeType face and no Cairo scaled font in the way. The run holds a
+	 space, which inks nothing, so the inked box and the advance cannot agree by accident.
+	 The record the canvas fills holds doubles, so our exact fractions come back rounded to the
+	 nearest double and the numbers are compared as floats."
+
+	| font glyphs ours metrics advances |
+	font := self scaledFontOfTheFixture.
+	glyphs := font glyphArrayForString: 'a b'.
+	ours := font glyphExtentsOf: glyphs.
+	metrics := (AeCanvas extent: 10 @ 10) metricsFor: glyphs font: font.
+	advances := glyphs inject: 0 @ 0 into: [ :sum :each |
+		            sum + (font glyphAdvanceOf: each index) ].
+	self assert: metrics bearingX closeTo: ours bearingX.
+	self assert: metrics bearingY closeTo: ours bearingY.
+	self assert: metrics width closeTo: ours width.
+	self assert: metrics height closeTo: ours height.
+	self assert: metrics advanceX closeTo: ours advanceX.
+	self assert: metrics advanceY closeTo: ours advanceY.
+	self assert: metrics advanceX closeTo: advances x.
+	self assert: metrics width < metrics advanceX
 ]
 
 { #category : 'tests - font bridge' }

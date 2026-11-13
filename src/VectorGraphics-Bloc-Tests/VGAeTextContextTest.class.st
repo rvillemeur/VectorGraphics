@@ -170,10 +170,10 @@ VGAeTextContextTest >> testEverySurfaceAnswersTheContextThatKnowsOurFonts [
 
 { #category : 'tests' }
 VGAeTextContextTest >> testTheTextSitesTheLaterUnitsDeliverFailNamingOurOwnFontAndSelector [
-	"Measuring, pathing and font extents are units 4.3, 4.4 and 4.5 of the font plan. Until they
-	 land, each site has to fail on our own class naming the method that is missing, and never
-	 reach the FFI call: marshalling a VGScaledFont into cairo_set_scaled_font dies far from the
-	 cause, on VGFontFace >> #tfPointerAddress."
+	"Pathing and font extents are units 4.4 and 4.5 of the font plan. Until they land, each site
+	 has to fail on our own class naming the method that is missing, and never reach the FFI
+	 call: marshalling a VGScaledFont into cairo_set_scaled_font dies far from the cause, on
+	 VGFontFace >> #tfPointerAddress. Measuring left this list with unit 4.3."
 
 	| font surface context glyphs |
 	font := self scaledFontOfTheFixture.
@@ -181,14 +181,6 @@ VGAeTextContextTest >> testTheTextSitesTheLaterUnitsDeliverFailNamingOurOwnFontA
 	context := surface newContext.
 	context scaledFont: font.
 	glyphs := font glyphArrayForString: 'a'.
-
-	self
-		assert: (self receiverAndSelectorNotUnderstoodIn: [
-				 context
-					 getGlyphExtentsOf: glyphs
-					 size: 1
-					 into: AeCairoTextExtents new ])
-		equals: VGScaledFont -> #glyphExtentsOf:size:into:onAeContext:.
 	self
 		assert: (self receiverAndSelectorNotUnderstoodIn: [
 				 context appendGlyphsPath: glyphs ])
