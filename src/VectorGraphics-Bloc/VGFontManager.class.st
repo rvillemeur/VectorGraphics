@@ -7,7 +7,9 @@ What I register, I register through `TTFontCatalogue`, which I own for the sessi
 
 The catalogue is my only index, which is why the four inherited readers of `entriesByFamilyName` are overridden: each one reads that instance variable directly, and mine stays empty. It keys a family by name in lower case and then by what the font states of itself — its slant, its OS/2 weight class, its width class. Alexandrie keys by `AeFontSlant`, `AeFontWeight` and `AeFontStretch` read off the style name instead, and `entryForFamilyName:slant:weight:stretch:ifNone:` is the one place the two vocabularies meet.
 
-`faceAt:` is still the inherited one, which answers from my cache and raises on a miss, until unit 3.4 of the font plan builds the face.
+`faceAt:` builds the face from the entry's own bytes and keeps it, so a font is read once a session draws with it and never again; a file the reader refused is named in an error rather than parsed a second time. Every reader of mine asks through an accessor that checks the session first, so a manager left over from a dead session rebuilds its catalogue before it answers.
+
+Nothing of mine is posed anywhere until `installGlobally` is sent. It is my class that keeps what was posed, writes it into the slot `AeFontManager` answers `globalInstance` from, and puts it back from `startUp:` after upstream nils that slot at every image start. An image that installed nothing keeps the manager Alexandrie built for itself.
 "
 Class {
 	#name : 'VGFontManager',
