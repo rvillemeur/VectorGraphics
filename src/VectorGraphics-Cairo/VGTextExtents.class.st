@@ -71,12 +71,14 @@ VGTextExtents >> bearingY: aNumber [
 
 { #category : 'inspector' }
 VGTextExtents >> drawGeometryOn: aForm placing: aBlock [
-	"The baseline across the image, the origin of the first glyph as a black tick, the inked box
-	 in blue, and the advance to where the next run starts as a red line under the baseline."
+	"The baseline across the image, the origin of the first glyph as a black tick that straddles
+	 it, the inked box in blue, and the advance to where the next run starts as a red line under
+	 it, ended by a tick of its own."
 
-	| origin advanceEnd |
+	| origin advanceEnd tick |
 	origin := aBlock value: 0 @ 0.
 	advanceEnd := aBlock value: self advance.
+	tick := 4.
 	aForm
 		fill: (0 @ origin y extent: aForm width @ 1)
 		fillColor: Color lightGray.
@@ -87,13 +89,15 @@ VGTextExtents >> drawGeometryOn: aForm placing: aBlock [
 		on: aForm
 		color: Color blue.
 	aForm
-		fill: (origin x @ (origin y - 4) extent: 1 @ 9)
+		fill: (origin x @ (origin y - tick) extent: 1 @ (2 * tick + 1))
 		fillColor: Color black.
 	aForm
-		fill: (origin x @ (origin y + 4) corner: advanceEnd x + 1 @ (origin y + 5))
+		fill:
+			(origin x @ (origin y + tick) corner:
+				 advanceEnd x + 1 @ (origin y + tick + 1))
 		fillColor: Color red.
 	aForm
-		fill: (advanceEnd x @ (origin y + 1) extent: 1 @ 7)
+		fill: (advanceEnd x @ (origin y + 1) extent: 1 @ (2 * tick - 1))
 		fillColor: Color red
 ]
 
