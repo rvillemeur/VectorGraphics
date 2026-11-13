@@ -89,6 +89,28 @@ VGCanvasExamples class >> metricsOfARunMeasuredThroughTheCanvas [
 ]
 
 { #category : 'examples' }
+VGCanvasExamples class >> runPathFilledThroughTheCanvas [
+	<sampleInstance>
+	"The path site as Bloc reaches it: the canvas is given a path factory that appends the
+	 glyphs of a run, and the figure drawn from it is the text as a filled shape. This is what
+	 a text border and a text shadow are built on."
+
+	| font canvas glyphs |
+	font := self scaledFontForTheDefaultFace.
+	canvas := AeCanvas extent: 120 @ 40.
+	glyphs := font glyphArrayForString: 'Hi a'.
+	canvas
+		pathTranslate: 6 @ 28;
+		pathFactory: [ :cairoContext |
+			canvas appendGlyphsPath: glyphs font: font ];
+		setBackgroundWith: [ canvas setSourceColor: Color black ];
+		setBorderOff;
+		drawFigure.
+	canvas privateAeCairoSurface flush.
+	^ canvas privateAeCairoSurface asForm
+]
+
+{ #category : 'examples' }
 VGCanvasExamples class >> scaledFontAnUnmodifiedCanvasAnswers [
 	<sampleInstance>
 

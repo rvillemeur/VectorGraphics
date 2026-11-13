@@ -2,8 +2,9 @@ Extension { #name : 'VGScaledFont' }
 
 { #category : '*VectorGraphics-Bloc' }
 VGScaledFont >> appendContour: aContour toAeContext: aContext [
-	"One contour, already in device space: the start point, then a control point and an end point
-	 for every quadratic. A glyph contour is always closed."
+	"One contour, already placed, in whichever space the caller chose: device space for the
+	 mask of a glyph, user space for the path of a run. The points are the start point, then a
+	 control point and an end point for every quadratic. A glyph contour is always closed."
 
 	| current |
 	current := aContour first.
@@ -15,6 +16,19 @@ VGScaledFont >> appendContour: aContour toAeContext: aContext [
 		aContext quadraticCurveFromCurrentPoint: current via: via to: to.
 		current := to ].
 	aContext closePath
+]
+
+{ #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> appendPathOfGlyphs: aGlyphArray length: aNumberOfGlyphs onAeContext: aContext [
+	"The path site: cairo_glyph_path upstream, my own outlines here. A glyph is positioned in
+	 user space and the contours go on in user space too, so the context's matrix takes part
+	 when the path is filled or stroked, as it does for any other path the caller builds. The
+	 mask route snaps a glyph to the device grid; this one must not, or a path stroked under a
+	 matrix would carry pixels of the matrix in its shape."
+
+	(self glyphsOf: aGlyphArray size: aNumberOfGlyphs) do: [ :glyph |
+		(self userSpaceContoursOfGlyphAt: glyph index at: glyph x @ glyph y)
+			do: [ :contour | self appendContour: contour toAeContext: aContext ] ]
 ]
 
 { #category : '*VectorGraphics-Bloc' }
@@ -90,6 +104,16 @@ VGScaledFont >> cairoMaskSurfaceOfContours: aContourCollection extent: anExtent 
 ]
 
 { #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> contoursOfTheInspectorSample [
+	"The contours the path route puts down for a short run, in user space, placed at the glyph
+	 positions the layout chose. The view draws these and its gate counts them, so neither one
+	 restates what the route does: both ask it."
+
+	^ (self glyphArrayForString: 'Hamburg') flatCollect: [ :glyph |
+		  self userSpaceContoursOfGlyphAt: glyph index at: glyph x @ glyph y ]
+]
+
+{ #category : '*VectorGraphics-Bloc' }
 VGScaledFont >> extentTextOfCairoMask: anAssociation [
 	"The extent of one row of the Cairo masks view, said in words where there is no mask."
 
@@ -106,6 +130,30 @@ VGScaledFont >> glyphExtentsOf: aGlyphArray size: aNumberOfGlyphs into: aTextExt
 
 	^ (self glyphExtentsOf: (self glyphsOf: aGlyphArray size: aNumberOfGlyphs))
 		  writeInto: aTextExtents
+]
+
+{ #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> glyphPathFormOfContours: aContourCollection [
+	"A picture of a set of contours: Cairo strokes them thinly on white, so that the shape of
+	 the outline shows and not the coverage a fill would lay down. The whole pixel box of the
+	 contours decides the size of the image and the drawing is moved so that the box starts at
+	 its corner. The poser is the one the path route uses, so the picture cannot drift from it."
+
+	| box surface context |
+	box := self wholePixelBoxOfContours: aContourCollection.
+	surface := AeCairoImageSurface extent: box extent.
+	context := AeCairoContext newFor: surface.
+	context
+		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0;
+		paint;
+		translateBy: box origin negated;
+		sourceColorR: 0.0 g: 0.0 b: 0.0 a: 1.0;
+		strokeSize: 1.
+	aContourCollection do: [ :contour |
+		self appendContour: contour toAeContext: context ].
+	context stroke.
+	surface flush.
+	^ surface asForm
 ]
 
 { #category : '*VectorGraphics-Bloc' }
@@ -157,6 +205,26 @@ VGScaledFont >> inspectorCairoMasksContext: aContext [
 	 built on the first such glyph."
 
 	aContext active: cairoMaskAtlas notNil
+]
+
+{ #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> inspectorGlyphPath: aBuilder [
+	<inspectorPresentationOrder: 13 title: 'Path'>
+	"The other route of text, beside the masks: the outlines of a short run as the path site
+	 appends them, in user space and with no snapping to the device grid. A stroke and not a
+	 fill, because what the route delivers is a shape, and a filled letter would hide where its
+	 contours run."
+
+	^ aBuilder newImage image:
+		  (self glyphPathFormOfContours: self contoursOfTheInspectorSample)
+]
+
+{ #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> inspectorGlyphPathContext: aContext [
+	"Nothing to draw for a font whose face maps every letter of the sample to a glyph with no
+	 contour: the run would lay down an empty path and the image would have no box."
+
+	aContext active: self contoursOfTheInspectorSample notEmpty
 ]
 
 { #category : '*VectorGraphics-Bloc' }

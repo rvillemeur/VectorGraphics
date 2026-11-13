@@ -14,6 +14,26 @@ Class {
 	#package : 'VectorGraphics-Bloc-Tests'
 }
 
+{ #category : 'running' }
+VGCanvasTest >> inkBoxOf: aForm [
+	"The whole pixel box holding every pixel the drawing touched, nil when nothing was drawn. A
+	 pixel of a Cairo image surface read back as a Form carries its alpha in the high byte, and
+	 an untouched pixel reads as transparent white, so alpha and not the whole word says ink.
+	 The box of the inked pixels themselves holds their top left corners, so the corner moves
+	 one pixel down and right to hold the pixels whole."
+
+	| bits width inked box |
+	bits := aForm bits.
+	width := aForm width.
+	inked := (1 to: aForm height) flatCollect: [ :row |
+		         ((1 to: width) select: [ :column |
+			          ((bits at: row - 1 * width + column) bitShift: -24) ~= 0 ])
+			         collect: [ :column | column - 1 @ (row - 1) ] ].
+	inked ifEmpty: [ ^ nil ].
+	box := Rectangle encompassing: inked.
+	^ box origin corner: box corner + (1 @ 1)
+]
+
 { #category : 'fixture' }
 VGCanvasTest >> scaledFontOfTheFixture [
 	"Source Sans Pro regular at a readable size, with the identity as the user to device matrix,
@@ -112,6 +132,38 @@ VGCanvasTest >> testARunMeasuredThroughTheCanvasCarriesOurOwnExtents [
 	self assert: metrics advanceY closeTo: ours advanceY.
 	self assert: metrics advanceX closeTo: advances x.
 	self assert: metrics width < metrics advanceX
+]
+
+{ #category : 'tests' }
+VGCanvasTest >> testARunPathAppendedThroughTheCanvasInksOurOwnOutlines [
+	"The site Bloc calls: BlTextBorderAttribute hands the canvas a path factory that sends
+	 #appendGlyphsPath:font:, and the figure drawn from it is the text as a shape. A canvas
+	 over an Alexandrie surface holds a VGAeTextContext, so the glyphs of one of our fonts
+	 reach the path as our own contours. Filling the figure has to ink inside the box our
+	 measuring reports and to fill it: one glyph out of fifteen would otherwise pass. A pixel of
+	 margin, because the rasteriser shades the pixels an edge crosses. The figure is a
+	 background with no border, which is the canvas asking for a plain fill of the path."
+
+	| font canvas glyphs origin extents expected inkBox |
+	font := self scaledFontOfTheFixture.
+	canvas := AeCanvas extent: 240 @ 60.
+	glyphs := font glyphArrayForString: 'Hamburgefonstiv'.
+	origin := 10 @ 44.
+	canvas
+		pathTranslate: origin;
+		pathFactory: [ :cairoContext |
+			canvas appendGlyphsPath: glyphs font: font ];
+		setBackgroundWith: [ canvas setSourceColor: Color black ];
+		setBorderOff;
+		drawFigure.
+	canvas privateAeCairoSurface flush.
+	inkBox := self inkBoxOf: canvas privateAeCairoSurface asForm.
+	extents := font glyphExtentsOf: glyphs.
+	expected := ((extents bearing + origin) extent: extents extent) expandBy: 1.
+	self deny: inkBox isNil.
+	self assert: (expected containsRect: inkBox).
+	self assert: inkBox width >= (expected width - 3).
+	self assert: inkBox height >= (expected height - 3)
 ]
 
 { #category : 'tests - font bridge' }

@@ -123,6 +123,23 @@ VGScaledFontExamples class >> glyphMaskOfOneLetter [
 ]
 
 { #category : 'examples' }
+VGScaledFontExamples class >> glyphsPathOfARunOnACairoContext [
+	<sampleInstance>
+	"The path site of unit 4.4: a run laid out with one of our fonts, appended to the path of a
+	 context Alexandrie made, as our own outlines. The context answers its current path, and
+	 the surface behind it has nothing drawn on it: appending a path inks nothing."
+
+	| font context |
+	font := self scaledFontAtAReadableSize.
+	context := (AeCairoImageSurface extent: 120 @ 40) newContext.
+	context
+		translateBy: 6 @ 28;
+		scaledFont: font;
+		appendGlyphsPath: (font glyphArrayForString: self exampleRun).
+	^ context
+]
+
+{ #category : 'examples' }
 VGScaledFontExamples class >> scaledFontAtAReadableSize [
 	<sampleInstance>
 	"A font face at a size, which is the object that answers metrics and holds the glyph atlas.

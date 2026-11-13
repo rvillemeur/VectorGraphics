@@ -158,6 +158,28 @@ VGAeTextContextTest >> testARealCairoFontStillDrawsThroughCairoItself [
 ]
 
 { #category : 'tests' }
+VGAeTextContextTest >> testARunThatInksNothingAppendsNoSubPath [
+	"A run of spaces has glyphs, and not one of them has a contour, so nothing at all reaches
+	 the path. Cairo answers an empty rectangle for an empty path, and drops a move-to that
+	 starts no sub-path from the extents it reports, so the extents alone would also pass for a
+	 path of stray move-tos: the current point says the rest. Cairo leaves it unset while
+	 nothing has been drawn, and a stray move-to would set it."
+
+	| font surface context |
+	font := self scaledFontOfTheFixture.
+	surface := AeCairoImageSurface extent: 60 @ 30.
+	context := surface newContext.
+	context
+		translateBy: 5 @ 20;
+		scaledFont: font;
+		appendGlyphsPath: (font glyphArrayForString: '   ').
+	self
+		assert: context pathExtentsInUserSpace
+		equals: (0 @ 0 corner: 0 @ 0).
+	self deny: context hasCurrentPoint
+]
+
+{ #category : 'tests' }
 VGAeTextContextTest >> testEverySurfaceAnswersTheContextThatKnowsOurFonts [
 	"Decision 7 of the plan: one substitution site, AeCairoSurface >> newContext, which covers
 	 window, composition layers, shadows, exporters and offscreen at once."
@@ -169,22 +191,47 @@ VGAeTextContextTest >> testEverySurfaceAnswersTheContextThatKnowsOurFonts [
 ]
 
 { #category : 'tests' }
-VGAeTextContextTest >> testTheTextSitesTheLaterUnitsDeliverFailNamingOurOwnFontAndSelector [
-	"Pathing and font extents are units 4.4 and 4.5 of the font plan. Until they land, each site
-	 has to fail on our own class naming the method that is missing, and never reach the FFI
-	 call: marshalling a VGScaledFont into cairo_set_scaled_font dies far from the cause, on
-	 VGFontFace >> #tfPointerAddress. Measuring left this list with unit 4.3."
+VGAeTextContextTest >> testThePathOfARunEnclosesTheBoxItsExtentsReport [
+	"The red of unit 4.4. The path appended for a run covers the box our own measuring reports
+	 for that run. Both boxes are built from the same points, the contour points of the glyphs
+	 with their control points among them, so they are the same box and not merely close ones.
+	 Cairo keeps a path point on a grid of two hundred and fifty sixths of a pixel, which is
+	 the whole of the difference between the two: a quarter of a hundredth of a pixel of
+	 tolerance leaves room for it and for nothing else. Cairo answers the path extents in user
+	 space, which is where the contours are put, so the context's translation takes no part in
+	 the numbers; a path baked into device pixels would come back moved by it."
 
-	| font surface context glyphs |
+	| font surface context glyphs inked pathBox |
+	font := self scaledFontOfTheFixture.
+	surface := AeCairoImageSurface extent: 240 @ 60.
+	context := surface newContext.
+	glyphs := font glyphArrayForString: 'Hamburgefonstiv'.
+	context
+		translateBy: 10 @ 44;
+		scaledFont: font;
+		appendGlyphsPath: glyphs.
+	inked := font textExtentsOf: 'Hamburgefonstiv'.
+	inked := inked bearing extent: inked extent.
+	pathBox := context pathExtentsInUserSpace.
+	self assert: pathBox left closeTo: inked left precision: 0.0025.
+	self assert: pathBox top closeTo: inked top precision: 0.0025.
+	self assert: pathBox right closeTo: inked right precision: 0.0025.
+	self assert: pathBox bottom closeTo: inked bottom precision: 0.0025
+]
+
+{ #category : 'tests' }
+VGAeTextContextTest >> testTheTextSitesTheLaterUnitsDeliverFailNamingOurOwnFontAndSelector [
+	"Font extents are unit 4.5 of the font plan. Until it lands, the site has to fail on our
+	 own class naming the method that is missing, and never reach the FFI call: marshalling a
+	 VGScaledFont into cairo_set_scaled_font dies far from the cause, on
+	 VGFontFace >> #tfPointerAddress. Measuring left this list with unit 4.3, pathing with
+	 unit 4.4."
+
+	| font surface context |
 	font := self scaledFontOfTheFixture.
 	surface := AeCairoImageSurface extent: 20 @ 20.
 	context := surface newContext.
 	context scaledFont: font.
-	glyphs := font glyphArrayForString: 'a'.
-	self
-		assert: (self receiverAndSelectorNotUnderstoodIn: [
-				 context appendGlyphsPath: glyphs ])
-		equals: VGScaledFont -> #appendPathOfGlyphs:length:onAeContext:.
 	self
 		assert:
 			(self receiverAndSelectorNotUnderstoodIn: [ context fontExtents ])

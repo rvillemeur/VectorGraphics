@@ -346,6 +346,16 @@ VGScaledFont >> userSpaceContoursOfGlyphAt: aGlyphIndex [
 		  ifAbsentPut: [ self computeUserSpaceContoursOfGlyphAt: aGlyphIndex ]
 ]
 
+{ #category : 'outlines' }
+VGScaledFont >> userSpaceContoursOfGlyphAt: aGlyphIndex at: aUserPoint [
+	"The contours of one glyph in user space, placed at a user space point. The font matrix is
+	 in the cached contours already, so placing one is a translation and nothing else; its
+	 sibling for device space has the linear part of a matrix to apply as well."
+
+	^ (self userSpaceContoursOfGlyphAt: aGlyphIndex) collect: [ :contour |
+		  contour collect: [ :point | point + aUserPoint ] ]
+]
+
 { #category : 'accessing' }
 VGScaledFont >> userToDeviceMatrix [
 	^ userToDeviceMatrix
