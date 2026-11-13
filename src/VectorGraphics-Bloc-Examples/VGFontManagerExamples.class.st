@@ -9,6 +9,20 @@ Class {
 }
 
 { #category : 'examples' }
+VGFontManagerExamples class >> managerBlocAsksToday [
+	<sampleInstance>
+	"The font manager every consumer of a face reaches in this image right now. Bloc asks for
+	 it through BlFont >> asAeFTFace, which goes to BAFontConverter >> faceFor:, which sends
+	 AeFontManager globalInstance — so this one click answers which reader of fonts the image
+	 draws with. An AeFontManager, and the faces are FreeType handles; a VGFontManager, and
+	 unit 3.5 of the font plan has installed ours, which reads fonts in Pharo.
+	 Builds Alexandrie's own manager if nobody has asked yet, which is what Bloc would do on
+	 the first text it drew."
+
+	^ AeFontManager globalInstance
+]
+
+{ #category : 'examples' }
 VGFontManagerExamples class >> managerThatScannedTheInstalledFonts [
 	<sampleInstance>
 	"A font manager that met every font file this machine has installed, read by the catalogue

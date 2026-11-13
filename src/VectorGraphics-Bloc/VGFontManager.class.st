@@ -15,10 +15,100 @@ Class {
 	#instVars : [
 		'catalogue'
 	],
+	#classInstVars : [
+		'installedInstance'
+	],
 	#category : 'VectorGraphics-Bloc-Fonts',
 	#package : 'VectorGraphics-Bloc',
 	#tag : 'Fonts'
 }
+
+{ #category : 'class initialization' }
+VGFontManager class >> initialize [
+	"Register for the image start. The priority is 115: above the 110 where upstream registers
+	 the reset that nils the manager, and below the 120 where AeCanvas initialises its font
+	 options. Registering at 110 would work only while our package happens to load after
+	 Alexandrie, since a priority list keeps the order it was registered in."
+
+	SessionManager default
+		registerGuiClassNamed: self name
+		atPriority: 115
+]
+
+{ #category : 'inspector' }
+VGFontManager class >> inspectorInstallation: aBuilder [
+
+	<inspectorPresentationOrder: 1 title: 'Installation'>
+	"Whether this project has posed a font manager as the one Bloc asks for its faces, and what
+	 that manager knows. Reads my own slot only: sending AeFontManager globalInstance would
+	 build a complete FreeType manager at the moment a reader opens an inspector, which is the
+	 opposite of what this unit is for. The example managerBlocAsksToday is where one asks the
+	 real route and accepts that it builds."
+
+	| manager |
+	manager := installedInstance.
+	^ aBuilder newTable
+		  items: {
+				  ('Installed manager' -> manager).
+				  ('Families' -> (manager ifNil: [ 0 ] ifNotNil: [ :each | each familyNames size ])).
+				  ('Entries' -> (manager ifNil: [ 0 ] ifNotNil: [ :each | each faceEntries size ])).
+				  ('Faces built' -> (manager ifNil: [ 0 ] ifNotNil: [ :each | each faceByEntryCache size ])) };
+		  addColumn:
+			  (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Value'
+				   evaluated: [ :each | each value printString ]);
+		  yourself
+]
+
+{ #category : 'installing' }
+VGFontManager class >> installGlobally [
+	"Make a manager of mine the one every consumer of a face reaches through
+	 AeFontManager globalInstance. The manager is empty: it knows no family until something
+	 scans or registers, which unit 3.6 of the font plan will do for the default families.
+	 Kept here as well as written upstream, so that startUp: can put the same object back after
+	 upstream nils its slot at every image start, and so that nothing of mine has to read a
+	 slot of Alexandrie's to know what it posed."
+
+	installedInstance := self new.
+	AeFontManager globalInstance: installedInstance.
+	^ installedInstance
+]
+
+{ #category : 'accessing' }
+VGFontManager class >> installedInstance [
+	"The manager I posed as the one Bloc asks for its faces, or nil if I posed none. One slot
+	 rather than a flag beside a manager: two pieces of state could fall out of step, and the
+	 question 'is our manager installed' is answered by whether this is nil."
+
+	^ installedInstance
+]
+
+{ #category : 'system startup' }
+VGFontManager class >> startUp: isResuming [
+	"Put my manager back after upstream nils its slot. I am registered at GUI priority 115 and
+	 upstream at 110, and a category starts its handlers by rising priority, so this runs after
+	 its reset and before AeCanvas initialises its font options at 120.
+	 I run in every image this package is loaded in, installed or not, so a nil slot of mine
+	 means hands off: upstream keeps whatever manager it built.
+	 The manager kept here is the one the dead session held. It answers nothing of that session:
+	 every reader of it checks the session first and rebuilds its catalogue, which is what unit
+	 3.4 is for."
+
+	isResuming ifFalse: [ ^ self ].
+	installedInstance ifNil: [ ^ self ].
+	AeFontManager globalInstance: installedInstance
+]
+
+{ #category : 'installing' }
+VGFontManager class >> uninstallGlobally [
+	"Stop being the manager Bloc asks, and leave upstream to rebuild its own. Upstream's slot
+	 goes to nil rather than back to whatever was there: its globalInstance builds a manager
+	 lazily, which is the state an image that never met this project is in."
+
+	installedInstance := nil.
+	AeFontManager globalInstance: nil
+]
 
 { #category : 'accessing' }
 VGFontManager >> catalogue [
