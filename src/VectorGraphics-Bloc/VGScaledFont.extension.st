@@ -18,6 +18,18 @@ VGScaledFont >> appendContour: aContour toAeContext: aContext [
 ]
 
 { #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> cairoMaskAssociations [
+	"The masks of the route through real Cairo, as atlas key to mask associations, read through
+	 the variable and not through #cairoMaskAtlas: that accessor builds the atlas on first use,
+	 and asking what has been drawn must leave the font alone. Empty for a font no glyph has
+	 been drawn through on this route."
+
+	^ cairoMaskAtlas
+		  ifNil: [ #(  ) ]
+		  ifNotNil: [ :maskAtlas | maskAtlas masks associations asArray ]
+]
+
+{ #category : '*VectorGraphics-Bloc' }
 VGScaledFont >> cairoMaskAtlas [
 	"My rasterised glyphs for the route through real Cairo, built on the first glyph drawn that
 	 way. It is a second atlas and not the one in `atlas`, because a mask is only usable by the
@@ -78,6 +90,15 @@ VGScaledFont >> cairoMaskSurfaceOfContours: aContourCollection extent: anExtent 
 ]
 
 { #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> extentTextOfCairoMask: anAssociation [
+	"The extent of one row of the Cairo masks view, said in words where there is no mask."
+
+	^ anAssociation value
+		  ifNil: [ 'inks nothing' ]
+		  ifNotNil: [ :mask | mask extent printString ]
+]
+
+{ #category : '*VectorGraphics-Bloc' }
 VGScaledFont >> glyphsOf: aGlyphArray size: aNumberOfGlyphs [
 	"The first aNumberOfGlyphs glyphs of an array, as a collection I can walk. Alexandrie hands
 	 over an opaque external array that answers its size and nothing else; the indexable
@@ -96,16 +117,12 @@ VGScaledFont >> inspectorCairoMasks: aBuilder [
 
 	<inspectorPresentationOrder: 12 title: 'Cairo masks'>
 	"One row per glyph of the atlas of the route through real Cairo, with the A8 mask Cairo
-	 rasterised shown as it is: read back as a Form, the coverage reads as grey.
-	 The atlas is read through the variable and not through #cairoMaskAtlas, because that
-	 accessor builds the atlas on first use and a view must leave the object it shows alone. A
-	 font no glyph has been drawn through on this route has no atlas at all: the gate of this
-	 view hides the tab, and the table is empty for a reader who opens it all the same."
+	 rasterised shown as it is: read back as a Form, the coverage reads as grey. The gate of
+	 this view hides the tab for a font with no atlas, and the table is empty for a reader who
+	 opens it all the same."
 
 	^ aBuilder newTable
-		  items: (cairoMaskAtlas
-				   ifNil: [ #(  ) ]
-				   ifNotNil: [ :atlas | atlas masks associations asArray ]);
+		  items: self cairoMaskAssociations;
 		  addColumn: (SpStringTableColumn
 				   title: 'Glyph'
 				   evaluated: [ :each | each key first printString ]);
@@ -114,22 +131,13 @@ VGScaledFont >> inspectorCairoMasks: aBuilder [
 				   evaluated: [ :each | each key second printString ]);
 		  addColumn: (SpImageTableColumn
 				   title: 'Mask'
-				   evaluated: [ :each |
-					   each value
-						   ifNil: [ Form extent: 1 @ 1 depth: 32 ]
-						   ifNotNil: [ :mask | mask surface asForm ] ]);
+				   evaluated: [ :each | self maskFormOfCairoMask: each ]);
 		  addColumn: (SpStringTableColumn
 				   title: 'Extent'
-				   evaluated: [ :each |
-					   each value
-						   ifNil: [ 'inks nothing' ]
-						   ifNotNil: [ :mask | mask extent printString ] ]);
+				   evaluated: [ :each | self extentTextOfCairoMask: each ]);
 		  addColumn: (SpStringTableColumn
 				   title: 'Offset'
-				   evaluated: [ :each |
-					   each value
-						   ifNil: [ '' ]
-						   ifNotNil: [ :mask | mask offset printString ] ]);
+				   evaluated: [ :each | self offsetTextOfCairoMask: each ]);
 		  yourself
 ]
 
@@ -139,6 +147,26 @@ VGScaledFont >> inspectorCairoMasksContext: aContext [
 	 built on the first such glyph."
 
 	aContext active: cairoMaskAtlas notNil
+]
+
+{ #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> maskFormOfCairoMask: anAssociation [
+	"The mask of one row of the Cairo masks view, as a Form a table cell can draw. A glyph that
+	 inks nothing is held in the atlas as nil, and one transparent pixel is what a row shows for
+	 it."
+
+	^ anAssociation value
+		  ifNil: [ Form extent: 1 @ 1 depth: 32 ]
+		  ifNotNil: [ :mask | mask surface asForm ]
+]
+
+{ #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> offsetTextOfCairoMask: anAssociation [
+	"The offset of one row of the Cairo masks view, blank where there is no mask."
+
+	^ anAssociation value
+		  ifNil: [ '' ]
+		  ifNotNil: [ :mask | mask offset printString ]
 ]
 
 { #category : '*VectorGraphics-Bloc' }
