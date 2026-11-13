@@ -97,3 +97,22 @@ VGFontManagerInstallationTest >> testTheInstallationViewNamesWhatIsPosedAndAsksU
 		((AeFontManager class slotNamed: #globalInstance) read: AeFontManager)
 			identicalTo: VGFontManager installedInstance
 ]
+
+{ #category : 'tests' }
+VGFontManagerInstallationTest >> testTheManagerPosedAnswersTheDefaultFamiliesUpstreamsOwnReadersAskFor [
+	"What installGlobally poses has to be able to draw, because BAFontConverter >> faceFor:
+	 falls back on the default face of whatever manager is posed for every family a text names
+	 and nobody holds. Asked here through upstream's own two class-side readers, which is the
+	 way the rest of the image asks."
+
+	VGFontManager installGlobally.
+	self
+		assert: AeFontManager defaultFontFamilyName
+		equals: 'Source Sans Pro'.
+	self
+		assert: AeFontManager defaultCodeFontFamilyName
+		equals: 'Source Code Pro'.
+	self
+		assert: AeFontManager globalInstance defaultFace class
+		equals: VGFontFace
+]

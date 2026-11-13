@@ -67,6 +67,26 @@ VGFontManagerTest >> testAFreshManagerOwnsNoFreeTypeLibraryAndHoldsAPermanentFac
 ]
 
 { #category : 'tests' }
+VGFontManagerTest >> testAManagerBuiltWithTheDefaultFacesDrawsTheTwoEmbeddedFamiliesWithoutFreeType [
+	"The manager a consumer can draw with straight away: the six faces a package carries with
+	 it, and the two faces Bloc falls back on for text and for code. Upstream builds the same
+	 pair lazily in its globalInstance, through FreeType; these two are read in Pharo, which is
+	 what the count of AeFTFace instances states."
+
+	| before manager |
+	before := AeFTFace allInstances size.
+	manager := VGFontManager newWithDefaultFaces.
+	self
+		assert: manager familyNames asArray
+		equals: #( 'Source Code Pro' 'Source Sans Pro' ).
+	self assert: manager faceEntries size equals: 6.
+	self assert: manager defaultFace class equals: VGFontFace.
+	self assert: manager defaultFace familyName equals: 'Source Sans Pro'.
+	self assert: manager defaultCodeFace familyName equals: 'Source Code Pro'.
+	self assert: AeFTFace allInstances size equals: before
+]
+
+{ #category : 'tests' }
 VGFontManagerTest >> testAManagerLeftOverFromAnotherSessionRebuildsItselfBeforeAnsweringAnything [
 	"Upstream resets a manager whose session is not this one, because the faces of a dead
 	 session are handles into a library that is gone. Mine holds no handle, but the rule is the

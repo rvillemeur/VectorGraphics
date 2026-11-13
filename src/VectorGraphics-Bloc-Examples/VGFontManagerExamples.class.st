@@ -23,6 +23,18 @@ VGFontManagerExamples class >> managerBlocAsksToday [
 ]
 
 { #category : 'examples' }
+VGFontManagerExamples class >> managerReadyToDrawDefaultText [
+	<sampleInstance>
+	"A font manager that can draw before anything registers anything. Six faces from the fonts
+	 a package carries with it, and the two faces a text falls back on: Source Sans Pro for
+	 text, Source Code Pro for code. Open the State tab, where the Default face and Default
+	 code face rows name them — the same manager as
+	 managerWithTheEmbeddedFontsRegistered shows those two rows as nil."
+
+	^ VGFontManager newWithDefaultFaces
+]
+
+{ #category : 'examples' }
 VGFontManagerExamples class >> managerThatScannedTheInstalledFonts [
 	<sampleInstance>
 	"A font manager that met every font file this machine has installed, read by the catalogue

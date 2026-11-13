@@ -63,13 +63,14 @@ VGFontManager class >> inspectorInstallation: aBuilder [
 { #category : 'installing' }
 VGFontManager class >> installGlobally [
 	"Make a manager of mine the one every consumer of a face reaches through
-	 AeFontManager globalInstance. The manager is empty: it knows no family until something
-	 scans or registers, which unit 3.6 of the font plan will do for the default families.
+	 AeFontManager globalInstance. It is built with the default faces, so it can draw the
+	 moment it is posed: BAFontConverter >> faceFor: falls back on the default face for every
+	 family a text names and nobody holds, and a nil there would break in the drawing.
 	 Kept here as well as written upstream, so that startUp: can put the same object back after
 	 upstream nils its slot at every image start, and so that nothing of mine has to read a
 	 slot of Alexandrie's to know what it posed."
 
-	installedInstance := self new.
+	installedInstance := self newWithDefaultFaces.
 	AeFontManager globalInstance: installedInstance.
 	^ installedInstance
 ]
@@ -81,6 +82,28 @@ VGFontManager class >> installedInstance [
 	 question 'is our manager installed' is answered by whether this is nil."
 
 	^ installedInstance
+]
+
+{ #category : 'instance creation' }
+VGFontManager class >> newWithDefaultFaces [
+	"A manager that can draw before anything registers anything: the six faces a package
+	 carries with it, and the two faces Bloc falls back on when a text names a family nobody
+	 holds — one for text, one for code. Upstream builds the same pair inside its lazy
+	 globalInstance; here it is a constructor, so a test, an example or a consumer can have a
+	 manager ready to draw without posing it as the one the whole image asks.
+	 The families are named by the embedded font classes themselves rather than by two strings
+	 that would have to be kept in step, and they are asked for the way Bloc asks, through the
+	 translation into Alexandrie's vocabulary. The machine's own fonts are not scanned: a
+	 consumer that wants them sends scanDefaultDirectories."
+
+	| manager |
+	manager := self new.
+	manager scanEmbeddedFonts.
+	manager defaultFace: (manager defaultFaceOfFamilyNamed:
+			 AeSourceSansPro_Regular familyName).
+	manager defaultCodeFace: (manager defaultFaceOfFamilyNamed:
+			 AeSourceCodePro_Regular familyName).
+	^ manager
 ]
 
 { #category : 'system startup' }
@@ -122,6 +145,21 @@ VGFontManager >> catalogue [
 
 	self checkSession.
 	^ catalogue
+]
+
+{ #category : 'accessing' }
+VGFontManager >> defaultFaceOfFamilyNamed: aFamilyName [
+	"The regular face of a family, for a caller that wants it as a default to fall back on. The
+	 absence is an error naming the family: a default face left nil would come back as nil from
+	 BAFontConverter >> faceFor:, and the breakage would appear in the drawing rather than
+	 here."
+
+	^ self
+		  detectFamilyName: aFamilyName
+		  slant: AeFontSlant normal
+		  weight: AeFontWeight normal
+		  stretch: AeFontStretch normal
+		  ifNone: [ Error signal: 'No face registered for the family ' , aFamilyName ]
 ]
 
 { #category : 'accessing' }
