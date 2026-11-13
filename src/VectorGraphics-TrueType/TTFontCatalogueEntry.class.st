@@ -111,6 +111,21 @@ TTFontCatalogueEntry >> rejectionReason [
 	^ metadata rejectionReason
 ]
 
+{ #category : 'signalling' }
+TTFontCatalogueEntry >> signalRefusal: whatCannotBeDone [
+	"Signal that the reader refused the file I name, saying which file it was, the reason the
+	 reader gave, and what therefore cannot be done with me. The caller checks isRejected first
+	 and says only the last clause, so the first two are written once however many things a
+	 refused entry turns out not to be good for.
+
+	 The reason repeats what the reader already said rather than letting a parse fail a second
+	 time, deeper, on the same bytes."
+
+	^ Error signal:
+		  'The font reader refused ' , self fontSourceName , ': '
+		  , self rejectionReason asString , '. ' , whatCannotBeDone
+]
+
 { #category : 'accessing' }
 TTFontCatalogueEntry >> source [
 	"Where my bytes are: a FileReference, or the bytes themselves."

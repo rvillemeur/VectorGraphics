@@ -225,15 +225,18 @@ VGFontManager >> faceAt: anEntry [
 	"The face of one entry, parsed once and then kept. Upstream's answers whatever its LRU
 	 cache holds and builds nothing, since its cache was given a factory that calls FreeType;
 	 mine builds the face here, out of the bytes the entry names.
+
 	 The bytes are read at this point and not before: a catalogue that scanned this machine
 	 knows 544 files and 262 MB in all, and a session draws with a handful of them.
-	 A refused entry is named rather than parsed. The reader already said why it would not
-	 read the file, so the error repeats that reason instead of letting a parse fail a second
-	 time, deeper, on the same bytes.
+
+	 A refused entry is named rather than parsed. The entry says the refusal itself, since the
+	 sentence is about the file it names and not about me.
+
 	 The cache is asked through its accessor, which checks the session first, as upstream's
 	 does."
 
-	anEntry isRejected ifTrue: [ ^ self refuseFaceFor: anEntry ].
+	anEntry isRejected ifTrue: [
+		^ anEntry signalRefusal: 'No face can be built for it.' ].
 	^ self faceByEntryCache
 		  at: anEntry
 		  ifAbsentPut: [ VGFontFace newForBytes: anEntry bytes ]
@@ -378,18 +381,6 @@ VGFontManager >> inspectorStateContext: aContext [
 	 this view to show nils for."
 
 	aContext active: true
-]
-
-{ #category : 'accessing' }
-VGFontManager >> refuseFaceFor: anEntry [
-	"Signal that no face can be built for a file the reader refused, naming the file and the
-	 reason the reader gave. Separate from faceAt: so that the one answers a face and this one
-	 states the refusal."
-
-	^ Error signal:
-		  'The font reader refused ' , anEntry source fontSourceName , ': '
-		  , anEntry metadata rejectionReason asString
-		  , '. No face can be built for it.'
 ]
 
 { #category : 'registering' }

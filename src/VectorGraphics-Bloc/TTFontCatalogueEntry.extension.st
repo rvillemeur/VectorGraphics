@@ -56,8 +56,8 @@ TTFontCatalogueEntry >> newHbFontScaledTo: aSize [
 
 	 A refused file is refused here too, although HarfBuzz would read it: it parses a font file
 	 itself and accepts a collection, which this project's reader rejects. The glyph identifiers
-	 would then name glyphs of a face no font face of this project can draw. The sentence is the
-	 one VGFontManager >> refuseFaceFor: says about a face, said about shaping.
+	 would then name glyphs of a face no font face of this project can draw. The refusal is said
+	 by signalRefusal:, which VGFontManager >> faceAt: sends for the same reason about a face.
 
 	 The face index is 0 because I hold one font: a file holding several is a collection, which
 	 the reader refuses before I am made drawable.
@@ -68,10 +68,7 @@ TTFontCatalogueEntry >> newHbFontScaledTo: aSize [
 	 set on the FreeType face; nothing poses it for us."
 
 	self isRejected ifTrue: [
-		^ Error signal:
-			  'The font reader refused ' , self fontSourceName , ': '
-			  , self rejectionReason asString
-			  , '. Nothing can be shaped with it.' ].
+		^ self signalRefusal: 'Nothing can be shaped with it.' ].
 	^ (self source newHbBlob newHbFaceAtIndex: 0) newHbFont
 		  scaleX: aSize * 64 y: aSize * 64;
 		  yourself
