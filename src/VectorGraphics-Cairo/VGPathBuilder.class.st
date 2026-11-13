@@ -31,11 +31,37 @@ VGPathBuilder class >> defaultFlatteningTolerance [
 	^ 0.1
 ]
 
+{ #category : 'snapping' }
+VGPathBuilder class >> fixedOf: aNumber [
+	"A coordinate on the grid Cairo stores a path on. A cairo_fixed_t is twenty-four bits of
+	 whole number and eight of fraction, so a device coordinate lands on a two hundred and fifty
+	 sixth of a pixel, and the conversion rounds a half to the even neighbour. Both halves of the
+	 rule are measured: a rectangle one five hundred and twelfth of a pixel wide paints nothing
+	 on a live context, where a half rounded away from zero would make it paint an alpha of one."
+
+	| scaled floor |
+	scaled := aNumber * 256.
+	floor := scaled floor.
+	^ (scaled - floor = (1 / 2)
+		   ifTrue: [ floor even ifTrue: [ floor ] ifFalse: [ floor + 1 ] ]
+		   ifFalse: [ scaled rounded ]) / 256.0
+]
+
 { #category : 'constants' }
 VGPathBuilder class >> maximumSubdivisionDepth [
 	"A degenerate curve, one whose control points send the flatness test to infinity, must still
 	 end: sixteen halvings is well past the point where a pixel can tell."
 	^ 16
+]
+
+{ #category : 'snapping' }
+VGPathBuilder class >> snapped: aPoint [
+	"The point Cairo would store for this one. Snapping where device coordinates arrive is what
+	 keeps our coverage and Cairo''s from drifting apart on a shape thinner than a step of the
+	 grid. On the class side, because the rule is the grid''s and not an instance''s, and a
+	 caller that only has a point to snap should not have to build a path."
+
+	^ (self fixedOf: aPoint x) @ (self fixedOf: aPoint y)
 ]
 
 { #category : 'building' }
@@ -115,21 +141,6 @@ VGPathBuilder >> firstOf: aCollectionOfPoints [
 	"The first of these differences that has a direction, which is how Cairo reads the tangent of
 	 a spline whose first or last control point sits on its end point."
 	^ aCollectionOfPoints detect: [ :each | each isZero not ] ifNone: [ 0 @ 0 ]
-]
-
-{ #category : 'private' }
-VGPathBuilder >> fixedOf: aNumber [
-	"A coordinate on the grid Cairo stores a path on. A cairo_fixed_t is twenty-four bits of
-	 whole number and eight of fraction, so a device coordinate lands on a two hundred and fifty
-	 sixth of a pixel, and the conversion rounds a half to the even neighbour. Both halves of the
-	 rule are measured: a rectangle one five hundred and twelfth of a pixel wide paints nothing
-	 on a live context, where a half rounded away from zero would make it paint an alpha of one."
-	| scaled floor |
-	scaled := aNumber * 256.
-	floor := scaled floor.
-	^ (scaled - floor = (1 / 2)
-		   ifTrue: [ floor even ifTrue: [ floor ] ifFalse: [ floor + 1 ] ]
-		   ifFalse: [ scaled rounded ]) / 256.0
 ]
 
 { #category : 'private' }
@@ -336,8 +347,9 @@ VGPathBuilder >> runOfPoints: aPointCollection closed: aBoolean [
 
 { #category : 'private' }
 VGPathBuilder >> snapped: aPoint [
-	"The point Cairo would store for this one. Snapping here, where device coordinates arrive,
-	 is what keeps our coverage and Cairo's from drifting apart on a shape thinner than a step
-	 of the grid."
-	^ (self fixedOf: aPoint x) @ (self fixedOf: aPoint y)
+	"The point Cairo would store for this one, by the rule my class holds. Snapping here, where
+	 device coordinates arrive, is what keeps our coverage and Cairo's from drifting apart on a
+	 shape thinner than a step of the grid."
+
+	^ self class snapped: aPoint
 ]

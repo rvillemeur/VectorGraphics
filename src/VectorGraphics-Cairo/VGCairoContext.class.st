@@ -1275,7 +1275,7 @@ VGCairoContext >> snappedDevicePointFor: aPoint [
 	 the sub-pixel phase of its origin are exact: the atlas keys on the phase, and a mask
 	 rendered at that phase then covers its pixels exactly as the filled path would."
 
-	^ self pathBuilder snapped: (self devicePointFor: aPoint)
+	^ VGPathBuilder snapped: (self devicePointFor: aPoint)
 ]
 
 { #category : 'source' }

@@ -180,8 +180,7 @@ VGScaledFont >> showOneGlyph: aGlyph underMatrix: aMatrix linearPart: aLinearMat
 	 a letter is shared by every place that letter sits on a whole pixel."
 
 	| device whole phase mask |
-	device := VGPathBuilder new snapped:
-		          (aMatrix valueX: aGlyph x y: aGlyph y).
+	device := VGPathBuilder snapped: (aMatrix valueX: aGlyph x y: aGlyph y).
 	whole := device floor.
 	phase := device - whole.
 	mask := self cairoMaskAtlas
