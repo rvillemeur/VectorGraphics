@@ -2,40 +2,18 @@ Extension { #name : 'TTFontCatalogueEntry' }
 
 { #category : '*VectorGraphics-Bloc' }
 TTFontCatalogueEntry >> inspectorShaping: aBuilder [
-	"What HarfBuzz makes of a fixed sample word through me, at a fixed size. The figures are
-	 shaped here and now rather than described: the scale is read back off the font HarfBuzz
-	 answered, and the glyphs are the ones it placed, so neither can drift from
-	 newHbFontScaledTo:. The source row names where the blob came from — a basename for a file,
-	 a byte count for a font held in memory — which is the one thing that tells the two routes
-	 apart.
-
-	 Shaping calls libharfbuzz and, for a font held in memory, pins my bytes. It changes nothing
-	 of mine."
+	"The figures shapingRowsAtSize: shapes, in a table. The source row names where the blob came
+	 from — a basename for a file, a byte count for a font held in memory — which is the one
+	 thing that tells the two routes apart."
 
 	<inspectorPresentationOrder: 20 title: 'Shaping'>
-	| font buffer rows |
-	font := self newHbFontScaledTo: 22.
-	buffer := AeHbBuffer new
-		          direction: AeHbDirection leftToRight;
-		          script: AeHbScript latin;
-		          language: AeHbLanguage en;
-		          addString: 'Pharo';
-		          yourself.
-	buffer shapeWithFont: font.
-	rows := OrderedCollection new.
-	rows add: 'blob source' -> self fontSourceName.
-	rows add: 'scale, 26.6 of 22 px' -> font scale printString.
-	buffer cairoGlyphArray doWithIndex: [ :each :index |
-		rows add: 'glyph ' , index printString
-				-> ('identifier ' , each index printString , ', x '
-					 , each x printString) ].
 	^ aBuilder newTable
 		  addColumn:
 			  ((SpStringTableColumn title: 'Name' evaluated: [ :each | each key ])
 				   width: 160);
 		  addColumn:
 			  (SpStringTableColumn title: 'Value' evaluated: [ :each | each value ]);
-		  items: rows asArray;
+		  items: (self shapingRowsAtSize: 22);
 		  yourself
 ]
 
@@ -72,4 +50,38 @@ TTFontCatalogueEntry >> newHbFontScaledTo: aSize [
 	^ (self source newHbBlob newHbFaceAtIndex: 0) newHbFont
 		  scaleX: aSize * 64 y: aSize * 64;
 		  yourself
+]
+
+{ #category : '*VectorGraphics-Bloc' }
+TTFontCatalogueEntry >> shapingRowsAtSize: aSize [
+	"What HarfBuzz makes of a fixed sample word through me at this pixel size, as name and value
+	 pairs: where the blob came from, the scale read back off the font HarfBuzz answered, then
+	 one row per glyph it placed. Shaped here and now rather than described, so no figure can
+	 drift from newHbFontScaledTo:.
+
+	 The buffer is built the way Alexandrie's own experiments build one: left to right, latin,
+	 English. The sample word is Latin script, and this is a view, not the text path — unit 4 is
+	 where a real run says which script and language it is in.
+
+	 This calls libharfbuzz and, for a font held in memory, pins my bytes. It changes nothing of
+	 mine."
+
+	| font buffer rows |
+	font := self newHbFontScaledTo: aSize.
+	buffer := AeHbBuffer new
+		          direction: AeHbDirection leftToRight;
+		          script: AeHbScript latin;
+		          language: AeHbLanguage en;
+		          addString: 'Pharo';
+		          yourself.
+	buffer shapeWithFont: font.
+	rows := OrderedCollection new.
+	rows add: 'blob source' -> self fontSourceName.
+	rows add: 'scale, 26.6 of ' , aSize printString , ' px'
+			-> font scale printString.
+	buffer cairoGlyphArray doWithIndex: [ :each :index |
+		rows add: 'glyph ' , index printString
+				-> ('identifier ' , each index printString , ', x '
+					 , each x printString) ].
+	^ rows asArray
 ]
