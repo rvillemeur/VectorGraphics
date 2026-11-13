@@ -41,20 +41,17 @@ VGFontManager class >> initialize [
 VGFontManager class >> inspectorInstallation: aBuilder [
 
 	<inspectorPresentationOrder: 1 title: 'Installation'>
-	"Whether this project has posed a font manager as the one Bloc asks for its faces, and what
-	 that manager knows. Reads my own slot only: sending AeFontManager globalInstance would
+	"Whether this project has posed a font manager as the one Bloc asks for its faces, and
+	 which one. Says that and nothing else: what the manager knows — its families, its entries,
+	 the faces it has built — is what its own State view says, so a reader dives into the row
+	 rather than reading a second copy of those counts that could disagree with the first.
+	 Reads my own slot only, through the accessor: sending AeFontManager globalInstance would
 	 build a complete FreeType manager at the moment a reader opens an inspector, which is the
 	 opposite of what this unit is for. The example managerBlocAsksToday is where one asks the
 	 real route and accepts that it builds."
 
-	| manager |
-	manager := installedInstance.
 	^ aBuilder newTable
-		  items: {
-				  ('Installed manager' -> manager).
-				  ('Families' -> (manager ifNil: [ 0 ] ifNotNil: [ :each | each familyNames size ])).
-				  ('Entries' -> (manager ifNil: [ 0 ] ifNotNil: [ :each | each faceEntries size ])).
-				  ('Faces built' -> (manager ifNil: [ 0 ] ifNotNil: [ :each | each faceByEntryCache size ])) };
+		  items: { ('Installed manager' -> self installedInstance) };
 		  addColumn:
 			  (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
 		  addColumn: (SpStringTableColumn

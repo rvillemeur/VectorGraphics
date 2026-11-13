@@ -76,7 +76,8 @@ VGFontManagerInstallationTest >> testOurManagerSurvivesTheResetUpstreamPerformsA
 VGFontManagerInstallationTest >> testTheInstallationViewNamesWhatIsPosedAndAsksUpstreamForNothing [
 	"The view a reader opens on the class itself, where the installation lives. It says what
 	 this project posed, nothing about what upstream holds: asking AeFontManager globalInstance
-	 would build a whole FreeType manager at the moment an inspector opens."
+	 would build a whole FreeType manager at the moment an inspector opens. What the posed
+	 manager knows is its own State view's business, not this one's."
 
 	| rowsBefore rowsAfter builder |
 	builder := [ SpPresenterBuilder newApplication: SpApplication new ].
@@ -92,9 +93,6 @@ VGFontManagerInstallationTest >> testTheInstallationViewNamesWhatIsPosedAndAsksU
 		assert:
 		(rowsAfter detect: [ :each | each key = 'Installed manager' ]) value
 		identicalTo: VGFontManager installedInstance.
-	self
-		assert: (rowsAfter detect: [ :each | each key = 'Families' ]) value
-		equals: 0.
 	self assert:
 		((AeFontManager class slotNamed: #globalInstance) read: AeFontManager)
 			identicalTo: VGFontManager installedInstance
