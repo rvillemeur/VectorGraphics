@@ -344,8 +344,8 @@ VGFrameStageBenchmarkTest >> testTheViewsOfTheBudgetAreCheckedLikeAnyOther [
 
 	| guard |
 	guard := VGVulkanExamplesTest new.
-	self assert: (guard viewMethodsOf: VGFrameDrawingKit ours) notEmpty.
+	self assert: (guard viewMethodsTheProjectWroteOf: VGFrameDrawingKit ours) notEmpty.
 	self
 		assert:
-		(guard viewMethodsOf: VGFrameStageBenchmark onTheBackgroundFrame) notEmpty
+		(guard viewMethodsTheProjectWroteOf: VGFrameStageBenchmark onTheBackgroundFrame) notEmpty
 ]

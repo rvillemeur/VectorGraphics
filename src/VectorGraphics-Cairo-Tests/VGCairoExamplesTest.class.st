@@ -230,7 +230,7 @@ VGCairoExamplesTest >> testEveryViewHasAGate [
 	| ungated |
 	ungated := OrderedCollection new.
 	self exampleSubjects do: [ :subject |
-		(self viewMethodsOf: subject) do: [ :each |
+		(self viewMethodsTheProjectWroteOf: subject) do: [ :each |
 			| gate |
 			gate := ((each value selector allButLast: 1) , 'Context:') asSymbol.
 			(each key class canUnderstand: gate) ifFalse: [
@@ -281,7 +281,7 @@ VGCairoExamplesTest >> viewMethodsAReaderOpensOf: anObject [
 ]
 
 { #category : 'accessing' }
-VGCairoExamplesTest >> viewMethodsOf: anObject [
+VGCairoExamplesTest >> viewMethodsTheProjectWroteOf: anObject [
 	"The inspector views of this project that would show for this object, found by the pragma on
 	 both sides, as receiver to method associations: a class-side view is sent to the class.
 	 Pharo's own views on an object an example answers are left out; see `projectDefines:`. This
