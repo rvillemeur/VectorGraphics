@@ -142,23 +142,6 @@ VGScaledFont >> inspectorCairoMasksContext: aContext [
 ]
 
 { #category : '*VectorGraphics-Bloc' }
-VGScaledFont >> matrixOfAeContext: aContext [
-	"The transformation the context carries, read into one of our own matrices: Cairo's record
-	 and ours hold the same six numbers under the same names."
-
-	| matrix |
-	matrix := aContext matrix.
-	^ VGCairoMatrix new
-		  beX: matrix x
-		  y: matrix y
-		  sx: matrix sx
-		  sy: matrix sy
-		  shx: matrix shx
-		  shy: matrix shy;
-		  yourself
-]
-
-{ #category : '*VectorGraphics-Bloc' }
 VGScaledFont >> poseOnAeContext: aContext [
 	"Extensions in this project's Bloc package, because the engine's own package must name no
 	 Alexandrie class: an A8 mask surface is one. Cairo is told nothing, since it has no handle
@@ -174,7 +157,7 @@ VGScaledFont >> showGlyphs: aGlyphsArray size: aNumberOfGlyphs onAeContext: aCon
 	 matrix is put aside: the device origin of a glyph is already in device pixels."
 
 	| matrix linear |
-	matrix := self matrixOfAeContext: aContext.
+	matrix := aContext matrix asVGCairoMatrix.
 	linear := matrix copy
 		          x: 0;
 		          y: 0;
