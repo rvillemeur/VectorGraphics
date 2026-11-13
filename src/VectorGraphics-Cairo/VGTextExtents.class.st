@@ -129,10 +129,11 @@ VGTextExtents >> height: aNumber [
 VGTextExtents >> inspectorGeometry: aBuilder [
 	<inspectorPresentationOrder: 20 title: 'Geometry'>
 	"Six numbers say nothing on their own: the picture places the inked box against the baseline
-	 and the origin, and draws the advance to where the next run would start. A run that inks
-	 nothing and advances nowhere has no picture, and says so."
+	 and the origin, and draws the advance to where the next run would start. An empty run has
+	 no picture, and says so: the gate hides the tab, and a reader who reaches the view anyway
+	 reads the sentence."
 
-	(self extent isZero and: [ self advance isZero ]) ifTrue: [
+	self isEmpty ifTrue: [
 		^ aBuilder newText
 			  text: 'This run inks nothing and advances nowhere';
 			  beNotEditable;
@@ -140,6 +141,21 @@ VGTextExtents >> inspectorGeometry: aBuilder [
 	^ aBuilder newImage
 		  image: self geometryForm;
 		  yourself
+]
+
+{ #category : 'inspector' }
+VGTextExtents >> inspectorGeometryContext: aContext [
+	"Nothing to draw for an empty run, so the tab stays shut on one."
+
+	aContext active: self isEmpty not
+]
+
+{ #category : 'testing' }
+VGTextExtents >> isEmpty [
+	"A run that inks nothing and advances nowhere: all six numbers zero, which is what Cairo
+	 answers for an empty run and what we answer for one made only of glyphs with no outline."
+
+	^ self extent isZero and: [ self advance isZero ]
 ]
 
 { #category : 'inspector' }
