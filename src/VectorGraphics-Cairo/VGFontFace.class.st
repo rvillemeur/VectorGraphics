@@ -331,7 +331,10 @@ VGFontFace >> inspectorFace: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Face'>
 	"What the font's own tables say, read through the public readers rather than restated. No row
 	 reports the outline memo cache, so a glyph a later view reads cannot change what this one
-	 shows. The two name rows are nil for a font carrying no name table, which I still draw."
+	 shows. The two name rows are nil for a font carrying no name table, which I still draw.
+
+	 The last row sends newCairoFontFace rather than saying what it answers, so it stops being
+	 true the day that method answers something other than me."
 
 	^ aBuilder newTable
 		  items: {
@@ -344,7 +347,8 @@ VGFontFace >> inspectorFace: aBuilder [
 				  ('Line gap' -> self lineGap).
 				  ('Maximum advance width' -> self maxAdvanceWidth).
 				  ('Bounds in font units' -> self boundsRectangle).
-				  ('Bytes' -> self bytes size) };
+				  ('Bytes' -> self bytes size).
+				  ('Own Cairo font face' -> (self newCairoFontFace == self)) };
 		  addColumn: (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
 		  addColumn: (SpStringTableColumn
 				   title: 'Value'
@@ -365,6 +369,21 @@ VGFontFace >> lineGap [
 { #category : 'accessing' }
 VGFontFace >> maxAdvanceWidth [
 	^ maxAdvanceWidth
+]
+
+{ #category : 'instance creation' }
+VGFontFace >> newCairoFontFace [
+	"Myself: a face of this project is already the Cairo font face a drawing scales. Cairo spells
+	 the font face and the scaled font as two objects, and Alexandrie's canvas asks the face it is
+	 given for the first of them before asking that one for the second, which is the single place
+	 where the backend is reached with no Cairo class named in the source. Upstream's AeFTFace
+	 answers an AeCairoFreetypeFontFace there, a wrapper over a FreeType handle; nothing of mine
+	 is a handle, so there is nothing to wrap.
+
+	 This and newScaledFontWithFontMatrix:userToDeviceMatrix:options: are the two messages that
+	 protocol sends a font face, which is why they sit together."
+
+	^ self
 ]
 
 { #category : 'instance creation' }

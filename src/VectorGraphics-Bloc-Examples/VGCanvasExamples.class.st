@@ -74,6 +74,21 @@ VGCanvasExamples class >> fontFaceForTheFontManagersDefaultFace [
 ]
 
 { #category : 'examples' }
+VGCanvasExamples class >> scaledFontAnUnmodifiedCanvasAnswers [
+	<sampleInstance>
+
+	"The scaled font Alexandrie's own canvas answers for a face of this project, with nothing
+	 overridden. The inherited scaledFontForFace:size: sends newCairoFontFace to the face, which
+	 answers itself, so the canvas builds a VGScaledFont without naming a class of either backend.
+	 Its companion scaledFontForTheDefaultFace shows the other half of the same seam: the FreeType
+	 face Bloc hands over today, resolved through VGCanvas."
+
+	^ (AeCanvas extent: 10 @ 10)
+		  scaledFontForFace: VGFontFace default
+		  size: 17
+]
+
+{ #category : 'examples' }
 VGCanvasExamples class >> scaledFontForTheDefaultFace [
 	<sampleInstance>
 	"The scaled font the canvas answers for a FreeType face and a size, built from the bytes the

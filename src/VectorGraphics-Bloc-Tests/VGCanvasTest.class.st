@@ -112,6 +112,32 @@ VGCanvasTest >> testASurfaceForALogicalExtentCarriesTheDeviceScale [
 ]
 
 { #category : 'tests - font bridge' }
+VGCanvasTest >> testAnUnmodifiedCanvasAnswersOneOfOurScaledFontsForOneOfOurFaces [
+	"The inherited scaledFontForFace:size: sends newCairoFontFace to the face it is given and
+	 then asks that answer for a scaled font. A face of this project answers itself, so Alexandrie's
+	 own canvas, with nothing overridden, builds one of our scaled fonts. This is the route Bloc
+	 takes once the font manager is ours and the faces it hands over are ours: the canvas is
+	 asked here by its own class on purpose, so the test cannot slide onto VGCanvas without
+	 showing it.
+
+	 The matrix is the one the inherited method builds, an AeCairoMatrix scaling by the size, and
+	 it is handed to our scaled font unchanged. Nothing asks the font for its extents: the
+	 inherited canvas carries AeCairoFontOptions, which do not understand hintsMetrics, and
+	 teaching the text path to accept them belongs to unit 4."
+
+	| canvas face font |
+	canvas := AeCanvas extent: 10 @ 10.
+	face := VGFontFace default.
+	font := canvas scaledFontForFace: face size: 17.
+	self assert: canvas class equals: AeCanvas.
+	self assert: font class equals: VGScaledFont.
+	self assert: font fontFace == face.
+	self
+		assert: font fontMatrix
+		equals: (AeCairoMatrix newScalingByX: 17 y: 17)
+]
+
+{ #category : 'tests - font bridge' }
 VGCanvasTest >> testOneFontFaceIsKeptPerFamilyAndStyle [
 	"The bundled face alone is nearly three hundred kilobytes of tables, so a face is parsed once
 	 and kept. Two canvases asking for one family therefore share a face, and with it a glyph
@@ -173,6 +199,27 @@ VGCanvasTest >> testTheFontOptionsAreOurOwnRecordAtBothQualities [
 	self assert: canvas fontOptions hintStyle equals: #none.
 	self assert: canvas fontOptions hintMetrics equals: #off.
 	self assert: canvas fontOptions antialias equals: #fast
+]
+
+{ #category : 'tests - font bridge' }
+VGCanvasTest >> testTheScaledFontAnUnmodifiedCanvasAnswersMeasuresThroughAlexandriesOwnOptions [
+	"A face of this project reached through Alexandrie's own canvas is scaled but, until this
+	 gate, never measured: the canvas hands the scaled font an AeCairoFontOptions of its own, and
+	 our measurements ask the options record one question it does not answer, hintsMetrics. Both
+	 fontExtents and glyphAdvanceOf: raised a MessageNotUnderstood on it. VGFontOptions, the
+	 record VGCanvas poses, answers the same question about itself.
+
+	 The canvas asks Cairo for hinted metrics, so the ascent and the advance come back rounded to
+	 whole pixels. They are asserted as integers rather than for their values: the rounding is
+	 what proves the answer reached the measurement, and the values belong to the face."
+
+	| font |
+	font := (AeCanvas extent: 10 @ 10)
+		        scaledFontForFace: VGFontFace default
+		        size: 17.
+	self assert: font options hintMetrics equals: AeCairoHintMetrics on.
+	self assert: font fontExtents ascent isInteger.
+	self assert: (font glyphAdvanceOf: 10) x isInteger
 ]
 
 { #category : 'tests - overrides' }
