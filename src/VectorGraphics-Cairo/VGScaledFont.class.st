@@ -6,6 +6,8 @@ My font matrix takes the em square to user space, and my user to device matrix i
 I answer the metrics Cairo answers: `fontExtents` for the vertical geometry of the face, `textExtentsOf:` and `glyphExtentsOf:` for a run, and `glyphArrayForString:` for the unshaped glyph array of a string. I cache the user space outline of each glyph I am asked for, so a repeated draw transforms nothing twice.
 
 With the metrics unhinted my numbers are exactly the font's own values scaled by my matrix. With them hinted I round the way FreeType rounds: the ascent and the descent up, the height and the maximum advance to the nearest whole pixel.
+
+I hold two glyph atlases, one for each renderer, because a mask is only usable by the renderer that made it. `atlas` holds the masks of this project's own rasteriser, in a `VGCairoImageSurface` of object memory. `cairoMaskAtlas` holds the masks of the route through real Cairo, in an externally allocated A8 `AeCairoImageSurface`: Cairo keeps the address of the pixels while it composites them, and the garbage collector may move a ByteArray. Both key on the glyph, its sub-pixel phase and the matrix, so they survive a whole page of text.
 "
 Class {
 	#name : 'VGScaledFont',
@@ -17,7 +19,8 @@ Class {
 		'options',
 		'fontExtents',
 		'outlines',
-		'atlas'
+		'atlas',
+		'cairoMaskAtlas'
 	],
 	#category : 'VectorGraphics-Cairo-Text',
 	#package : 'VectorGraphics-Cairo',
