@@ -209,6 +209,29 @@ VGCanvas >> initialize [
 ]
 
 { #category : 'inspector' }
+VGCanvas >> inspectionOfSurface: aBuilder [
+	<inspectorPresentationOrder: 0 title: 'Surface'>
+	"Alexandrie's own view of this tab answers the surface's Form itself. The inspector then sends
+	 asInspection to what the view answered, which a Form does not understand, and that send is
+	 outside the handler newInspectionPresenterOnApplication: wraps the build in: the tab raises
+	 for any AeCanvas, ours included. The Form goes through the builder here instead.
+
+	 The override lives on our canvas because Alexandrie's classes are never edited in this
+	 project. #asForm answers a fresh Form every call, so showing the surface cannot change it."
+
+	^ aBuilder newImage
+		  image: cairoSurface asForm;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGCanvas >> inspectionOfSurfaceContext: aContext [
+	"Nothing to show before a surface is posed: asForm would be asked of nil."
+
+	aContext active: cairoSurface notNil
+]
+
+{ #category : 'inspector' }
 VGCanvas >> inspectorBackend: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Backend'>
 	"What this canvas is drawing on and with, all of it ours: the surface, the device scale it

@@ -29,6 +29,48 @@ VGCairoExamplesTest >> allExampleMethods [
 ]
 
 { #category : 'accessing' }
+VGCairoExamplesTest >> cellComplaintsOf: aListPresenter named: aViewName [
+	"Every cell this table would draw, asked for: a column block only runs when a row is drawn, so
+	 a cell that raises shows for the first time under a reader's eyes."
+
+	| complaints |
+	complaints := OrderedCollection new.
+	aListPresenter items do: [ :item |
+		aListPresenter columns do: [ :column |
+			[ column evaluation value: item ]
+				on: Error
+				do: [ :error |
+					complaints add:
+						aViewName -> (column title , ': ' , error class name) ] ] ].
+	^ complaints
+]
+
+{ #category : 'accessing' }
+VGCairoExamplesTest >> complaintsAbout: aReceiverAndMethod builtWith: aBuilder [
+	"What goes wrong when the inspector opens this view on this object, as view name to reason
+	 associations, empty when nothing does. Building it can raise; what it answers has to be a
+	 presenter, because the inspector sends `asInspection` to it, which an ordinary object such as
+	 a `Form` does not understand and which is outside the handler
+	 `StInspectionContext >> newInspectionPresenterOnApplication:` wraps the build in; and a table's
+	 cells can raise, which `cellComplaintsOf:named:` asks for."
+
+	| method presenter |
+	method := aReceiverAndMethod value.
+	presenter := [ aReceiverAndMethod key perform: method selector with: aBuilder ]
+		             on: Error
+		             do: [ :error |
+			             ^ { (method printString
+				                -> (error class name , ': '
+					                 , error messageText printString)) } ].
+	(presenter isKindOf: SpPresenter) ifFalse: [
+		^ { (method printString
+			   -> (presenter class name
+				    , ' is not a presenter the inspector can show')) } ].
+	(presenter isKindOf: SpAbstractListPresenter) ifFalse: [ ^ #(  ) ].
+	^ self cellComplaintsOf: presenter named: method printString
+]
+
+{ #category : 'accessing' }
 VGCairoExamplesTest >> defaultTimeLimit [
 	"Every example of every family is rebuilt and every view of each is built and filled, which
 	 takes minutes rather than the ten seconds SUnit allows a test by default. Without this a
@@ -81,18 +123,33 @@ VGCairoExamplesTest >> exampleSubjects [
 		  each methodClass instanceSide perform: each selector ]
 ]
 
-{ #category : 'private' }
-VGCairoExamplesTest >> projectDefines: aCompiledMethod [
-	"Whether this project wrote the method. An example answers an ordinary Pharo object as often
-	 as one of ours — a `Form`, a `ByteArray` — and Pharo''s own inspector views on those objects
-	 are not ours to gate or to hold to this project''s rules. Every package of the project
-	 counts, not only the ones the Cairo reference scan covers: that scan skips the suites, the
-	 conformance corpus and the benchmark harness because they name the alternatives on purpose,
-	 and a view written there is still a view an example opens with one click."
+{ #category : 'accessing' }
+VGCairoExamplesTest >> projectDefines: aCompiledMethodOrClass [
+	"Whether this project wrote the method, or the class, it is asked about: both answer the
+	 package they live in. An example answers an ordinary Pharo object as often as one of ours — a
+	 `Form`, a `ByteArray` — and Pharo's own inspector views on those objects are not ours to gate
+	 or to hold to this project's rules. Every package of the project counts, not only the ones
+	 the Cairo reference scan covers: that scan skips the suites, the conformance corpus and the
+	 benchmark harness because they name the alternatives on purpose, and a view written there is
+	 still a view an example opens with one click."
+
+	| package |
+	package := aCompiledMethodOrClass package.
+	^ package notNil and: [
+		  package name beginsWith: VGCairoReferenceScanner projectPackagePrefix ]
+]
+
+{ #category : 'accessing' }
+VGCairoExamplesTest >> replacedStackDefines: aCompiledMethod [
+	"Whether the stack this project replaces wrote the method. A view of Alexandrie's or Bloc's
+	 that a class of ours inherits shows for our object, so it is ours to keep working: when it is
+	 broken there, the override goes in our own class and never in theirs."
+
 	| package |
 	package := aCompiledMethod package.
 	^ package notNil and: [
-		  package name beginsWith: VGCairoReferenceScanner projectPackagePrefix ]
+		  VGArchitectureTest replacedStackPackageNamePrefixes anySatisfy: [ :prefix |
+			  package name beginsWith: prefix ] ]
 ]
 
 { #category : 'tests' }
@@ -185,38 +242,51 @@ VGCairoExamplesTest >> testEveryViewHasAGate [
 
 { #category : 'tests' }
 VGCairoExamplesTest >> testEveryViewOfAnExampleBuildsAndFillsItsCells [
-	"A view that raises when the inspector opens it is worse than no view. Every example is asked
-	 for its presenters, and a table is asked for every cell it would show, because a column
-	 block only runs when a row is drawn."
+	"A view that raises when the inspector opens it is worse than no view. Every view a reader
+	 opens on every example is built, asked for what it answered, and asked for its cells;
+	 `complaintsAbout:builtWith:` says what each of those three can get wrong."
 
 	| broken builder |
 	builder := SpPresenterBuilder newApplication: SpApplication new.
 	broken := OrderedCollection new.
 	self exampleSubjects do: [ :subject |
-		(self viewMethodsOf: subject) do: [ :each |
-			| presenter |
-			presenter := nil.
-			[ presenter := each key perform: each value selector with: builder ]
-				on: Error
-				do: [ :error |
-					broken add: each value printString -> (error class name , ': ' , error messageText printString) ].
-			(presenter isKindOf: SpAbstractListPresenter) ifTrue: [
-				presenter items do: [ :item |
-					presenter columns do: [ :column |
-						[ column evaluation value: item ]
-							on: Error
-							do: [ :error |
-								broken add: each value printString -> (column title , ': ' , error class name) ] ] ] ] ] ].
+		(self viewMethodsAReaderOpensOf: subject) do: [ :each |
+			broken addAll: (self complaintsAbout: each builtWith: builder) ] ].
 	self
 		assert: broken isEmpty
 		description: 'these views do not build: ' , broken asArray printString
 ]
 
-{ #category : 'private' }
+{ #category : 'accessing' }
+VGCairoExamplesTest >> viewMethodsAReaderOpensOf: anObject [
+	"Every view a reader meets on an object of ours, which is more than the views the project
+	 wrote: the selector is looked up, so a view inherited from a superclass counts, and when the
+	 object's own class is one of ours a view the replaced stack wrote counts too. An Alexandrie
+	 view that a class of ours inherits opens with one click on our example, so it is ours to keep
+	 working, and the place to mask a break there is our own class. On an object an example merely
+	 answers — a `Form`, a `BlElement` — the views of its own stack are no more ours to gate than
+	 Pharo's are; see `projectDefines:`."
+
+	| class instanceSideViews classSideViews ours |
+	class := anObject class.
+	ours := self projectDefines: class.
+	instanceSideViews := class allSelectors asArray collect: [ :each |
+		                     anObject -> (class lookupSelector: each) ].
+	classSideViews := class class allSelectors asArray collect: [ :each |
+		                  class -> (class class lookupSelector: each) ].
+	^ instanceSideViews , classSideViews select: [ :each |
+		  (each value hasPragmaNamed: #inspectorPresentationOrder:title:) and: [
+			  (self projectDefines: each value) or: [
+				  ours and: [ self replacedStackDefines: each value ] ] ] ]
+]
+
+{ #category : 'accessing' }
 VGCairoExamplesTest >> viewMethodsOf: anObject [
 	"The inspector views of this project that would show for this object, found by the pragma on
 	 both sides, as receiver to method associations: a class-side view is sent to the class.
-	 Pharo's own views on an object an example answers are left out; see `projectDefines:`."
+	 Pharo's own views on an object an example answers are left out; see `projectDefines:`. This
+	 is the set the project's own rules apply to, so a view it inherits is not here; see
+	 `viewMethodsAReaderOpensOf:` for the wider set."
 
 	| class |
 	class := anObject class.
