@@ -95,6 +95,16 @@ VGScaledFont >> computeUserSpaceContoursOfGlyphAt: aGlyphIndex [
 			  self distanceX: point x / upem y: point y negated / upem ] ]
 ]
 
+{ #category : 'outlines' }
+VGScaledFont >> deviceContoursOfGlyphAt: aGlyphIndex underMatrix: aLinearMatrix at: aDevicePoint [
+	"The contours of one glyph in device space, placed at a device point. The points go through
+	 the matrix without its translation, because the translation is in the device point already."
+
+	^ (self userSpaceContoursOfGlyphAt: aGlyphIndex) collect: [ :contour |
+		  contour collect: [ :point |
+			  (aLinearMatrix valueX: point x y: point y) + aDevicePoint ] ]
+]
+
 { #category : 'private' }
 VGScaledFont >> distanceX: aNumber y: anotherNumber [
 	"A distance in em units through my font matrix. A distance is not a point: the matrix's

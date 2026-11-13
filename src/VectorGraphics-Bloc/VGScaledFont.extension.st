@@ -65,16 +65,6 @@ VGScaledFont >> cairoMaskForGlyph: aGlyphIndex atPhase: aPhasePoint underMatrix:
 ]
 
 { #category : '*VectorGraphics-Bloc' }
-VGScaledFont >> deviceContoursOfGlyphAt: aGlyphIndex underMatrix: aLinearMatrix at: aDevicePoint [
-	"The contours of one glyph in device space, placed at a device point. The points go through
-	 the matrix without its translation, because the translation is in the device point already."
-
-	^ (self userSpaceContoursOfGlyphAt: aGlyphIndex) collect: [ :contour |
-		  contour collect: [ :point |
-			  (aLinearMatrix valueX: point x y: point y) + aDevicePoint ] ]
-]
-
-{ #category : '*VectorGraphics-Bloc' }
 VGScaledFont >> glyphsOf: aGlyphArray size: aNumberOfGlyphs [
 	"The first aNumberOfGlyphs glyphs of an array, as a collection I can walk. Alexandrie hands
 	 over an opaque external array that answers its size and nothing else; the indexable

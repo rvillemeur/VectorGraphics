@@ -446,17 +446,16 @@ VGCairoContext >> defaultScaledFont [
 
 { #category : 'private' }
 VGCairoContext >> deviceContoursOfGlyph: aGlyphIndex at: aDevicePoint [
-	"The contours of one glyph in device space, placed at a device point. The contour points go
-	 through the matrix without its translation, because the translation is in the device point
-	 already, and the device point is the same number in both routes, so the rasteriser sees the
-	 same coordinates whether the glyph is filled as a path or rasterised into a mask."
+	"The contours of one glyph in device space, placed at a device point, asked of the font that
+	 owns the outlines. The matrix I hand it is mine without its translation, because the
+	 translation is in the device point already, and the device point is the same number in both
+	 routes, so the rasteriser sees the same coordinates whether the glyph is filled as a path
+	 or rasterised into a mask."
 
-	| linear |
-	linear := self linearMatrix.
-	^ (self currentScaledFont userSpaceContoursOfGlyphAt: aGlyphIndex) collect: [
-		  :contour |
-		  contour collect: [ :point |
-			  (linear valueX: point x y: point y) + aDevicePoint ] ]
+	^ self currentScaledFont
+		  deviceContoursOfGlyphAt: aGlyphIndex
+		  underMatrix: self linearMatrix
+		  at: aDevicePoint
 ]
 
 { #category : 'private' }
