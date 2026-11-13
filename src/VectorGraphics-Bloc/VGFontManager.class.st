@@ -47,8 +47,8 @@ VGFontManager class >> inspectorInstallation: aBuilder [
 	 rather than reading a second copy of those counts that could disagree with the first.
 	 Reads my own slot only, through the accessor: sending AeFontManager globalInstance would
 	 build a complete FreeType manager at the moment a reader opens an inspector, which is the
-	 opposite of what this unit is for. The example managerBlocAsksToday is where one asks the
-	 real route and accepts that it builds."
+	 opposite of what this unit is for. A reader who wants the real route asks
+	 AeFontManager globalInstance in a playground and accepts that it builds one."
 
 	^ aBuilder newTable
 		  items: { ('Installed manager' -> self installedInstance) };
@@ -58,6 +58,17 @@ VGFontManager class >> inspectorInstallation: aBuilder [
 				   title: 'Value'
 				   evaluated: [ :each | each value printString ]);
 		  yourself
+]
+
+{ #category : 'inspector' }
+VGFontManager class >> inspectorInstallationContext: aContext [
+
+	"The Installation view reads installedInstance, a class-instance variable: every subclass
+	 would get its own copy, always nil, and the tab would say nothing true of it. So the tab
+	 belongs to the class that installs, and the rule is asked of the class rather than
+	 restated — the view is offered where installGlobally is defined."
+
+	aContext active: self = VGFontManager
 ]
 
 { #category : 'installing' }

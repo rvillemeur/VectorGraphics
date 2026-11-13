@@ -86,13 +86,17 @@ VGArchitectureTest class >> allowedDependencies [
 				    'VectorGraphics-Conformance' ).
 			  "The Bloc renderer names the font reader as well as the Cairo backend since
 			   unit 3.2 of the font plan: VGFontManager is an adapter onto TTFontCatalogue,
-			   which reads the fonts the FreeType library used to read."
+			   which reads the fonts the FreeType library used to read. Its examples and
+			   its tests name the reader too since unit 3.7, where a catalogue entry is
+			   what a run of text is shaped from."
 			  'VectorGraphics-Bloc'
 			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-TrueType' ).
 			  'VectorGraphics-Bloc-Examples'
-			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ).
+			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo'
+				    'VectorGraphics-TrueType' ).
 			  'VectorGraphics-Bloc-Tests'
-			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples' 'VectorGraphics-Cairo' ).
+			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples'
+				    'VectorGraphics-Cairo' 'VectorGraphics-TrueType' ).
 			  "The device path reads the frame unit 1.11 profiles, which is drawn through the Bloc
 			   renderer, so binning and the budget name that package as well as the display list."
 			  'VectorGraphics-Vulkan' -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ).

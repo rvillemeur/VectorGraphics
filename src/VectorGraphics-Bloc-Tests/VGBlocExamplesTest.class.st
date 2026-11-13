@@ -21,5 +21,6 @@ VGBlocExamplesTest >> exampleHolders [
 		  VGCanvasExamples.
 		  VGFontManagerExamples.
 		  VGFrameProfileExamples.
+		  VGHarfbuzzShapingExamples.
 		  VGRendererExamples }
 ]

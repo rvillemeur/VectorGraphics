@@ -40,7 +40,8 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 	 is Cairo-Examples on Cairo-Tests, because the reverse is stated and a cycle has no load
 	 order. The Cairo backend and the Bloc renderer name the font reader alone out of the four
 	 rasteriser packages, which is why loading 'cairo' or 'bloc' brings neither the
-	 scan-line engine nor the front page.
+	 scan-line engine nor the front page. The Bloc examples and the Bloc tests name the reader
+	 as well since unit 3.7, where a catalogue entry is what a run of text is shaped from.
 	 The corpus and the benchmark harness are declared by declareSupportPackagesOn:."
 
 	spec
@@ -57,12 +58,15 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 		with: [
 			spec requires: #( 'Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Bloc-Examples'
-		with: [ spec requires: #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ) ];
+		with: [
+			spec requires:
+				#( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo'
+				   'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Bloc-Tests'
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples' 'VectorGraphics-Cairo'
-					   'VectorGraphics-Cairo-Tests' ) ];
+					   'VectorGraphics-Cairo-Tests' 'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Vulkan'
 		with: [ spec requires: #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ) ];
 		package: 'VectorGraphics-Vulkan-Examples'
