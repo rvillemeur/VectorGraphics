@@ -69,6 +69,34 @@ VGTextExtents >> bearingY: aNumber [
 	bearingY := aNumber
 ]
 
+{ #category : 'inspector' }
+VGTextExtents >> drawGeometryOn: aForm placing: aBlock [
+	"The baseline across the image, the origin of the first glyph as a black tick, the inked box
+	 in blue, and the advance to where the next run starts as a red line under the baseline."
+
+	| origin advanceEnd |
+	origin := aBlock value: 0 @ 0.
+	advanceEnd := aBlock value: self advance.
+	aForm
+		fill: (0 @ origin y extent: aForm width @ 1)
+		fillColor: Color lightGray.
+	self
+		outline:
+			((aBlock value: self inkedBox origin) corner:
+				 (aBlock value: self inkedBox corner))
+		on: aForm
+		color: Color blue.
+	aForm
+		fill: (origin x @ (origin y - 4) extent: 1 @ 9)
+		fillColor: Color black.
+	aForm
+		fill: (origin x @ (origin y + 4) corner: advanceEnd x + 1 @ (origin y + 5))
+		fillColor: Color red.
+	aForm
+		fill: (advanceEnd x @ (origin y + 1) extent: 1 @ 7)
+		fillColor: Color red
+]
+
 { #category : 'accessing' }
 VGTextExtents >> extent [
 	^ self width @ self height
@@ -76,43 +104,34 @@ VGTextExtents >> extent [
 
 { #category : 'inspector' }
 VGTextExtents >> geometryForm [
-	"A picture of what my six numbers mean: the baseline, the origin of the first glyph, the
-	 inked box placed at my bearing, and the advance to where the next run starts. Everything
-	 I hold is scaled into one image, so a run of any size reads the same way. Text coordinates
+	"A picture of what my six numbers mean, drawn on a white image of a fixed size: the placer
+	 scales whatever I hold into it, and the drawing puts down the baseline, the origin, the
+	 inked box and the advance."
+
+	| form |
+	form := Form extent: 240 @ 140 depth: 32.
+	form fillColor: Color white.
+	self drawGeometryOn: form placing: (self geometryPlacerInto: form extent).
+	^ form
+]
+
+{ #category : 'inspector' }
+VGTextExtents >> geometryPlacerInto: anExtent [
+	"A block that maps a point of my own space into an image of that extent: everything I hold,
+	 scaled to fit inside a margin, so a run of any size reads the same way. Text coordinates
 	 grow downwards, as a form's do, so nothing is flipped."
 
-	| inked content scale form place origin baselineY advanceEnd |
-	inked := self bearing extent: self extent.
+	| content margin scale |
 	content := Rectangle encompassing: {
 			           0 @ 0.
 			           self advance.
-			           inked origin.
-			           inked corner }.
-	scale := (220 / (content width max: 1) min: 110 / (content height max: 1))
+			           self inkedBox origin.
+			           self inkedBox corner }.
+	margin := 10 @ 15.
+	scale := (anExtent x - (2 * margin x) / (content width max: 1)
+		          min: anExtent y - (2 * margin y) / (content height max: 1))
 		         asFloat.
-	form := Form extent: 240 @ 140 depth: 32.
-	form fillColor: Color white.
-	place := [ :point | (point - content origin * scale + (10 @ 15)) rounded ].
-	origin := place value: 0 @ 0.
-	baselineY := origin y.
-	advanceEnd := place value: self advance.
-	form
-		fill: (0 @ baselineY extent: form width @ 1)
-		fillColor: Color lightGray.
-	self
-		outline: ((place value: inked origin) corner: (place value: inked corner))
-		on: form
-		color: Color blue.
-	form
-		fill: (origin x @ (baselineY - 4) extent: 1 @ 9)
-		fillColor: Color black.
-	form
-		fill: (origin x @ (baselineY + 4) corner: advanceEnd x + 1 @ (baselineY + 5))
-		fillColor: Color red.
-	form
-		fill: (advanceEnd x @ (baselineY + 1) extent: 1 @ 7)
-		fillColor: Color red.
-	^ form
+	^ [ :point | (point - content origin * scale + margin) rounded ]
 ]
 
 { #category : 'accessing' }
@@ -123,6 +142,14 @@ VGTextExtents >> height [
 { #category : 'accessing' }
 VGTextExtents >> height: aNumber [
 	height := aNumber
+]
+
+{ #category : 'accessing' }
+VGTextExtents >> inkedBox [
+	"The box my glyphs ink, placed against the origin of the first one: my bearing is where it
+	 starts and my extent is how big it is."
+
+	^ self bearing extent: self extent
 ]
 
 { #category : 'inspector' }
