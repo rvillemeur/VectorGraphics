@@ -210,6 +210,20 @@ VGScaledFont >> glyphExtentsOf: aGlyphCollection [
 		  yourself
 ]
 
+{ #category : 'layout' }
+VGScaledFont >> glyphsOf: aGlyphArray size: aNumberOfGlyphs [
+	"The first aNumberOfGlyphs glyphs of an array, as a collection I can walk. Alexandrie hands
+	 over an opaque external array that answers its size and nothing else; the indexable
+	 structure behind it comes from #asExternalStructure. Its glyphs answer index, x and y, as
+	 ours do."
+
+	| indexable |
+	indexable := (aGlyphArray respondsTo: #asExternalStructure)
+		             ifTrue: [ aGlyphArray asExternalStructure ]
+		             ifFalse: [ aGlyphArray ].
+	^ (1 to: aNumberOfGlyphs) collect: [ :index | indexable at: index ]
+]
+
 { #category : 'metrics' }
 VGScaledFont >> inkedBoxOfGlyphAt: aGlyphIndex [
 	"The box the font stores for one glyph, in user space, with its origin at the glyph's origin.
