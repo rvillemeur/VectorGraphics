@@ -89,6 +89,21 @@ VGFontCanvas class >> ourClassesBelowAlexandrie [
 ]
 
 { #category : 'seam' }
+VGFontCanvas class >> ourOverriddenUpstreamSelectors [
+	"Every selector `AeCanvas` implements, on either side, that a canvas of ours on the stretch
+	 below it replaces."
+
+	| selectors |
+	selectors := Set new.
+	self ourClassesBelowAlexandrie do: [ :ourClass |
+		(ourClass methods , ourClass class methods) do: [ :each |
+			((AeCanvas includesSelector: each selector) or: [
+				 AeCanvas class includesSelector: each selector ]) ifTrue: [
+				selectors add: each selector ] ] ].
+	^ selectors
+]
+
+{ #category : 'seam' }
 VGFontCanvas class >> overridesUpstreamSelector: aSelector [
 	"Whether a canvas of ours replaces the upstream method named by the selector, on either side.
 	 The question is asked of the whole stretch from this class up to Alexandrie's canvas, that
@@ -107,19 +122,26 @@ VGFontCanvas class >> seamRows [
 	 named-classes associations sorted by selector. A creation method added upstream appears with
 	 nothing named against it, which is what a hole in the failover looks like."
 
+	| rows |
+	rows := self upstreamCairoRows.
+	self ourOverriddenUpstreamSelectors do: [ :selector |
+		rows at: selector ifAbsentPut: [ #(  ) ] ].
+	^ (rows associations asSortedCollection: [ :a :b | a key <= b key ])
+		  asOrderedCollection
+]
+
+{ #category : 'seam' }
+VGFontCanvas class >> upstreamCairoRows [
+	"Every method of `AeCanvas`, on either side, that names a class of the Cairo package, as a
+	 dictionary from selector to the classes that method names."
+
 	| scanner rows |
 	scanner := VGCairoReferenceScanner new.
 	rows := Dictionary new.
 	(AeCanvas methods , AeCanvas class methods) do: [ :each |
 		(scanner cairoClassesNamedBy: each) ifNotEmpty: [ :named |
 			rows at: each selector put: named ] ].
-	self ourClassesBelowAlexandrie do: [ :ourClass |
-		((ourClass methods , ourClass class methods) select: [ :each |
-			 (AeCanvas includesSelector: each selector) or: [
-				 AeCanvas class includesSelector: each selector ] ]) do: [ :each |
-			rows at: each selector ifAbsentPut: [ #(  ) ] ] ].
-	^ (rows associations asSortedCollection: [ :a :b | a key <= b key ])
-		  asOrderedCollection
+	^ rows
 ]
 
 { #category : 'API - text' }
