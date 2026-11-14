@@ -40,24 +40,17 @@ VGFontExtents >> descent: aNumber [
 
 { #category : 'inspecting' }
 VGFontExtents >> drawLinesOn: aForm placing: aBlock [
-	"The lines my five numbers stand for, drawn across the image: the bottom of the line box in
-	 green one line height under the ascent, then the ascent and the descent in blue over it,
-	 then the baseline in grey, and the widest advance the face allows as a red segment running
-	 from the origin along the baseline. A face with no line gap puts the bottom of its line box
-	 exactly on its descent, so the blue lines are drawn short and over the green one: where the
-	 two meet, the green line is the part still showing to the right."
+	"The lines my five numbers stand for, drawn across the image: the line box, the ascent, the
+	 descent and the baseline as horizontalLines orders them, then the widest advance the face
+	 allows as a red segment running from the origin along the baseline."
 
 	| baseline |
 	baseline := aBlock value: 0 @ 0.
-	{
-		(height - ascent -> (Color green darker -> 1)).
-		(ascent negated -> (Color blue -> 0.6)).
-		(descent -> (Color blue -> 0.6)).
-		(0 -> (Color lightGray -> 1)) } do: [ :each |
+	self horizontalLines do: [ :line |
 		aForm
-			fill: (0 @ (aBlock value: 0 @ each key) y
-					 extent: (aForm width * each value value) rounded @ 1)
-			fillColor: each value key ].
+			fill: (0 @ (aBlock value: 0 @ line first) y
+					 extent: (aForm width * line third) rounded @ 1)
+			fillColor: line second ].
 	aForm
 		fill:
 			(baseline x @ (baseline y + 2)
@@ -73,6 +66,21 @@ VGFontExtents >> height [
 { #category : 'accessing' }
 VGFontExtents >> height: aNumber [
 	height := aNumber
+]
+
+{ #category : 'inspecting' }
+VGFontExtents >> horizontalLines [
+	"The four lines a reader of my numbers wants to see, each as the distance from the baseline
+	 it sits at, the colour it is drawn in, and the share of the image width it runs across. A
+	 face with no line gap puts the bottom of its line box exactly on its descent, so the line
+	 box comes first and runs the whole width while the two blue lines are drawn short over it:
+	 where they meet, the green part still showing to the right is the line box."
+
+	^ {
+		  { (height - ascent). Color green darker. 1 }.
+		  { ascent negated. Color blue. 0.6 }.
+		  { descent. Color blue. 0.6 }.
+		  { 0. Color lightGray. 1 } }
 ]
 
 { #category : 'accessing' }
