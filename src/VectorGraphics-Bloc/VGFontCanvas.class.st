@@ -80,13 +80,22 @@ VGFontCanvas class >> lowQualityTolerance [
 ]
 
 { #category : 'seam' }
+VGFontCanvas class >> ourClassesBelowAlexandrie [
+	"My class and the ones above it, up to Alexandrie's canvas, that one excluded: the stretch of
+	 the hierarchy that holds our own overrides. Since unit 5.1 of the font plan it is two classes
+	 under `VGCanvas` and under `VGAeCanvas`, and one under `VGFontCanvas` itself."
+
+	^ self withAllSuperclasses copyUpTo: AeCanvas
+]
+
+{ #category : 'seam' }
 VGFontCanvas class >> overridesUpstreamSelector: aSelector [
 	"Whether a canvas of ours replaces the upstream method named by the selector, on either side.
 	 The question is asked of the whole stretch from this class up to Alexandrie's canvas, that
 	 one excluded, because the font methods sit on `VGFontCanvas` and the surface and pattern ones
 	 on its subclasses. A selector nothing of ours implements reaches Cairo's own FreeType."
 
-	^ (self withAllSuperclasses copyUpTo: AeCanvas) anySatisfy: [ :each |
+	^ self ourClassesBelowAlexandrie anySatisfy: [ :each |
 		  (each includesSelector: aSelector) or: [
 			  each class includesSelector: aSelector ] ]
 ]
@@ -104,7 +113,7 @@ VGFontCanvas class >> seamRows [
 	(AeCanvas methods , AeCanvas class methods) do: [ :each |
 		(scanner cairoClassesNamedBy: each) ifNotEmpty: [ :named |
 			rows at: each selector put: named ] ].
-	(self withAllSuperclasses copyUpTo: AeCanvas) do: [ :ourClass |
+	self ourClassesBelowAlexandrie do: [ :ourClass |
 		((ourClass methods , ourClass class methods) select: [ :each |
 			 (AeCanvas includesSelector: each selector) or: [
 				 AeCanvas class includesSelector: each selector ] ]) do: [ :each |
