@@ -132,6 +132,25 @@ VGAeTextFont >> cairoMaskSurfaceOfContours: aContourCollection extent: anExtent 
 	^ maskSurface
 ]
 
+{ #category : 'inspector' }
+VGAeTextFont >> contoursOfTheInspectorSample [
+	"The contours the path route puts down for a short run, in user space, placed at the glyph
+	 positions the layout chose. The view draws these and its gate counts them, so neither one
+	 restates what the route does: both ask it."
+
+	^ (scaledFont glyphArrayForString: 'Hamburg') flatCollect: [ :glyph |
+		  scaledFont userSpaceContoursOfGlyphAt: glyph index at: glyph x @ glyph y ]
+]
+
+{ #category : 'inspector' }
+VGAeTextFont >> extentTextOfCairoMask: anAssociation [
+	"The extent of one row of the Cairo masks view, said in words where there is no mask."
+
+	^ anAssociation value
+		  ifNil: [ 'inks nothing' ]
+		  ifNotNil: [ :mask | mask extent printString ]
+]
+
 { #category : 'text sites' }
 VGAeTextFont >> fontExtentsInto: aFontExtents onAeContext: aContext [
 	"The font extents site: cairo_font_extents upstream, the font's own hhea numbers here. The
@@ -150,6 +169,155 @@ VGAeTextFont >> glyphExtentsOf: aGlyphArray size: aNumberOfGlyphs into: aTextExt
 	^ (scaledFont glyphExtentsOf:
 		   (scaledFont glyphsOf: aGlyphArray size: aNumberOfGlyphs))
 		  writeInto: aTextExtents
+]
+
+{ #category : 'inspector' }
+VGAeTextFont >> glyphPathFormOfContours: aContourCollection [
+	"A picture of a set of contours: Cairo strokes them thinly on white, so that the shape of
+	 the outline shows and not the coverage a fill would lay down. The whole pixel box of the
+	 contours decides the size of the image and the drawing is moved so that the box starts at
+	 its corner. The poser is the one the path route uses, so the picture cannot drift from it."
+
+	| box surface context |
+	box := scaledFont wholePixelBoxOfContours: aContourCollection.
+	surface := AeCairoImageSurface extent: box extent.
+	context := AeCairoContext newFor: surface.
+	context
+		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0;
+		paint;
+		translateBy: box origin negated;
+		sourceColorR: 0.0 g: 0.0 b: 0.0 a: 1.0;
+		strokeSize: 1.
+	aContourCollection do: [ :contour |
+		self appendContour: contour toAeContext: context ].
+	context stroke.
+	surface flush.
+	^ surface asForm
+]
+
+{ #category : 'inspector' }
+VGAeTextFont >> inspectorCairoMasks: aBuilder [
+	<inspectorPresentationOrder: 1 title: 'Cairo masks'>
+	"One row per glyph of my atlas, with the A8 mask Cairo rasterised shown as it is: read back
+	 as a Form, the coverage reads as grey. The gate of this view hides the tab while no glyph
+	 has been drawn through me, and the table is empty for a reader who opens it all the same."
+
+	^ aBuilder newTable
+		  items: self cairoMaskAssociations;
+		  addColumn: (SpStringTableColumn
+				   title: 'Glyph'
+				   evaluated: [ :each | each key first printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Phase'
+				   evaluated: [ :each | each key second printString ]);
+		  addColumn: (SpImageTableColumn
+				   title: 'Mask'
+				   evaluated: [ :each | self maskFormOfCairoMask: each ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Extent'
+				   evaluated: [ :each | self extentTextOfCairoMask: each ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Offset'
+				   evaluated: [ :each | self offsetTextOfCairoMask: each ]);
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGAeTextFont >> inspectorCairoMasksContext: aContext [
+	"Nothing to show before a glyph has been drawn through me: my atlas is built on the first
+	 such glyph."
+
+	aContext active: cairoMaskAtlas notNil
+]
+
+{ #category : 'inspector' }
+VGAeTextFont >> inspectorGlyphPath: aBuilder [
+	<inspectorPresentationOrder: 2 title: 'Path'>
+	"The other route of text, beside the masks: the outlines of a short run as the path site
+	 appends them, in user space and with no snapping to the device grid. A stroke and not a
+	 fill, because what the route delivers is a shape, and a filled letter would hide where its
+	 contours run."
+
+	^ aBuilder newImage image:
+		  (self glyphPathFormOfContours: self contoursOfTheInspectorSample)
+]
+
+{ #category : 'inspector' }
+VGAeTextFont >> inspectorGlyphPathContext: aContext [
+	"Nothing to draw for a font whose face maps every letter of the sample to a glyph with no
+	 contour: the run would lay down an empty path and the image would have no box."
+
+	aContext active: self contoursOfTheInspectorSample notEmpty
+]
+
+{ #category : 'inspector' }
+VGAeTextFont >> inspectorLineBox: aBuilder [
+	<inspectorPresentationOrder: 3 title: 'Line box'>
+	"Ascent, descent and line height are three numbers in the font's Metrics tab; here they are
+	 the lines a backend stacks text between, drawn around a word of its glyphs at its size."
+
+	^ aBuilder newImage
+		  image: self lineBoxFormOfTheInspectorSample;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGAeTextFont >> inspectorLineBoxContext: aContext [
+	"Nothing to draw for a font whose sample run inks no contour, so the tab stays shut on one."
+
+	aContext active: self contoursOfTheInspectorSample notEmpty
+]
+
+{ #category : 'inspector' }
+VGAeTextFont >> lineBoxFormOfTheInspectorSample [
+	"A word of my font's glyphs at its size, with the lines a text backend lays it out with
+	 drawn around it. The word is the contours the path site puts down, so the picture cannot
+	 drift from the route, and the lines are asked of the font's own extents, which places them."
+
+	| extents contours margin baseline right surface context form |
+	extents := scaledFont fontExtents.
+	contours := self contoursOfTheInspectorSample.
+	margin := 8.
+	baseline := (margin @ (margin + extents ascent)) rounded.
+	right := (contours inject: extents maxAdvanceX into: [ :widest :contour |
+		          contour inject: widest into: [ :each :point | each max: point x ] ]).
+	surface := AeCairoImageSurface extent:
+		           ((margin * 2 + right)
+			            @ (margin * 2 + extents ascent
+				              + (extents descent max: extents height - extents ascent)))
+			           ceiling.
+	context := AeCairoContext newFor: surface.
+	context
+		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0;
+		paint;
+		translateBy: baseline;
+		sourceColorR: 0.0 g: 0.0 b: 0.0 a: 1.0.
+	contours do: [ :contour | self appendContour: contour toAeContext: context ].
+	context fill.
+	surface flush.
+	form := surface asForm.
+	extents drawLinesOn: form placing: [ :point | (point + baseline) rounded ].
+	^ form
+]
+
+{ #category : 'inspector' }
+VGAeTextFont >> maskFormOfCairoMask: anAssociation [
+	"The mask of one row of the Cairo masks view, as a Form a table cell can draw. A glyph that
+	 inks nothing is held in the atlas as nil, and one transparent pixel is what a row shows for
+	 it."
+
+	^ anAssociation value
+		  ifNil: [ Form extent: 1 @ 1 depth: 32 ]
+		  ifNotNil: [ :mask | mask surface asForm ]
+]
+
+{ #category : 'inspector' }
+VGAeTextFont >> offsetTextOfCairoMask: anAssociation [
+	"The offset of one row of the Cairo masks view, blank where there is no mask."
+
+	^ anAssociation value
+		  ifNil: [ '' ]
+		  ifNotNil: [ :mask | mask offset printString ]
 ]
 
 { #category : 'text sites' }

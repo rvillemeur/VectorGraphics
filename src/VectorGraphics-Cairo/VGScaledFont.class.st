@@ -20,7 +20,6 @@ Class {
 		'fontExtents',
 		'outlines',
 		'atlas',
-		'cairoMaskAtlas',
 		'aeTextFont'
 	],
 	#category : 'VectorGraphics-Cairo-Text',
