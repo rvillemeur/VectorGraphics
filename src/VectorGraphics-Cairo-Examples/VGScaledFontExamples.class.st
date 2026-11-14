@@ -73,21 +73,6 @@ VGScaledFontExamples class >> fontDirectory [
 	^ '/usr/share/fonts' asFileReference
 ]
 
-{ #category : 'examples' }
-VGScaledFontExamples class >> fontExtentsThroughAnAlexandrieContext [
-	<sampleInstance>
-	"The font extents site of unit 4.5: the five numbers a text backend lays lines out with -
-	 ascent, descent, line height and the widest advance the face allows - read back from the
-	 record Alexandrie owns, filled by our own font rather than by Cairo. They are the numbers
-	 the font answers, turned into the C doubles the record holds."
-
-	| font context |
-	font := self scaledFontAtAReadableSize.
-	context := (AeCairoImageSurface extent: 20 @ 20) newContext.
-	context scaledFont: font.
-	^ context fontExtents
-]
-
 { #category : 'fixture' }
 VGScaledFontExamples class >> fontFace [
 	"A font face over the first candidate system font, which is what every example here reads."
@@ -135,23 +120,6 @@ VGScaledFontExamples class >> glyphMaskOfOneLetter [
 		moveTo: 8 @ 48;
 		showText: 'a'.
 	^ font atlas masks values detect: [ :each | each notNil ]
-]
-
-{ #category : 'examples' }
-VGScaledFontExamples class >> glyphsPathOfARunOnACairoContext [
-	<sampleInstance>
-	"The path site of unit 4.4: a run laid out with one of our fonts, appended to the path of a
-	 context Alexandrie made, as our own outlines. The context answers its current path, and
-	 the surface behind it has nothing drawn on it: appending a path inks nothing."
-
-	| font context |
-	font := self scaledFontAtAReadableSize.
-	context := (AeCairoImageSurface extent: 120 @ 40) newContext.
-	context
-		translateBy: 6 @ 28;
-		scaledFont: font;
-		appendGlyphsPath: (font glyphArrayForString: self exampleRun).
-	^ context
 ]
 
 { #category : 'examples' }

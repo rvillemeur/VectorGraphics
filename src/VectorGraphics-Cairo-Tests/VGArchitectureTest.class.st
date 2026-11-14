@@ -637,6 +637,31 @@ VGArchitectureTest >> testNoMethodOfThisProjectExtendsANumberClass [
 ]
 
 { #category : 'tests' }
+VGArchitectureTest >> testNoMethodOfThisProjectRedefinesAMethodOfAnotherProject [
+	"An extension may add a selector to a class another project owns; it may not replace one a
+	 class already has. A class holds one method object per selector, so a redefinition takes
+	 that method away from the upstream package: the upstream checkout then reports the method
+	 as gone, and the next load of that package puts its own version back and takes ours away
+	 without a word. The upstream source on disk is the referee - a selector one of our packages
+	 owns must not appear as a method header in the Tonel file of the package defining the class."
+
+	| strays |
+	strays := Set new.
+	self class projectPackageNames do: [ :name |
+		(PackageOrganizer default packageNamed: name ifAbsent: [ nil ])
+			ifNotNil: [ :package |
+				package extensionMethods do: [ :method |
+					(self tonelFileDefiningTheClassOf: method) ifNotNil: [ :file |
+						(file contents includesSubstring:
+							 method methodClass name , ' >> ' , method selector , ' [')
+							ifTrue: [
+							strays add:
+								method methodClass name asString , ' >> '
+								, method selector asString ] ] ] ] ].
+	self assert: strays asSortedCollection asArray equals: #(  )
+]
+
+{ #category : 'tests' }
 VGArchitectureTest >> testNoPackageOfTheDefaultGroupDefinesAMethodOnTheStackItReplaces [
 	"Loading this project with no group named must not need Bloc or Alexandrie, so a package of
 	 the default group installs no method on a class of either: the extension would have no
@@ -927,4 +952,24 @@ VGArchitectureTest >> testVulkanStaysInsideItsAllowedDependencies [
 { #category : 'tests' }
 VGArchitectureTest >> testVulkanTestsStayInsideTheirAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Vulkan-Tests'
+]
+
+{ #category : 'private' }
+VGArchitectureTest >> tonelFileDefiningTheClassOf: aMethod [
+	"The Tonel file of the package that owns the class a method of ours extends, or nil when the
+	 class belongs to this project, or to a package no registered repository has on disk, as the
+	 image's own packages do."
+
+	| home repository |
+	home := aMethod methodClass instanceSide package name.
+	(self class projectPackageNames includes: home) ifTrue: [ ^ nil ].
+	repository := IceRepository registry
+		              detect: [ :each |
+			              each workingCopy packages anySatisfy: [ :package |
+				              package name = home ] ]
+		              ifNone: [ ^ nil ].
+	repository location ifNil: [ ^ nil ].
+	^ (repository location / 'src' / home
+	   / (aMethod methodClass instanceSide name , '.class.st')) ifNotNil: [ :file |
+		  file exists ifTrue: [ file ] ifFalse: [ nil ] ]
 ]

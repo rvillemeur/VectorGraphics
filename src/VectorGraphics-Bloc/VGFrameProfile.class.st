@@ -165,6 +165,8 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Cairo/Compositing' -> #compositing).
 			  ('VectorGraphics-Cairo/Surface' -> #pixelAccess).
 			  ('VectorGraphics-Cairo/Text' -> #text).
+			  ('VectorGraphics-Bloc/Fonts' -> #text).
+			  ('VectorGraphics-Bloc/Text' -> #text).
 			  ('VectorGraphics-TrueType/Fonts' -> #text).
 			  ('VectorGraphics-TrueType/Glyphs' -> #text).
 			  ('VectorGraphics-TrueType/Reading' -> #text).
@@ -178,6 +180,7 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Cairo/Reflection' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc/Exporters' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc-Examples/Uncategorized' -> #notInTheFrame).
+			  ('VectorGraphics-Bloc-Examples/Text' -> #notInTheFrame).
 			  ('VectorGraphics-Cairo-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics-Vulkan/Budget' -> #notInTheFrame).
 			  ('VectorGraphics-Vulkan-Examples/Examples' -> #notInTheFrame).

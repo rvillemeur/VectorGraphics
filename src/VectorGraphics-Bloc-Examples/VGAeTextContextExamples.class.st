@@ -27,6 +27,38 @@ VGAeTextContextExamples class >> exampleRun [
 	^ 'Hamburg ef'
 ]
 
+{ #category : 'examples' }
+VGAeTextContextExamples class >> fontExtentsFilledIntoAnAlexandrieRecord [
+	<sampleInstance>
+	"The font extents site of unit 4.5: the five numbers a text backend lays lines out with -
+	 ascent, descent, line height and the widest advance the face allows - read back from the
+	 record Alexandrie owns, filled by our own font rather than by Cairo. They are the numbers
+	 the font answers, turned into the C doubles the record holds."
+
+	| context |
+	context := VGAeTextContext newFor: (AeCairoImageSurface extent: 20 @ 20).
+	context scaledFont: self scaledFont.
+	^ context fontExtents
+]
+
+{ #category : 'examples' }
+VGAeTextContextExamples class >> glyphsPathOfARunOnACairoSurface [
+	<sampleInstance>
+	"The path site of unit 4.4: a run laid out with one of our fonts, appended to the path of a
+	 context drawing on a surface Alexandrie made, as our own outlines. The context answers its
+	 current path, and the surface behind it has nothing drawn on it: appending a path inks
+	 nothing."
+
+	| font context |
+	font := self scaledFont.
+	context := VGAeTextContext newFor: (AeCairoImageSurface extent: 120 @ 40).
+	context
+		translateBy: 6 @ 28;
+		scaledFont: font;
+		appendGlyphsPath: (font glyphArrayForString: self exampleRun).
+	^ context
+]
+
 { #category : 'fixtures' }
 VGAeTextContextExamples class >> scaledFont [
 	"The bundled default face at a readable size, with the identity as the user to device
@@ -49,7 +81,7 @@ VGAeTextContextExamples class >> scaledFontWithAWarmCairoMaskAtlas [
 	| surface context font |
 	font := self scaledFont.
 	surface := AeCairoImageSurface extent: 360 @ 80.
-	context := surface newContext.
+	context := VGAeTextContext newFor: surface.
 	context
 		translateByX: 12 y: 56;
 		sourceColorR: 0.1 g: 0.1 b: 0.35 a: 1.0;
@@ -71,7 +103,7 @@ VGAeTextContextExamples class >> textRunDrawnThroughRealCairo [
 	| surface context font |
 	font := self scaledFont.
 	surface := AeCairoImageSurface extent: 360 @ 80.
-	context := surface newContext.
+	context := VGAeTextContext newFor: surface.
 	context
 		translateByX: 12 y: 56;
 		sourceColorR: 0.1 g: 0.1 b: 0.35 a: 1.0;

@@ -74,14 +74,14 @@ VGAeTextContextTest >> scaledFontOfTheFixture [
 
 { #category : 'tests' }
 VGAeTextContextTest >> testAFigureWithNoTextIsPixelForPixelWhatTheStockContextDraws [
-	"Substituting the context must change text and nothing else, so a figure of plain shapes has
-	 to come out of mine identical to the one the stock context draws."
+	"My context must change text and nothing else, so a figure of plain shapes has to come out
+	 of mine identical to the one the stock context draws."
 
 	| ours stock |
-	ours := self formOfTheFigureDrawnWith: [ :surface | surface newContext ].
+	ours := self formOfTheFigureDrawnWith: [ :surface |
+		        VGAeTextContext newFor: surface ].
 	stock := self formOfTheFigureDrawnWith: [ :surface |
 		         AeCairoContext newFor: surface ].
-
 	self deny: (stock bits allSatisfy: [ :each | each = 0 ]).
 	self assert: ours extent equals: stock extent.
 	self assert: ours bits asArray equals: stock bits asArray
@@ -97,7 +97,7 @@ VGAeTextContextTest >> testAGlyphRunDrawnThroughTheRealCairoInksInsideItsRunExte
 	| font surface context inkBox extents origin expected |
 	font := self scaledFontOfTheFixture.
 	surface := AeCairoImageSurface extent: 240 @ 60.
-	context := surface newContext.
+	context := VGAeTextContext newFor: surface.
 	origin := 10 @ 44.
 	context
 		translateBy: origin;
@@ -125,7 +125,7 @@ VGAeTextContextTest >> testARealCairoFontStillDrawsThroughCairoItself [
 
 	| surface context font inkBox |
 	surface := AeCairoImageSurface extent: 240 @ 60.
-	context := surface newContext.
+	context := VGAeTextContext newFor: surface.
 	context
 		translateByX: 10 y: 44;
 		sourceColorR: 0.0 g: 0.0 b: 0.0 a: 1.0;
@@ -156,7 +156,7 @@ VGAeTextContextTest >> testARunThatInksNothingAppendsNoSubPath [
 	| font surface context |
 	font := self scaledFontOfTheFixture.
 	surface := AeCairoImageSurface extent: 60 @ 30.
-	context := surface newContext.
+	context := VGAeTextContext newFor: surface.
 	context
 		translateBy: 5 @ 20;
 		scaledFont: font;
@@ -165,17 +165,6 @@ VGAeTextContextTest >> testARunThatInksNothingAppendsNoSubPath [
 		assert: context pathExtentsInUserSpace
 		equals: (0 @ 0 corner: 0 @ 0).
 	self deny: context hasCurrentPoint
-]
-
-{ #category : 'tests' }
-VGAeTextContextTest >> testEverySurfaceAnswersTheContextThatKnowsOurFonts [
-	"Decision 7 of the plan: one substitution site, AeCairoSurface >> newContext, which covers
-	 window, composition layers, shadows, exporters and offscreen at once."
-
-	| surface |
-	surface := AeCairoImageSurface extent: 10 @ 10.
-
-	self assert: surface newContext class equals: VGAeTextContext
 ]
 
 { #category : 'tests' }
@@ -190,7 +179,7 @@ VGAeTextContextTest >> testTheContextAnswersTheFontExtentsOfOurOwnFont [
 	| font surface context extents expected |
 	font := self scaledFontOfTheFixture.
 	surface := AeCairoImageSurface extent: 20 @ 20.
-	context := surface newContext.
+	context := VGAeTextContext newFor: surface.
 	context scaledFont: font.
 	extents := context fontExtents.
 	expected := font fontExtents.
@@ -215,7 +204,7 @@ VGAeTextContextTest >> testThePathOfARunEnclosesTheBoxItsExtentsReport [
 	| font surface context glyphs inked pathBox |
 	font := self scaledFontOfTheFixture.
 	surface := AeCairoImageSurface extent: 240 @ 60.
-	context := surface newContext.
+	context := VGAeTextContext newFor: surface.
 	glyphs := font glyphArrayForString: 'Hamburgefonstiv'.
 	context
 		translateBy: 10 @ 44;

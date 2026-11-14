@@ -76,14 +76,14 @@ VGCanvasExamples class >> fontFaceForTheFontManagersDefaultFace [
 { #category : 'examples' }
 VGCanvasExamples class >> metricsOfARunMeasuredThroughTheCanvas [
 	<sampleInstance>
-	"The measuring site of unit 4.3: a run laid out with one of our fonts, measured through
-	 Alexandrie's own canvas. The canvas asks the context it holds, the context asks the font,
+	"The measuring site of unit 4.3: a run laid out with one of our fonts, measured through the
+	 canvas of this project. The canvas asks the context it holds, the context asks the font,
 	 and the six numbers come back in the record the canvas owns. No FreeType face and no Cairo
 	 scaled font take part."
 
 	| font |
 	font := self scaledFontForTheDefaultFace.
-	^ (AeCanvas extent: 10 @ 10)
+	^ (VGCanvas extent: 10 @ 10)
 		  metricsFor: (font glyphArrayForString: 'Hi a')
 		  font: font
 ]
@@ -97,7 +97,7 @@ VGCanvasExamples class >> runPathFilledThroughTheCanvas [
 
 	| font canvas glyphs |
 	font := self scaledFontForTheDefaultFace.
-	canvas := AeCanvas extent: 120 @ 40.
+	canvas := VGCanvas extent: 120 @ 40.
 	glyphs := font glyphArrayForString: 'Hi a'.
 	canvas
 		pathTranslate: 6 @ 28;

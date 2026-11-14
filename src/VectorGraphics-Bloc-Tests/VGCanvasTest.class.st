@@ -110,7 +110,7 @@ VGCanvasTest >> testARadialGradientSourceIsOurOwnPattern [
 
 { #category : 'tests' }
 VGCanvasTest >> testARunMeasuredThroughTheCanvasCarriesOurOwnExtents [
-	"Unit 4.3 of the font plan, the measuring site. AeCanvas asks the context it holds for the
+	"Unit 4.3 of the font plan, the measuring site. The canvas asks the context it holds for the
 	 extents of a laid out run and reads six numbers back; a font of ours answers them from its
 	 own metrics, with no FreeType face and no Cairo scaled font in the way. The run holds a
 	 space, which inks nothing, so the inked box and the advance cannot agree by accident.
@@ -121,7 +121,7 @@ VGCanvasTest >> testARunMeasuredThroughTheCanvasCarriesOurOwnExtents [
 	font := self scaledFontOfTheFixture.
 	glyphs := font glyphArrayForString: 'a b'.
 	ours := font glyphExtentsOf: glyphs.
-	metrics := (AeCanvas extent: 10 @ 10) metricsFor: glyphs font: font.
+	metrics := (VGCanvas extent: 10 @ 10) metricsFor: glyphs font: font.
 	advances := glyphs inject: 0 @ 0 into: [ :sum :each |
 		            sum + (font glyphAdvanceOf: each index) ].
 	self assert: metrics bearingX closeTo: ours bearingX.
@@ -137,16 +137,16 @@ VGCanvasTest >> testARunMeasuredThroughTheCanvasCarriesOurOwnExtents [
 { #category : 'tests' }
 VGCanvasTest >> testARunPathAppendedThroughTheCanvasInksOurOwnOutlines [
 	"The site Bloc calls: BlTextBorderAttribute hands the canvas a path factory that sends
-	 #appendGlyphsPath:font:, and the figure drawn from it is the text as a shape. A canvas
-	 over an Alexandrie surface holds a VGAeTextContext, so the glyphs of one of our fonts
-	 reach the path as our own contours. Filling the figure has to ink inside the box our
-	 measuring reports and to fill it: one glyph out of fifteen would otherwise pass. A pixel of
-	 margin, because the rasteriser shades the pixels an edge crosses. The figure is a
-	 background with no border, which is the canvas asking for a plain fill of the path."
+	 #appendGlyphsPath:font:, and the figure drawn from it is the text as a shape. The canvas
+	 of this project holds a context of our own, so the glyphs of one of our fonts reach the
+	 path as our own contours. Filling the figure has to ink inside the box our measuring
+	 reports and to fill it: one glyph out of fifteen would otherwise pass. A pixel of margin,
+	 because the rasteriser shades the pixels an edge crosses. The figure is a background with
+	 no border, which is the canvas asking for a plain fill of the path."
 
 	| font canvas glyphs origin extents expected inkBox |
 	font := self scaledFontOfTheFixture.
-	canvas := AeCanvas extent: 240 @ 60.
+	canvas := VGCanvas extent: 240 @ 60.
 	glyphs := font glyphArrayForString: 'Hamburgefonstiv'.
 	origin := 10 @ 44.
 	canvas
