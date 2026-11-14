@@ -20,6 +20,19 @@ Class {
 	#tag : 'Text'
 }
 
+{ #category : 'private' }
+VGAeRendererTest >> exportSelectorsWithNoOverrideYet [
+	"The class-side export methods of `BARenderer` this route does not redefine. Their upstream
+	 bodies reach Alexandrie's own canvas — `newFormFrom:` through `aeAsForm`, `write:asPngTo:`
+	 through `BAExporter png` — and a `VGScaledFont` cannot be drawn through that canvas, so
+	 exporting an element that carries text is a stated hole of this route, not an oversight.
+	 `VGRenderer` covers both for the all-ours route; unit 5.3 of the font plan decides whether
+	 this one needs them. `testTheExportMethodsAreAStatedHoleOfThisRoute` fails as soon as one is
+	 covered."
+
+	^ #( #newFormFrom: #write:asPngTo: )
+]
+
 { #category : 'running' }
 VGAeRendererTest >> setUp [
 	"`BlHostRenderer class >> preferableClass` caches the renderer the whole image draws through,
@@ -120,6 +133,23 @@ VGAeRendererTest >> testMeasuringAParagraphWithoutAWindowUsesTheOffscreenOfThisR
 	paragraph := VGTextParagraphStub new.
 	VGAeRenderer offscreenMeasureTextParagraph: paragraph.
 	self assert: paragraph measurer canvas class equals: VGAeCanvas
+]
+
+{ #category : 'tests' }
+VGAeRendererTest >> testTheExportMethodsAreAStatedHoleOfThisRoute [
+	"Drawing a frame goes through our canvas, but exporting an element to a form or a PNG still
+	 goes through Alexandrie's, because this renderer inherits the two class-side export methods.
+	 The sister route redefines both. The selectors are listed, so the day one is covered the
+	 list has to change with it."
+
+	self exportSelectorsWithNoOverrideYet do: [ :each |
+		self assert: (BARenderer class includesSelector: each).
+		self assert: (VGRenderer class includesSelector: each).
+		self deny: (VGAeRenderer class includesSelector: each) ].
+	self
+		assertCollection: (VGRenderer class selectors reject: [ :each |
+				 VGAeRenderer class includesSelector: each ])
+		hasSameElements: self exportSelectorsWithNoOverrideYet
 ]
 
 { #category : 'tests' }
