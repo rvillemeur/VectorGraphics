@@ -2,8 +2,9 @@
 I hold the examples of `VGAeCanvas`, the canvas of the route where Cairo still draws the
 pixels and this project only supplies the fonts.
 
-One example per seam: a canvas over a small surface, whose Cairo context is a
-`VGAeTextContext`, and the scaled font that canvas answers for a face of our own font manager.
+One example per seam of that route: a canvas over a small surface, whose Cairo context is a
+`VGAeTextContext`, the scaled font that canvas answers for a face of our own font manager, and
+the one pixel offscreen that measures text through the same canvas before any window exists.
 
 One click opens an inspector on the object Bloc itself would be handed on that route.
 "
@@ -35,4 +36,16 @@ VGAeCanvasExamples class >> scaledFontForTheDefaultFace [
 	^ self canvasOnASmallSurface
 		  scaledFontForFace: VGFontFace default
 		  size: 17
+]
+
+{ #category : 'examples' }
+VGAeCanvasExamples class >> textMeasuringOffscreen [
+	<sampleInstance>
+	"The offscreen this route measures text with before a window exists: the same canvas, one
+	 pixel wide, built to answer scaled fonts and nothing else. Its Measuring tab names the
+	 canvas and the measurer it holds."
+
+	^ VGAeOffscreen new
+		  ensureReady;
+		  yourself
 ]

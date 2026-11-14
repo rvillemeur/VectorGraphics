@@ -27,34 +27,3 @@ VGOffscreen >> ensureReady [
 		                canvas: aeCanvas;
 		                yourself
 ]
-
-{ #category : 'inspector' }
-VGOffscreen >> inspectorMeasuring: aBuilder [
-	<inspectorPresentationOrder: 10 title: 'Measuring'>
-	"Text is measured before anything is drawn, and through a canvas of one pixel that exists only
-	 to answer scaled fonts. Both the canvas and the measurer have to be ours, and the fonts it
-	 has answered so far are counted rather than described."
-
-	^ aBuilder newTable
-		  items: {
-				  ('Canvas' -> aeCanvas class).
-				  ('Canvas is valid' -> (aeCanvas notNil and: [ aeCanvas isValid ])).
-				  ('Text measurer' -> textMeasurer class).
-				  ('Measurer canvas' -> (textMeasurer
-					    ifNil: [ nil ]
-					    ifNotNil: [ :measurer | measurer canvas class ])) };
-		  addColumn: (SpStringTableColumn
-				   title: 'Property'
-				   evaluated: [ :each | each key ]);
-		  addColumn: (SpStringTableColumn
-				   title: 'Value'
-				   evaluated: [ :each | each value printString ]);
-		  yourself
-]
-
-{ #category : 'inspector' }
-VGOffscreen >> inspectorMeasuringContext: aContext [
-	"An offscreen built but never made ready holds neither canvas nor measurer."
-
-	aContext active: aeCanvas notNil
-]
