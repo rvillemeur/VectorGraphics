@@ -8,10 +8,11 @@ build a surface, the two that build a gradient pattern, the one that builds the 
 surface of a shadow, and the one that builds a scaled font.
 
 The sixth is the awkward one. It names no Cairo class at all; it sends `newCairoFontFace` to the
-FreeType face Bloc hands over, so the Cairo call hides inside the face. That face carries a family
-name and a style name but no bytes, so `faceForFreeTypeFace:` matches it against the font manager's
-own entries to find the file or the memory it came from, and keeps one `VGFontFace` per family and
-style so that two scaled fonts of one family share a glyph cache.
+face Bloc hands over, so the Cairo call hides inside the face, and a face of ours answers itself.
+Unit 5.1 of the font plan moved that override up into `VGFontCanvas`, which I share with
+`VGAeCanvas`, and unit 5.2 took the bridge behind it away: the font manager posed for the image is
+ours, so the face arrives carrying its own bytes and there is nothing to match against a foreign
+font registry any more.
 
 My instance side holds no state of its own: everything I override reads the inherited instance
 variables, which is the point — the canvas stays Alexandrie's and only the objects change.
@@ -19,9 +20,6 @@ variables, which is the point — the canvas stays Alexandrie's and only the obj
 Class {
 	#name : 'VGCanvas',
 	#superclass : 'VGFontCanvas',
-	#classInstVars : [
-		'faceCache'
-	],
 	#category : 'VectorGraphics-Bloc-Backend',
 	#package : 'VectorGraphics-Bloc',
 	#tag : 'Backend'
@@ -33,28 +31,6 @@ VGCanvas class >> extent: aPoint [
 	 the backend of every canvas built by extent, including the one each exporter builds."
 
 	^ self newFor: (VGCairoImageSurface extent: aPoint)
-]
-
-{ #category : 'accessing' }
-VGCanvas class >> faceCache [
-	"One font face per family and style, so that two scaled fonts of one family share a glyph
-	 cache. The font manager has a cache of its own, but it is three entries deep and it holds
-	 FreeType faces, which are the thing we are replacing."
-
-	^ faceCache ifNil: [ faceCache := Dictionary new ]
-]
-
-{ #category : 'font bridge' }
-VGCanvas class >> faceForFreeTypeFace: anAeFTFace [
-	"Bloc hands the canvas a FreeType face, which carries a family name and a style name and no
-	 bytes. The face answers the resolution; the canvas adds the cache, so a family and style
-	 pair is read from the font manager once however many frames ask for it."
-
-	^ self faceCache
-		  at: {
-				  anAeFTFace familyName.
-				  anAeFTFace styleName }
-		  ifAbsentPut: [ VGFontFace newForFace: anAeFTFace ]
 ]
 
 { #category : 'form' }
@@ -93,21 +69,6 @@ VGCanvas class >> formOfElement: aBlElement [
 	^ aCanvas asForm
 ]
 
-{ #category : 'caching' }
-VGCanvas class >> resetFaceCache [
-	<script>
-	faceCache := nil
-]
-
-{ #category : 'API - text' }
-VGCanvas >> fontFaceFor: aFace [
-	"Bloc still hands this canvas a FreeType face, which carries a family name and a style name
-	 and no bytes, so the face of ours is found from the font manager's own entries and cached
-	 per family and style. Unit 5.2 of the font plan deletes this override with the bridge."
-
-	^ self class faceForFreeTypeFace: aFace
-]
-
 { #category : 'inspector' }
 VGCanvas >> inspectionOfSurface: aBuilder [
 	<inspectorPresentationOrder: 0 title: 'Surface'>
@@ -129,15 +90,6 @@ VGCanvas >> inspectionOfSurfaceContext: aContext [
 	"Nothing to show before a surface is posed: asForm would be asked of nil."
 
 	aContext active: cairoSurface notNil
-]
-
-{ #category : 'inspector' }
-VGCanvas >> inspectorBackendProperties [
-	"One row more than my superclass: the FreeType faces the bridge has cached. Unit 5.2 of the
-	 font plan deletes the bridge, and this override with it."
-
-	^ super inspectorBackendProperties , {
-		  ('Faces cached' -> self class faceCache size) }
 ]
 
 { #category : 'API - other' }

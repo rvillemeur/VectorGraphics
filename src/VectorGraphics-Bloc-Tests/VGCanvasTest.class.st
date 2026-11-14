@@ -58,35 +58,6 @@ VGCanvasTest >> scaledFontOfTheFixture [
 		  options: VGFontOptions new
 ]
 
-{ #category : 'tests - font bridge' }
-VGCanvasTest >> testAFaceBuiltFromAFreeTypeFaceReadsTheFontTheManagerHolds [
-	"A drawing that picks its font by family name holds a FreeType face and no canvas, so the
-	 resolution belongs to the face itself. It must read the bytes the manager registered under
-	 that family and style, or the replacement draws the right shapes in the wrong typeface."
-
-	| face entry ours |
-	face := AeFontManager globalInstance defaultFace.
-	entry := AeFontManager globalInstance faceEntries detect: [ :each |
-		         each familyName = face familyName and: [
-			         each styleName = face styleName ] ].
-	ours := VGFontFace newForFace: face.
-	self assert: ours bytes equals: entry bytes.
-	self assert: ours glyphCount equals: face numberOfGlyphs
-]
-
-{ #category : 'tests - font bridge' }
-VGCanvasTest >> testAFamilyTheFontManagerDoesNotKnowFallsBackToTheBundledFace [
-	"A face the manager cannot name has no bytes anywhere, and raising inside the renderer would
-	 lose the frame and with it the window. The bundled face is the stated fallback: wrong glyphs
-	 are recoverable, a broken render loop is not."
-
-	self
-		assert: (VGFontFace
-				 bytesForFamilyName: 'No Such Family At All'
-				 styleName: 'Regular')
-		equals: VGFontFace defaultBytes
-]
-
 { #category : 'tests - overrides' }
 VGCanvasTest >> testALinearGradientSourceIsOurOwnPattern [
 	"Bloc asks the canvas for a linear gradient by handing it offset to colour associations. The
@@ -177,26 +148,6 @@ VGCanvasTest >> testARunPathAppendedThroughTheCanvasInksOurOwnOutlines [
 	self assert: inkBox height >= (expected height - 3)
 ]
 
-{ #category : 'tests - font bridge' }
-VGCanvasTest >> testAScaledFontIsBuiltOnTheBytesOfTheFaceBlocAskedFor [
-	"Bloc asks the canvas for a scaled font by handing over a FreeType face and a size. The face is
-	 a handle into the library this project replaces, so the only way to honour the request is to
-	 find the bytes it was registered from and read them ourselves. The font matrix is the plain
-	 scale by the size, as Cairo builds it."
-
-	| canvas face font |
-	canvas := VGCanvas extent: 10 @ 10.
-	face := AeFontManager globalInstance defaultFace.
-	font := canvas scaledFontForFace: face size: 17.
-	self assert: font class equals: VGScaledFont.
-	self
-		assert: font fontFace bytes
-		equals: (VGFontFace
-				 bytesForFamilyName: face familyName
-				 styleName: face styleName).
-	self assert: font fontMatrix equals: (VGCairoMatrix newScalingByX: 17 y: 17)
-]
-
 { #category : 'tests - overrides' }
 VGCanvasTest >> testASurfaceForALogicalExtentCarriesTheDeviceScale [
 	"A canvas draws in points and its surface holds device pixels, so a canvas asked for a surface
@@ -239,22 +190,27 @@ VGCanvasTest >> testAnUnmodifiedCanvasAnswersOneOfOurScaledFontsForOneOfOurFaces
 		equals: (AeCairoMatrix newScalingByX: 17 y: 17)
 ]
 
-{ #category : 'tests - font bridge' }
-VGCanvasTest >> testOneFontFaceIsKeptPerFamilyAndStyle [
-	"The bundled face alone is nearly three hundred kilobytes of tables, so a face is parsed once
-	 and kept. Two canvases asking for one family therefore share a face, and with it a glyph
-	 cache, which is what makes a second text run cheap."
+{ #category : 'tests' }
+VGCanvasTest >> testNoMethodOfThisProjectRecoversTheBytesBehindAFreeTypeFace [
+	"A FreeType face carries a family name and a style name and no bytes, so every route from one
+	 to a face of ours had to look the two names up in a foreign font registry. Unit 5.2 of the
+	 font plan took that bridge away: the manager posed for the image is ours, so the face Bloc
+	 hands a canvas is already one of ours and there is nothing to recover. These six selectors
+	 are the bridge, and this project implements none of them any more. The scan is image-wide and
+	 then kept to our own packages, because upstream implements newForFace: too, on its own Cairo
+	 font face, and that one is not ours to delete."
 
-	| face first second |
-	VGCanvas resetFaceCache.
-	face := AeFontManager globalInstance defaultFace.
-	first := (VGCanvas extent: 10 @ 10) scaledFontForFace: face size: 10.
-	second := (VGCanvas extent: 10 @ 10) scaledFontForFace: face size: 20.
-	self assert: first fontFace identicalTo: second fontFace.
-	VGCanvas resetFaceCache.
-	self
-		deny: ((VGCanvas extent: 10 @ 10) scaledFontForFace: face size: 10) fontFace
-		identicalTo: first fontFace
+	| dead strays |
+	dead := #( #newForFace: #bytesForFamilyName:styleName:
+	           #faceForFreeTypeFace: #fontFaceFor: #faceCache #resetFaceCache ).
+	strays := dead flatCollect: [ :selector |
+		          (SystemNavigation default allImplementorsOf: selector)
+			          select: [ :each |
+				          each package name beginsWith:
+					          VGCairoReferenceScanner projectPackagePrefix ]
+			          thenCollect: [ :each |
+			          each methodClass name , ' >> ' , each selector ] ].
+	self assert: strays asSortedCollection asArray equals: #(  )
 ]
 
 { #category : 'tests' }
@@ -294,8 +250,9 @@ VGCanvasTest >> testOnlyTheOverriddenMethodsBuildACairoObject [
 VGCanvasTest >> testTheBackendViewIsOfferedByBothCanvasesAndCountsTheirScaledFonts [
 	"The Backend tab describes what a canvas draws with: the surface, the device scale, our font
 	 options and the scaled fonts it has cached. All four are the business of `VGFontCanvas`
-	 since unit 5.1, so both canvases offer the tab. Only `VGCanvas` runs the FreeType bridge, so
-	 only its table carries the row counting the faces that bridge cached."
+	 since unit 5.1, so both canvases offer the tab and both answer the same rows. `VGCanvas`
+	 carried one row more until unit 5.2, counting the faces the FreeType bridge had cached;
+	 the bridge is gone, so the override that appended that row is gone with it."
 
 	| builder |
 	builder := SpPresenterBuilder newApplication: SpApplication new.
@@ -314,10 +271,7 @@ VGCanvasTest >> testTheBackendViewIsOfferedByBothCanvasesAndCountsTheirScaledFon
 		self assert: (keys includes: 'Scaled fonts cached').
 		self
 			assert: (presenter items detect: [ :item | item key = 'Scaled fonts cached' ]) value
-			equals: 1.
-		self
-			assert: (keys includes: 'Faces cached')
-			equals: each = VGCanvas ]
+			equals: 1 ]
 ]
 
 { #category : 'tests' }
@@ -358,6 +312,24 @@ VGCanvasTest >> testTheScaledFontAnUnmodifiedCanvasAnswersMeasuresThroughAlexand
 	self assert: font options hintMetrics equals: AeCairoHintMetrics on.
 	self assert: font fontExtents ascent isInteger.
 	self assert: (font glyphAdvanceOf: 10) x isInteger
+]
+
+{ #category : 'tests' }
+VGCanvasTest >> testTheScaledFontCarriesTheVeryFaceBlocHandedTheCanvas [
+	"Bloc asks the canvas for a scaled font by handing over a face and a size. Until unit 5.2 of
+	 the font plan that face was a FreeType handle, which carries a family name and a style name
+	 and no bytes, so the canvas had to find the bytes it was registered from and read them back;
+	 the test that stood here asserted those recovered bytes. The manager posed for the image is
+	 ours now, so the face is already one of ours and the canvas passes it through untouched. The
+	 font matrix is the plain scale by the size, as Cairo builds it."
+
+	| canvas face font |
+	canvas := VGCanvas extent: 10 @ 10.
+	face := VGFontFace default.
+	font := canvas scaledFontForFace: face size: 17.
+	self assert: font class equals: VGScaledFont.
+	self assert: font fontFace identicalTo: face.
+	self assert: font fontMatrix equals: (VGCairoMatrix newScalingByX: 17 y: 17)
 ]
 
 { #category : 'tests' }

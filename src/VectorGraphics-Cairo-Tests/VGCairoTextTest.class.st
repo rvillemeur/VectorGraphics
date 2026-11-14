@@ -79,41 +79,6 @@ VGCairoTextTest >> fixtureFontFamilyName [
 ]
 
 { #category : 'helpers' }
-VGCairoTextTest >> fixtureFreeTypeFace [
-	"My fixture font as the font manager answers it: an AeFTFace, which carries a family name and
-	 a style name and no bytes at all. A drawing picks its font this way, so this is what the
-	 replacement is handed and has to resolve."
-
-	| manager |
-	manager := AeFontManager globalInstance.
-	^ manager
-		  detectFamilyName: self fixtureFontFamilyName
-		  slant: AeFontSlant normal
-		  weight: AeFontWeight normal
-		  stretch: AeFontStretch normal
-		  ifNone: [
-			  manager scanEmbeddedFonts.
-			  manager
-				  detectFamilyName: self fixtureFontFamilyName
-				  slant: AeFontSlant normal
-				  weight: AeFontWeight normal
-				  stretch: AeFontStretch normal
-				  ifNone: [ nil ] ]
-]
-
-{ #category : 'helpers' }
-VGCairoTextTest >> fixtureManagerEntryFor: anAeFTFace [
-	"The entry the font manager holds for that face. It is the entry, and not the face, that
-	 carries the bytes, which is why the replacement resolves a face through the manager."
-
-	^ AeFontManager globalInstance faceEntries
-		  detect: [ :each |
-			  each familyName = anAeFTFace familyName and: [
-				  each styleName = anAeFTFace styleName ] ]
-		  ifNone: [ nil ]
-]
-
-{ #category : 'helpers' }
 VGCairoTextTest >> fixtureScaledFontOfSize: aNumber hintMetrics: aSymbol [
 	"The fixture font at one size, with hinting of the metrics on or off. The user to device
 	 matrix is the identity, so user space and device space agree and a measured number is a
@@ -221,19 +186,6 @@ VGCairoTextTest >> testAFaceAnswersTheScaledFontTheClassSideConstructorBuilds [
 	self
 		assert: (fromTheFace textExtentsOf: 'Cairo in Pharo') advance
 		equals: (fromTheClass textExtentsOf: 'Cairo in Pharo') advance
-]
-
-{ #category : 'tests' }
-VGCairoTextTest >> testAFaceBuiltFromAFreeTypeFaceReadsTheFontTheManagerHolds [
-	"A drawing that picks its font by family name hands over an AeFTFace. The face of ours built
-	 from it must read the bytes the manager registered under that family and style, because
-	 otherwise the replacement draws the right shapes in the wrong typeface."
-
-	| freetypeFace ours |
-	freetypeFace := self fixtureFreeTypeFace.
-	ours := VGFontFace newForFace: freetypeFace.
-	self assert: ours bytes equals: (self fixtureManagerEntryFor: freetypeFace) bytes.
-	self assert: ours glyphCount equals: freetypeFace numberOfGlyphs
 ]
 
 { #category : 'tests' }

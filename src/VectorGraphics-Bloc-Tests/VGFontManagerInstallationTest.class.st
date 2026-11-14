@@ -44,6 +44,27 @@ VGFontManagerInstallationTest >> tearDown [
 ]
 
 { #category : 'tests' }
+VGFontManagerInstallationTest >> testAFamilyNobodyHoldsFallsBackOnTheDefaultFaceOfTheManagerPosed [
+	"A text names a family no manager holds, and a frame that raises inside the renderer loses the
+	 window, so the fallback has to be a face that can draw. BAFontConverter >> faceFor: asks the
+	 manager posed for the image and falls back on its default face, which is why installGlobally
+	 poses a manager whose default face is set. Until unit 5.2 of the font plan the fallback was
+	 made twice: a second time by VGFontFace class >> bytesForFamilyName:styleName:, which read
+	 the bundled font when the registry could not name the family. That bridge is gone, so this
+	 test is the one place the fallback is stated."
+
+	| font face |
+	VGFontManager installGlobally.
+	font := BlFont new
+		        familyName: 'No Such Family At All';
+		        yourself.
+	face := font asAeFTFace.
+	self assert: face class equals: VGFontFace.
+	self assert: face identicalTo: AeFontManager globalInstance defaultFace.
+	self deny: face bytes isEmpty
+]
+
+{ #category : 'tests' }
 VGFontManagerInstallationTest >> testAnImageThatInstalledNothingLeavesUpstreamsOwnManagerAlone [
 	"My startUp: runs in every image where this package is loaded, installed or not, because a
 	 session handler is registered once and cannot ask first. So it has to leave the slot alone

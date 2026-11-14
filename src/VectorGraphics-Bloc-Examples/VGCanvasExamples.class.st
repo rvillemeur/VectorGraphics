@@ -63,17 +63,6 @@ VGCanvasExamples class >> canvasOnASmallSurface [
 ]
 
 { #category : 'examples' }
-VGCanvasExamples class >> fontFaceForTheFontManagersDefaultFace [
-	<sampleInstance>
-	"The face of ours for the FreeType face the font manager answers. A FreeType face carries a
-	 family name and a style name and no bytes, so the face is built from the bytes the manager
-	 registered under those two names; this is the resolution a drawing uses when it holds no
-	 canvas."
-
-	^ VGFontFace newForFace: AeFontManager globalInstance defaultFace
-]
-
-{ #category : 'examples' }
 VGCanvasExamples class >> metricsOfARunMeasuredThroughTheCanvas [
 	<sampleInstance>
 	"The measuring site of unit 4.3: a run laid out with one of our fonts, measured through the
@@ -113,12 +102,11 @@ VGCanvasExamples class >> runPathFilledThroughTheCanvas [
 { #category : 'examples' }
 VGCanvasExamples class >> scaledFontAnUnmodifiedCanvasAnswers [
 	<sampleInstance>
-
 	"The scaled font Alexandrie's own canvas answers for a face of this project, with nothing
 	 overridden. The inherited scaledFontForFace:size: sends newCairoFontFace to the face, which
 	 answers itself, so the canvas builds a VGScaledFont without naming a class of either backend.
-	 Its companion scaledFontForTheDefaultFace shows the other half of the same seam: the FreeType
-	 face Bloc hands over today, resolved through VGCanvas."
+	 Its companion scaledFontForTheDefaultFace shows the same seam through VGCanvas, whose own
+	 scaledFontForFace:size: is the one that keeps a scaled font per face and size."
 
 	^ (AeCanvas extent: 10 @ 10)
 		  scaledFontForFace: VGFontFace default
@@ -128,11 +116,15 @@ VGCanvasExamples class >> scaledFontAnUnmodifiedCanvasAnswers [
 { #category : 'examples' }
 VGCanvasExamples class >> scaledFontForTheDefaultFace [
 	<sampleInstance>
-	"The scaled font the canvas answers for a FreeType face and a size, built from the bytes the
-	 font manager registered that face from, because the face itself is a handle into the library
-	 this project replaces."
+	"The scaled font the canvas answers for the face Bloc hands it with a size. The face is the
+	 default face of one of our font managers, which is what Bloc has to hand over since the
+	 manager posed for the image is ours: it carries its own bytes, so the canvas passes it
+	 straight to VGScaledFont and nothing is bridged. Until unit 5.2 of the font plan the face
+	 was a FreeType handle and this example showed the bytes being matched back out of the
+	 manager''s entries. The manager is built here rather than posed, because an example changes
+	 nothing in the image it runs in."
 
 	^ self canvasOnASmallSurface
-		  scaledFontForFace: AeFontManager globalInstance defaultFace
+		  scaledFontForFace: VGFontManager newWithDefaultFaces defaultFace
 		  size: 17
 ]

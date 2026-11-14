@@ -5,7 +5,7 @@ Bloc asks a canvas for a scaled font before it measures or draws any text, and t
 
 My two subclasses part on what draws the pixels, not on what reads the fonts: `VGCanvas` draws them with this project's rasteriser, `VGAeCanvas` leaves them to Cairo.
 
-I am abstract. The face Bloc hands over is the one thing my subclasses answer differently: `fontFaceFor:` is mine to ask and theirs to answer.
+I am abstract. The face Bloc hands over is already one of ours, because the font manager posed for the image is ours, so I hand it to the scaled font untouched. Until unit 5.2 of the font plan a subclass could be handed a FreeType face instead, and `fontFaceFor:` was mine to ask and theirs to answer; that was the last thing my subclasses parted on in the font path.
 "
 Class {
 	#name : 'VGFontCanvas',
@@ -144,15 +144,6 @@ VGFontCanvas class >> upstreamCairoRows [
 	^ rows
 ]
 
-{ #category : 'API - text' }
-VGFontCanvas >> fontFaceFor: aFace [
-	"The face of this project for the face Bloc handed the canvas. Mine is already one of ours,
-	 since the font manager that answered it is ours; a subclass that is still given a FreeType
-	 handle says here how it recovers the bytes behind it."
-
-	^ aFace
-]
-
 { #category : 'accessing' }
 VGFontCanvas >> fontOptions [
 	"`AeCanvas` holds its font options in an instance variable with no reader, and the failover
@@ -219,7 +210,12 @@ VGFontCanvas >> scaledFontForFace: aFace size: size [
 	 a Cairo class being named anywhere in the source.
 
 	 The inherited method also returns from inside the `ifAbsentPut:` block, so its cache never
-	 fills and every text run rebuilds its scaled font; the cache works here."
+	 fills and every text run rebuilds its scaled font; the cache works here.
+
+	 The face is used as it arrives. Until unit 5.2 of the font plan a subclass could be handed a
+	 FreeType face instead, and `fontFaceFor:` was where it said how it recovered the bytes
+	 behind one; the manager posed for the image is ours now, so what arrives is already one of
+	 our faces."
 
 	^ scaledFontCache
 		  at: {
@@ -227,7 +223,7 @@ VGFontCanvas >> scaledFontForFace: aFace size: size [
 				  size }
 		  ifAbsentPut: [
 			  VGScaledFont
-				  fontFace: (self fontFaceFor: aFace)
+				  fontFace: aFace
 				  fontMatrix: (VGCairoMatrix newScalingByX: size y: size)
 				  userToDeviceMatrix: deviceScaleMatrix
 				  options: fontOptions ]
