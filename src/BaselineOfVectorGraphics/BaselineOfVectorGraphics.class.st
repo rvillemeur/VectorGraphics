@@ -214,16 +214,20 @@ BaselineOfVectorGraphics >> declareRasteriserPackagesOn: spec [
 					   'VectorGraphics-Text-Examples' 'VectorGraphics-TrueType' ) ]
 ]
 
-{ #category : 'baselines' }
+{ #category : 'baseline' }
 BaselineOfVectorGraphics >> declareSupportPackagesOn: spec [
 	"The two packages that hold neither a layer nor a suite: the corpus every backend is
 	 compared against, and the harness that measures a frame through each of them. Both lived
 	 in a -Tests package until the review of 2026-11, which made an examples package depend
 	 on a test package; neither holds a TestCase, and each is a group of its own so that it
-	 loads with no suite in the image."
+	 loads with no suite in the image.
+	 The corpus names VectorGraphics-TrueType since unit 5.2 of the font plan: the experiments
+	 ported from Alexandrie read their font out of this project's own catalogue, where they
+	 read it out of the global FreeType font manager before."
+
 	spec
 		package: 'VectorGraphics-Conformance'
-		with: [ spec requires: #( 'VectorGraphics-Cairo' ) ];
+		with: [ spec requires: #( 'VectorGraphics-Cairo' 'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Benchmarks'
 		with: [
 			spec requires:

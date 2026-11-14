@@ -114,22 +114,75 @@ VGAlexandrieCorpus class >> experimentSelectors [
 ]
 
 { #category : 'ported copies' }
-VGAlexandrieCorpus class >> fontLifetimeSubstitutions [
-	"The rewrites a ported copy needs so that the picture it draws does not cost the image its
-	 life. FreeType destroys every face a library owns when the library goes, harfbuzz and Cairo
-	 each keep a C reference to a face they were handed and free it with FT_Done_Face, and nothing
-	 ties those lifetimes to the Smalltalk ones. A library built per call, or a font manager
-	 replaced and dropped, is therefore collected while a foreign font still points into it, and
-	 FT_Done_Face reads freed memory inside the finalisation process minutes after the drawing."
-	"Both rewrites keep an object for the session instead: one library for every case, and the
-	 manager a case leaves behind. The replacement is parenthesised so that it stands wherever
-	 the original expression stood."
+VGAlexandrieCorpus class >> fontLookupRewriteIndentedBy: aNumberOfTabs informing: aReceiverName [
+	"The rewrite that takes the font lookup of a ported copy off the global font manager of the
+	 image. Upstream replaces that manager, scans two sources into it, and asks it for a family
+	 by name and by three of Alexandrie's font category objects. The copy reads the same font
+	 file out of the same directory through this project's own catalogue instead: the picture is
+	 the same one, nothing is posed for the rest of the image, and no FreeType library is opened.
+	 Replacing the global manager was a hazard in itself, which this rewrite also removes: it
+	 dropped the manager a foreign font still pointed into, and FT_Done_Face then read freed
+	 memory inside the finalisation process minutes after the drawing.
+	 The catalogue is asked for a family and no style, which answers the plainest face of it —
+	 upright, normal weight, normal width — the face the three Alexandrie category objects name.
+	 The receiver of the inform: is the copy's own: one experiment is written on an instance of
+	 the experiment class and another on the class itself."
+
+	^ (self
+		   source: 'AeFontManager resetGlobalInstance.
+aManager := AeFontManager globalInstance.
+aManager
+	scanDirectory: AeFilesystemResources fontsDirectory;
+	scanEmbeddedFonts.
+
+aFace := aManager
+	         detectFamilyName: ''Cascadia Code''
+	         slant: AeFontSlant normal
+	         weight: AeFontWeight normal
+	         stretch: AeFontStretch normal
+	         ifNone: [
+	         ' , aReceiverName , ' inform: ''missing font'' ].'
+		   indentedBy: aNumberOfTabs)
+	  -> (self
+			   source: '"The font is read by this project''s own catalogue, out of the directory Alexandrie
+ scans: the same font file, so the picture is the same one. The manager posed for the whole
+ image is left alone."
+aManager := TTFontCatalogue new.
+aManager scanDirectory: AeFilesystemResources fontsDirectory.
+
+aFace := (aManager entryOfFamilyNamed: ''Cascadia Code'')
+	         ifNil: [ ' , aReceiverName , ' inform: ''missing font'' ]
+	         ifNotNil: [ :anEntry | VGFontFace newForBytes: anEntry bytes ].'
+			   indentedBy: aNumberOfTabs)
+]
+
+{ #category : 'ported copies' }
+VGAlexandrieCorpus class >> fontSubstitutions [
+	"The rewrites that take a ported copy off FreeType, so that the picture it draws is drawn with
+	 the fonts of this project and costs the image nothing. They are applied after the class names
+	 have been substituted, which is why the first two keys already say `VGFontFace`.
+	 An experiment picks its font in one of two ways. Two of them open a face on an embedded font
+	 class, which needs a FreeType library: the face of ours is read from the bytes that class
+	 carries, and no library is opened at all. Three of them replace the global font manager of the
+	 image and read a family out of it: the font reader of this project answers the same face out
+	 of the same file instead, and Cairo is handed a face of ours with no conversion.
+	 Two of those three then shape their text with HarfBuzz through a FreeType face, and one of
+	 the two asks that face for its glyph count. Each rewrite that spans whole lines is asked for
+	 twice, once at each depth the copies are written at.
+	 The last glyph count is this project's own name for it, and it is the count of the glyphs the
+	 face holds either way."
 
 	^ {
-		  ('AeFTLibrary newInitialized'
-		   -> 'VGAlexandrieFontLifetime freeTypeLibrary').
-		  ('AeFontManager globalInstance'
-		   -> '(VGAlexandrieFontLifetime retain: AeFontManager globalInstance)') }
+		  ('(VGFontFace newForFace: aFace)' -> 'aFace').
+		  ('VGFontFace newForFace:
+		            (AeSourceSansPro_Regular firstFaceUsing:
+			             AeFTLibrary newInitialized)'
+		   -> 'VGFontFace newForBytes: AeSourceSansPro_Regular fontContentsData').
+		  (self fontLookupRewriteIndentedBy: 1 informing: 'anAlexandrieCairoExperiment').
+		  (self fontLookupRewriteIndentedBy: 0 informing: 'self').
+		  (self shapingRewriteIndentedBy: 1).
+		  (self shapingRewriteIndentedBy: 0).
+		  ('aFace numberOfGlyphs' -> 'aFace glyphCount') }
 ]
 
 { #category : 'conformance' }
@@ -333,6 +386,49 @@ VGAlexandrieCorpus class >> regenerate [
 		(wanted includes: each) ifFalse: [ self portedClass class removeSelector: each ] ].
 	self cases do: [ :each | each compilePortedCopy ].
 	^ self portedClass class selectors size
+]
+
+{ #category : 'ported copies' }
+VGAlexandrieCorpus class >> shapingRewriteIndentedBy: aNumberOfTabs [
+	"The rewrite that shapes a ported copy's text with no FreeType face. Upstream sends
+	 AeHbBuffer >> cairoGlyphArrayForFace:size:, which sets the size on a FreeType face and
+	 builds the HarfBuzz font from it; a font face of this project is not one. HarfBuzz reads a
+	 font itself, from the address of the first byte, so the copy hands it a blob over the bytes
+	 of the face — which pin themselves first, because HarfBuzz keeps that address and reads
+	 through it long after the call returns.
+	 The scale is the pixel size times 64: a font built from a blob is unscaled, its scale being
+	 the units per em of its face, while AeHbBuffer >> cairoGlyphArray reads every advance and
+	 offset as 26.6 fixed point. TTFontCatalogueEntry >> newHbFontScaledTo: is where this
+	 project writes that rule up, and a copy here cannot send it: that method is filed in
+	 VectorGraphics-Bloc, and this package is loaded by the Cairo groups, which bring no Bloc
+	 package at all."
+
+	^ (self
+		   source: 'glyphs := buffer cairoGlyphArrayForFace: aFace size: fontHeight.'
+		   indentedBy: aNumberOfTabs)
+	  -> (self
+			   source: 'aFace bytes pinInMemory.
+buffer shapeWithFont: ((AeHbFont newForHbFace:
+		  (AeHbFace newForBlob: (AeHbBlob newFrom: aFace bytes) index: 0))
+		 scaleX: fontHeight * 64 y: fontHeight * 64;
+		 yourself).
+glyphs := buffer cairoGlyphArray.'
+			   indentedBy: aNumberOfTabs)
+]
+
+{ #category : 'ported copies' }
+VGAlexandrieCorpus class >> source: aString indentedBy: aNumberOfTabs [
+	"A piece of method source written at this depth: every line of it but an empty one gains that
+	 many tabs. The experiments are not all indented alike — textAllGlyphsInFontFace has an
+	 unindented body, the others are indented by one tab — so a rewrite that spans whole lines is
+	 asked for at the depth of the copy it has to match, and written here once."
+
+	| tabs |
+	tabs := String new: aNumberOfTabs withAll: Character tab.
+	^ (String with: Character cr) join: (aString lines collect: [ :each |
+			   each isEmpty
+				   ifTrue: [ each ]
+				   ifFalse: [ tabs , each ] ])
 ]
 
 { #category : 'tolerances' }

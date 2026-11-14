@@ -232,7 +232,7 @@ VGAlexandrieCase >> portedSource [
 	source := self experimentMethod sourceCode.
 	VGAlexandrieCorpus classNameMap do: [ :each |
 		source := source copyReplaceAll: each key with: each value ].
-	VGAlexandrieCorpus fontLifetimeSubstitutions do: [ :each |
+	VGAlexandrieCorpus fontSubstitutions do: [ :each |
 		source := source copyReplaceAll: each key with: each value ].
 	source := self isPortable
 		          ifTrue: [ self sourceWithTheExamplePragma: source ]

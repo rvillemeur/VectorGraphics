@@ -285,6 +285,32 @@ VGConformanceTest >> testTheComparisonPremultipliesTheStoredBytesAndNotAFraction
 ]
 
 { #category : 'tests' }
+VGConformanceTest >> testTheExperimentsPortedFromAlexandrieReadTheirFontWithNoFreeType [
+	"The experiments ported from `AlexandrieCairoExperiment` picked their font the way Alexandrie
+	 does: three of them reset the global font manager of the image and read a family out of it,
+	 two opened a FreeType face on an embedded font class, and all five handed the result to the
+	 bridge `VGFontFace class >> newForFace:`. They read a `TTFontCatalogue` of their own, or the
+	 bytes an embedded font class carries, since unit 5.2 of the font plan, so the port owes that
+	 bridge nothing and opens no FreeType library. Resetting the upstream global instance is
+	 looked for as well, because it takes the posed manager of the whole image down with it
+	 whatever the method then does with the face. `AeFontManager` is named here rather than
+	 `VGFontManager`, which no copy may name either: that rule belongs to `VGArchitectureTest`,
+	 since the Cairo groups load this package and bring no Bloc package."
+
+	| freeTypeNames freeTypeSelectors strays |
+	freeTypeNames := #( #AeFontManager #AeFTFace #AeFTLibrary ).
+	freeTypeSelectors := #( #freeTypeLibrary #newForFace: ).
+	strays := VGAlexandriePortedExperiments class methods select: [ :each |
+		          (each allLiterals anySatisfy: [ :literal |
+			           literal isVariableBinding and: [
+				           freeTypeNames includes: literal key ] ]) or: [
+			          each sendsAnySelectorOf: freeTypeSelectors asSet ] ].
+	self
+		assert: (strays collect: [ :each | each selector ]) asSortedCollection asArray
+		equals: #(  )
+]
+
+{ #category : 'tests' }
 VGConformanceTest >> testTheMeshCasesCoverEverySideAndFoldOfAPatch [
 	"Unit 1.12: the four shapes a patch can take, each in a case of its own, because what parts our
 	 raster from Cairo's differs between them. A patch with straight sides is bilinear colour over a

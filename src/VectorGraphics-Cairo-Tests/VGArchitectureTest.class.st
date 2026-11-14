@@ -118,7 +118,12 @@ VGArchitectureTest class >> allowedDependencies [
 			   the review of 2026-11, which made an examples package depend on a test package. The
 			   corpus names the backend it is compared against; the benchmarks name the corpus they
 			   measure and the backends they drive."
-			  'VectorGraphics-Conformance' -> #( 'VectorGraphics-Cairo' ).
+			  "The corpus names the font reader since unit 5.2 of the font plan: the experiments
+			   ported from Alexandrie read their font out of a TTFontCatalogue, where they read it
+			   out of the global FreeType font manager before. It names no Bloc class, because the
+			   Cairo groups load it and bring no Bloc package."
+			  'VectorGraphics-Conformance'
+			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-TrueType' ).
 			  'VectorGraphics-Benchmarks'
 			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Conformance'
 				    'VectorGraphics-Vulkan' ) }

@@ -772,9 +772,7 @@ VGAlexandriePortedExperiments class >> fillPaint1 [
 		stroke.
 
 	"some text in white blending in the background"
-	fontFace := VGFontFace newForFace:
-		            (AeSourceSansPro_Regular firstFaceUsing:
-			             VGAlexandrieFontLifetime freeTypeLibrary).
+	fontFace := VGFontFace newForBytes: AeSourceSansPro_Regular fontContentsData.
 	scaledFont := fontFace
 		              newScaledFontWithFontMatrix:
 		              (VGCairoMatrix newScalingBy: 30 asPoint)
@@ -847,9 +845,7 @@ VGAlexandriePortedExperiments class >> fillPaint2 [
 		stroke.
 
 	"some text in white blending in the background"
-	fontFace := VGFontFace newForFace:
-		            (AeSourceSansPro_Regular firstFaceUsing:
-			             VGAlexandrieFontLifetime freeTypeLibrary).
+	fontFace := VGFontFace newForBytes: AeSourceSansPro_Regular fontContentsData.
 	scaledFont := fontFace
 		              newScaledFontWithFontMatrix:
 		              (VGCairoMatrix newScalingBy: 30 asPoint)
@@ -2260,19 +2256,15 @@ VGAlexandriePortedExperiments class >> texWithHarfbuzzWithFontManager [
 	context translateBy: fontHeight / 2 @ 0.
 
 	"font definition"
-	AeFontManager resetGlobalInstance.
-	aManager := (VGAlexandrieFontLifetime retain: AeFontManager globalInstance).
-	aManager
-		scanDirectory: AeFilesystemResources fontsDirectory;
-		scanEmbeddedFonts.
+	"The font is read by this project's own catalogue, out of the directory Alexandrie
+	 scans: the same font file, so the picture is the same one. The manager posed for the whole
+	 image is left alone."
+	aManager := TTFontCatalogue new.
+	aManager scanDirectory: AeFilesystemResources fontsDirectory.
 
-	aFace := aManager
-		         detectFamilyName: 'Cascadia Code'
-		         slant: AeFontSlant normal
-		         weight: AeFontWeight normal
-		         stretch: AeFontStretch normal
-		         ifNone: [
-		         anAlexandrieCairoExperiment inform: 'missing font' ].
+	aFace := (aManager entryOfFamilyNamed: 'Cascadia Code')
+		         ifNil: [ anAlexandrieCairoExperiment inform: 'missing font' ]
+		         ifNotNil: [ :anEntry | VGFontFace newForBytes: anEntry bytes ].
 
 	fontOptions := VGFontOptions new
 		               antialias: VGCairoAntialias fast;
@@ -2281,7 +2273,7 @@ VGAlexandriePortedExperiments class >> texWithHarfbuzzWithFontManager [
 		               subpixelOrder: VGCairoSubpixelOrder default.
 
 	scaledFont := VGScaledFont
-		              fontFace: (VGFontFace newForFace: aFace)
+		              fontFace: aFace
 		              fontMatrix:
 		              (VGCairoMatrix newScalingByX: fontHeight y: fontHeight)
 		              userToDeviceMatrix: VGCairoMatrix newIdentity
@@ -2298,7 +2290,12 @@ VGAlexandriePortedExperiments class >> texWithHarfbuzzWithFontManager [
 		          flags: AeHbBufferFlags beginningOrEndingOfText;
 		          addString: text.
 
-	glyphs := buffer cairoGlyphArrayForFace: aFace size: fontHeight.
+	aFace bytes pinInMemory.
+	buffer shapeWithFont: ((AeHbFont newForHbFace:
+			  (AeHbFace newForBlob: (AeHbBlob newFrom: aFace bytes) index: 0))
+			 scaleX: fontHeight * 64 y: fontHeight * 64;
+			 yourself).
+	glyphs := buffer cairoGlyphArray.
 	"full stroke and fill paint"
 	context
 		translateBy: 0 @ (fontHeight * 1.1);
@@ -2342,22 +2339,18 @@ context
 context translateBy: fontHeight / 2 @ 0.
 
 "font definition"
-AeFontManager resetGlobalInstance.
-aManager := (VGAlexandrieFontLifetime retain: AeFontManager globalInstance).
-aManager
-	scanDirectory: AeFilesystemResources fontsDirectory;
-	scanEmbeddedFonts.
+"The font is read by this project's own catalogue, out of the directory Alexandrie
+ scans: the same font file, so the picture is the same one. The manager posed for the whole
+ image is left alone."
+aManager := TTFontCatalogue new.
+aManager scanDirectory: AeFilesystemResources fontsDirectory.
 
-aFace := aManager
-	         detectFamilyName: 'Cascadia Code'
-	         slant: AeFontSlant normal
-	         weight: AeFontWeight normal
-	         stretch: AeFontStretch normal
-	         ifNone: [
-	         self inform: 'missing font' ].
+aFace := (aManager entryOfFamilyNamed: 'Cascadia Code')
+	         ifNil: [ self inform: 'missing font' ]
+	         ifNotNil: [ :anEntry | VGFontFace newForBytes: anEntry bytes ].
 
 text := String new writeStream.
-33 to: aFace numberOfGlyphs do: [ :asciiValue |
+33 to: aFace glyphCount do: [ :asciiValue |
 	| character |
 	character := Character value: asciiValue.
 	text nextPut: character].
@@ -2370,7 +2363,7 @@ fontOptions := VGFontOptions new
 	               subpixelOrder: VGCairoSubpixelOrder default.
 
 scaledFont := VGScaledFont
-	              fontFace: (VGFontFace newForFace: aFace)
+	              fontFace: aFace
 	              fontMatrix:
 	              (VGCairoMatrix newScalingByX: fontHeight y: fontHeight)
 	              userToDeviceMatrix: VGCairoMatrix newIdentity
@@ -2387,7 +2380,12 @@ buffer := AeHbBuffer new
 	          flags: AeHbBufferFlags beginningOrEndingOfText;
 	          addString: text contents.
 
-glyphs := buffer cairoGlyphArrayForFace: aFace size: fontHeight.
+aFace bytes pinInMemory.
+buffer shapeWithFont: ((AeHbFont newForHbFace:
+		  (AeHbFace newForBlob: (AeHbBlob newFrom: aFace bytes) index: 0))
+		 scaleX: fontHeight * 64 y: fontHeight * 64;
+		 yourself).
+glyphs := buffer cairoGlyphArray.
 "full stroke and fill paint"
 context
 	translateBy: 0 @ (fontHeight * 1.1);
@@ -2419,19 +2417,15 @@ VGAlexandriePortedExperiments class >> textWithoutHarfbuzzWithFontManager [
 	context translateBy: fontHeight / 2 @ 0.
 
 	"font definition"
-	AeFontManager resetGlobalInstance.
-	aManager := (VGAlexandrieFontLifetime retain: AeFontManager globalInstance).
-	aManager
-		scanDirectory: AeFilesystemResources fontsDirectory;
-		scanEmbeddedFonts.
+	"The font is read by this project's own catalogue, out of the directory Alexandrie
+	 scans: the same font file, so the picture is the same one. The manager posed for the whole
+	 image is left alone."
+	aManager := TTFontCatalogue new.
+	aManager scanDirectory: AeFilesystemResources fontsDirectory.
 
-	aFace := aManager
-		         detectFamilyName: 'Cascadia Code'
-		         slant: AeFontSlant normal
-		         weight: AeFontWeight normal
-		         stretch: AeFontStretch normal
-		         ifNone: [
-		         anAlexandrieCairoExperiment inform: 'missing font' ].
+	aFace := (aManager entryOfFamilyNamed: 'Cascadia Code')
+		         ifNil: [ anAlexandrieCairoExperiment inform: 'missing font' ]
+		         ifNotNil: [ :anEntry | VGFontFace newForBytes: anEntry bytes ].
 
 	fontOptions := VGFontOptions new
 		               antialias: VGCairoAntialias fast;
@@ -2440,7 +2434,7 @@ VGAlexandriePortedExperiments class >> textWithoutHarfbuzzWithFontManager [
 		               subpixelOrder: VGCairoSubpixelOrder default.
 
 	scaledFont := VGScaledFont
-		              fontFace: (VGFontFace newForFace: aFace)
+		              fontFace: aFace
 		              fontMatrix:
 		              (VGCairoMatrix newScalingByX: fontHeight y: fontHeight)
 		              userToDeviceMatrix: VGCairoMatrix newIdentity
