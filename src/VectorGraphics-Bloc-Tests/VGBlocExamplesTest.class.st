@@ -18,6 +18,7 @@ Class {
 { #category : 'accessing' }
 VGBlocExamplesTest >> exampleHolders [
 	^ {
+		  VGAeCanvasExamples.
 		  VGAeTextContextExamples.
 		  VGAeTextFontExamples.
 		  VGCanvasExamples.

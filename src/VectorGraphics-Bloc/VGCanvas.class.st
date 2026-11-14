@@ -18,7 +18,7 @@ variables, which is the point — the canvas stays Alexandrie's and only the obj
 "
 Class {
 	#name : 'VGCanvas',
-	#superclass : 'AeCanvas',
+	#superclass : 'VGFontCanvas',
 	#classInstVars : [
 		'faceCache'
 	],
@@ -93,119 +93,19 @@ VGCanvas class >> formOfElement: aBlElement [
 	^ aCanvas asForm
 ]
 
-{ #category : 'accessing - quality' }
-VGCanvas class >> highQualityFontOptions [
-	"Hinted metrics and slight hinting, the four values `AeCanvas class >> initializeFontOptions`
-	 puts in its own high quality record. One record is shared, because the options are read and
-	 never changed."
-
-	^ VGFontOptions new
-		  antialias: #fast;
-		  hintMetrics: #on;
-		  hintStyle: #slight;
-		  yourself
-]
-
-{ #category : 'accessing - quality' }
-VGCanvas class >> highQualityTolerance [
-	"The flattening tolerance Alexandrie sets for a window drawn at scale one, in device pixels."
-
-	^ 0.2
-]
-
-{ #category : 'inspector' }
-VGCanvas class >> inspectorSeams: aBuilder [
-	<inspectorPresentationOrder: 10 title: 'Seams'>
-	"The whole seam between Bloc''s canvas and a backend, asked of the code rather than listed
-	 here; `seamRows` reads it."
-
-	^ aBuilder newTable
-		  items: self seamRows;
-		  addColumn: (SpStringTableColumn
-				   title: 'Selector'
-				   evaluated: [ :each | each key ]);
-		  addColumn: (SpStringTableColumn
-				   title: 'Cairo classes named upstream'
-				   evaluated: [ :each |
-					   ((each value collect: [ :class | class name ]) asSortedCollection: [
-						    :a :b | a <= b ]) asArray printString ]);
-		  addColumn: (SpStringTableColumn
-				   title: 'Overridden here'
-				   evaluated: [ :each |
-					   ((self includesSelector: each key) or: [
-						    self class includesSelector: each key ]) printString ]);
-		  yourself
-]
-
-{ #category : 'inspector' }
-VGCanvas class >> inspectorSeamsContext: aContext [
-	"The seam is a fact about this class and its superclass, so the tab belongs to the class that
-	 subclasses Bloc's own canvas and not to anything below it."
-
-	aContext active: self superclass = AeCanvas
-]
-
-{ #category : 'accessing - quality' }
-VGCanvas class >> lowQualityFontOptions [
-	"Hinting off, the four values `AeCanvas class >> initializeFontOptions` puts in its own low
-	 quality record."
-
-	^ VGFontOptions new
-		  antialias: #fast;
-		  hintMetrics: #off;
-		  hintStyle: #none;
-		  yourself
-]
-
-{ #category : 'accessing - quality' }
-VGCanvas class >> lowQualityTolerance [
-	"The flattening tolerance Alexandrie sets for a window drawn at a scale above one."
-
-	^ 0.5
-]
-
 { #category : 'caching' }
 VGCanvas class >> resetFaceCache [
 	<script>
 	faceCache := nil
 ]
 
-{ #category : 'reflection' }
-VGCanvas class >> seamRows [
-	"Every method of `AeCanvas` that names a class of the Cairo package, and every method of it
-	 this class overrides, as selector to named-classes associations sorted by selector. A creation
-	 method added upstream appears with nothing named against it, which is what a hole in the
-	 failover looks like."
+{ #category : 'API - text' }
+VGCanvas >> fontFaceFor: aFace [
+	"Bloc still hands this canvas a FreeType face, which carries a family name and a style name
+	 and no bytes, so the face of ours is found from the font manager's own entries and cached
+	 per family and style. Unit 5.2 of the font plan deletes this override with the bridge."
 
-	| scanner rows |
-	scanner := VGCairoReferenceScanner new.
-	rows := Dictionary new.
-	(AeCanvas methods , AeCanvas class methods) do: [ :each |
-		(scanner cairoClassesNamedBy: each) ifNotEmpty: [ :named |
-			rows at: each selector put: named ] ].
-	((self methods , self class methods) select: [ :each |
-		 (AeCanvas includesSelector: each selector) or: [
-			 AeCanvas class includesSelector: each selector ] ]) do: [ :each |
-		rows at: each selector ifAbsentPut: [ #(  ) ] ].
-	^ (rows associations asSortedCollection: [ :a :b | a key <= b key ])
-		  asOrderedCollection
-]
-
-{ #category : 'accessing' }
-VGCanvas >> fontOptions [
-	"`AeCanvas` holds its font options in an instance variable with no reader, and the failover
-	 has to be able to state that ours are never Cairo's record."
-
-	^ fontOptions
-]
-
-{ #category : 'initialization' }
-VGCanvas >> initialize [
-	"The inherited method leaves the font options nil until the canvas is prepared for a surface,
-	 and a scaled font can be asked for before that, when text is measured without a window."
-
-	super initialize.
-	fontOptions := self class highQualityFontOptions
+	^ self class faceForFreeTypeFace: aFace
 ]
 
 { #category : 'inspector' }
@@ -232,38 +132,12 @@ VGCanvas >> inspectionOfSurfaceContext: aContext [
 ]
 
 { #category : 'inspector' }
-VGCanvas >> inspectorBackend: aBuilder [
-	<inspectorPresentationOrder: 10 title: 'Backend'>
-	"What this canvas is drawing on and with, all of it ours: the surface, the device scale it
-	 carries, our own font options, and the two caches the font bridge fills. The caches are
-	 asked for their size, so a bridge that stopped caching shows here as a growing or an empty
-	 table."
+VGCanvas >> inspectorBackendProperties [
+	"One row more than my superclass: the FreeType faces the bridge has cached. Unit 5.2 of the
+	 font plan deletes the bridge, and this override with it."
 
-	^ aBuilder newTable
-		  items: {
-				  ('Surface' -> cairoSurface class).
-				  ('Surface extent' -> (cairoSurface
-					    ifNil: [ nil ]
-					    ifNotNil: [ :surface | surface extent ])).
-				  ('Device scale' -> self deviceScale).
-				  ('Font options' -> fontOptions).
-				  ('Scaled fonts cached' -> scaledFontCache size).
-				  ('Faces cached' -> self class faceCache size) };
-		  addColumn: (SpStringTableColumn
-				   title: 'Property'
-				   evaluated: [ :each | each key ]);
-		  addColumn: (SpStringTableColumn
-				   title: 'Value'
-				   evaluated: [ :each | each value printString ]);
-		  yourself
-]
-
-{ #category : 'inspector' }
-VGCanvas >> inspectorBackendContext: aContext [
-	"A canvas built without a surface holds no caches yet, and the device scale is read from the
-	 surface."
-
-	aContext active: cairoSurface notNil
+	^ super inspectorBackendProperties , {
+		  ('Faces cached' -> self class faceCache size) }
 ]
 
 { #category : 'API - other' }
@@ -298,50 +172,6 @@ VGCanvas >> newSurfaceWithGaussianShadow: extent width: width canvasDo: aBlock [
 		surface: alphaSurface;
 		applyRadius: width.
 	^ alphaSurface
-]
-
-{ #category : 'API - text' }
-VGCanvas >> scaledFontForFace: aFace size: size [
-	"Answer a `VGScaledFont` for the FreeType face and size Bloc asked for. The inherited method
-	 sends `newCairoFontFace` to the face, which is the one place where the backend is reached
-	 without a Cairo class being named anywhere in the source.
-	 The inherited method also returns from inside the `ifAbsentPut:` block, so its cache never
-	 fills and every text run rebuilds its scaled font; the cache works here."
-
-	^ scaledFontCache
-		  at: {
-				  aFace.
-				  size }
-		  ifAbsentPut: [
-			  VGScaledFont
-				  fontFace: (self class faceForFreeTypeFace: aFace)
-				  fontMatrix: (VGCairoMatrix newScalingByX: size y: size)
-				  userToDeviceMatrix: deviceScaleMatrix
-				  options: fontOptions ]
-]
-
-{ #category : 'initialization' }
-VGCanvas >> setHighQualityOptions [
-	"The inherited method assigns a shared `AeCairoFontOptions`, which is a Cairo object: reading
-	 any of its four fields is a foreign call into the library this project replaces. Our own
-	 record holds the same four values."
-
-	cairoContext
-		tolerance: self class highQualityTolerance;
-		antialias: #fast.
-	fontOptions := self class highQualityFontOptions
-]
-
-{ #category : 'initialization' }
-VGCanvas >> setLowQualityOptions [
-	"Set when the host window draws at a scale factor above one, where the extra samples would be
-	 thrown away by the downscale. The inherited method assigns a shared Cairo record; see
-	 `setHighQualityOptions`."
-
-	cairoContext
-		tolerance: self class lowQualityTolerance;
-		antialias: #fast.
-	fontOptions := self class lowQualityFontOptions
 ]
 
 { #category : 'API - source' }

@@ -34,6 +34,17 @@ VGCanvasTest >> inkBoxOf: aForm [
 	^ box origin corner: box corner + (1 @ 1)
 ]
 
+{ #category : 'running' }
+VGCanvasTest >> ourClassesOverride: aSelector from: aBehavior upTo: anUpstreamBehavior [
+	"Whether one of our own canvases on the stretch from `aBehavior` up to Alexandrie's, that one
+	 excluded, implements the selector. Since unit 5.1 the stretch is two classes: `VGCanvas`
+	 itself and the abstract `VGFontCanvas` it shares with `VGAeCanvas`, which holds the font
+	 methods. Where the override sits is a design decision; that it exists is the seam."
+
+	^ (aBehavior withAllSuperclasses copyUpTo: anUpstreamBehavior) anySatisfy: [ :each |
+		  each includesSelector: aSelector ]
+]
+
 { #category : 'fixture' }
 VGCanvasTest >> scaledFontOfTheFixture [
 	"Source Sans Pro regular at a readable size, with the identity as the user to device matrix,
@@ -250,7 +261,7 @@ VGCanvasTest >> testOneFontFaceIsKeptPerFamilyAndStyle [
 VGCanvasTest >> testOnlyTheOverriddenMethodsBuildACairoObject [
 	"`AeCanvas` names a Cairo class in fifteen methods. Nine of them name only an enumeration or a
 	 record of integers, which needs no replacement because nothing is called to read it. The
-	 other six build a Cairo object. Five are overridden here. The sixth,
+	 other six build a Cairo object. Five are overridden by our canvases. The sixth,
 	 `initializeFontOptions`, stores two shared records in class variables, and is answered by
 	 overriding the two methods that read them, so the record is never asked for a field. A
 	 seventh builder upstream would be a hole in the failover, so this test states the partition
@@ -269,8 +280,44 @@ VGCanvasTest >> testOnlyTheOverriddenMethodsBuildACairoObject [
 		hasSameElements: #( #extent: #newCairoSurfaceExtent: #setSourceLinearPatternStops:start:end:
 			 #setSourceRadialPatternStops:innerCenter:innerRadius:outerCenter:outerRadius:
 			 #newSurfaceWithGaussianShadow:width:canvasDo: #initializeFontOptions ) asSet.
-	self assert: (VGCanvas includesSelector: #setHighQualityOptions).
-	self assert: (VGCanvas includesSelector: #setLowQualityOptions)
+	self assert: (self
+			 ourClassesOverride: #setHighQualityOptions
+			 from: VGCanvas
+			 upTo: AeCanvas).
+	self assert: (self
+			 ourClassesOverride: #setLowQualityOptions
+			 from: VGCanvas
+			 upTo: AeCanvas)
+]
+
+{ #category : 'tests' }
+VGCanvasTest >> testTheBackendViewIsOfferedByBothCanvasesAndCountsTheirScaledFonts [
+	"The Backend tab describes what a canvas draws with: the surface, the device scale, our font
+	 options and the scaled fonts it has cached. All four are the business of `VGFontCanvas`
+	 since unit 5.1, so both canvases offer the tab. Only `VGCanvas` runs the FreeType bridge, so
+	 only its table carries the row counting the faces that bridge cached."
+
+	| builder |
+	builder := SpPresenterBuilder newApplication: SpApplication new.
+	{ VGCanvas. VGAeCanvas } do: [ :each |
+		| canvas presenter keys |
+		canvas := each extent: 1 @ 1.
+		canvas scaledFontForFace: VGFontFace default size: 17.
+		presenter := (StInspectionContext new
+			              inspectedObject: canvas;
+			              methodSelector: #inspectorBackend:;
+			              yourself) basicNewInspectionPresenter: builder.
+		self assert: presenter notNil.
+		presenter columns do: [ :column |
+			presenter items do: [ :item | column evaluation value: item ] ].
+		keys := presenter items collect: [ :item | item key ].
+		self assert: (keys includes: 'Scaled fonts cached').
+		self
+			assert: (presenter items detect: [ :item | item key = 'Scaled fonts cached' ]) value
+			equals: 1.
+		self
+			assert: (keys includes: 'Faces cached')
+			equals: each = VGCanvas ]
 ]
 
 { #category : 'tests' }
@@ -313,6 +360,34 @@ VGCanvasTest >> testTheScaledFontAnUnmodifiedCanvasAnswersMeasuresThroughAlexand
 	self assert: (font glyphAdvanceOf: 10) x isInteger
 ]
 
+{ #category : 'tests' }
+VGCanvasTest >> testTheSeamsViewOfEveryCanvasOfOursMarksThePulledUpFontMethodsAsOverridden [
+	"The Seams tab answers, per upstream selector, whether a canvas of ours replaces it. Unit 5.1
+	 moved the three font methods to `VGFontCanvas`, so a tab that only asked the class it was
+	 opened on would report the font seam as a hole on `VGCanvas` and would not be offered at all
+	 on `VGAeCanvas`, which does not descend from `VGCanvas`. `initializeFontOptions` is the one
+	 builder we deliberately leave upstream, so it stays marked as not overridden."
+
+	| builder |
+	builder := SpPresenterBuilder newApplication: SpApplication new.
+	{ VGFontCanvas. VGCanvas. VGAeCanvas } do: [ :each |
+		| presenter overriddenColumn rowOf |
+		presenter := (StInspectionContext new
+			              inspectedObject: each;
+			              methodSelector: #inspectorSeams:;
+			              yourself) basicNewInspectionPresenter: builder.
+		self assert: presenter notNil.
+		overriddenColumn := presenter columns third.
+		rowOf := [ :selector |
+		          presenter items detect: [ :row | row key = selector ] ].
+		self
+			assert: (overriddenColumn evaluation value: (rowOf value: #setHighQualityOptions))
+			equals: 'true'.
+		self
+			assert: (overriddenColumn evaluation value: (rowOf value: #initializeFontOptions))
+			equals: 'false' ]
+]
+
 { #category : 'tests - overrides' }
 VGCanvasTest >> testTheShadowSurfaceIsOurOwnBlurredAlphaSurface [
 	"A shadow is drawn once into an alpha surface, blurred, and then used as a mask. Two things
@@ -350,7 +425,8 @@ VGCanvasTest >> testTheUpstreamCreationSelectorsStillExist [
 	 `newCairoFontFace` to the FreeType face. The two quality setters assign a shared
 	 `AeCairoFontOptions`, whose four fields are foreign calls, so they are replaced rather than
 	 the record. An upstream rename has to be noticed here, and not in a window that silently
-	 draws nothing."
+	 draws nothing. The three font ones sit on `VGFontCanvas` since unit 5.1, so the override is
+	 looked for over the pair rather than on `VGCanvas` alone."
 
 	| classSide instanceSide |
 	classSide := #( #extent: ).
@@ -360,8 +436,14 @@ VGCanvasTest >> testTheUpstreamCreationSelectorsStillExist [
 	                   #setHighQualityOptions #setLowQualityOptions ).
 	classSide do: [ :each |
 		self assert: (AeCanvas class includesSelector: each).
-		self assert: (VGCanvas class includesSelector: each) ].
+		self assert: (self
+				 ourClassesOverride: each
+				 from: VGCanvas class
+				 upTo: AeCanvas class) ].
 	instanceSide do: [ :each |
 		self assert: (AeCanvas includesSelector: each).
-		self assert: (VGCanvas includesSelector: each) ]
+		self assert: (self
+				 ourClassesOverride: each
+				 from: VGCanvas
+				 upTo: AeCanvas) ]
 ]
