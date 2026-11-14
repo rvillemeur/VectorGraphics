@@ -11,11 +11,13 @@ BARenderer >> canvas [
 
 { #category : '*VectorGraphics-Bloc' }
 BARenderer >> inspectorRenderer: aBuilder [
+
 	<inspectorPresentationOrder: 10 title: 'Renderer'>
 	"An extension of this project, because the tab has to serve every renderer and ours are
 	 siblings under this class. What Bloc holds for a frame: the canvas it draws through, the
 	 text measurer layout reads, and the class the image would pick for the next space it opens,
-	 which is asked of Bloc rather than assumed. Each renderer reports its own."
+	 which is asked of Bloc rather than assumed. Each renderer reports its own. The scale factor
+	 is read from the slot because `BlHostRenderer` declares it without an accessor."
 
 	^ aBuilder newTable
 		  items: {

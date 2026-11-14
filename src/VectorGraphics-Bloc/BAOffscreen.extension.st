@@ -2,11 +2,14 @@ Extension { #name : 'BAOffscreen' }
 
 { #category : '*VectorGraphics-Bloc' }
 BAOffscreen >> inspectorMeasuring: aBuilder [
+
 	<inspectorPresentationOrder: 10 title: 'Measuring'>
 	"An extension of this project, because the tab has to serve every offscreen and the three of
 	 them are siblings under Alexandrie's. Text is measured before anything is drawn, and through
 	 a canvas of one pixel that exists only to answer scaled fonts. The canvas and the measurer
-	 are asked of the object, so each route reports its own."
+	 are asked of the object, so each route reports its own. Read from the slots and not through
+	 `canvas` and `textMeasurer`, which send `ensureReady`: an accessor here would build the
+	 measuring canvas of the object a reader is merely looking at."
 
 	^ aBuilder newTable
 		  items: {
