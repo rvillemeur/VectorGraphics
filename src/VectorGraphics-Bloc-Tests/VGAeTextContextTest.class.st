@@ -61,18 +61,6 @@ VGAeTextContextTest >> inkedPixelsOf: aForm [
 ]
 
 { #category : 'running' }
-VGAeTextContextTest >> receiverAndSelectorNotUnderstoodIn: aBlock [
-	"The class of the receiver and the selector of the message aBlock fails on, nil when it
-	 does not fail."
-
-	^ [
-	  aBlock value.
-	  nil ]
-		  on: MessageNotUnderstood
-		  do: [ :error | error receiver class -> error message selector ]
-]
-
-{ #category : 'running' }
 VGAeTextContextTest >> scaledFontOfTheFixture [
 	"Source Sans Pro regular at a size big enough that a glyph covers several pixels, with the
 	 identity as the user to device matrix, so a measured number is a pixel count."
@@ -191,6 +179,29 @@ VGAeTextContextTest >> testEverySurfaceAnswersTheContextThatKnowsOurFonts [
 ]
 
 { #category : 'tests' }
+VGAeTextContextTest >> testTheContextAnswersTheFontExtentsOfOurOwnFont [
+	"The font extents site. Alexandrie's context asks Cairo for the five numbers of the font it
+	 was posed; ours asks the font itself, which has no cairo_scaled_font_t to ask about. The
+	 numbers are the font's own, so the test compares against the font and not against figures
+	 copied out of hhea: those are pinned against live Cairo and FreeType in VGCairoTextTest.
+	 The record is five C doubles while our own metrics are exact fractions, so the comparison
+	 is against the double each one becomes on the way in."
+
+	| font surface context extents expected |
+	font := self scaledFontOfTheFixture.
+	surface := AeCairoImageSurface extent: 20 @ 20.
+	context := surface newContext.
+	context scaledFont: font.
+	extents := context fontExtents.
+	expected := font fontExtents.
+	self assert: extents ascent equals: expected ascent asFloat.
+	self assert: extents descent equals: expected descent asFloat.
+	self assert: extents height equals: expected height asFloat.
+	self assert: extents maxAdvanceX equals: expected maxAdvanceX asFloat.
+	self assert: extents maxAdvanceY equals: expected maxAdvanceY asFloat
+]
+
+{ #category : 'tests' }
 VGAeTextContextTest >> testThePathOfARunEnclosesTheBoxItsExtentsReport [
 	"The red of unit 4.4. The path appended for a run covers the box our own measuring reports
 	 for that run. Both boxes are built from the same points, the contour points of the glyphs
@@ -217,23 +228,4 @@ VGAeTextContextTest >> testThePathOfARunEnclosesTheBoxItsExtentsReport [
 	self assert: pathBox top closeTo: inked top precision: 0.0025.
 	self assert: pathBox right closeTo: inked right precision: 0.0025.
 	self assert: pathBox bottom closeTo: inked bottom precision: 0.0025
-]
-
-{ #category : 'tests' }
-VGAeTextContextTest >> testTheTextSitesTheLaterUnitsDeliverFailNamingOurOwnFontAndSelector [
-	"Font extents are unit 4.5 of the font plan. Until it lands, the site has to fail on our
-	 own class naming the method that is missing, and never reach the FFI call: marshalling a
-	 VGScaledFont into cairo_set_scaled_font dies far from the cause, on
-	 VGFontFace >> #tfPointerAddress. Measuring left this list with unit 4.3, pathing with
-	 unit 4.4."
-
-	| font surface context |
-	font := self scaledFontOfTheFixture.
-	surface := AeCairoImageSurface extent: 20 @ 20.
-	context := surface newContext.
-	context scaledFont: font.
-	self
-		assert:
-			(self receiverAndSelectorNotUnderstoodIn: [ context fontExtents ])
-		equals: VGScaledFont -> #fontExtentsInto:onAeContext:
 ]

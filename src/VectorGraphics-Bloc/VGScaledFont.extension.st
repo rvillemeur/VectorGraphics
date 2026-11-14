@@ -123,6 +123,15 @@ VGScaledFont >> extentTextOfCairoMask: anAssociation [
 ]
 
 { #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> fontExtentsInto: aFontExtents onAeContext: aContext [
+	"The font extents site: cairo_font_extents upstream, my own hhea numbers here. The numbers
+	 are in user space, as Cairo answers them, so the context's matrix takes no part and the
+	 argument is unused; it is kept because the five text sites dispatch the same way."
+
+	^ self fontExtents writeInto: aFontExtents
+]
+
+{ #category : '*VectorGraphics-Bloc' }
 VGScaledFont >> glyphExtentsOf: aGlyphArray size: aNumberOfGlyphs into: aTextExtents onAeContext: aContext [
 	"The measuring site: cairo_glyph_extents upstream, my own metrics here. The numbers are in
 	 user space, as Cairo answers them, so the context's matrix takes no part and the argument is
@@ -225,6 +234,56 @@ VGScaledFont >> inspectorGlyphPathContext: aContext [
 	 contour: the run would lay down an empty path and the image would have no box."
 
 	aContext active: self contoursOfTheInspectorSample notEmpty
+]
+
+{ #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> inspectorLineBox: aBuilder [
+	<inspectorPresentationOrder: 14 title: 'Line box'>
+	"Ascent, descent and line height are three numbers in the Metrics tab; here they are the
+	 lines a backend stacks text between, drawn around a word of my own glyphs at my own size."
+
+	^ aBuilder newImage
+		  image: self lineBoxFormOfTheInspectorSample;
+		  yourself
+]
+
+{ #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> inspectorLineBoxContext: aContext [
+	"Nothing to draw for a font whose sample run inks no contour, so the tab stays shut on one."
+
+	aContext active: self contoursOfTheInspectorSample notEmpty
+]
+
+{ #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> lineBoxFormOfTheInspectorSample [
+	"A word of my own glyphs at my own size, with the lines a text backend lays it out with
+	 drawn around it. The word is the contours the path site puts down, so the picture cannot
+	 drift from the route, and the lines are asked of my own font extents, which places them."
+
+	| extents contours margin baseline right surface context form |
+	extents := self fontExtents.
+	contours := self contoursOfTheInspectorSample.
+	margin := 8.
+	baseline := (margin @ (margin + extents ascent)) rounded.
+	right := (contours inject: extents maxAdvanceX into: [ :widest :contour |
+		          contour inject: widest into: [ :each :point | each max: point x ] ]).
+	surface := AeCairoImageSurface extent:
+		           ((margin * 2 + right)
+			            @ (margin * 2 + extents ascent
+				              + (extents descent max: extents height - extents ascent)))
+			           ceiling.
+	context := AeCairoContext newFor: surface.
+	context
+		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0;
+		paint;
+		translateBy: baseline;
+		sourceColorR: 0.0 g: 0.0 b: 0.0 a: 1.0.
+	contours do: [ :contour | self appendContour: contour toAeContext: context ].
+	context fill.
+	surface flush.
+	form := surface asForm.
+	extents drawLinesOn: form placing: [ :point | (point + baseline) rounded ].
+	^ form
 ]
 
 { #category : '*VectorGraphics-Bloc' }

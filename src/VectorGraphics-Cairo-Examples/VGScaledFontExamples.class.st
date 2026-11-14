@@ -73,6 +73,21 @@ VGScaledFontExamples class >> fontDirectory [
 	^ '/usr/share/fonts' asFileReference
 ]
 
+{ #category : 'examples' }
+VGScaledFontExamples class >> fontExtentsThroughAnAlexandrieContext [
+	<sampleInstance>
+	"The font extents site of unit 4.5: the five numbers a text backend lays lines out with -
+	 ascent, descent, line height and the widest advance the face allows - read back from the
+	 record Alexandrie owns, filled by our own font rather than by Cairo. They are the numbers
+	 the font answers, turned into the C doubles the record holds."
+
+	| font context |
+	font := self scaledFontAtAReadableSize.
+	context := (AeCairoImageSurface extent: 20 @ 20) newContext.
+	context scaledFont: font.
+	^ context fontExtents
+]
+
 { #category : 'fixture' }
 VGScaledFontExamples class >> fontFace [
 	"A font face over the first candidate system font, which is what every example here reads."

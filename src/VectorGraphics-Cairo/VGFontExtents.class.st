@@ -38,6 +38,33 @@ VGFontExtents >> descent: aNumber [
 	descent := aNumber
 ]
 
+{ #category : 'inspecting' }
+VGFontExtents >> drawLinesOn: aForm placing: aBlock [
+	"The lines my five numbers stand for, drawn across the image: the bottom of the line box in
+	 green one line height under the ascent, then the ascent and the descent in blue over it,
+	 then the baseline in grey, and the widest advance the face allows as a red segment running
+	 from the origin along the baseline. A face with no line gap puts the bottom of its line box
+	 exactly on its descent, so the blue lines are drawn short and over the green one: where the
+	 two meet, the green line is the part still showing to the right."
+
+	| baseline |
+	baseline := aBlock value: 0 @ 0.
+	{
+		(height - ascent -> (Color green darker -> 1)).
+		(ascent negated -> (Color blue -> 0.6)).
+		(descent -> (Color blue -> 0.6)).
+		(0 -> (Color lightGray -> 1)) } do: [ :each |
+		aForm
+			fill: (0 @ (aBlock value: 0 @ each key) y
+					 extent: (aForm width * each value value) rounded @ 1)
+			fillColor: each value key ].
+	aForm
+		fill:
+			(baseline x @ (baseline y + 2)
+				 extent: (aBlock value: maxAdvanceX @ 0) x - baseline x @ 1)
+		fillColor: Color red
+]
+
 { #category : 'accessing' }
 VGFontExtents >> height [
 	^ height
@@ -86,4 +113,19 @@ VGFontExtents >> printOn: aStream [
 		nextPutAll: ' maxAdvance: ';
 		print: self maxAdvance;
 		nextPut: $)
+]
+
+{ #category : 'converting' }
+VGFontExtents >> writeInto: aFontExtents [
+	"Copy my five numbers into the extents record a caller handed over. Cairo's font extents call
+	 writes into a record its caller owns and answers nothing, so both contexts fill one rather
+	 than return one. I name no class: anything that answers the five setters serves."
+
+	aFontExtents
+		ascent: ascent;
+		descent: descent;
+		height: height;
+		maxAdvanceX: maxAdvanceX;
+		maxAdvanceY: maxAdvanceY.
+	^ aFontExtents
 ]
