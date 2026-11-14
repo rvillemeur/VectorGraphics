@@ -19,6 +19,7 @@ Class {
 VGBlocExamplesTest >> exampleHolders [
 	^ {
 		  VGAeCanvasExamples.
+		  VGAeRendererExamples.
 		  VGAeTextContextExamples.
 		  VGAeTextFontExamples.
 		  VGCanvasExamples.

@@ -60,14 +60,6 @@ VGRenderer class >> write: aBlElement asPngTo: aFileReference [
 		  export
 ]
 
-{ #category : 'accessing' }
-VGRenderer >> canvas [
-	"The canvas of the current frame. A renderer builds one canvas and reuses it, giving it the
-	 surface of each damaged rectangle in turn."
-
-	^ aeCanvas
-]
-
 { #category : 'initialization' }
 VGRenderer >> initializeForHostSpace: aBlHostSpace [
 	"The inherited method builds the frame canvas by naming `AeCanvas` and takes its text measurer
@@ -80,39 +72,6 @@ VGRenderer >> initializeForHostSpace: aBlHostSpace [
 	session := Smalltalk session.
 	textMeasurer := VGOffscreen instance textMeasurer.
 	aeCanvas := VGCanvas newWithoutSurface
-]
-
-{ #category : 'inspector' }
-VGRenderer >> inspectorRenderer: aBuilder [
-	<inspectorPresentationOrder: 10 title: 'Renderer'>
-	"What Bloc holds when this project is the backend: our canvas for the frame, our text
-	 measurer for layout, and the class the image would pick for the next space it opens, which
-	 is asked of Bloc rather than assumed."
-
-	^ aBuilder newTable
-		  items: {
-				  ('Label' -> self class label).
-				  ('Canvas' -> self canvas class).
-				  ('Canvas is valid' -> self isValid).
-				  ('Text measurer canvas' -> (self textMeasurer
-					    ifNil: [ nil ]
-					    ifNotNil: [ :measurer | measurer canvas class ])).
-				  ('Scale factor' -> scaleFactor).
-				  ('Bloc would pick' -> BlHostRenderer preferableClass) };
-		  addColumn: (SpStringTableColumn
-				   title: 'Property'
-				   evaluated: [ :each | each key ]);
-		  addColumn: (SpStringTableColumn
-				   title: 'Value'
-				   evaluated: [ :each | each value printString ]);
-		  yourself
-]
-
-{ #category : 'inspector' }
-VGRenderer >> inspectorRendererContext: aContext [
-	"A renderer holds nothing until a host space has initialised it."
-
-	aContext active: aeCanvas notNil
 ]
 
 { #category : 'rendering' }
