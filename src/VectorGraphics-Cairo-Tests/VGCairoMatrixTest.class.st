@@ -106,6 +106,23 @@ VGCairoMatrixTest >> testInvertedUndoesTheTransformation [
 ]
 
 { #category : 'tests' }
+VGCairoMatrixTest >> testLinearPartDropsTheTranslationAndKeepsTheMapping [
+	"The part of a matrix a vector is mapped by: the same rotation, scale and shear, with the
+	 origin left where it is. It maps a vector exactly as the whole matrix maps the step
+	 between two points."
+
+	| matrix linear |
+	matrix := self rotatedAndShearedMatrix.
+	linear := matrix linearPart.
+	self assert: linear translationFactors equals: 0 @ 0.
+	self assert: linear scaleFactors equals: matrix scaleFactors.
+	self assert: linear shearFactors equals: matrix shearFactors.
+	self
+		assertPoint: (linear valueX: 3 y: 5)
+		isCloseTo: (matrix valueX: 3 y: 5) - (matrix valueX: 0 y: 0)
+]
+
+{ #category : 'tests' }
 VGCairoMatrixTest >> testMappedCornersMatchTheCairoMatrix [
 	"What the gate asks of a rotated and sheared shape, at the only level unit 1.2 can ask it: every
 	 corner of the rectangle lands where Cairo lands it. The shape itself arrives with unit 1.3."

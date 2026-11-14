@@ -377,10 +377,7 @@ VGAeTextFont >> showGlyphs: aGlyphsArray size: aNumberOfGlyphs onAeContext: aCon
 
 	| matrix linear |
 	matrix := aContext matrix asVGCairoMatrix.
-	linear := matrix copy
-		          x: 0;
-		          y: 0;
-		          yourself.
+	linear := matrix linearPart.
 	aContext saveState.
 	aContext setIdentityMatrix.
 	(scaledFont glyphsOf: aGlyphsArray size: aNumberOfGlyphs) do: [ :glyph |

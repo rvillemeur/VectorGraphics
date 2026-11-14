@@ -251,6 +251,18 @@ VGCairoMatrix >> isInvertible [
 	^ (det isFloat and: [ det isNaN or: [ det isInfinite ] ]) not
 ]
 
+{ #category : 'accessing' }
+VGCairoMatrix >> linearPart [
+	"My rotation, scale and shear with my translation dropped: the matrix a vector is mapped
+	 by, where a point is mapped by me whole. A glyph mask is rasterised under this part alone,
+	 because where the glyph sits is carried by the blit and not by the outline."
+
+	^ self copy
+		  x: 0;
+		  y: 0;
+		  yourself
+]
+
 { #category : 'inspecting' }
 VGCairoMatrix >> mappingDescription [
 	"Where I send the corners of the unit square and the two axis tips, and where an inverse of me
