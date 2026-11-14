@@ -490,24 +490,6 @@ VGCairoTextTest >> testEveryCairoFontEnumerationAnswersTheNamesTheOptionsKnow [
 ]
 
 { #category : 'tests - font lifetime' }
-VGCairoTextTest >> testEveryFaceHandedToHarfbuzzIsKeptForTheSession [
-	"hb_ft_font_create_referenced keeps the FreeType face alive at the C level and frees it with
-	 FT_Done_Face when the harfbuzz font is collected, and the face it was handed belongs to a
-	 font manager this project replaces whenever it draws one of these cases. So a method that
-	 hands a face to harfbuzz keeps the manager, and with it the library and the face, for the
-	 session; the rule is read off the code so a new case cannot forget it."
-
-	| callers |
-	callers := self methodsOfThisProjectSending: #cairoGlyphArrayForFace:size:.
-	self deny: callers isEmpty.
-	callers do: [ :each |
-		self
-			assert: (each sendsSelector: #retain:)
-			description: each methodClass name , ' >> ' , each selector
-				, ' hands a face to harfbuzz without keeping it' ]
-]
-
-{ #category : 'tests - font lifetime' }
 VGCairoTextTest >> testEveryInspectorViewOfTheFontKeeperBuildsThroughThePresenterBuilder [
 	"Both tabs of the keeper, built the way the inspector builds them: through
 	 StInspectionContext, which hands the method a presenter builder and refuses a view that
@@ -544,6 +526,26 @@ VGCairoTextTest >> testHintedMetricsAreRoundedTheWayFreetypeRoundsThem [
 	self assert: atSixteen ascent equals: 16.
 	self assert: atSixteen descent equals: 5.
 	self assert: atSixteen height equals: 20
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testNoMethodHandsAFreeTypeFaceToHarfbuzz [
+	"hb_ft_font_create_referenced keeps the FreeType face alive at the C level and frees it with
+	 FT_Done_Face when the harfbuzz font is collected, from the finalisation process, which has
+	 taken the image down minutes after a drawing. AeHbBuffer >> cairoGlyphArrayForFace:size: is
+	 the call that opens that door, so no method of this project sends it: the project shapes from
+	 a harfbuzz blob over the bytes of a face instead, the way
+	 TTFontCatalogueEntry >> newHbFontScaledTo: does. Until unit 5.2 of the font plan the rule
+	 read the other way, that a sender of it keeps the face for the session; that unit took the
+	 last two senders away, the experiments ported from Alexandrie, so the rule is now that there
+	 are none."
+
+	| senders |
+	senders := self methodsOfThisProjectSending: #cairoGlyphArrayForFace:size:.
+	self
+		assert: (senders collect: [ :each |
+				 each methodClass name , ' >> ' , each selector ]) asSortedCollection asArray
+		equals: #(  )
 ]
 
 { #category : 'tests - font lifetime' }
