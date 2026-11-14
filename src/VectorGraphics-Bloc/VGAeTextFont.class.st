@@ -45,6 +45,15 @@ VGAeTextFont >> appendContour: aContour toAeContext: aContext [
 	aContext closePath
 ]
 
+{ #category : 'private' }
+VGAeTextFont >> appendContours: aContourCollection toAeContext: aContext [
+	"Every contour of a set, appended in the order they came. The set is a glyph's outline, or
+	 the outlines of a whole run already placed; either way each contour closes on its own."
+
+	aContourCollection do: [ :contour |
+		self appendContour: contour toAeContext: aContext ]
+]
+
 { #category : 'text sites' }
 VGAeTextFont >> appendPathOfGlyphs: aGlyphArray length: aNumberOfGlyphs onAeContext: aContext [
 	"The path site: cairo_glyph_path upstream, the font's own outlines here. A glyph is
@@ -54,10 +63,11 @@ VGAeTextFont >> appendPathOfGlyphs: aGlyphArray length: aNumberOfGlyphs onAeCont
 	 stroked under a matrix would carry pixels of the matrix in its shape."
 
 	(scaledFont glyphsOf: aGlyphArray size: aNumberOfGlyphs) do: [ :glyph |
-		(scaledFont
-			 userSpaceContoursOfGlyphAt: glyph index
-			 at: glyph x @ glyph y) do: [ :contour |
-			self appendContour: contour toAeContext: aContext ] ]
+		self
+			appendContours: (scaledFont
+					 userSpaceContoursOfGlyphAt: glyph index
+					 at: glyph x @ glyph y)
+			toAeContext: aContext ]
 ]
 
 { #category : 'masks' }
@@ -125,8 +135,7 @@ VGAeTextFont >> cairoMaskSurfaceOfContours: aContourCollection extent: anExtent 
 		antialias: aContext antialias;
 		useFillRuleWinding;
 		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
-	aContourCollection do: [ :contour |
-		self appendContour: contour toAeContext: maskContext ].
+	self appendContours: aContourCollection toAeContext: maskContext.
 	maskContext fill.
 	maskSurface flush.
 	^ maskSurface
@@ -188,8 +197,7 @@ VGAeTextFont >> glyphPathFormOfContours: aContourCollection [
 		translateBy: box origin negated;
 		sourceColorR: 0.0 g: 0.0 b: 0.0 a: 1.0;
 		strokeSize: 1.
-	aContourCollection do: [ :contour |
-		self appendContour: contour toAeContext: context ].
+	self appendContours: aContourCollection toAeContext: context.
 	context stroke.
 	surface flush.
 	^ surface asForm
@@ -269,30 +277,49 @@ VGAeTextFont >> inspectorLineBoxContext: aContext [
 ]
 
 { #category : 'inspector' }
+VGAeTextFont >> inspectorLineBoxMargin [
+	"The white space the line box picture keeps around the run, in pixels, so that the lines
+	 the extents place are visible on every side of it."
+
+	^ 8
+]
+
+{ #category : 'inspector' }
+VGAeTextFont >> lineBoxExtentOfTheInspectorSample [
+	"The size of the line box picture: the sample run plus a margin on each side, and tall
+	 enough for everything the extents place — the ascent above the baseline, the descent
+	 below it, and the line height where it reaches further than the descent. The width is
+	 asked of the real box of the contours rather than measured again here, and never less
+	 than one advance, so a run that inks nothing still has a box to draw the lines in."
+
+	| extents margin |
+	extents := scaledFont fontExtents.
+	margin := self inspectorLineBoxMargin.
+	^ ((margin * 2
+	    + ((scaledFont wholePixelBoxOfContours: self contoursOfTheInspectorSample) right
+		     max: extents maxAdvanceX))
+	   @ (margin * 2 + extents ascent
+		    + (extents descent max: extents height - extents ascent))) ceiling
+]
+
+{ #category : 'inspector' }
 VGAeTextFont >> lineBoxFormOfTheInspectorSample [
 	"A word of my font's glyphs at its size, with the lines a text backend lays it out with
 	 drawn around it. The word is the contours the path site puts down, so the picture cannot
 	 drift from the route, and the lines are asked of the font's own extents, which places them."
 
-	| extents contours margin baseline right surface context form |
+	| margin baseline surface context form extents |
 	extents := scaledFont fontExtents.
-	contours := self contoursOfTheInspectorSample.
-	margin := 8.
+	margin := self inspectorLineBoxMargin.
 	baseline := (margin @ (margin + extents ascent)) rounded.
-	right := (contours inject: extents maxAdvanceX into: [ :widest :contour |
-		          contour inject: widest into: [ :each :point | each max: point x ] ]).
-	surface := AeCairoImageSurface extent:
-		           ((margin * 2 + right)
-			            @ (margin * 2 + extents ascent
-				              + (extents descent max: extents height - extents ascent)))
-			           ceiling.
+	surface := AeCairoImageSurface extent: self lineBoxExtentOfTheInspectorSample.
 	context := AeCairoContext newFor: surface.
 	context
 		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0;
 		paint;
 		translateBy: baseline;
 		sourceColorR: 0.0 g: 0.0 b: 0.0 a: 1.0.
-	contours do: [ :contour | self appendContour: contour toAeContext: context ].
+	self appendContours: self contoursOfTheInspectorSample toAeContext: context.
 	context fill.
 	surface flush.
 	form := surface asForm.
