@@ -1,17 +1,17 @@
 "
-I am the Cairo context Alexandrie builds for every surface, and I know this project's scaled fonts.
+I am a Cairo context that knows this project's scaled fonts.
 
-Cairo's own text calls take a `cairo_scaled_font_t`. A `VGScaledFont` has no such handle, so a text selector that reaches the FFI call with one of ours dies marshalling it. I take the decision out of the context: every text selector asks the scaled font it was given, and the font answers for itself. A `VGScaledFont` draws through its own glyph atlas; a real `AeCairoScaledFont` sends the call straight back to me, to the `…ThroughCairo:` method that holds what my superclass does, so an image with no font manager of ours draws exactly as before.
+Cairo's own text calls take a `cairo_scaled_font_t`. A `VGScaledFont` has no such handle, so a text selector that reaches the FFI call with one of ours dies marshalling it. I take the decision out of the context: the font posed on me is asked for its text adapter, and that adapter answers every text selector afterwards. One of our fonts answers a `VGAeTextFont`, which draws through its own masks and outlines; a real `AeCairoScaledFont` answers itself and sends the call straight back to me, to the `…ThroughCairo:` method that holds what my superclass does, so an image with no font manager of ours draws exactly as before.
 
-`ownScaledFont` holds the last scaled font of this project posed on me, which is what my glyph and extent selectors then work from. It is nil while a real Alexandrie font is posed: that route never reads it.
+`ownTextFont` holds the adapter of the last font of this project posed on me, which is what my glyph and extent selectors then work from. It is nil while a real Alexandrie font is posed: that route never reads it.
 
-I am substituted for my superclass at one site, the extension `AeCairoSurface >> newContext`, which covers windows, composition layers, shadows, exporters and offscreen surfaces at once.
+`VGCanvas` builds me for the surface it draws on. My superclass is left alone: substituting me for it at `AeCairoSurface >> newContext` was withdrawn in unit 4.6 of the font plan, because an extension that redefines an upstream method cannot leave that checkout clean.
 "
 Class {
 	#name : 'VGAeTextContext',
 	#superclass : 'AeCairoContext',
 	#instVars : [
-		'ownScaledFont'
+		'ownTextFont'
 	],
 	#category : 'VectorGraphics-Bloc-Text',
 	#package : 'VectorGraphics-Bloc',
@@ -34,7 +34,7 @@ VGAeTextContext class >> unownedNewFor: targetSurface [
 VGAeTextContext >> appendGlyphsPath: aGlyphsArray length: aNumberOfGlyphs [
 	"The path site, which unit 4.4 of the font plan answers from our own outlines."
 
-	^ self scaledFontToWorkFrom
+	^ self textFontToWorkFrom
 		  appendPathOfGlyphs: aGlyphsArray
 		  length: aNumberOfGlyphs
 		  onAeContext: self
@@ -58,7 +58,7 @@ VGAeTextContext >> fontExtentsThroughCairoInto: aFontExtents [
 VGAeTextContext >> getFontExtentsInto: aFontExtents [
 	"The font extents site, which unit 4.5 of the font plan answers from hhea."
 
-	^ self scaledFontToWorkFrom fontExtentsInto: aFontExtents onAeContext: self
+	^ self textFontToWorkFrom fontExtentsInto: aFontExtents onAeContext: self
 ]
 
 { #category : 'API - text' }
@@ -68,7 +68,7 @@ VGAeTextContext >> getGlyphExtentsOf: aGlyphArray size: aNumberOfGlyphs into: aT
 	 selector, which says what is missing; nothing reaches the FFI call with a font it cannot
 	 marshal."
 
-	^ self scaledFontToWorkFrom
+	^ self textFontToWorkFrom
 		  glyphExtentsOf: aGlyphArray
 		  size: aNumberOfGlyphs
 		  into: aTextExtents
@@ -86,18 +86,20 @@ VGAeTextContext >> glyphExtentsThroughCairoOf: aGlyphArray size: aNumberOfGlyphs
 ]
 
 { #category : 'accessing' }
-VGAeTextContext >> ownScaledFont [
-	"The scaled font of this project posed on me, nil while a real Alexandrie font is posed."
+VGAeTextContext >> ownTextFont [
+	"The adapter of one of our scaled fonts, posed on me, nil while a real Alexandrie font is
+	 posed."
 
-	^ ownScaledFont
+	^ ownTextFont
 ]
 
 { #category : 'accessing' }
-VGAeTextContext >> ownScaledFont: aScaledFont [
-	"Sent by a VGScaledFont posing itself on me. Cairo is told nothing: it has no handle for this
-	 font, and marshalling one into cairo_set_scaled_font is the very break this class removes."
+VGAeTextContext >> ownTextFont: aTextFont [
+	"Sent by a VGAeTextFont posing itself on me. Cairo is told nothing: it has no handle for the
+	 font behind that adapter, and marshalling one into cairo_set_scaled_font is the very break
+	 this class removes."
 
-	ownScaledFont := aScaledFont
+	ownTextFont := aTextFont
 ]
 
 { #category : 'text - through cairo' }
@@ -106,7 +108,7 @@ VGAeTextContext >> poseScaledFontThroughCairo: aScaledFont [
 	 than letting me ask what it is, and an extension method cannot send super for me, so every
 	 inherited text call has a method of its own on this side."
 
-	ownScaledFont := nil.
+	ownTextFont := nil.
 	^ super scaledFont: aScaledFont
 ]
 
@@ -120,19 +122,11 @@ VGAeTextContext >> scaledFont: aScaledFont [
 	^ aScaledFont aeTextFont poseOnAeContext: self
 ]
 
-{ #category : 'text' }
-VGAeTextContext >> scaledFontToWorkFrom [
-	"The font my text selectors ask: ours when one was posed, otherwise the one Cairo itself
-	 holds, which is what keeps an image with no font manager of ours on the stock route."
-
-	^ ownScaledFont ifNil: [ self scaledFont ]
-]
-
 { #category : 'API - text' }
 VGAeTextContext >> showGlyphs: aGlyphsArray size: aNumberOfGlyphs [
 	"The drawing site: cairo_show_glyphs upstream, one A8 mask a glyph here."
 
-	^ self scaledFontToWorkFrom
+	^ self textFontToWorkFrom
 		  showGlyphs: aGlyphsArray
 		  size: aNumberOfGlyphs
 		  onAeContext: self
@@ -143,4 +137,13 @@ VGAeTextContext >> showGlyphsThroughCairo: aGlyphsArray size: aNumberOfGlyphs [
 	"What my superclass does, cairo_show_glyphs."
 
 	^ super showGlyphs: aGlyphsArray size: aNumberOfGlyphs
+]
+
+{ #category : 'text' }
+VGAeTextContext >> textFontToWorkFrom [
+	"The font my text selectors ask: the adapter of one of ours when one was posed, otherwise
+	 the font Cairo itself holds, which is what keeps an image with no font manager of ours on
+	 the stock route."
+
+	^ ownTextFont ifNil: [ self scaledFont ]
 ]

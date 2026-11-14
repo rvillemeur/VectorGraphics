@@ -325,7 +325,7 @@ VGAeTextFont >> poseOnAeContext: aContext [
 	"Cairo is told nothing, since it has no handle for my font; the context remembers me and
 	 asks me for every text call that follows."
 
-	^ aContext ownScaledFont: self
+	^ aContext ownTextFont: self
 ]
 
 { #category : 'accessing' }

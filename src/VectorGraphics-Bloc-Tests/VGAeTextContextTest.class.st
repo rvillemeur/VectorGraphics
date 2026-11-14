@@ -1,9 +1,9 @@
 "
 I check the Cairo context that knows our scaled fonts.
 
-Alexandrie builds a context for every surface it draws on, and sends the text selectors of that context whatever scaled font the canvas carries. A `VGScaledFont` is not an `AeCairoScaledFont`, so a text selector that reaches the FFI call with ours dies marshalling it. `VGAeTextContext` is the context Alexandrie builds instead: it routes every text selector to the scaled font it is given, which answers for itself, and a real `AeCairoScaledFont` routes straight back to the stock implementation.
+Alexandrie builds a context for every surface it draws on, and sends the text selectors of that context whatever scaled font the canvas carries. A `VGScaledFont` is not an `AeCairoScaledFont`, so a text selector that reaches the FFI call with ours dies marshalling it. `VGAeTextContext` is the context our own canvas builds instead: it asks every font posed on it for its text adapter, routes every text selector to that adapter, and a real `AeCairoScaledFont`, which answers itself, routes straight back to the stock implementation.
 
-So I check two things: that a surface really answers one of ours, and that nothing else about drawing changed — a figure with no text in it is pixel for pixel what the stock context draws.
+So I check each of the five text sites through a context of mine, that a real Cairo font still draws through Cairo itself, and that nothing else about drawing changed — a figure with no text in it is pixel for pixel what the stock context draws.
 "
 Class {
 	#name : 'VGAeTextContextTest',
@@ -138,9 +138,8 @@ VGAeTextContextTest >> testARealCairoFontStillDrawsThroughCairoItself [
 		scaledFont: font;
 		showGlyphs: (font glyphArrayForString: 'Hamburgefonstiv').
 	surface flush.
-
 	inkBox := self inkBoxOf: surface asForm.
-	self assert: context ownScaledFont isNil.
+	self assert: context ownTextFont isNil.
 	self deny: inkBox isNil.
 	self assert: inkBox width > 100
 ]
