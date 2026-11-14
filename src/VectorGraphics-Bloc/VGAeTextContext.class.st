@@ -113,10 +113,11 @@ VGAeTextContext >> poseScaledFontThroughCairo: aScaledFont [
 { #category : 'API - text' }
 VGAeTextContext >> scaledFont: aScaledFont [
 	"The verb AeCanvas sends before it draws, measures or paths any text. Which font arrives
-	 decides the whole route, so the font answers for itself: one of ours remembers itself on me,
-	 a real AeCairoScaledFont goes to Cairo."
+	 decides the whole route, so the font answers for itself through its adapter: one of ours
+	 answers a VGAeTextFont, which remembers itself on me, a real AeCairoScaledFont answers
+	 itself and goes to Cairo."
 
-	^ aScaledFont poseOnAeContext: self
+	^ aScaledFont aeTextFont poseOnAeContext: self
 ]
 
 { #category : 'text' }

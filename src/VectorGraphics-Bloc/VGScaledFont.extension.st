@@ -1,6 +1,15 @@
 Extension { #name : 'VGScaledFont' }
 
 { #category : '*VectorGraphics-Bloc' }
+VGScaledFont >> aeTextFont [
+	"My adapter for the Alexandrie route, built on first use and kept: it holds the masks Cairo
+	 rasterised for my glyphs, and each context of a frame poses me again. This is the one
+	 selector of that package I answer; the five text verbs are the adapter's."
+
+	^ aeTextFont ifNil: [ aeTextFont := VGAeTextFont on: self ]
+]
+
+{ #category : '*VectorGraphics-Bloc' }
 VGScaledFont >> appendContour: aContour toAeContext: aContext [
 	"One contour, already placed, in whichever space the caller chose: device space for the
 	 mask of a glyph, user space for the path of a run. The points are the start point, then a
@@ -16,19 +25,6 @@ VGScaledFont >> appendContour: aContour toAeContext: aContext [
 		aContext quadraticCurveFromCurrentPoint: current via: via to: to.
 		current := to ].
 	aContext closePath
-]
-
-{ #category : '*VectorGraphics-Bloc' }
-VGScaledFont >> appendPathOfGlyphs: aGlyphArray length: aNumberOfGlyphs onAeContext: aContext [
-	"The path site: cairo_glyph_path upstream, my own outlines here. A glyph is positioned in
-	 user space and the contours go on in user space too, so the context's matrix takes part
-	 when the path is filled or stroked, as it does for any other path the caller builds. The
-	 mask route snaps a glyph to the device grid; this one must not, or a path stroked under a
-	 matrix would carry pixels of the matrix in its shape."
-
-	(self glyphsOf: aGlyphArray size: aNumberOfGlyphs) do: [ :glyph |
-		(self userSpaceContoursOfGlyphAt: glyph index at: glyph x @ glyph y)
-			do: [ :contour | self appendContour: contour toAeContext: aContext ] ]
 ]
 
 { #category : '*VectorGraphics-Bloc' }
@@ -54,56 +50,6 @@ VGScaledFont >> cairoMaskAtlas [
 ]
 
 { #category : '*VectorGraphics-Bloc' }
-VGScaledFont >> cairoMaskForGlyph: aGlyphIndex atPhase: aPhasePoint underMatrix: aLinearMatrix onAeContext: aContext [
-	"One glyph rasterised by Cairo itself into an A8 surface of its own, with its origin at the
-	 sub-pixel phase the atlas keyed on. The box is whole pixels, so blitting the mask at a
-	 whole pixel offset keeps that phase. Nil for a glyph that inks nothing, a space for
-	 instance. The contours are placed once and then moved to the box, because transforming the
-	 outline is the work of a mask that misses the atlas."
-
-	| contours box |
-	contours := self
-		            deviceContoursOfGlyphAt: aGlyphIndex
-		            underMatrix: aLinearMatrix
-		            at: aPhasePoint.
-	contours ifEmpty: [ ^ nil ].
-	box := self wholePixelBoxOfContours: contours.
-	^ VGGlyphMask
-		  surface: (self
-				   cairoMaskSurfaceOfContours: (contours collect: [ :contour |
-						    contour collect: [ :point | point - box origin ] ])
-				   extent: box extent
-				   onAeContext: aContext)
-		  offset: box origin
-]
-
-{ #category : '*VectorGraphics-Bloc' }
-VGScaledFont >> cairoMaskSurfaceOfContours: aContourCollection extent: anExtent onAeContext: aContext [
-	"An A8 surface of its own holding the coverage Cairo rasterises for a set of device space
-	 contours, which are placed for this surface already.
-	 The surface is externally allocated, which is what the mask has to be: Cairo keeps the
-	 address of the pixels while it composites them, and the garbage collector may move a
-	 ByteArray. Alpha is the coverage and nothing else, so the mask is filled with opaque white,
-	 with the winding rule a glyph outline is drawn with and the antialiasing the drawing
-	 context asks for."
-
-	| maskSurface maskContext |
-	maskSurface := AeCairoImageSurface
-		               extent: anExtent
-		               format: AeCairoSurfaceFormat a8.
-	maskContext := AeCairoContext newFor: maskSurface.
-	maskContext
-		antialias: aContext antialias;
-		useFillRuleWinding;
-		sourceColorR: 1.0 g: 1.0 b: 1.0 a: 1.0.
-	aContourCollection do: [ :contour |
-		self appendContour: contour toAeContext: maskContext ].
-	maskContext fill.
-	maskSurface flush.
-	^ maskSurface
-]
-
-{ #category : '*VectorGraphics-Bloc' }
 VGScaledFont >> contoursOfTheInspectorSample [
 	"The contours the path route puts down for a short run, in user space, placed at the glyph
 	 positions the layout chose. The view draws these and its gate counts them, so neither one
@@ -120,25 +66,6 @@ VGScaledFont >> extentTextOfCairoMask: anAssociation [
 	^ anAssociation value
 		  ifNil: [ 'inks nothing' ]
 		  ifNotNil: [ :mask | mask extent printString ]
-]
-
-{ #category : '*VectorGraphics-Bloc' }
-VGScaledFont >> fontExtentsInto: aFontExtents onAeContext: aContext [
-	"The font extents site: cairo_font_extents upstream, my own hhea numbers here. The numbers
-	 are in user space, as Cairo answers them, so the context's matrix takes no part and the
-	 argument is unused; it is kept because the five text sites dispatch the same way."
-
-	^ self fontExtents writeInto: aFontExtents
-]
-
-{ #category : '*VectorGraphics-Bloc' }
-VGScaledFont >> glyphExtentsOf: aGlyphArray size: aNumberOfGlyphs into: aTextExtents onAeContext: aContext [
-	"The measuring site: cairo_glyph_extents upstream, my own metrics here. The numbers are in
-	 user space, as Cairo answers them, so the context's matrix takes no part and the argument is
-	 unused; it is kept because the five text sites dispatch the same way."
-
-	^ (self glyphExtentsOf: (self glyphsOf: aGlyphArray size: aNumberOfGlyphs))
-		  writeInto: aTextExtents
 ]
 
 { #category : '*VectorGraphics-Bloc' }
@@ -304,63 +231,4 @@ VGScaledFont >> offsetTextOfCairoMask: anAssociation [
 	^ anAssociation value
 		  ifNil: [ '' ]
 		  ifNotNil: [ :mask | mask offset printString ]
-]
-
-{ #category : '*VectorGraphics-Bloc' }
-VGScaledFont >> poseOnAeContext: aContext [
-	"Extensions in this project's Bloc package, because the engine's own package must name no
-	 Alexandrie class: an A8 mask surface is one. Cairo is told nothing, since it has no handle
-	 for me; the context remembers me and asks me for every text call that follows."
-
-	^ aContext ownScaledFont: self
-]
-
-{ #category : '*VectorGraphics-Bloc' }
-VGScaledFont >> showGlyphs: aGlyphsArray size: aNumberOfGlyphs onAeContext: aContext [
-	"One A8 mask a glyph, composited by Cairo with whatever source the context carries, which is
-	 how any other mask gets its colour. cairo_mask_surface places a mask in user space, so the
-	 matrix is put aside: the device origin of a glyph is already in device pixels."
-
-	| matrix linear |
-	matrix := aContext matrix asVGCairoMatrix.
-	linear := matrix copy
-		          x: 0;
-		          y: 0;
-		          yourself.
-	aContext saveState.
-	aContext setIdentityMatrix.
-	(self glyphsOf: aGlyphsArray size: aNumberOfGlyphs) do: [ :glyph |
-		self
-			showOneGlyph: glyph
-			underMatrix: matrix
-			linearPart: linear
-			onAeContext: aContext ].
-	aContext restoreState
-]
-
-{ #category : '*VectorGraphics-Bloc' }
-VGScaledFont >> showOneGlyph: aGlyph underMatrix: aMatrix linearPart: aLinearMatrix onAeContext: aContext [
-	"One glyph blitted through its mask. The origin is snapped to Cairo's grid first, then split
-	 into the whole pixels the blit carries and the phase the mask is rendered at, so the mask of
-	 a letter is shared by every place that letter sits on a whole pixel."
-
-	| device whole phase mask |
-	device := VGPathBuilder snapped: (aMatrix valueX: aGlyph x y: aGlyph y).
-	whole := device floor.
-	phase := device - whole.
-	mask := self cairoMaskAtlas
-		        maskForGlyph: aGlyph index
-		        phase: phase
-		        matrix: aLinearMatrix
-		        ifAbsentPut: [
-		        self
-			        cairoMaskForGlyph: aGlyph index
-			        atPhase: phase
-			        underMatrix: aLinearMatrix
-			        onAeContext: aContext ].
-	mask ifNil: [ ^ self ].
-	aContext
-		maskSurface: mask surface
-		x: (whole + mask offset) x
-		y: (whole + mask offset) y
 ]

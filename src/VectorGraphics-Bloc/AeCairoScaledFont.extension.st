@@ -1,6 +1,15 @@
 Extension { #name : 'AeCairoScaledFont' }
 
 { #category : '*VectorGraphics-Bloc' }
+AeCairoScaledFont >> aeTextFont [
+	"I am a font Cairo itself can draw, so I need no adapter: I am my own. The pivot in
+	 VGAeTextContext asks every font for its adapter, which is how one of ours reaches
+	 VGAeTextFont without a test of its class."
+
+	^ self
+]
+
+{ #category : '*VectorGraphics-Bloc' }
 AeCairoScaledFont >> appendPathOfGlyphs: aGlyphsArray length: aNumberOfGlyphs onAeContext: aContext [
 	"Straight back to cairo_glyph_path."
 
