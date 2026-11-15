@@ -52,13 +52,9 @@ TTFontFixtures class >> familyOfThreeFacesInOneFamily [
 	 as its base, the bold and the italic one filed by emphasis, and not one of the three
 	 parsed."
 
-	| catalogue family |
-	catalogue := self catalogueOfThreeFacesInOneFamily.
-	family := TrueTypeFontFamily baseCatalogueEntry:
-		          (catalogue entryOfFamilyNamed: 'Fixture Sans').
-	(catalogue entriesByFamilyName at: 'fixture sans') do: [ :entry |
-		family addCatalogueEntry: entry ].
-	^ family
+	^ TrueTypeFontFamily
+		  fromCatalogue: self catalogueOfThreeFacesInOneFamily
+		  familyNamed: 'Fixture Sans'
 ]
 
 { #category : 'fixtures' }

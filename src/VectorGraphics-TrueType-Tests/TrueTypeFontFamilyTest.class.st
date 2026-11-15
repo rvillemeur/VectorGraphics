@@ -79,6 +79,29 @@ TrueTypeFontFamilyTest >> testAFamilyKeepsTheCatalogueFacesItWasGivenAndParsesNo
 ]
 
 { #category : 'tests' }
+TrueTypeFontFamilyTest >> testARealFaceIsParsedAtTheFirstAskForAFontAndNotBefore [
+	"The same fact as the fixtures state, on a font of this machine, where the parse succeeds
+	 instead of raising: a family registered from a catalogue holds no description until a
+	 reader asks it for a font, and the font it then answers draws that face at the size asked."
+
+	| catalogue family font |
+	catalogue := TTFontCatalogue new.
+	catalogue addFile: TrueTypeExamples defaultFontPath asFileReference.
+	family := TrueTypeFontFamily baseCatalogueEntry:
+		          (catalogue entryOfFamilyNamed: catalogue familyNames first).
+
+	self
+		assert: (family instVarNamed: 'baseTTFontDescription')
+		equals: nil.
+
+	font := family atPointSize: 12.
+
+	self deny: (family instVarNamed: 'baseTTFontDescription') isNil.
+	self assert: font pointSize equals: 12.
+	self assert: font familyName equals: family familyName
+]
+
+{ #category : 'tests' }
 TrueTypeFontFamilyTest >> testAnEmphasisIsParsedOnlyWhenAFontOfThatEmphasisIsAskedFor [
 	"A family asked for a font of an emphasis it holds a face for parses that face, and that
 	 face alone, at the moment of the ask. Two facts: asking for the bold one reaches its bytes,
@@ -118,6 +141,37 @@ TrueTypeFontFamilyTest >> testAtPointSizeCreatesTrueTypeFont [
 ]
 
 { #category : 'tests' }
+TrueTypeFontFamilyTest >> testClearingTheCacheOfALazyFamilyThrowsAwayItsFontsAndReadsNothing [
+	"Clearing the cache drops the fonts a family built and keeps what it knows of its faces.
+	 Two facts: a family that has parsed nothing survives the call — it used to reach for a
+	 description it does not have and fail on nil — and a family that built a font answers a
+	 fresh one afterwards, while the description it parsed stays parsed."
+
+	| lazy catalogue parsed first |
+	lazy := TTFontFixtures familyOfThreeFacesInOneFamily.
+
+	lazy clearCache.
+
+	self deny: (lazy hasParsedEmphasis: 0).
+	self
+		assert: (lazy catalogueEntryForEmphasis: 1) metadata styleName
+		equals: 'Bold'.
+
+	catalogue := TTFontCatalogue new
+		             addFile: TrueTypeExamples defaultFontPath asFileReference;
+		             yourself.
+	parsed := TrueTypeFontFamily
+		          fromCatalogue: catalogue
+		          familyNamed: catalogue familyNames first.
+	first := parsed atPointSize: 12.
+
+	parsed clearCache.
+
+	self assert: (parsed hasParsedEmphasis: 0).
+	self deny: (parsed atPointSize: 12) == first
+]
+
+{ #category : 'tests' }
 TrueTypeFontFamilyTest >> testFamilyName [
 
 	self assert: self makeFamily familyName equals: 'TestFamily'
@@ -152,4 +206,29 @@ TrueTypeFontFamilyTest >> testPointSizes [
 	self assert: (sizes includes: 6).
 	self assert: (sizes includes: 144).
 	self assert: sizes size equals: 18
+]
+
+{ #category : 'tests' }
+TrueTypeFontFamilyTest >> testTheFacesViewNamesEveryEmphasisAndParsesNoneOfThem [
+	"The Faces view answers the question a reader of a lazy family has: which faces are known,
+	 and which of them have been read. The view is built the way the inspector builds it,
+	 through StInspectionContext, and a table's column blocks run per drawn row only, so each
+	 is run over each row here. Two facts: there is a row per emphasis the family holds a face
+	 for, the base one included, and building it parses nothing — these fixtures raise on a
+	 parse, so a row that read bytes would error."
+
+	| builder presenter rows |
+	builder := SpPresenterBuilder newApplication: SpApplication new.
+	presenter := (StInspectionContext new
+		              inspectedObject: TTFontFixtures familyOfThreeFacesInOneFamily;
+		              methodSelector: #inspectorFaces:;
+		              yourself) basicNewInspectionPresenter: builder.
+	rows := presenter items collect: [ :item |
+		        presenter columns collect: [ :column |
+			        column evaluation value: item ] ].
+
+	self assert: rows asArray equals: {
+			{ '0'. 'Regular'. 'pending' }.
+			{ '1'. 'Bold'. 'pending' }.
+			{ '2'. 'Italic'. 'pending' } }
 ]

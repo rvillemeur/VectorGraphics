@@ -120,6 +120,26 @@ TrueTypeExamples class >> findDefaultFontPath [
 ]
 
 { #category : 'examples' }
+TrueTypeExamples class >> fontFamilyOfThisMachine [
+	"One click: the family of the font the examples draw with, taken from this machine's own
+	 fonts the way an installation takes it — the plainest face as the base, the bold and the
+	 italic ones filed by emphasis, and not one of them parsed yet. Inspect its faces to see
+	 which of them have been read, then ask it for a font and look again.
+
+	TrueTypeExamples fontFamilyOfThisMachine inspect"
+
+	<sampleInstance>
+	| catalogue names |
+	catalogue := TTFontCatalogue new
+		             scanDefaultDirectories;
+		             yourself.
+	names := self installedPreferredFamilyNamesIn: catalogue.
+	^ TrueTypeFontFamily
+		  fromCatalogue: catalogue
+		  familyNamed: (names ifEmpty: [ catalogue familyNames ]) first
+]
+
+{ #category : 'examples' }
 TrueTypeExamples class >> fontMetadata [
 	"Load a TTF file and inspect its metadata.
 	TrueTypeExamples fontMetadata inspect"

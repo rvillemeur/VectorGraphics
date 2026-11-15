@@ -61,6 +61,20 @@ TrueTypeFontFamily class >> emphasisOfCatalogueEntry: aCatalogueEntry [
 	^ emphasis
 ]
 
+{ #category : 'instance creation' }
+TrueTypeFontFamily class >> fromCatalogue: aFontCatalogue familyNamed: aString [
+	"The family a catalogue holds under a name: its plainest face as the base, every other face
+	 of the name filed by the emphasis its style key states. Nothing is parsed here — a face is
+	 read when a reader first asks for a font of its emphasis."
+
+	| family |
+	family := self baseCatalogueEntry:
+		          (aFontCatalogue entryOfFamilyNamed: aString).
+	(aFontCatalogue entriesByFamilyName at: aString asLowercase) do: [
+		:entry | family addCatalogueEntry: entry ].
+	^ family
+]
+
 { #category : 'accessing' }
 TrueTypeFontFamily >> addCatalogueEntry: aCatalogueEntry [
 	"File one more face of mine, under the emphasis its style key states. The plain face is my
@@ -131,11 +145,12 @@ TrueTypeFontFamily >> baseTTFontDescription [
 
 { #category : 'initialization' }
 TrueTypeFontFamily >> baseTTFontDescription: aTTFontDescription [
-
 	self assert: aTTFontDescription emphasis = 0.
 	familyName := aTTFontDescription familyName.
 	baseFontBySizes := Dictionary new.
 	baseTTFontDescription := aTTFontDescription.
+	catalogueEntriesByEmphasis ifNil: [
+		catalogueEntriesByEmphasis := Dictionary new ].
 	ttFontDescriptionsByEmphasis ifNil: [
 		ttFontDescriptionsByEmphasis := Dictionary new ]
 ]
@@ -150,15 +165,14 @@ TrueTypeFontFamily >> catalogueEntryForEmphasis: anInteger [
 
 { #category : 'initialization' }
 TrueTypeFontFamily >> clearCache [
+	"Throw away the fonts I built, at every size and every emphasis, and keep what I know of my
+	 faces: the catalogue entries, and whatever of them has already been parsed. A reader that
+	 asks again gets fresh fonts, and pays no parse for the faces already read.
 
-	"
 	TrueTypeFontFamily allInstancesDo: [ :each | each clearCache ].
 	"
 
-	| emphasized |
-	emphasized := ttFontDescriptionsByEmphasis values.
-	self baseTTFontDescription: baseTTFontDescription.
-	emphasized do: [ :each | self addTTFontDescription: each ]
+	baseFontBySizes := Dictionary new
 ]
 
 { #category : 'accessing' }
@@ -193,11 +207,51 @@ TrueTypeFontFamily >> fontForEmphasis: anInteger pointSize: aNumber [
 ]
 
 { #category : 'testing' }
+TrueTypeFontFamily >> hasParsedEmphasis: anInteger [
+	"Have the outlines of the face I hold for this emphasis been read? Asking never reads them."
+
+	anInteger = 0 ifTrue: [ ^ baseTTFontDescription notNil ].
+	^ ttFontDescriptionsByEmphasis includesKey: anInteger
+]
+
+{ #category : 'testing' }
 TrueTypeFontFamily >> includesAscii [
 	"Answer true if we include the basic ASCII characters.
 	If not, we are not suitable for displaying Smalltalk code."
 
 	^ self baseTTFontDescription includesAscii
+]
+
+{ #category : 'inspecting' }
+TrueTypeFontFamily >> inspectorFaces: aBuilder [
+	"The faces I know of and what has been read of each. One row per emphasis, the base face
+	 first; the Style column names the face a catalogue met, the Read column says whether its
+	 outlines have been parsed — which happens when a reader first asks me for a font of that
+	 emphasis. Building this view reads no bytes, so a family inspected before anything asked
+	 it says 'pending' on every row."
+
+	<inspectorPresentationOrder: 10 title: 'Faces'>
+	| emphases |
+	emphases := (catalogueEntriesByEmphasis keys
+	             , ttFontDescriptionsByEmphasis keys asArray , #( 0 )) asSet
+		            asSortedCollection asArray.
+	^ aBuilder newTable
+		  addColumn: ((SpStringTableColumn
+				    title: 'Emphasis'
+				    evaluated: [ :each | each printString ])
+				   width: 80);
+		  addColumn: ((SpStringTableColumn
+				    title: 'Style'
+				    evaluated: [ :each | self styleNameOfEmphasis: each ])
+				   width: 200);
+		  addColumn: (SpStringTableColumn
+				   title: 'Read'
+				   evaluated: [ :each |
+					   (self hasParsedEmphasis: each)
+						   ifTrue: [ 'parsed' ]
+						   ifFalse: [ 'pending' ] ]);
+		  items: emphases;
+		  yourself
 ]
 
 { #category : 'testing' }
@@ -210,4 +264,20 @@ TrueTypeFontFamily >> isTrueTypeFontFamily [
 TrueTypeFontFamily >> pointSizes [
 
 	^ #( 6 7 8 9 10 11 12 13 14 15 18 22 26 36 48 72 96 144 )
+]
+
+{ #category : 'accessing' }
+TrueTypeFontFamily >> styleNameOfEmphasis: anInteger [
+	"What the face I hold for this emphasis calls its style — 'Regular', 'Bold', 'Italic'. Read
+	 from the catalogue entry when there is one, from the parsed description otherwise, and
+	 nil when I hold neither. Asking parses nothing."
+
+	| entry |
+	entry := anInteger = 0
+		         ifTrue: [ baseCatalogueEntry ]
+		         ifFalse: [ self catalogueEntryForEmphasis: anInteger ].
+	entry ifNotNil: [ ^ entry metadata styleName ].
+	anInteger = 0 ifTrue: [ ^ baseTTFontDescription ifNotNil: [ :each | each fullName ] ].
+	^ (ttFontDescriptionsByEmphasis at: anInteger ifAbsent: [ nil ])
+		  ifNotNil: [ :each | each fullName ]
 ]

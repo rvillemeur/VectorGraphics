@@ -48,14 +48,11 @@ FontFamily class >> addFamiliesFrom: aFontCatalogue [
 	 Nothing is parsed here. Each family keeps the catalogue entries of its faces and reads the
 	 outlines behind one when a reader first asks for it."
 
-	aFontCatalogue familyNames do: [ :name |
-		(self familyNamed: name) ifNil: [
-			| family |
-			family := TrueTypeFontFamily baseCatalogueEntry:
-				          (aFontCatalogue entryOfFamilyNamed: name).
-			(aFontCatalogue entriesByFamilyName at: name asLowercase)
-				do: [ :entry | family addCatalogueEntry: entry ].
-			self addFamily: family ] ]
+	aFontCatalogue familyNames do: [ :aFamilyName |
+		(self familyNamed: aFamilyName) ifNil: [
+			self addFamily: (TrueTypeFontFamily
+					 fromCatalogue: aFontCatalogue
+					 familyNamed: aFamilyName) ] ]
 ]
 
 { #category : 'initialization' }
