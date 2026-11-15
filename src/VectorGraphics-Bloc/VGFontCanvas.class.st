@@ -145,6 +145,19 @@ VGFontCanvas class >> upstreamCairoRows [
 ]
 
 { #category : 'accessing' }
+VGFontCanvas >> cachedScaledFontsByFaceAndSize [
+	"The scaled fonts this canvas has built, keyed by an array of the face and the size they
+	 were asked for — the shape `scaledFontForFace:size:` caches them in. A snapshot in a
+	 `Dictionary`, not the cache: it is an `LRUCache`, which reading promotes and which a reader
+	 could empty under the canvas it is drawing with."
+
+	| snapshot |
+	snapshot := Dictionary new.
+	scaledFontCache keysAndValuesDo: [ :key :font | snapshot at: key put: font ].
+	^ snapshot
+]
+
+{ #category : 'accessing' }
 VGFontCanvas >> fontOptions [
 	"`AeCanvas` holds its font options in an instance variable with no reader, and the failover
 	 has to be able to state that ours are never Cairo's record."

@@ -32,7 +32,7 @@ VGRendererTest >> cachedFacesAndSizesOf: aCanvas [
 	 cache because a span resolves its scaled font while it is being measured, and the frame
 	 canvas is then handed the font that measuring built."
 
-	^ ((aCanvas instVarNamed: 'scaledFontCache') keys collect: [ :each |
+	^ (aCanvas cachedScaledFontsByFaceAndSize keys collect: [ :each |
 		   each first -> each second ]) asArray sort: [ :a :b | a value < b value ]
 ]
 

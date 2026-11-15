@@ -78,3 +78,27 @@ VGAeCanvasTest >> testTheScaledFontForAFaceIsOneOfOursUnderOurOwnMatrixAndOption
 		equals: (VGCairoMatrix newScalingByX: 17 y: 17).
 	self assert: font options class equals: VGFontOptions
 ]
+
+{ #category : 'tests' }
+VGAeCanvasTest >> testTheScaledFontsCachedAreReadableByFaceAndSizeWithoutReflection [
+	"The cache a reader needs to state what a frame resolved: three tests of this project used
+	 to reach into the `scaledFontCache` variable with `instVarNamed:`, which no rename would
+	 follow. Three facts: the reader answers the fonts built, keyed by the face and the size
+	 they were asked for, and what it answers is a copy, so a reader cannot evict what the
+	 canvas is drawing with."
+
+	| canvas face font cached |
+	canvas := VGAeCanvas extent: 10 @ 10.
+	face := VGFontFace default.
+	font := canvas scaledFontForFace: face size: 17.
+	cached := canvas cachedScaledFontsByFaceAndSize.
+	self assert: cached size equals: 1.
+	self
+		assert: (cached keys collect: [ :each | each first -> each second ]) asArray
+		equals: { face -> 17 }.
+	self assert: cached anyOne identicalTo: font.
+	cached removeAll.
+	self
+		assert: (canvas scaledFontForFace: face size: 17)
+		identicalTo: font
+]

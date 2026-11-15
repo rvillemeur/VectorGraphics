@@ -26,7 +26,7 @@ VGAeRendererTest >> cachedFacesAndSizesOf: aCanvas [
 	 cache because a span resolves its scaled font while it is being measured, and the frame
 	 canvas is then handed the font that measuring built."
 
-	^ ((aCanvas instVarNamed: 'scaledFontCache') keys collect: [ :each |
+	^ (aCanvas cachedScaledFontsByFaceAndSize keys collect: [ :each |
 		   each first -> each second ]) asArray sort: [ :a :b | a value < b value ]
 ]
 
@@ -97,7 +97,7 @@ VGAeRendererTest >> testASpaceWithTextDrawsThroughCairoWithOurScaledFontsAndNoFr
 	self deny: (space hostSpace pixels allSatisfy: [ :each | each = 0 ]).
 	faces := OrderedCollection new.
 	fonts := OrderedCollection new.
-	(VGAeOffscreen instance canvas instVarNamed: 'scaledFontCache')
+	VGAeOffscreen instance canvas cachedScaledFontsByFaceAndSize
 		keysAndValuesDo: [ :key :font |
 			faces add: key first.
 			fonts add: font ].
