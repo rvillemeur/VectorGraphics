@@ -151,6 +151,17 @@ TTFontMetadata >> slant: aSymbol [
 ]
 
 { #category : 'accessing' }
+TTFontMetadata >> style [
+	"What tells the face I read apart from the other faces of its family: the slant, the weight
+	 class and the width class, as one object. The style name is not in it — that is what the
+	 font calls itself, where this is what it measures."
+	^ TTFontStyle
+		  slant: slant
+		  weightClass: weightClass
+		  widthClass: widthClass
+]
+
+{ #category : 'accessing' }
 TTFontMetadata >> styleName [
 	"The name of this face within its family — Regular, Bold Italic, Condensed Light — as the
 	 font's own name table spells it, in the record TrueType calls the subfamily."

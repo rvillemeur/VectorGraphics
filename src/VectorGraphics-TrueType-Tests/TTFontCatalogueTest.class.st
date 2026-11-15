@@ -54,29 +54,29 @@ TTFontCatalogueTest >> directoryOfSixFacesTwoFamiliesAndTwoRefusals [
 ]
 
 { #category : 'tests' }
-TTFontCatalogueTest >> testAFaceIsFoundByItsStyleKeyAndBothMissesAnswerTheAbsentBlock [
-	"A consumer that knows which face it wants names the family and the style key. A family I
+TTFontCatalogueTest >> testAFaceIsFoundByItsStyleAndBothMissesAnswerTheAbsentBlock [
+	"A consumer that knows which face it wants names the family and the style. A family I
 	 never met and a style that family does not hold are both misses, and a miss answers the
 	 block rather than raising."
-
-	| catalogue |
+	| catalogue bold |
 	catalogue := self catalogueScannedOverTheFixtureDirectory.
+	bold := TTFontStyle slant: #normal weightClass: 700 widthClass: 5.
 	self
 		assert: ((catalogue
 				  entryOfFamilyNamed: 'source SANS pro'
-				  styleKey: #( #normal 700 5 )
+				  style: bold
 				  ifNone: [ nil ]) metadata styleName)
 		equals: 'Bold'.
 	self
 		assert: (catalogue
 				 entryOfFamilyNamed: 'Helvetica'
-				 styleKey: #( #normal 700 5 )
+				 style: bold
 				 ifNone: [ #noSuchFamily ])
 		equals: #noSuchFamily.
 	self
 		assert: (catalogue
 				 entryOfFamilyNamed: 'Source Sans Pro'
-				 styleKey: #( #normal 900 5 )
+				 style: (TTFontStyle slant: #normal weightClass: 900 widthClass: 5)
 				 ifNone: [ #noSuchStyle ])
 		equals: #noSuchStyle
 ]
@@ -86,15 +86,11 @@ TTFontCatalogueTest >> testAFamilyIsFoundByTheNameItStatesWhateverTheCaseAndAnsw
 	"A consumer names a family the way a reader spells it, not the way I key it. It means the
 	 plain face of that family when it does not say which one: upright, normal weight, normal
 	 width. A family I never met answers nothing rather than raising."
-
 	| catalogue entry |
 	catalogue := self catalogueScannedOverTheFixtureDirectory.
 	entry := catalogue entryOfFamilyNamed: 'source SANS pro'.
 	self assert: entry familyName equals: 'Source Sans Pro'.
-	self assert: entry styleKey equals: {
-			#normal.
-			TTFontMetadataReader normalWeightClass.
-			TTFontMetadataReader normalWidthClass }.
+	self assert: entry style equals: TTFontStyle plainest.
 	self assert: (catalogue entryOfFamilyNamed: 'Helvetica') isNil
 ]
 
@@ -168,12 +164,11 @@ TTFontCatalogueTest >> testAnEntryAnswersTheFamilyAndTheStyleItsFontStates [
 	"The two names a reader sorts and groups a catalogue by. An entry answers both itself, so a
 	 table of faces does not reach through it into the metadata for one of the pair and not the
 	 other."
-
 	| entry |
-	entry := (self catalogueScannedOverTheFixtureDirectory
-		          entryOfFamilyNamed: 'Source Sans Pro'
-		          styleKey: #( #normal 700 5 )
-		          ifNone: [ nil ]).
+	entry := self catalogueScannedOverTheFixtureDirectory
+		         entryOfFamilyNamed: 'Source Sans Pro'
+		         style: (TTFontStyle slant: #normal weightClass: 700 widthClass: 5)
+		         ifNone: [ nil ].
 	self assert: entry familyName equals: 'Source Sans Pro'.
 	self assert: entry styleName equals: 'Bold'.
 	self assert: entry styleName equals: entry metadata styleName
@@ -223,17 +218,17 @@ TTFontCatalogueTest >> testAnEntryOnAFileReadsTheWholeFontOnlyWhenAskedForItsByt
 { #category : 'tests' }
 TTFontCatalogueTest >> testFacesOfOneFamilyAreKeyedBySlantWeightAndWidth [
 	"How a font manager finds the face a text asks for: the family in lower case, then the
-	 triple that tells the faces of that family apart."
-
+	 style that tells the faces of that family apart."
 	| catalogue faces |
 	catalogue := self catalogueScannedOverTheFixtureDirectory.
 	faces := catalogue entriesByFamilyName at: 'source sans pro'.
 	self assert: faces keys asSet equals: {
-			#( #italic 400 5 ).
-			#( #normal 400 5 ).
-			#( #normal 700 5 ) } asSet.
+			(TTFontStyle slant: #italic weightClass: 400 widthClass: 5).
+			(TTFontStyle slant: #normal weightClass: 400 widthClass: 5).
+			(TTFontStyle slant: #normal weightClass: 700 widthClass: 5) } asSet.
 	self
-		assert: (faces at: #( #normal 700 5 )) metadata styleName
+		assert: (faces at: (TTFontStyle slant: #normal weightClass: 700 widthClass: 5))
+				metadata styleName
 		equals: 'Bold'
 ]
 
@@ -305,7 +300,7 @@ TTFontCatalogueTest >> testTheFirstSourceOfAFaceWinsAndTheSecondIsStillKept [
 			first.
 			second }.
 	self
-		assert: ((catalogue entriesByFamilyName at: 'source sans pro') at: first styleKey)
+		assert: ((catalogue entriesByFamilyName at: 'source sans pro') at: first style)
 		identicalTo: first
 ]
 

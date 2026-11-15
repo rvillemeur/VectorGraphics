@@ -141,14 +141,11 @@ TTFontCatalogueEntry >> source: anObject [
 ]
 
 { #category : 'accessing' }
-TTFontCatalogueEntry >> styleKey [
+TTFontCatalogueEntry >> style [
 	"What tells me apart from the other faces of my family: the slant, the weight class and the
-	 width class, which is the triple a font manager matches a text style against."
-
-	^ {
-		  metadata slant.
-		  metadata weightClass.
-		  metadata widthClass }
+	 width class my font states, which is what a font manager matches a text style against. The
+	 metadata holds the three facts, so it answers the style and I pass it on."
+	^ metadata style
 ]
 
 { #category : 'accessing' }

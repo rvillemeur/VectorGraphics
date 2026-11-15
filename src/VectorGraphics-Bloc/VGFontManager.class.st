@@ -235,34 +235,29 @@ VGFontManager >> detectFamilyName: aFamilyName slant: aSlant weight: aWeight str
 	^ self faceAt: entry
 ]
 
-{ #category : 'accessing' }
+{ #category : 'accessing - faces' }
 VGFontManager >> entriesByFamilyName [
 	"The faces I answer for, keyed as the catalogue keys them: family name in lower case, then
-	 the slant, weight class and width class of the face. Not upstream's key, which is a triple
-	 of AeFontSlant, AeFontWeight and AeFontStretch read off the style name; the translation
-	 between the two lives in entryForFamilyName:slant:weight:stretch:ifNone:, the one place a
-	 consumer asks in Alexandrie's vocabulary."
-
+	 the TTFontStyle the face states. Not upstream's key, which is a triple of AeFontSlant,
+	 AeFontWeight and AeFontStretch read off the style name; the translation between the two
+	 lives in styleForSlant:weight:stretch:, and entryForFamilyName:slant:weight:stretch:
+	 ifNone: is the one place a consumer asks in Alexandrie's vocabulary."
 	^ self catalogue entriesByFamilyName
 ]
 
-{ #category : 'accessing' }
+{ #category : 'accessing - faces' }
 VGFontManager >> entryForFamilyName: aFamilyName slant: aSlant weight: aWeight stretch: aStretch ifNone: absentBlock [
 	"One face of a family, asked for the way Alexandrie asks: a family name and three of its
-	 font category objects. This is the one place the two vocabularies meet, and the three
-	 translations are exact rather than approximate, which is why they run in this direction
-	 only. A slant answers its name, the same symbol the metadata reader states. An AeFontWeight
-	 answers the OS/2 weight class itself — normal is 400, bold is 700. An AeFontStretch answers
-	 the OS/2 width class less one, since it counts ultraCondensed from zero where OS/2 counts
-	 it from one. The catalogue does the looking up: how it keys a family and a style is its
-	 own."
-
+	 font category objects. This is the one place the two vocabularies meet, which is why the
+	 translation lives here and the five arguments are upstream's own — detectFamilyName:
+	 slant:weight:stretch:ifNone: is an AeFontManager selector and I cannot shorten it. The
+	 catalogue does the looking up: how it keys a family and a style is its own."
 	^ self catalogue
 		  entryOfFamilyNamed: aFamilyName
-		  styleKey: {
-				  aSlant name.
-				  aWeight value.
-				  aStretch value + 1 }
+		  style: (self
+				   styleForSlant: aSlant
+				   weight: aWeight
+				   stretch: aStretch)
 		  ifNone: absentBlock
 ]
 
@@ -505,4 +500,18 @@ VGFontManager >> scanDirectory: aFileReference [
 	 is not a font becomes a refused entry rather than a file silently passed over."
 
 	^ self catalogue scanDirectory: aFileReference
+]
+
+{ #category : 'accessing - faces' }
+VGFontManager >> styleForSlant: aSlant weight: aWeight stretch: aStretch [
+	"The style of a face, out of Alexandrie's three font category objects. The three
+	 translations are exact rather than approximate, which is why they run in this direction
+	 only. A slant answers its name, the same symbol the metadata reader states. An AeFontWeight
+	 answers the OS/2 weight class itself — normal is 400, bold is 700. An AeFontStretch answers
+	 the OS/2 width class less one, since it counts ultraCondensed from zero where OS/2 counts
+	 it from one."
+	^ TTFontStyle
+		  slant: aSlant name
+		  weightClass: aWeight value
+		  widthClass: aStretch value + 1
 ]

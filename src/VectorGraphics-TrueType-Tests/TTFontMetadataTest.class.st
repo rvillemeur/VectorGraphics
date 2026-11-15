@@ -12,6 +12,21 @@ Class {
 }
 
 { #category : 'tests' }
+TTFontMetadataTest >> testMetadataAnswersTheStyleOfTheFaceItRead [
+	"The three facts that tell faces of one family apart are mine, so I answer them as one
+	 style rather than letting a reader gather them one accessor at a time."
+	| metadata |
+	metadata := TTFontMetadata new
+		            slant: #oblique;
+		            weightClass: 300;
+		            widthClass: 7;
+		            yourself.
+	self
+		assert: metadata style
+		equals: (TTFontStyle slant: #oblique weightClass: 300 widthClass: 7)
+]
+
+{ #category : 'tests' }
 TTFontMetadataTest >> testPrintingAFaceThatIsRefusedNamesTheReason [
 	"More files in a font directory are not drawable fonts than are — 182 of the 544 on this
 	 machine — and fontNamesWithoutParsingGlyphs makes a reader inspect all of them at once. A

@@ -314,7 +314,24 @@ TrueTypeExamples class >> styleCountsOfTheInstalledFonts [
 	self catalogueOfTheInstalledFonts entries do: [ :each |
 		each metadata isRejected ifFalse: [
 			| key |
-			key := each styleKey.
+			key := each style.
 			counts at: key put: (counts at: key ifAbsent: [ 0 ]) + 1 ] ].
 	^ counts
+]
+
+{ #category : 'examples' }
+TrueTypeExamples class >> styleOfTheBoldestFaceOfThisMachine [
+	"One click: the style of the heaviest face installed here — the slant, weight class and
+	 width class that face states, as the one object a catalogue keys a family by. The faces of
+	 this machine are read for what they say about themselves and the heaviest one wins; a tie
+	 goes to the first face met.
+	 TrueTypeExamples styleOfTheBoldestFaceOfThisMachine inspect"
+	<sampleInstance>
+	| styles |
+	styles := self catalogueOfTheInstalledFonts drawableEntries collect: [ :each |
+		          each style ].
+	^ styles inject: TTFontStyle plainest into: [ :boldest :each |
+		  each weightClass > boldest weightClass
+			  ifTrue: [ each ]
+			  ifFalse: [ boldest ] ]
 ]

@@ -5,7 +5,7 @@ Two registries read me and neither knows the other: a font manager for the Bloc 
 
 Three doors fill me. `scanDefaultDirectories` walks the places this platform keeps fonts, `scanDirectory:` walks one directory and its subdirectories, and `addBytes:` takes a font nobody wrote to disk. Every file under a directory I am given reaches `addFile:`: I read no file name, because the metadata reader says what a file is from its content, and one rule for that is enough.
 
-I keep every file I met in `entries`, in the order I met it, and index only the faces that can be drawn in `entriesByFamilyName`: the family name in lower case, then the slant, weight class and width class, then the entry. The first source of a given face wins, as AeFontManager does. The files I refused are still mine — `rejectedEntries` answers them, with the reason each one gave — so a reader can see what the scan passed over rather than guessing.
+I keep every file I met in `entries`, in the order I met it, and index only the faces that can be drawn in `entriesByFamilyName`: the family name in lower case, then the `TTFontStyle` the face states, then the entry. The first source of a given face wins, as AeFontManager does. The files I refused are still mine — `rejectedEntries` answers them, with the reason each one gave — so a reader can see what the scan passed over rather than guessing.
 
 A scan is cheap: reading the metadata of the 362 faces installed on this machine costs 14 ms, against 4.6 s to read all their bytes.
 "
@@ -74,7 +74,7 @@ TTFontCatalogue >> addSource: anObject metadata: aFontMetadata [
 		(entriesByFamilyName
 			 at: entry familyName asLowercase
 			 ifAbsentPut: [ Dictionary new ])
-			at: entry styleKey
+			at: entry style
 			ifAbsentPut: [ entry ] ].
 	^ entry
 ]
@@ -96,9 +96,8 @@ TTFontCatalogue >> entries [
 
 { #category : 'accessing' }
 TTFontCatalogue >> entriesByFamilyName [
-	"The faces I can answer for, keyed by family name in lower case, then by the slant, weight
-	 class and width class that tell two faces of one family apart. Refused files are not here."
-
+	"The faces I can answer for, keyed by family name in lower case, then by the TTFontStyle
+	 that tells two faces of one family apart. Refused files are not here."
 	^ entriesByFamilyName
 ]
 
@@ -108,25 +107,18 @@ TTFontCatalogue >> entryOfFamilyNamed: aString [
 	 case. The plainest face when the family has one — upright, normal weight, normal width —
 	 since a consumer that names only a family means the ordinary face of it; any face of the
 	 family otherwise. nil when I hold no such family."
-
 	| faces |
 	faces := entriesByFamilyName at: aString asLowercase ifAbsent: [ ^ nil ].
-	^ faces
-		  at: {
-				  #normal.
-				  TTFontMetadataReader normalWeightClass.
-				  TTFontMetadataReader normalWidthClass }
-		  ifAbsent: [ faces anyOne ]
+	^ faces at: TTFontStyle plainest ifAbsent: [ faces anyOne ]
 ]
 
 { #category : 'accessing' }
-TTFontCatalogue >> entryOfFamilyNamed: aString styleKey: aStyleKey ifNone: absentBlock [
-	"The one face of a family that a style key names, the family spelled in any case. Both a
-	 family I never met and a style the family does not hold answer the block. The shape of the
-	 key is mine, as addSource:metadata: builds it; a client states a style, not an index."
-
+TTFontCatalogue >> entryOfFamilyNamed: aString style: aFontStyle ifNone: absentBlock [
+	"The one face of a family that a style names, the family spelled in any case. Both a family
+	 I never met and a style the family does not hold answer the block. A style is a TTFontStyle,
+	 the three facts a font states about a face, and never an index into anything of mine."
 	^ (entriesByFamilyName at: aString asLowercase ifAbsent: [ ^ absentBlock value ])
-		  at: aStyleKey
+		  at: aFontStyle
 		  ifAbsent: [ ^ absentBlock value ]
 ]
 
