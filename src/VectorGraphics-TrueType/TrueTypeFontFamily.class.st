@@ -45,6 +45,35 @@ TrueTypeFontFamily class >> baseTTFontDescription: aTTFontDescription [
 	^ self new baseTTFontDescription: aTTFontDescription
 ]
 
+{ #category : 'accessing' }
+TrueTypeFontFamily class >> emphasisOfCatalogueEntry: aCatalogueEntry [
+	"Which of my faces a catalogue entry is, in the encoding StrikeFont uses and TrueTypeFont
+	 answers: 1 bold, 2 italic, 3 both, 0 the plain face. It is read from the triple the
+	 catalogue keys the face by — slant, weight class, width class — and not from the
+	 description, which would have to be parsed first. A weight class of 600 is Semibold, the
+	 lightest weight a reader is meant to see as bold."
+
+	| metadata emphasis |
+	metadata := aCatalogueEntry metadata.
+	emphasis := 0.
+	metadata weightClass >= 600 ifTrue: [ emphasis := emphasis bitOr: 1 ].
+	metadata slant = #normal ifFalse: [ emphasis := emphasis bitOr: 2 ].
+	^ emphasis
+]
+
+{ #category : 'accessing' }
+TrueTypeFontFamily >> addCatalogueEntry: aCatalogueEntry [
+	"File one more face of mine, under the emphasis its style key states. The plain face is my
+	 base and is not filed again, and the first face to claim an emphasis keeps it — a family
+	 with two faces of one emphasis, say Semibold and Black, draws with the one met first.
+	 Nothing is parsed: the outlines behind the face are read when a reader first asks for it."
+
+	| emphasis |
+	emphasis := self class emphasisOfCatalogueEntry: aCatalogueEntry.
+	emphasis = 0 ifTrue: [ ^ self ].
+	catalogueEntriesByEmphasis at: emphasis ifAbsentPut: [ aCatalogueEntry ]
+]
+
 { #category : 'initialization' }
 TrueTypeFontFamily >> addTTFontDescription: aTTFontDescription [
 
@@ -109,6 +138,14 @@ TrueTypeFontFamily >> baseTTFontDescription: aTTFontDescription [
 	baseTTFontDescription := aTTFontDescription.
 	ttFontDescriptionsByEmphasis ifNil: [
 		ttFontDescriptionsByEmphasis := Dictionary new ]
+]
+
+{ #category : 'accessing' }
+TrueTypeFontFamily >> catalogueEntryForEmphasis: anInteger [
+	"The face of mine a reader asking for that emphasis would draw with, or nil when I hold no
+	 such face and the caller must fall back. Reading it parses nothing."
+
+	^ catalogueEntriesByEmphasis at: anInteger ifAbsent: [ nil ]
 ]
 
 { #category : 'initialization' }

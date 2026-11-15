@@ -67,6 +67,24 @@ FontFamilyTest >> tearDown [
 ]
 
 { #category : 'tests' }
+FontFamilyTest >> testAFamilyTakenFromACatalogueKeepsEveryFaceOfItsFamily [
+	"A family is registered with all the faces the catalogue holds for it, not only the plainest
+	 one, so a bold or an italic run finds a real face rather than falling back on the plain
+	 one. They are filed by emphasis and none of them is parsed here."
+
+	| family |
+	FontFamily addFamiliesFrom: self catalogueOfSixFacesInTwoFamilies.
+	family := FontFamily familyNamed: 'Source Sans Pro'.
+	self
+		assert: (family catalogueEntryForEmphasis: 1) metadata styleName
+		equals: 'Bold'.
+	self
+		assert: (family catalogueEntryForEmphasis: 2) metadata styleName
+		equals: 'Italic'.
+	self assert: (family catalogueEntryForEmphasis: 3) equals: nil
+]
+
+{ #category : 'tests' }
 FontFamilyTest >> testAddFamiliesFromACatalogueRegistersALazyFamilyPerNameAndLeavesThePosedOnesAlone [
 	"Unit 5.4: the registry takes its families from a catalogue. Four facts. One family per name
 	 the catalogue holds, under the name a font states rather than the lower-case key the
