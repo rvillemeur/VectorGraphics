@@ -25,12 +25,19 @@ Class {
 	#superclass : 'FontFamily',
 	#instVars : [
 		'baseTTFontDescription',
-		'ttFontDescriptionsByEmphasis'
+		'ttFontDescriptionsByEmphasis',
+		'baseCatalogueEntry',
+		'catalogueEntriesByEmphasis'
 	],
 	#category : 'VectorGraphics-TrueType-Fonts',
 	#package : 'VectorGraphics-TrueType',
 	#tag : 'Fonts'
 }
+
+{ #category : 'instance creation' }
+TrueTypeFontFamily class >> baseCatalogueEntry: aCatalogueEntry [
+	^ self new baseCatalogueEntry: aCatalogueEntry
+]
 
 { #category : 'instance creation' }
 TrueTypeFontFamily class >> baseTTFontDescription: aTTFontDescription [
@@ -48,12 +55,11 @@ TrueTypeFontFamily >> addTTFontDescription: aTTFontDescription [
 
 { #category : 'accessing' }
 TrueTypeFontFamily >> atPointSize: aNumber [
-
 	| baseFont |
 	baseFontBySizes at: aNumber ifPresent: [ :existingBaseFont | ^ existingBaseFont ].
 	baseFont := TrueTypeFont
 		            family: self
-		            ttFontDescription: baseTTFontDescription
+		            ttFontDescription: self baseTTFontDescription
 		            pointSize: aNumber.
 	baseFontBySizes at: aNumber put: baseFont.
 	ttFontDescriptionsByEmphasis do: [ :emphasizedTTFontDescription |
@@ -65,6 +71,33 @@ TrueTypeFontFamily >> atPointSize: aNumber [
 		emphasizedFont baseFont: baseFont.
 		baseFont addDerivativeFont: emphasizedFont ].
 	^ baseFont
+]
+
+{ #category : 'initialization' }
+TrueTypeFontFamily >> baseCatalogueEntry: aCatalogueEntry [
+	"Build me from a face a catalogue met, rather than from a parsed description. The name is
+	 the one the font states, which the scan read from the name table, so I can be registered
+	 without the 80 ms my outlines cost to parse."
+
+	familyName := aCatalogueEntry familyName.
+	baseFontBySizes := Dictionary new.
+	baseCatalogueEntry := aCatalogueEntry.
+	catalogueEntriesByEmphasis ifNil: [
+		catalogueEntriesByEmphasis := Dictionary new ].
+	ttFontDescriptionsByEmphasis ifNil: [
+		ttFontDescriptionsByEmphasis := Dictionary new ]
+]
+
+{ #category : 'accessing' }
+TrueTypeFontFamily >> baseTTFontDescription [
+	"My plainest face, parsed. A family built from a catalogue entry parses it here, at the
+	 first point size, the first measure or the first question about my coverage — the 80 ms a
+	 font costs is paid by the first reader that needs an outline, not by the scan that met the
+	 file. A family built from a description already has it."
+
+	^ baseTTFontDescription ifNil: [
+		  baseTTFontDescription := TTFontReader readTTFFrom:
+			                           baseCatalogueEntry bytes ]
 ]
 
 { #category : 'initialization' }
@@ -93,17 +126,15 @@ TrueTypeFontFamily >> clearCache [
 
 { #category : 'accessing' }
 TrueTypeFontFamily >> folderName [
-
-	^ baseTTFontDescription folderName
+	^ self baseTTFontDescription folderName
 ]
 
 { #category : 'testing' }
 TrueTypeFontFamily >> includesAscii [
-
 	"Answer true if we include the basic ASCII characters.
 	If not, we are not suitable for displaying Smalltalk code."
 
-	^ baseTTFontDescription includesAscii
+	^ self baseTTFontDescription includesAscii
 ]
 
 { #category : 'testing' }

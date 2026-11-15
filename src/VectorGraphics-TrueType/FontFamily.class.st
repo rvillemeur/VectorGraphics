@@ -38,6 +38,21 @@ Class {
 	#tag : 'Fonts'
 }
 
+{ #category : 'accessing' }
+FontFamily class >> addFamiliesFrom: aFontCatalogue [
+	"Register one family per family the catalogue holds, under the name the fonts state. A name
+	 already registered is left alone: a family posed by hand — by a test, by a consumer, by a
+	 font loaded on its own — is never replaced by a scan, which also makes a second call do
+	 nothing rather than throw away the fonts the first one built.
+	 Nothing is parsed here. Each family keeps the catalogue entries of its faces and reads the
+	 outlines behind them when a reader first asks for a point size."
+
+	aFontCatalogue familyNames do: [ :name |
+		(self familyNamed: name) ifNil: [
+			self addFamily: (TrueTypeFontFamily baseCatalogueEntry:
+					 (aFontCatalogue entryOfFamilyNamed: name)) ] ]
+]
+
 { #category : 'initialization' }
 FontFamily class >> addFamily: aFontFamily [
 

@@ -18,6 +18,28 @@ Class {
 	#tag : 'Tests'
 }
 
+{ #category : 'private' }
+FontFamilyTest >> catalogueOfSixFacesInTwoFamilies [
+	"A catalogue of fonts nobody wrote to disk: three styles each of two families, met through
+	 addBytes:. The bytes carry a name table and an OS/2 table, which is all a scan reads, and
+	 no glyph tables at all — so a parse of one of them raises, which is how a test states that
+	 registering a family parsed nothing."
+
+	| catalogue |
+	catalogue := TTFontCatalogue new.
+	#( 'Source Sans Pro' 'Source Code Pro' ) do: [ :familyName |
+		{
+			{ 'Regular'. 400. false }.
+			{ 'Bold'. 700. false }.
+			{ 'Italic'. 400. true } } do: [ :style |
+			catalogue addBytes: (TTFontFixtures
+					 renderableFontBytesWithFamilyName: familyName
+					 styleName: style first
+					 weightClass: style second
+					 italic: style third) ] ].
+	^ catalogue
+]
+
 { #category : 'helpers' }
 FontFamilyTest >> makeFamilyNamed: aString [
 
@@ -42,6 +64,38 @@ FontFamilyTest >> tearDown [
 	savedEntries keysAndValuesDo: [ :k :v |
 		FontFamily availableFamilies at: k put: v ].
 	super tearDown
+]
+
+{ #category : 'tests' }
+FontFamilyTest >> testAddFamiliesFromACatalogueRegistersALazyFamilyPerNameAndLeavesThePosedOnesAlone [
+	"Unit 5.4: the registry takes its families from a catalogue. Four facts. One family per name
+	 the catalogue holds, under the name a font states rather than the lower-case key the
+	 catalogue indexes by. Each is a TrueTypeFontFamily. A family posed by hand under a name the
+	 catalogue also holds is left exactly where it was, since a scan is a floor and not an
+	 authority. And nothing was parsed: these fixtures carry no glyph tables, so the parse the
+	 first point size asks for is the one that raises."
+
+	| posed |
+	posed := self makeFamilyNamed: 'Source Sans Pro'.
+	FontFamily addFamily: posed.
+	FontFamily addFamiliesFrom: self catalogueOfSixFacesInTwoFamilies.
+	self
+		assert: FontFamily familyNames
+		equals: #( 'Source Code Pro' 'Source Sans Pro' ).
+	self assert: (FontFamily familyNamed: 'Source Sans Pro') identicalTo: posed.
+	self
+		assert: (FontFamily familyNamed: 'Source Code Pro') class
+		equals: TrueTypeFontFamily.
+	self
+		assert: (FontFamily familyNamed: 'Source Code Pro') familyName
+		equals: 'Source Code Pro'.
+	self
+		should: [ (FontFamily familyNamed: 'Source Code Pro') atPointSize: 12 ]
+		raise: Error
+		withExceptionDo: [ :error |
+			self
+				assert: error messageText
+				equals: 'Missing required TrueType table: head' ]
 ]
 
 { #category : 'tests' }
