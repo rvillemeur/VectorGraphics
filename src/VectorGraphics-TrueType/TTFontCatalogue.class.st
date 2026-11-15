@@ -82,8 +82,7 @@ TTFontCatalogue >> addSource: anObject metadata: aFontMetadata [
 { #category : 'accessing' }
 TTFontCatalogue >> drawableEntries [
 	"The faces I met and will answer for, in the order I met them. A consumer picking a face to
-	 draw with asks me this; refusedEntries is the other side of the same selection."
-
+	 draw with asks me this; rejectedEntries is the other side of the same selection."
 	^ entries reject: [ :each | each isRejected ]
 ]
 
@@ -207,7 +206,7 @@ TTFontCatalogue >> inspectorRefusals: aBuilder [
 
 	<inspectorPresentationOrder: 20 title: 'Refusals'>
 	| byReason |
-	byReason := self refusedEntries groupedBy: [ :each | each rejectionReason ].
+	byReason := self rejectedEntries groupedBy: [ :each | each rejectionReason ].
 	^ aBuilder newTable
 		  addColumn: ((SpStringTableColumn
 				    title: 'Reason'
@@ -226,7 +225,7 @@ TTFontCatalogue >> inspectorRefusals: aBuilder [
 ]
 
 { #category : 'accessing' }
-TTFontCatalogue >> refusedEntries [
+TTFontCatalogue >> rejectedEntries [
 	"The files I met and will not answer for, each carrying the reason it gave. Derived from my
 	 entries rather than kept beside them, so no second collection can fall out of step."
 

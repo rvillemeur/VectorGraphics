@@ -138,7 +138,7 @@ TTFontCatalogueTest >> testAFreshCatalogueAndAnEmptyDirectoryBothAnswerNothing [
 	catalogue := TTFontCatalogue new.
 	self assert: catalogue entries isEmpty.
 	self assert: catalogue familyNames isEmpty.
-	self assert: catalogue refusedEntries isEmpty.
+	self assert: catalogue rejectedEntries isEmpty.
 	directory := FileSystem memory root / 'empty'.
 	directory ensureCreateDirectory.
 	catalogue scanDirectory: directory.
@@ -156,7 +156,7 @@ TTFontCatalogueTest >> testARefusedFileIsKeptWithItsReasonAndIsNotIndexed [
 	catalogue := TTFontCatalogue new.
 	entry := catalogue addBytes: TTFontFixtures otfFontBytes.
 	self assert: catalogue entries asArray equals: { entry }.
-	self assert: catalogue refusedEntries asArray equals: { entry }.
+	self assert: catalogue rejectedEntries asArray equals: { entry }.
 	self assert: entry metadata rejectionReason equals: #noGlyfTable.
 	self assert: entry metadata familyName equals: 'Waree'.
 	self assert: catalogue entriesByFamilyName isEmpty.
@@ -249,7 +249,7 @@ TTFontCatalogueTest >> testScanningADirectoryAnswersAFamilyPerNameAndAnEntryPerF
 		assert: catalogue familyNames asArray
 		equals: #( 'Source Code Pro' 'Source Sans Pro' ).
 	self
-		assert: (catalogue refusedEntries collect: [ :each |
+		assert: (catalogue rejectedEntries collect: [ :each |
 				 each metadata rejectionReason ]) asArray asSet
 		equals: #( #notAnSfntFont ) asSet
 ]
@@ -264,7 +264,7 @@ TTFontCatalogueTest >> testTheDrawableEntriesAreTheOnesLeftWhenTheRefusalsAreTak
 	catalogue := self catalogueScannedOverTheFixtureDirectory.
 	self assert: catalogue drawableEntries size equals: 6.
 	self
-		assert: catalogue drawableEntries size + catalogue refusedEntries size
+		assert: catalogue drawableEntries size + catalogue rejectedEntries size
 		equals: catalogue entries size.
 	self deny: (catalogue drawableEntries anySatisfy: [ :each | each isRejected ]).
 	self assert: TTFontCatalogue new drawableEntries isEmpty

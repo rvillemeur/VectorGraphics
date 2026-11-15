@@ -456,7 +456,7 @@ VGFontManager >> rejectedFiles [
 	 reader who cannot find a family can ask why. The catalogue derives the list from the
 	 entries it kept, so this is not a second collection that could fall out of step."
 
-	^ self catalogue refusedEntries
+	^ self catalogue rejectedEntries
 ]
 
 { #category : 'initialization' }

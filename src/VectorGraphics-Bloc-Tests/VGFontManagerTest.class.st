@@ -29,7 +29,7 @@ VGFontManagerTest >> testADirectoryScanReadsEveryFileAndJudgesItByItsContent [
 	self assert: manager faceEntries size equals: 1.
 	self assert: manager catalogue entries size equals: 2.
 	self
-		assert: (manager catalogue refusedEntries collect: [ :each |
+		assert: (manager catalogue rejectedEntries collect: [ :each |
 				 each metadata rejectionReason ]) asArray
 		equals: #( #notAnSfntFont )
 ]
