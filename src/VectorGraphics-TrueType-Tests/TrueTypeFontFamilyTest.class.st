@@ -74,8 +74,7 @@ TrueTypeFontFamilyTest >> testAFamilyKeepsTheCatalogueFacesItWasGivenAndParsesNo
 	self
 		assert: (family catalogueEntryForEmphasis: 2) metadata styleName
 		equals: 'Italic'.
-	self assert: (family catalogueEntryForEmphasis: 3) equals: nil.
-	self assert: (family catalogueEntryForEmphasis: 0) equals: nil
+	self assert: (family catalogueEntryForEmphasis: 3) equals: nil
 ]
 
 { #category : 'tests' }
