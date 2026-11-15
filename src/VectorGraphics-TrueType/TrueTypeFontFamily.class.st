@@ -24,10 +24,7 @@ Class {
 	#name : 'TrueTypeFontFamily',
 	#superclass : 'FontFamily',
 	#instVars : [
-		'baseTTFontDescription',
-		'ttFontDescriptionsByEmphasis',
-		'baseCatalogueEntry',
-		'catalogueEntriesByEmphasis'
+		'facesByEmphasis'
 	],
 	#category : 'VectorGraphics-TrueType-Fonts',
 	#package : 'VectorGraphics-TrueType',
@@ -85,19 +82,27 @@ TrueTypeFontFamily >> addCatalogueEntry: aCatalogueEntry [
 	| emphasis |
 	emphasis := self class emphasisOfCatalogueEntry: aCatalogueEntry.
 	emphasis = 0 ifTrue: [ ^ self ].
-	catalogueEntriesByEmphasis at: emphasis ifAbsentPut: [ aCatalogueEntry ]
+	facesByEmphasis
+		at: emphasis
+		ifAbsentPut: [ TTFamilyFace catalogueEntry: aCatalogueEntry ]
 ]
 
 { #category : 'initialization' }
 TrueTypeFontFamily >> addTTFontDescription: aTTFontDescription [
+	"File a face of mine that is already parsed, under the emphasis it states."
 
-	ttFontDescriptionsByEmphasis
+	facesByEmphasis
 		at: aTTFontDescription emphasis
-		put: aTTFontDescription
+		put: (TTFamilyFace ttFontDescription: aTTFontDescription)
 ]
 
 { #category : 'accessing' }
 TrueTypeFontFamily >> atPointSize: aNumber [
+	"My plain font at a size, with the fonts of every face I have already parsed hung off it as
+	 its derivatives. The faces still pending are left alone: building them here would parse
+	 every face of mine the moment a reader asks for the plain one. A reader that asks for an
+	 emphasis gets it through fontForEmphasis:pointSize:, which parses that one face."
+
 	| baseFont |
 	baseFontBySizes at: aNumber ifPresent: [ :existingBaseFont | ^ existingBaseFont ].
 	baseFont := TrueTypeFont
@@ -105,14 +110,15 @@ TrueTypeFontFamily >> atPointSize: aNumber [
 		            ttFontDescription: self baseTTFontDescription
 		            pointSize: aNumber.
 	baseFontBySizes at: aNumber put: baseFont.
-	ttFontDescriptionsByEmphasis do: [ :emphasizedTTFontDescription |
-		| emphasizedFont |
-		emphasizedFont := TrueTypeFont
-			                  family: self
-			                  ttFontDescription: emphasizedTTFontDescription
-			                  pointSize: aNumber.
-		emphasizedFont baseFont: baseFont.
-		baseFont addDerivativeFont: emphasizedFont ].
+	facesByEmphasis keysAndValuesDo: [ :emphasis :face |
+		(emphasis ~= 0 and: [ face isParsed ]) ifTrue: [
+			| emphasizedFont |
+			emphasizedFont := TrueTypeFont
+				                  family: self
+				                  ttFontDescription: face ttFontDescription
+				                  pointSize: aNumber.
+			emphasizedFont baseFont: baseFont.
+			baseFont addDerivativeFont: emphasizedFont ] ].
 	^ baseFont
 ]
 
@@ -124,11 +130,8 @@ TrueTypeFontFamily >> baseCatalogueEntry: aCatalogueEntry [
 
 	familyName := aCatalogueEntry familyName.
 	baseFontBySizes := Dictionary new.
-	baseCatalogueEntry := aCatalogueEntry.
-	catalogueEntriesByEmphasis ifNil: [
-		catalogueEntriesByEmphasis := Dictionary new ].
-	ttFontDescriptionsByEmphasis ifNil: [
-		ttFontDescriptionsByEmphasis := Dictionary new ]
+	facesByEmphasis := Dictionary new.
+	facesByEmphasis at: 0 put: (TTFamilyFace catalogueEntry: aCatalogueEntry)
 ]
 
 { #category : 'accessing' }
@@ -138,9 +141,7 @@ TrueTypeFontFamily >> baseTTFontDescription [
 	 font costs is paid by the first reader that needs an outline, not by the scan that met the
 	 file. A family built from a description already has it."
 
-	^ baseTTFontDescription ifNil: [
-		  baseTTFontDescription := TTFontReader readTTFFrom:
-			                           baseCatalogueEntry bytes ]
+	^ (facesByEmphasis at: 0) ttFontDescription
 ]
 
 { #category : 'initialization' }
@@ -148,19 +149,19 @@ TrueTypeFontFamily >> baseTTFontDescription: aTTFontDescription [
 	self assert: aTTFontDescription emphasis = 0.
 	familyName := aTTFontDescription familyName.
 	baseFontBySizes := Dictionary new.
-	baseTTFontDescription := aTTFontDescription.
-	catalogueEntriesByEmphasis ifNil: [
-		catalogueEntriesByEmphasis := Dictionary new ].
-	ttFontDescriptionsByEmphasis ifNil: [
-		ttFontDescriptionsByEmphasis := Dictionary new ]
+	facesByEmphasis := Dictionary new.
+	facesByEmphasis
+		at: 0
+		put: (TTFamilyFace ttFontDescription: aTTFontDescription)
 ]
 
 { #category : 'accessing' }
 TrueTypeFontFamily >> catalogueEntryForEmphasis: anInteger [
-	"The face of mine a reader asking for that emphasis would draw with, or nil when I hold no
-	 such face and the caller must fall back. Reading it parses nothing."
+	"The catalogue entry of the face a reader asking for that emphasis would draw with, or nil
+	 when I hold no such face and the caller must fall back — and nil as well for a face posed
+	 as a parsed description, which no catalogue met. Reading it parses nothing."
 
-	^ catalogueEntriesByEmphasis at: anInteger ifAbsent: [ nil ]
+	^ (facesByEmphasis at: anInteger ifAbsent: [ ^ nil ]) catalogueEntry
 ]
 
 { #category : 'initialization' }
@@ -182,20 +183,14 @@ TrueTypeFontFamily >> folderName [
 
 { #category : 'accessing' }
 TrueTypeFontFamily >> fontForEmphasis: anInteger pointSize: aNumber [
-	"The font of this family for an emphasis, built from the catalogue face filed under that
-	 emphasis and parsed here, at the first ask — registration parses nothing. Answers nil when
-	 no face of this family carries the emphasis, which leaves the caller its own fallbacks."
+	"The font of this family for an emphasis, built from the face filed under that emphasis and
+	 parsed here, at the first ask — registration parses nothing. Answers nil when no face of
+	 this family carries the emphasis, which leaves the caller its own fallbacks."
 
-	| description baseFontOfSize font |
-	description := ttFontDescriptionsByEmphasis
-		               at: anInteger
-		               ifAbsent: [
-			               | entry parsed |
-			               entry := self catalogueEntryForEmphasis: anInteger.
-			               entry ifNil: [ ^ nil ].
-			               parsed := TTFontReader readTTFFrom: entry bytes.
-			               self addTTFontDescription: parsed.
-			               parsed ].
+	| face description baseFontOfSize font |
+	face := facesByEmphasis at: anInteger ifAbsent: [ ^ nil ].
+	anInteger = 0 ifTrue: [ ^ self atPointSize: aNumber ].
+	description := face ttFontDescription.
 	baseFontOfSize := self atPointSize: aNumber.
 	font := TrueTypeFont
 		        family: self
@@ -208,10 +203,10 @@ TrueTypeFontFamily >> fontForEmphasis: anInteger pointSize: aNumber [
 
 { #category : 'testing' }
 TrueTypeFontFamily >> hasParsedEmphasis: anInteger [
-	"Have the outlines of the face I hold for this emphasis been read? Asking never reads them."
+	"Have the outlines of the face I hold for this emphasis been read? Asking never reads them,
+	 and an emphasis I hold no face for answers false."
 
-	anInteger = 0 ifTrue: [ ^ baseTTFontDescription notNil ].
-	^ ttFontDescriptionsByEmphasis includesKey: anInteger
+	^ (facesByEmphasis at: anInteger ifAbsent: [ ^ false ]) isParsed
 ]
 
 { #category : 'testing' }
@@ -231,10 +226,6 @@ TrueTypeFontFamily >> inspectorFaces: aBuilder [
 	 it says 'pending' on every row."
 
 	<inspectorPresentationOrder: 10 title: 'Faces'>
-	| emphases |
-	emphases := (catalogueEntriesByEmphasis keys
-	             , ttFontDescriptionsByEmphasis keys asArray , #( 0 )) asSet
-		            asSortedCollection asArray.
 	^ aBuilder newTable
 		  addColumn: ((SpStringTableColumn
 				    title: 'Emphasis'
@@ -250,7 +241,7 @@ TrueTypeFontFamily >> inspectorFaces: aBuilder [
 					   (self hasParsedEmphasis: each)
 						   ifTrue: [ 'parsed' ]
 						   ifFalse: [ 'pending' ] ]);
-		  items: emphases;
+		  items: facesByEmphasis keys asSortedCollection asArray;
 		  yourself
 ]
 
@@ -268,16 +259,8 @@ TrueTypeFontFamily >> pointSizes [
 
 { #category : 'accessing' }
 TrueTypeFontFamily >> styleNameOfEmphasis: anInteger [
-	"What the face I hold for this emphasis calls its style — 'Regular', 'Bold', 'Italic'. Read
-	 from the catalogue entry when there is one, from the parsed description otherwise, and
-	 nil when I hold neither. Asking parses nothing."
+	"What the face I hold for this emphasis calls its style — 'Regular', 'Bold', 'Italic' — and
+	 nil for an emphasis I hold no face for. Asking parses nothing."
 
-	| entry |
-	entry := anInteger = 0
-		         ifTrue: [ baseCatalogueEntry ]
-		         ifFalse: [ self catalogueEntryForEmphasis: anInteger ].
-	entry ifNotNil: [ ^ entry metadata styleName ].
-	anInteger = 0 ifTrue: [ ^ baseTTFontDescription ifNotNil: [ :each | each fullName ] ].
-	^ (ttFontDescriptionsByEmphasis at: anInteger ifAbsent: [ nil ])
-		  ifNotNil: [ :each | each fullName ]
+	^ (facesByEmphasis at: anInteger ifAbsent: [ ^ nil ]) styleName
 ]
