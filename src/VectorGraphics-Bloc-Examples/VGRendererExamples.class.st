@@ -87,8 +87,7 @@ VGRendererExamples class >> openWindowWithTextDrawnWithoutCairo [
 	<sampleInstance>
 	| previousRenderer previousManager space |
 	previousRenderer := BlHostRenderer preferableClass.
-	previousManager := (AeFontManager class slotNamed: #globalInstance) read:
-		                   AeFontManager.
+	previousManager := VGFontManager managerUpstreamHolds.
 	VGFontManager installGlobally.
 	AeFontManager globalInstance scanDirectory:
 		AeFilesystemResources fontsDirectory.
@@ -98,11 +97,9 @@ VGRendererExamples class >> openWindowWithTextDrawnWithoutCairo [
 	space extent: 320 @ 160.
 	space title: 'Text drawn without Cairo, fonts of ours'.
 	space root addChild: self textSceneInTwoSizes.
-	space when: BlSpaceClosedEvent doOnce: [ :event |
+	space addEventHandlerOn: BlSpaceClosedEvent doOnce: [ :event |
 		BlHostRenderer preferableClass: previousRenderer.
-		(AeFontManager class slotNamed: #globalInstance)
-			write: previousManager
-			to: AeFontManager.
+		VGFontManager restoreUpstreamManager: previousManager.
 		VGOffscreen resetInstance ].
 	space show.
 	^ space

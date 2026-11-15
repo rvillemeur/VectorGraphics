@@ -18,28 +18,24 @@ Class {
 
 { #category : 'running' }
 VGFontManagerInstallationTest >> setUp [
-	"Remember both slots before a test writes either of them. Upstream's is read by reflection
-	 on purpose: sending globalInstance would build a whole AeFontManager, FreeType and all,
-	 just to tell me what was there."
+	"Remember both slots before a test writes either of them."
 
 	super setUp.
-	previousGlobalInstance := (AeFontManager class slotNamed: #globalInstance)
-		                          read: AeFontManager.
+	previousGlobalInstance := VGFontManager managerUpstreamHolds.
 	previousInstalledInstance := VGFontManager installedInstance
 ]
 
 { #category : 'running' }
 VGFontManagerInstallationTest >> tearDown [
-	"Put the image back the way I found it, whichever way the test went. Both slots are written
-	 directly, since uninstallGlobally would leave upstream's at nil and this image had a
-	 manager there before I ran."
+	"Put the image back the way I found it, whichever way the test went. Upstream's slot is
+	 written through the project's own writer, since uninstallGlobally would leave it at nil and
+	 this image had a manager there before I ran. Ours is written directly, having no writer of
+	 its own."
 
 	(VGFontManager class slotNamed: #installedInstance)
 		write: previousInstalledInstance
 		to: VGFontManager.
-	(AeFontManager class slotNamed: #globalInstance)
-		write: previousGlobalInstance
-		to: AeFontManager.
+	VGFontManager restoreUpstreamManager: previousGlobalInstance.
 	super tearDown
 ]
 
@@ -136,4 +132,28 @@ VGFontManagerInstallationTest >> testTheManagerPosedAnswersTheDefaultFamiliesUps
 	self
 		assert: AeFontManager globalInstance defaultFace class
 		equals: VGFontFace
+]
+
+{ #category : 'tests' }
+VGFontManagerInstallationTest >> testTheUpstreamSlotIsReadAndWrittenWithoutEverBuildingAManager [
+	"The two readers every test and example of this project uses to save and put back the
+	 manager Bloc asks for its faces. Three facts: the reader answers what the slot holds,
+	 nil included, writing one back makes it what the slot holds, and neither of them sends
+	 `globalInstance` — which is the whole point, since that getter builds a FreeType manager
+	 just to say what was there."
+	| posed |
+	VGFontManager uninstallGlobally.
+	self assert: VGFontManager managerUpstreamHolds equals: nil.
+	VGFontManager installGlobally.
+	posed := VGFontManager installedInstance.
+	self assert: VGFontManager managerUpstreamHolds identicalTo: posed.
+	VGFontManager restoreUpstreamManager: nil.
+	self assert: VGFontManager managerUpstreamHolds equals: nil.
+	VGFontManager restoreUpstreamManager: posed.
+	self
+		assert: ((AeFontManager class slotNamed: #globalInstance) read: AeFontManager)
+		identicalTo: posed.
+	#( #managerUpstreamHolds #restoreUpstreamManager: ) do: [ :selector |
+		self deny:
+			((VGFontManager class >> selector) messages includes: #globalInstance) ]
 ]

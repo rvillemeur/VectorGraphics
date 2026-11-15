@@ -424,8 +424,7 @@ VGRendererTest >> testTheWindowSceneDrawsTextOfTwoSizesInACatalogueFamily [
 	 top of the manager's default faces, because that is where Cascadia Code is."
 
 	| space scene drawn previousManager |
-	previousManager := (AeFontManager class slotNamed: #globalInstance) read:
-		                   AeFontManager.
+	previousManager := VGFontManager managerUpstreamHolds.
 	VGFontManager installGlobally.
 	AeFontManager globalInstance scanDirectory:
 		AeFilesystemResources fontsDirectory.
@@ -454,9 +453,7 @@ VGRendererTest >> testTheWindowSceneDrawsTextOfTwoSizesInACatalogueFamily [
 		space close.
 		VGPixelBufferHost cleanUp.
 		VGOffscreen resetInstance.
-		(AeFontManager class slotNamed: #globalInstance)
-			write: previousManager
-			to: AeFontManager ]
+		VGFontManager restoreUpstreamManager: previousManager ]
 ]
 
 { #category : 'private' }

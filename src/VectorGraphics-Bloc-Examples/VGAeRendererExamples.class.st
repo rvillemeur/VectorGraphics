@@ -29,8 +29,7 @@ VGAeRendererExamples class >> openWindowWithTextDrawnByCairo [
 	<sampleInstance>
 	| previousRenderer previousManager space |
 	previousRenderer := BlHostRenderer preferableClass.
-	previousManager := (AeFontManager class slotNamed: #globalInstance) read:
-		                   AeFontManager.
+	previousManager := VGFontManager managerUpstreamHolds.
 	VGFontManager installGlobally.
 	AeFontManager globalInstance scanDirectory:
 		AeFilesystemResources fontsDirectory.
@@ -40,11 +39,9 @@ VGAeRendererExamples class >> openWindowWithTextDrawnByCairo [
 	space extent: 320 @ 160.
 	space title: 'Text drawn by Cairo, fonts of ours'.
 	space root addChild: self textSceneInTwoSizes.
-	space when: BlSpaceClosedEvent doOnce: [ :event |
+	space addEventHandlerOn: BlSpaceClosedEvent doOnce: [ :event |
 		BlHostRenderer preferableClass: previousRenderer.
-		(AeFontManager class slotNamed: #globalInstance)
-			write: previousManager
-			to: AeFontManager.
+		VGFontManager restoreUpstreamManager: previousManager.
 		VGAeOffscreen resetInstance ].
 	space show.
 	^ space
@@ -77,8 +74,7 @@ VGAeRendererExamples class >> spaceWithTextDrawnIntoAPixelBuffer [
 
 	| previousRenderer previousManager space element |
 	previousRenderer := BlHostRenderer preferableClass.
-	previousManager := (AeFontManager class slotNamed: #globalInstance) read:
-		                   AeFontManager.
+	previousManager := VGFontManager managerUpstreamHolds.
 	space := BlSpace new
 		         host: VGPixelBufferHost default;
 		         yourself.
@@ -99,9 +95,7 @@ VGAeRendererExamples class >> spaceWithTextDrawnIntoAPixelBuffer [
 		VGPixelBufferHost cleanUp.
 		VGAeOffscreen resetInstance.
 		BlHostRenderer preferableClass: previousRenderer.
-		(AeFontManager class slotNamed: #globalInstance)
-			write: previousManager
-			to: AeFontManager ]
+		VGFontManager restoreUpstreamManager: previousManager ]
 ]
 
 { #category : 'examples' }

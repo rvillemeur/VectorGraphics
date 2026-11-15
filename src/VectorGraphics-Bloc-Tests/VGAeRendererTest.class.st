@@ -51,8 +51,7 @@ VGAeRendererTest >> setUp [
 
 	super setUp.
 	previousRendererClass := BlHostRenderer preferableClass.
-	previousFontManager := (AeFontManager class slotNamed: #globalInstance) read:
-		                       AeFontManager
+	previousFontManager := VGFontManager managerUpstreamHolds
 ]
 
 { #category : 'running' }
@@ -61,9 +60,7 @@ VGAeRendererTest >> tearDown [
 	 otherwise decide how the rest of the image draws and finds its fonts."
 
 	BlHostRenderer preferableClass: previousRendererClass.
-	(AeFontManager class slotNamed: #globalInstance)
-		write: previousFontManager
-		to: AeFontManager.
+	VGFontManager restoreUpstreamManager: previousFontManager.
 	VGAeOffscreen resetInstance.
 	super tearDown
 ]

@@ -95,6 +95,16 @@ VGFontManager class >> installedInstance [
 	^ installedInstance
 ]
 
+{ #category : 'installing' }
+VGFontManager class >> managerUpstreamHolds [
+	"What `AeFontManager` holds in its own class slot right now, nil included. The slot is read
+	 by reflection rather than by sending `AeFontManager globalInstance`, which builds a whole
+	 manager, FreeType and all, when the slot is nil — a test or an example that only wants to
+	 put the image back as it found it must not create one on the way."
+
+	^ (AeFontManager class slotNamed: #globalInstance) read: AeFontManager
+]
+
 { #category : 'instance creation' }
 VGFontManager class >> newWithDefaultFaces [
 	"A manager that can draw before anything registers anything: the six faces a package
@@ -115,6 +125,17 @@ VGFontManager class >> newWithDefaultFaces [
 	manager defaultCodeFace: (manager defaultFaceOfFamilyNamed:
 			 AeSourceCodePro_Regular familyName).
 	^ manager
+]
+
+{ #category : 'installing' }
+VGFontManager class >> restoreUpstreamManager: aFontManagerOrNil [
+	"Put back in `AeFontManager`'s class slot whatever `managerUpstreamHolds` answered before
+	 this project posed its own. Takes nil, because an image that had never asked for a face
+	 holds nil there, and `uninstallGlobally` would leave it nil whatever was there before."
+
+	(AeFontManager class slotNamed: #globalInstance)
+		write: aFontManagerOrNil
+		to: AeFontManager
 ]
 
 { #category : 'system startup' }
