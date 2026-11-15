@@ -205,21 +205,6 @@ VGFontManager >> catalogue [
 	^ catalogue
 ]
 
-{ #category : 'accessing' }
-VGFontManager >> defaultFaceOfFamilyNamed: aFamilyName [
-	"The regular face of a family, for a caller that wants it as a default to fall back on. The
-	 absence is an error naming the family: a default face left nil would come back as nil from
-	 BAFontConverter >> faceFor:, and the breakage would appear in the drawing rather than
-	 here."
-
-	^ self
-		  detectFamilyName: aFamilyName
-		  slant: AeFontSlant normal
-		  weight: AeFontWeight normal
-		  stretch: AeFontStretch normal
-		  ifNone: [ Error signal: 'No face registered for the family ' , aFamilyName ]
-]
-
 { #category : 'accessing - faces' }
 VGFontManager >> defaultFaceOfFirstFamilyNamedIn: familyNames [
 	"The face of the first family of an ordered preference list that this machine holds, for a
