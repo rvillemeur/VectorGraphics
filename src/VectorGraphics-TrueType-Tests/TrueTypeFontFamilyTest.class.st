@@ -81,22 +81,21 @@ TrueTypeFontFamilyTest >> testAFamilyKeepsTheCatalogueFacesItWasGivenAndParsesNo
 { #category : 'tests' }
 TrueTypeFontFamilyTest >> testARealFaceIsParsedAtTheFirstAskForAFontAndNotBefore [
 	"The same fact as the fixtures state, on a font of this machine, where the parse succeeds
-	 instead of raising: a family registered from a catalogue holds no description until a
-	 reader asks it for a font, and the font it then answers draws that face at the size asked."
+	 instead of raising: a family registered from a catalogue has read nothing until a reader
+	 asks it for a font, and the font it then answers draws that face at the size asked."
 
 	| catalogue family font |
 	catalogue := TTFontCatalogue new.
 	catalogue addFile: TrueTypeExamples defaultFontPath asFileReference.
-	family := TrueTypeFontFamily baseCatalogueEntry:
-		          (catalogue entryOfFamilyNamed: catalogue familyNames first).
+	family := TrueTypeFontFamily
+		          fromCatalogue: catalogue
+		          familyNamed: catalogue familyNames first.
 
-	self
-		assert: (family instVarNamed: 'baseTTFontDescription')
-		equals: nil.
+	self deny: (family hasParsedEmphasis: 0).
 
 	font := family atPointSize: 12.
 
-	self deny: (family instVarNamed: 'baseTTFontDescription') isNil.
+	self assert: (family hasParsedEmphasis: 0).
 	self assert: font pointSize equals: 12.
 	self assert: font familyName equals: family familyName
 ]
