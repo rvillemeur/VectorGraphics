@@ -21,6 +21,16 @@ Class {
 }
 
 { #category : 'private' }
+VGAeRendererTest >> cachedFacesAndSizesOf: aCanvas [
+	"The scaled fonts a canvas built, as face -> size, ordered by size. They are read from the
+	 cache because a span resolves its scaled font while it is being measured, and the frame
+	 canvas is then handed the font that measuring built."
+
+	^ ((aCanvas instVarNamed: 'scaledFontCache') keys collect: [ :each |
+		   each first -> each second ]) asArray sort: [ :a :b | a value < b value ]
+]
+
+{ #category : 'private' }
 VGAeRendererTest >> exportSelectorsWithNoOverrideYet [
 	"The class-side export methods of `BARenderer` this route does not redefine. Their upstream
 	 bodies reach Alexandrie's own canvas — `newFormFrom:` through `aeAsForm`, `write:asPngTo:`
@@ -177,4 +187,64 @@ VGAeRendererTest >> testTheRendererIsOneBlocCanChooseAndNamesItselfApartFromTheO
 	self assert: (BlHostRenderer availableClasses includes: VGAeRenderer).
 	self deny: VGAeRenderer label equals: BARenderer label.
 	self deny: VGAeRenderer label equals: VGRenderer label
+]
+
+{ #category : 'tests' }
+VGAeRendererTest >> testTheWindowSceneDrawsTextOfTwoSizesInACatalogueFamily [
+	"The gate of unit 5.3. The scene the window example shows is drawn here on a host with no
+	 window, because a real window blocks the image until a reader closes it. Three facts: the
+	 frame reached the pixels the host lent, the scene names one family in two sizes, and the
+	 scaled fonts the frame resolved are faces of ours carrying that very family at those two
+	 sizes — so a reader of the window sees the font the catalogue found on the disk, not a
+	 silent fallback on the default face.
+	 The manager is posed with its default faces, which are the two Source families Pharo
+	 embeds, so the font directory Pharo ships is scanned on top of them: 2 ms, and the only
+	 place Cascadia Code is found."
+
+	| space scene drawn |
+	VGFontManager installGlobally.
+	AeFontManager globalInstance scanDirectory:
+		AeFilesystemResources fontsDirectory.
+	BlHostRenderer preferableClass: VGAeRenderer.
+	VGAeOffscreen resetInstance.
+	scene := VGAeRendererExamples textSceneInTwoSizes.
+	space := BlSpace new
+		         host: VGPixelBufferHost default;
+		         yourself.
+	space extent: 320 @ 160.
+	space root addChild: scene.
+	[
+	space show.
+	space settleForDuration: 5 seconds.
+	self deny: (space hostSpace pixels allSatisfy: [ :each | each = 0 ]).
+	self
+		assert: (self textFamiliesAndSizesIn: scene)
+		equals: { ('Cascadia Code' -> 12). ('Cascadia Code' -> 36) }.
+	drawn := self cachedFacesAndSizesOf: VGAeOffscreen instance canvas.
+	self
+		assert: (drawn collect: [ :each | each key class -> each value ])
+		equals: { (VGFontFace -> 12). (VGFontFace -> 36) }.
+	self
+		assert: (drawn collect: [ :each | each key familyName -> each value ])
+		equals: { ('Cascadia Code' -> 12). ('Cascadia Code' -> 36) } ] ensure: [
+		space close.
+		VGPixelBufferHost cleanUp.
+		VGFontManager uninstallGlobally ]
+]
+
+{ #category : 'private' }
+VGAeRendererTest >> textFamiliesAndSizesIn: aScene [
+	"Every text element of a scene as family name -> font size, ordered by size, so that a test
+	 states what a reader of the window sees rather than the order the children happen to be
+	 in."
+
+	^ ((aScene children select: [ :each | each isKindOf: BlTextElement ])
+		   collect: [ :each |
+			   | attributes |
+			   attributes := each text attributesAt: 1.
+			   (attributes detect: [ :attribute |
+				    attribute isKindOf: BlFontFamilyAttribute ]) name
+			   -> (attributes detect: [ :attribute |
+					    attribute isKindOf: BlFontSizeAttribute ]) size ]) asArray
+		  sort: [ :a :b | a value < b value ]
 ]

@@ -16,6 +16,41 @@ Class {
 }
 
 { #category : 'examples' }
+VGAeRendererExamples class >> openWindowWithTextDrawnByCairo [
+	"The deliverable of unit 5.3: a real window of this machine, every pixel of it rasterised by
+	 Cairo, with the glyphs read and scaled by this project and no FreeType face anywhere in the
+	 route. Click it and read the two lines; close the window and the image is as it was.
+	 The window has to outlive this method, so the renderer and the font manager cannot be put
+	 back in an `ensure:`: a frame resolves its faces through `AeFontManager globalInstance`
+	 again on every repaint. They are put back when the window closes instead.
+	 The font directory Pharo ships is scanned on top of the manager's default faces, because
+	 that is where Cascadia Code is, which the scene names."
+
+	<sampleInstance>
+	| previousRenderer previousManager space |
+	previousRenderer := BlHostRenderer preferableClass.
+	previousManager := (AeFontManager class slotNamed: #globalInstance) read:
+		                   AeFontManager.
+	VGFontManager installGlobally.
+	AeFontManager globalInstance scanDirectory:
+		AeFilesystemResources fontsDirectory.
+	BlHostRenderer preferableClass: VGAeRenderer.
+	VGAeOffscreen resetInstance.
+	space := BlSpace new.
+	space extent: 320 @ 160.
+	space title: 'Text drawn by Cairo, fonts of ours'.
+	space root addChild: self textSceneInTwoSizes.
+	space when: BlSpaceClosedEvent doOnce: [ :event |
+		BlHostRenderer preferableClass: previousRenderer.
+		(AeFontManager class slotNamed: #globalInstance)
+			write: previousManager
+			to: AeFontManager.
+		VGAeOffscreen resetInstance ].
+	space show.
+	^ space
+]
+
+{ #category : 'examples' }
 VGAeRendererExamples class >> rendererPreparedForAHostSpace [
 	<sampleInstance>
 	"A renderer as a host space holds it: one canvas for the frame and one text measurer for
@@ -67,4 +102,32 @@ VGAeRendererExamples class >> spaceWithTextDrawnIntoAPixelBuffer [
 		(AeFontManager class slotNamed: #globalInstance)
 			write: previousManager
 			to: AeFontManager ]
+]
+
+{ #category : 'examples' }
+VGAeRendererExamples class >> textSceneInTwoSizes [
+	"The scene the window example of this route shows: one line of text in two sizes, on a
+	 background that makes the compositing visible. The family is named rather than left to the
+	 default face, so that what a reader sees is the font the catalogue found on the disk; Pharo
+	 bundles Cascadia Code, so the name holds in any image of it.
+	 The sister route has a scene of its own. The two are the same today and are kept apart on
+	 purpose: each example reads on its own, and two occurrences are not yet a rule."
+
+	<sampleInstance>
+	| scene |
+	scene := BlElement new
+		         extent: 320 @ 160;
+		         background: (Color gray: 0.95);
+		         yourself.
+	#( 12 36 ) doWithIndex: [ :size :index |
+		| text |
+		text := 'Drawn with our own fonts' asRopedText.
+		text
+			fontName: 'Cascadia Code';
+			fontSize: size.
+		scene addChild: (BlTextElement new
+				 text: text;
+				 position: 20 @ (20 + (index - 1 * 60));
+				 yourself) ].
+	^ scene
 ]

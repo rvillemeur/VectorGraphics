@@ -71,6 +71,43 @@ VGRendererExamples class >> offscreenTextMeasurer [
 		  yourself
 ]
 
+{ #category : 'examples' }
+VGRendererExamples class >> openWindowWithTextDrawnWithoutCairo [
+	"A real window of this machine drawn by this project alone: no Cairo anywhere, our own
+	 glyphs, our own compositing. Click it and read the two lines; close the window and the
+	 image is as it was. It proves nothing about FONT-PLAN, which is about the Cairo route, and
+	 it is kept as the sibling of `VGAeRendererExamples class >>
+	 openWindowWithTextDrawnByCairo` because the same faces serve both.
+	 The window has to outlive this method, so the renderer and the font manager cannot be put
+	 back in an `ensure:`: a frame resolves its faces through `AeFontManager globalInstance`
+	 again on every repaint. They are put back when the window closes instead.
+	 The font directory Pharo ships is scanned on top of the manager's default faces, because
+	 that is where Cascadia Code is, which the scene names."
+
+	<sampleInstance>
+	| previousRenderer previousManager space |
+	previousRenderer := BlHostRenderer preferableClass.
+	previousManager := (AeFontManager class slotNamed: #globalInstance) read:
+		                   AeFontManager.
+	VGFontManager installGlobally.
+	AeFontManager globalInstance scanDirectory:
+		AeFilesystemResources fontsDirectory.
+	BlHostRenderer preferableClass: VGRenderer.
+	VGOffscreen resetInstance.
+	space := BlSpace new.
+	space extent: 320 @ 160.
+	space title: 'Text drawn without Cairo, fonts of ours'.
+	space root addChild: self textSceneInTwoSizes.
+	space when: BlSpaceClosedEvent doOnce: [ :event |
+		BlHostRenderer preferableClass: previousRenderer.
+		(AeFontManager class slotNamed: #globalInstance)
+			write: previousManager
+			to: AeFontManager.
+		VGOffscreen resetInstance ].
+	space show.
+	^ space
+]
+
 { #category : 'examples - exporters' }
 VGRendererExamples class >> pngExporterForAnElement [
 	"The PNG exporter itself, with an element and a target in an in-memory file system, so the
@@ -146,4 +183,32 @@ VGRendererExamples class >> spaceDrawnIntoAPixelBuffer [
 			space close.
 			VGPixelBufferHost cleanUp.
 			BlHostRenderer preferableClass: previous ]
+]
+
+{ #category : 'examples' }
+VGRendererExamples class >> textSceneInTwoSizes [
+	"The scene the window example of this route shows: one line of text in two sizes, on a
+	 background that makes the compositing visible. The family is named rather than left to the
+	 default face, so that what a reader sees is the font the catalogue found on the disk; Pharo
+	 bundles Cascadia Code, so the name holds in any image of it.
+	 The sister route has a scene of its own. The two are the same today and are kept apart on
+	 purpose: each example reads on its own, and two occurrences are not yet a rule."
+
+	<sampleInstance>
+	| scene |
+	scene := BlElement new
+		         extent: 320 @ 160;
+		         background: (Color gray: 0.95);
+		         yourself.
+	#( 12 36 ) doWithIndex: [ :size :index |
+		| text |
+		text := 'Drawn without Cairo' asRopedText.
+		text
+			fontName: 'Cascadia Code';
+			fontSize: size.
+		scene addChild: (BlTextElement new
+				 text: text;
+				 position: 20 @ (20 + (index - 1 * 60));
+				 yourself) ].
+	^ scene
 ]
