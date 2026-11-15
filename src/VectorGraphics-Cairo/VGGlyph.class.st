@@ -16,6 +16,21 @@ Class {
 	#tag : 'Text'
 }
 
+{ #category : 'accessing' }
+VGGlyph class >> glyphsOf: aGlyphArray size: aNumberOfGlyphs [
+	"The first aNumberOfGlyphs glyphs of an array, as a collection a caller can walk. Alexandrie
+	 hands over an opaque external array that answers its size and nothing else; the indexable
+	 structure behind it comes from #asExternalStructure, and asking for that selector rather
+	 than for a class name is what keeps this package free of Alexandrie's names. The glyphs
+	 answered are whatever the array holds, Alexandrie's or ours, and both answer index, x
+	 and y."
+	| indexable |
+	indexable := (aGlyphArray respondsTo: #asExternalStructure)
+		             ifTrue: [ aGlyphArray asExternalStructure ]
+		             ifFalse: [ aGlyphArray ].
+	^ (1 to: aNumberOfGlyphs) collect: [ :index | indexable at: index ]
+]
+
 { #category : 'instance creation' }
 VGGlyph class >> index: anInteger x: aNumber y: anotherNumber [
 	^ self new

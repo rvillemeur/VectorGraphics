@@ -552,18 +552,11 @@ VGCairoContext >> getGlyphExtentsOf: aGlyphArray size: aNumberOfGlyphs into: aTe
 		aTextExtentsRecord
 ]
 
-{ #category : 'private' }
+{ #category : 'text' }
 VGCairoContext >> glyphsOf: aGlyphArray size: aNumberOfGlyphs [
-	"The first aNumberOfGlyphs glyphs of an array, as a collection I can walk. Alexandrie hands
-	 over an opaque external array that answers its size and nothing else; the indexable
-	 structure behind it comes from #asExternalStructure, and asking for that selector rather
-	 than for a class name is what keeps this package free of Alexandrie's names."
-
-	| indexable |
-	indexable := (aGlyphArray respondsTo: #asExternalStructure)
-		             ifTrue: [ aGlyphArray asExternalStructure ]
-		             ifFalse: [ aGlyphArray ].
-	^ (1 to: aNumberOfGlyphs) collect: [ :index | indexable at: index ]
+	"The first aNumberOfGlyphs glyphs of an array, as a collection I can walk. The glyph class
+	 does the unwrapping, since a scaled font asks the same question of the same kind of array."
+	^ VGGlyph glyphsOf: aGlyphArray size: aNumberOfGlyphs
 ]
 
 { #category : 'testing' }
