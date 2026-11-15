@@ -67,22 +67,23 @@ VGFontManagerTest >> testAFreshManagerOwnsNoFreeTypeLibraryAndHoldsAPermanentFac
 ]
 
 { #category : 'tests' }
-VGFontManagerTest >> testAManagerBuiltWithTheDefaultFacesDrawsTheTwoEmbeddedFamiliesWithoutFreeType [
-	"The manager a consumer can draw with straight away: the six faces a package carries with
-	 it, and the two faces Bloc falls back on for text and for code. Upstream builds the same
-	 pair lazily in its globalInstance, through FreeType; these two are read in Pharo, which is
-	 what the count of AeFTFace instances states."
-
+VGFontManagerTest >> testAManagerBuiltWithTheDefaultFacesDrawsTheMachineFamiliesWithoutFreeType [
+	"The manager a consumer can draw with straight away: every family this machine has
+	 installed, and a face for text and a face for code chosen among them. Upstream builds the
+	 same pair lazily in its globalInstance, from the font bytes its own package carries and
+	 through FreeType; these two are files of the machine read in Pharo, which is what the
+	 count of AeFTFace instances states."
 	| before manager |
 	before := AeFTFace allInstances size.
 	manager := VGFontManager newWithDefaultFaces.
 	self
 		assert: manager familyNames asArray
-		equals: #( 'Source Code Pro' 'Source Sans Pro' ).
-	self assert: manager faceEntries size equals: 6.
+		equals: manager catalogue familyNames asArray.
+	self assert: (manager includesFamilyName: manager defaultFace familyName).
+	self assert:
+		(manager includesFamilyName: manager defaultCodeFace familyName).
 	self assert: manager defaultFace class equals: VGFontFace.
-	self assert: manager defaultFace familyName equals: 'Source Sans Pro'.
-	self assert: manager defaultCodeFace familyName equals: 'Source Code Pro'.
+	self assert: manager defaultCodeFace class equals: VGFontFace.
 	self assert: AeFTFace allInstances size equals: before
 ]
 
@@ -155,6 +156,30 @@ VGFontManagerTest >> testAManagerThatHoldsNothingAnswersTheAbsentBlockRatherThan
 ]
 
 { #category : 'tests' }
+VGFontManagerTest >> testAskingForADefaultFaceNoFamilyOfTheListCanGiveRefusesByName [
+	"The degenerate machine: none of the families a preference list names is installed. The
+	 refusal is a class of its own, so a test and a caller can tell it from any other error,
+	 and it says both what was looked for and how many families there were to look through —
+	 an empty manager and a manager full of other families are different mistakes."
+	| manager error |
+	manager := VGFontManager new.
+	error := nil.
+	[
+	manager defaultFaceOfFirstFamilyNamedIn:
+		#( 'No Such Family' 'Nor This One' ) ]
+		on: VGFontManagerHasNoUsableFamily
+		do: [ :each | error := each ].
+	self assert: error notNil.
+	self
+		assert: error familyNames asArray
+		equals: #( 'No Such Family' 'Nor This One' ).
+	self assert: error familyCount equals: 0.
+	self assert: (error messageText includesSubstring: 'No Such Family').
+	self assert: (error messageText includesSubstring: 'Nor This One').
+	self assert: (error messageText includesSubstring: '0 families')
+]
+
+{ #category : 'tests' }
 VGFontManagerTest >> testAskingForTheFaceOfARefusedFileSaysWhichFileAndWhy [
 	"A reader holds my refused files since unit 3.3, so one of them can be handed back to me.
 	 The reader of 1.3 has already said no to those bytes, so I say so by name rather than
@@ -214,6 +239,33 @@ VGFontManagerTest >> testTheCacheViewListsWhatAFaceReadAndTheFacesViewSaysWhichA
 	context := StInspectionContext new.
 	manager inspectorCacheContext: context.
 	self assert: context isActive
+]
+
+{ #category : 'tests' }
+VGFontManagerTest >> testTheDefaultFacesComeFromTheMachineAndNotFromEmbeddedBytes [
+	"The two faces Bloc falls back on, for text and for code, are faces of this machine read
+	 from a file on disk. Nothing of the manager names a font another package carries in its
+	 image, which is what lets a consumer draw with Alexandrie-FreeType out of the image.
+	 Each default is the first family of its preference list that the machine holds, so the
+	 test states the rule rather than the name this machine happens to answer."
+	| manager textEntry codeEntry |
+	manager := VGFontManager newWithDefaultFaces.
+	self
+		assert: manager defaultFace familyName
+		equals: (VGFontManager preferredTextFamilyNames detect: [ :each |
+				 manager includesFamilyName: each ]).
+	self
+		assert: manager defaultCodeFace familyName
+		equals: (VGFontManager preferredCodeFamilyNames detect: [ :each |
+				 manager includesFamilyName: each ]).
+	textEntry := manager catalogue entryOfFamilyNamed:
+		             manager defaultFace familyName.
+	codeEntry := manager catalogue entryOfFamilyNamed:
+		             manager defaultCodeFace familyName.
+	self assert: (textEntry source isKindOf: AbstractFileReference).
+	self assert: (codeEntry source isKindOf: AbstractFileReference).
+	self deny: (manager faceEntries anySatisfy: [ :each |
+			 each source isKindOf: ByteArray ])
 ]
 
 { #category : 'tests' }
@@ -291,6 +343,35 @@ VGFontManagerTest >> testTheFilesRefusedAreKeptWithTheirReasonAndAFreshManagerRe
 	self
 		assert: manager rejectedFiles anyOne source basename
 		equals: 'readme.txt'
+]
+
+{ #category : 'tests' }
+VGFontManagerTest >> testTheRefusalViewListsTheFamiliesLookedForAndWhetherTheMachineHasThem [
+	"The Families view of the refusal: one row per family looked for, in the order it was
+	 preferred, and a last column that asks this machine rather than the refusal. Two names no
+	 machine has are absent on any reader's machine, and the family the manager chose off this
+	 machine reads installed."
+	| refusal table rows manager |
+	refusal := nil.
+	[
+	VGFontManager new defaultFaceOfFirstFamilyNamedIn:
+		#( 'No Font Like This' 'Nor This One Either' ) ]
+		on: VGFontManagerHasNoUsableFamily
+		do: [ :each | refusal := each ].
+	table := refusal inspectorFamilies:
+		         (SpPresenterBuilder newApplication: SpApplication new).
+	rows := table items asArray.
+	self assert: (rows collect: [ :each | each value ]) equals:
+		#( 'No Font Like This' 'Nor This One Either' ).
+	self assert: (rows collect: [ :each | each key ]) equals: #( 1 2 ).
+	self
+		assert: (table columns last evaluation value: rows first)
+		equals: 'absent'.
+	manager := VGFontManager newWithDefaultFaces.
+	self
+		assert:
+		(table columns last evaluation value: 1 -> manager defaultFace familyName)
+		equals: 'installed'
 ]
 
 { #category : 'tests' }

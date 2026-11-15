@@ -291,6 +291,18 @@ VGArchitectureTest class >> inspectorGroupsContext: aContext [
 	^ aContext active: BaselineOfVectorGraphics project version groups notEmpty
 ]
 
+{ #category : 'accessing' }
+VGArchitectureTest class >> isProductionPackageNamed: aPackageName [
+	"Whether a package of this project is one a consumer loads to draw, as against one that
+	 only this project runs. Tests and examples are out by their name; the conformance corpus
+	 and the benchmarks are out because they are harnesses too, each holding fixtures of its
+	 own."
+	^ ((aPackageName endsWith: '-Tests') or: [
+		   aPackageName endsWith: '-Examples' ]) not and: [
+		  ((aPackageName endsWith: '-Conformance') or: [
+			   aPackageName endsWith: '-Benchmarks' ]) not ]
+]
+
 { #category : 'layering' }
 VGArchitectureTest class >> packageNameSeparator [
 	"What dependencyReport puts between two package names inside one table cell."
@@ -707,6 +719,33 @@ VGArchitectureTest >> testNoPackageOfTheDefaultGroupNamesAClassOfTheStackItRepla
 				             package , ': ' , each key methodClass name , '>>'
 				             , each key selector , ' names '
 				             , (each value collect: [ :one | one name ]) asArray printString ] ].
+	self assert: offenders asSortedCollection asArray equals: #(  )
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testNoProductionMethodOfThisProjectReadsTheFontBytesAlexandrieEmbeds [
+	"The font a consumer draws with by default is a file of the machine, read by this project.
+	 Alexandrie-FreeType carries six fonts of its own as byte arrays in classes, and a
+	 production method that names one of them, or that sends scanEmbeddedFonts to register all
+	 six, cannot run in an image loaded without that package — which is the image unit 6 of
+	 FONT-PLAN.md drew in.
+	 Tests, examples, the conformance corpus and the benchmarks are left out on purpose: they
+	 want the same bytes every run, and a font of the machine is not the same on two machines.
+	 The suite therefore still needs Alexandrie-FreeType, and a consumer of the project does
+	 not."
+	| embedded offenders |
+	embedded := AeEmbeddedFontFile withAllSubclasses asArray.
+	offenders := OrderedCollection new.
+	self class projectPackageNames do: [ :packageName |
+		(self class isProductionPackageNamed: packageName) ifTrue: [
+			(PackageOrganizer default packageNamed: packageName) methods do: [
+				:each |
+				((each literals anySatisfy: [ :literal |
+					  literal isVariableBinding and: [
+							  embedded includes: literal value ] ]) or: [
+					 each sendsSelector: #scanEmbeddedFonts ]) ifTrue: [
+					offenders add:
+						packageName , ': ' , each methodClass name , '>>' , each selector ] ] ] ].
 	self assert: offenders asSortedCollection asArray equals: #(  )
 ]
 

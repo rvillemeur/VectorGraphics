@@ -132,6 +132,17 @@ TTFontCatalogue >> entryOfFamilyNamed: aString styleKey: aStyleKey ifNone: absen
 ]
 
 { #category : 'accessing' }
+TTFontCatalogue >> entryOfFirstFamilyNamedIn: familyNames ifNone: absentBlock [
+	"One face of the first family of an ordered list that I hold, the plainest face of it, as
+	 entryOfFamilyNamed: chooses. The list is a caller's preference and says nothing about my
+	 index: I walk it in order and answer the block when I hold none of its families, so a
+	 caller states what it would like and not how to look for it."
+	familyNames do: [ :each |
+		(self entryOfFamilyNamed: each) ifNotNil: [ :entry | ^ entry ] ].
+	^ absentBlock value
+]
+
+{ #category : 'accessing' }
 TTFontCatalogue >> familyNames [
 	"The families I hold, as their own fonts spell them rather than as I key them, sorted. A
 	 consumer shows these to a reader; the lower-case keys are mine alone."

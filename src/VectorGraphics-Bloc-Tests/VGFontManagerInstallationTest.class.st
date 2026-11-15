@@ -90,23 +90,20 @@ VGFontManagerInstallationTest >> testInstallingRegistersTheCatalogueFamiliesAndP
 	"Installing makes the faces of the manager's catalogue reachable the other way too, through
 	 FontFamily, which is what a consumer of the text classes asks. Three facts: every family
 	 name of the catalogue is a registered family afterwards, an image with no default of its
-	 own is given one it can draw with, and a default already chosen is left alone."
-
+	 own is given the family of the face the manager chose for itself, and a default already
+	 chosen is left alone."
 	| manager |
 	FontFamily classPool at: #AvailableFamilies put: nil.
 	FontFamily classPool at: #DefaultFamilyName put: nil.
 	FontFamily classPool at: #DefaultPointSize put: nil.
-
 	manager := VGFontManager installGlobally.
-
 	self
 		assertCollection: FontFamily familyNames asSet
 		includesAll: manager familyNames asSet.
 	self
 		assert: FontFamily defaultFamilyName
-		equals: AeSourceSansPro_Regular familyName.
+		equals: manager defaultFace familyName.
 	self assert: FontFamily defaultPointSize equals: 12.
-
 	FontFamily defaultFamilyName: 'Fixture Sans' defaultPointSize: 42.
 	VGFontManager installGlobally.
 	self assert: FontFamily defaultFamilyName equals: 'Fixture Sans'.
@@ -158,15 +155,17 @@ VGFontManagerInstallationTest >> testTheManagerPosedAnswersTheDefaultFamiliesUps
 	"What installGlobally poses has to be able to draw, because BAFontConverter >> faceFor:
 	 falls back on the default face of whatever manager is posed for every family a text names
 	 and nobody holds. Asked here through upstream's own two class-side readers, which is the
-	 way the rest of the image asks."
-
-	VGFontManager installGlobally.
+	 way the rest of the image asks. The two names are the families of the faces the manager
+	 chose off this machine, so the test states the rule and not the font a given machine
+	 happens to have installed."
+	| manager |
+	manager := VGFontManager installGlobally.
 	self
 		assert: AeFontManager defaultFontFamilyName
-		equals: 'Source Sans Pro'.
+		equals: manager defaultFace familyName.
 	self
 		assert: AeFontManager defaultCodeFontFamilyName
-		equals: 'Source Code Pro'.
+		equals: manager defaultCodeFace familyName.
 	self
 		assert: AeFontManager globalInstance defaultFace class
 		equals: VGFontFace

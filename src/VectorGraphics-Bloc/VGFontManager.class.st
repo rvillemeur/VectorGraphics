@@ -83,13 +83,13 @@ VGFontManager class >> installGlobally [
 	 The same faces are registered with FontFamily, which is the other door onto them — the one
 	 the text classes ask. Nothing is parsed on the way: each family reads the outlines behind a
 	 face when a reader first asks for it. A default family or point size the image has not
-	 chosen is given the one this manager can draw with; a choice already made is left alone."
-
+	 chosen is given the one this manager can draw with — the family of the face it chose for
+	 itself, so the two doors name the same font; a choice already made is left alone."
 	installedInstance := self newWithDefaultFaces.
 	AeFontManager globalInstance: installedInstance.
 	FontFamily addFamiliesFrom: installedInstance catalogue.
 	FontFamily defaultFamilyName ifNil: [
-		FontFamily defaultFamilyName: AeSourceSansPro_Regular familyName ].
+		FontFamily defaultFamilyName: installedInstance defaultFace familyName ].
 	FontFamily defaultPointSize ifNil: [ FontFamily defaultPointSize: 12 ].
 	^ installedInstance
 ]
@@ -115,24 +115,42 @@ VGFontManager class >> managerUpstreamHolds [
 
 { #category : 'instance creation' }
 VGFontManager class >> newWithDefaultFaces [
-	"A manager that can draw before anything registers anything: the six faces a package
-	 carries with it, and the two faces Bloc falls back on when a text names a family nobody
-	 holds — one for text, one for code. Upstream builds the same pair inside its lazy
-	 globalInstance; here it is a constructor, so a test, an example or a consumer can have a
-	 manager ready to draw without posing it as the one the whole image asks.
-	 The families are named by the embedded font classes themselves rather than by two strings
-	 that would have to be kept in step, and they are asked for the way Bloc asks, through the
-	 translation into Alexandrie's vocabulary. The machine's own fonts are not scanned: a
-	 consumer that wants them sends scanDefaultDirectories."
-
+	"A manager that can draw before anything registers anything: every font this machine has
+	 installed, and the two faces Bloc falls back on when a text names a family nobody holds —
+	 one for text, one for code. Upstream builds that pair from the font bytes its own package
+	 carries; here they are faces of the machine read from a file, so a consumer of mine draws
+	 with Alexandrie's FreeType packages out of the image.
+	 Each default is the first family of a preference list that the machine holds, and a
+	 machine that holds none of them is an error rather than a nil default: a nil comes back
+	 from BAFontConverter >> faceFor: and breaks in the drawing instead of here."
 	| manager |
 	manager := self new.
-	manager scanEmbeddedFonts.
-	manager defaultFace: (manager defaultFaceOfFamilyNamed:
-			 AeSourceSansPro_Regular familyName).
-	manager defaultCodeFace: (manager defaultFaceOfFamilyNamed:
-			 AeSourceCodePro_Regular familyName).
+	manager scanDefaultDirectories.
+	manager defaultFace: (manager defaultFaceOfFirstFamilyNamedIn:
+			 self preferredTextFamilyNames).
+	manager defaultCodeFace: (manager defaultFaceOfFirstFamilyNamedIn:
+			 self preferredCodeFamilyNames).
 	^ manager
+]
+
+{ #category : 'defaults' }
+VGFontManager class >> preferredCodeFamilyNames [
+	"The families a manager of mine takes its default code face from, best first. Monospacing
+	 is asked for by name and not detected: the metadata this project reads carries no
+	 fixed-pitch flag, and the families named here are monospaced by their own definition."
+	^ #( 'DejaVu Sans Mono' 'Liberation Mono' 'Noto Sans Mono' 'FreeMono'
+	     'Menlo' 'Monaco' 'Consolas' 'Courier New' )
+]
+
+{ #category : 'defaults' }
+VGFontManager class >> preferredTextFamilyNames [
+	"The families a manager of mine takes its default text face from, best first. A default is
+	 a fallback for every family a text names and nobody holds, so what matters is that it is
+	 an ordinary sans face present on the machine rather than which one it is. The list runs
+	 from the faces a Linux image almost always has to the ones a macOS or a Windows image
+	 carries, so an image on any of the three finds one."
+	^ #( 'DejaVu Sans' 'Liberation Sans' 'Noto Sans' 'FreeSans'
+	     'Helvetica Neue' 'Helvetica' 'Arial' 'Segoe UI' )
 ]
 
 { #category : 'installing' }
@@ -200,6 +218,20 @@ VGFontManager >> defaultFaceOfFamilyNamed: aFamilyName [
 		  weight: AeFontWeight normal
 		  stretch: AeFontStretch normal
 		  ifNone: [ Error signal: 'No face registered for the family ' , aFamilyName ]
+]
+
+{ #category : 'accessing - faces' }
+VGFontManager >> defaultFaceOfFirstFamilyNamedIn: familyNames [
+	"The face of the first family of an ordered preference list that this machine holds, for a
+	 caller that wants a default to fall back on and does not care which family answers. The
+	 catalogue walks the list; the face is built here, out of the bytes the entry names. A
+	 machine that holds none of them is a refusal naming the list, not a nil face."
+	^ self faceAt: (self catalogue
+			   entryOfFirstFamilyNamedIn: familyNames
+			   ifNone: [
+				   VGFontManagerHasNoUsableFamily
+					   signalForFamilyNames: familyNames
+					   outOf: self familyNames size ])
 ]
 
 { #category : 'accessing' }

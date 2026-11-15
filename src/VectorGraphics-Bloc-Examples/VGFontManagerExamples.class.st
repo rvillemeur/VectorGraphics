@@ -11,12 +11,12 @@ Class {
 { #category : 'examples' }
 VGFontManagerExamples class >> managerReadyToDrawDefaultText [
 	<sampleInstance>
-	"A font manager that can draw before anything registers anything. Six faces from the fonts
-	 a package carries with it, and the two faces a text falls back on: Source Sans Pro for
-	 text, Source Code Pro for code. Open the State tab, where the Default face and Default
-	 code face rows name them — the same manager as
-	 managerWithTheEmbeddedFontsRegistered shows those two rows as nil."
-
+	"A font manager that can draw before anything registers anything: every font this machine
+	 has installed, and the two faces a text falls back on, one for text and one for code,
+	 chosen as the first family of each preference list the machine holds. Open the State tab,
+	 where the Default face and Default code face rows name them — the same manager as
+	 managerThatScannedTheInstalledFonts shows those two rows as nil. The families named are
+	 this machine's, so they differ from one reader to the next."
 	^ VGFontManager newWithDefaultFaces
 ]
 
@@ -73,4 +73,19 @@ VGFontManagerExamples class >> managerWithoutALibrary [
 	 upstream holds an LRUCache capped at twenty faces."
 
 	^ VGFontManager new
+]
+
+{ #category : 'examples' }
+VGFontManagerExamples class >> refusalOfAMachineHoldingNoPreferredFamily [
+	<sampleInstance>
+	"The refusal a manager raises when none of the families it would take a default face from
+	 is installed. Raised here against two names no machine has, so the example reads the same
+	 everywhere. Open the Families tab: the two names are listed in the order they were
+	 preferred, and the last column says absent for both — a name a reader installs meanwhile
+	 would read installed, because the column asks the machine and not the refusal."
+	^ [
+	  VGFontManager new defaultFaceOfFirstFamilyNamedIn:
+		  #( 'No Font Like This' 'Nor This One Either' ) ]
+		  on: VGFontManagerHasNoUsableFamily
+		  do: [ :each | each ]
 ]
