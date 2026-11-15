@@ -46,6 +46,34 @@ TTFamilyFace >> familyName [
 	^ ttFontDescription familyName
 ]
 
+{ #category : 'inspecting' }
+TTFamilyFace >> inspectorFace: aBuilder [
+	"What I am and what has been read of me. The rows come from the entry a scan made of me,
+	 never from my outlines, so opening this view on a pending face leaves it pending — the
+	 point of a lazy face being that a reader can look at a family without paying for one
+	 parse per face."
+
+	<inspectorPresentationOrder: 10 title: 'Face'>
+	^ aBuilder newTable
+		  addColumn: ((SpStringTableColumn
+				    title: 'Fact'
+				    evaluated: [ :each | each key ])
+				   width: 120);
+		  addColumn: (SpStringTableColumn
+				   title: 'Value'
+				   evaluated: [ :each | each value ]);
+		  items: {
+				  ('Family' -> self familyName).
+				  ('Style' -> self styleName).
+				  ('Outlines' -> (self isParsed
+					    ifTrue: [ 'parsed' ]
+					    ifFalse: [ 'pending' ])).
+				  ('Comes from' -> (catalogueEntry
+					    ifNil: [ 'a description posed by hand' ]
+					    ifNotNil: [ :entry | entry fontSourceName ])) };
+		  yourself
+]
+
 { #category : 'testing' }
 TTFamilyFace >> isParsed [
 	"Have my outlines been read? Asking never reads them."

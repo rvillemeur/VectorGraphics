@@ -120,6 +120,20 @@ TrueTypeExamples class >> findDefaultFontPath [
 ]
 
 { #category : 'examples' }
+TrueTypeExamples class >> fontFaceOfThisMachine [
+	"One click: the plain face of the family the examples draw with, as a family holds it —
+	 named, placed, and not read. Inspect it, then send it ttFontDescription and inspect it
+	 again to see the outlines appear.
+
+	TrueTypeExamples fontFaceOfThisMachine inspect"
+
+	<sampleInstance>
+	| family |
+	family := self fontFamilyOfThisMachine.
+	^ TTFamilyFace catalogueEntry: (family catalogueEntryForEmphasis: 0)
+]
+
+{ #category : 'examples' }
 TrueTypeExamples class >> fontFamilyOfThisMachine [
 	"One click: the family of the font the examples draw with, taken from this machine's own
 	 fonts the way an installation takes it — the plainest face as the base, the bold and the
