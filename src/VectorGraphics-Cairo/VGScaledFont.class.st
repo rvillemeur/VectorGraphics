@@ -185,17 +185,9 @@ VGScaledFont >> glyphExtentsOf: aGlyphCollection [
 	 box of the glyphs, relative to the origin of the first one, and the advance from the first
 	 origin to where the next run would start. A run that inks nothing is all zeroes, which is
 	 also Cairo's answer."
-
 	| box origin last advance |
 	aGlyphCollection ifEmpty: [ ^ self emptyTextExtents ].
-	box := nil.
-	aGlyphCollection do: [ :glyph |
-		(self inkedBoxOfGlyphAt: glyph index) ifNotNil: [ :glyphBox |
-			| placed |
-			placed := glyphBox translateBy: glyph position.
-			box := box
-				       ifNil: [ placed ]
-				       ifNotNil: [ box merge: placed ] ] ].
+	box := self inkedBoxOfRun: aGlyphCollection.
 	box ifNil: [ ^ self emptyTextExtents ].
 	origin := aGlyphCollection first position.
 	last := aGlyphCollection last.
@@ -241,6 +233,24 @@ VGScaledFont >> inkedBoxOfGlyphAt: aGlyphIndex [
 	xs := corners collect: [ :each | each x ].
 	ys := corners collect: [ :each | each y ].
 	^ xs min @ ys min corner: xs max @ ys max
+]
+
+{ #category : 'metrics' }
+VGScaledFont >> inkedBoxOfRun: aGlyphCollection [
+	"The box a laid out run inks, in user space, in the coordinates the run itself is laid out
+	 in: the box of every glyph moved to where the run puts that glyph, all merged. Nil when the
+	 run inks nothing, a run of spaces for instance, since there is then no box to speak of and
+	 a zero sized one at the origin would be a place."
+	| box |
+	box := nil.
+	aGlyphCollection do: [ :glyph |
+		(self inkedBoxOfGlyphAt: glyph index) ifNotNil: [ :glyphBox |
+			| placed |
+			placed := glyphBox translateBy: glyph position.
+			box := box
+				       ifNil: [ placed ]
+				       ifNotNil: [ box merge: placed ] ] ].
+	^ box
 ]
 
 { #category : 'inspector' }
