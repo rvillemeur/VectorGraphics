@@ -5,7 +5,7 @@ Two registries read me and neither knows the other: a font manager for the Bloc 
 
 Three doors fill me. `scanDefaultDirectories` walks the places this platform keeps fonts, `scanDirectory:` walks one directory and its subdirectories, and `addBytes:` takes a font nobody wrote to disk. Every file under a directory I am given reaches `addFile:`: I read no file name, because the metadata reader says what a file is from its content, and one rule for that is enough.
 
-I keep every file I met in `entries`, in the order I met it, and index only the faces that can be drawn in `entriesByFamilyName`: the family name in lower case, then the slant, weight class and width class, then the entry. The first source of a given face wins, as AeFontManager does. The files I refused are still mine — `refusedEntries` answers them, with the reason each one gave — so a reader can see what the scan passed over rather than guessing.
+I keep every file I met in `entries`, in the order I met it, and index only the faces that can be drawn in `entriesByFamilyName`: the family name in lower case, then the slant, weight class and width class, then the entry. The first source of a given face wins, as AeFontManager does. The files I refused are still mine — `rejectedEntries` answers them, with the reason each one gave — so a reader can see what the scan passed over rather than guessing.
 
 A scan is cheap: reading the metadata of the 362 faces installed on this machine costs 14 ms, against 4.6 s to read all their bytes.
 "

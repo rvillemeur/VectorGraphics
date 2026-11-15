@@ -256,10 +256,9 @@ TTFontCatalogueTest >> testScanningADirectoryAnswersAFamilyPerNameAndAnEntryPerF
 
 { #category : 'tests' }
 TTFontCatalogueTest >> testTheDrawableEntriesAreTheOnesLeftWhenTheRefusalsAreTakenAway [
-	"The other side of refusedEntries, and the question a consumer asks to pick a face to draw
+	"The other side of rejectedEntries, and the question a consumer asks to pick a face to draw
 	 with. Six of the eight files of the fixture directory carry outlines and a name; the two
 	 refusals are not among them, and an empty catalogue answers nothing."
-
 	| catalogue |
 	catalogue := self catalogueScannedOverTheFixtureDirectory.
 	self assert: catalogue drawableEntries size equals: 6.
