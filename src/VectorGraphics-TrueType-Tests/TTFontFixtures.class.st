@@ -13,6 +13,27 @@ Class {
 	#tag : 'Fixtures'
 }
 
+{ #category : 'catalogues' }
+TTFontFixtures class >> catalogueOfThreeFacesInOneFamily [
+	"A family of three faces nobody wrote to disk: the plain face, a bold one and an italic one.
+	 The bytes carry a name table and an OS/2 table, which is all a scan reads, and no glyph
+	 tables at all — so a parse of one of them raises, which is how a test states which face a
+	 reader reached for and when."
+
+	| catalogue |
+	catalogue := TTFontCatalogue new.
+	{
+		{ 'Regular'. 400. false }.
+		{ 'Bold'. 700. false }.
+		{ 'Italic'. 400. true } } do: [ :style |
+		catalogue addBytes: (self
+				 renderableFontBytesWithFamilyName: 'Fixture Sans'
+				 styleName: style first
+				 weightClass: style second
+				 italic: style third) ].
+	^ catalogue
+]
+
 { #category : 'fixtures' }
 TTFontFixtures class >> colourFontBytes [
 	"A font with glyph outlines and a CBDT table of colour bitmaps beside them. The outlines are
@@ -23,6 +44,21 @@ TTFontFixtures class >> colourFontBytes [
 			  ('glyf' -> (ByteArray new: 32)).
 			  (TTFontMetadataReader nameTableTag
 			   -> (self nameTableWithFamilyName: 'Noto Color Emoji' styleName: 'Regular')) }
+]
+
+{ #category : 'catalogues' }
+TTFontFixtures class >> familyOfThreeFacesInOneFamily [
+	"The family a registration builds from `catalogueOfThreeFacesInOneFamily`: the plainest face
+	 as its base, the bold and the italic one filed by emphasis, and not one of the three
+	 parsed."
+
+	| catalogue family |
+	catalogue := self catalogueOfThreeFacesInOneFamily.
+	family := TrueTypeFontFamily baseCatalogueEntry:
+		          (catalogue entryOfFamilyNamed: 'Fixture Sans').
+	(catalogue entriesByFamilyName at: 'fixture sans') do: [ :entry |
+		family addCatalogueEntry: entry ].
+	^ family
 ]
 
 { #category : 'fixtures' }

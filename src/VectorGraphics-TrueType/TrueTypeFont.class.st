@@ -104,16 +104,20 @@ TrueTypeFont >> emphasis [
 
 { #category : 'emphasis' }
 TrueTypeFont >> emphasized: code [
-
 	"Answer a copy of the receiver with emphasis set to include code."
 
 	| derivative addedEmphasis derivedFrom |
 	self isBaseFont ifFalse: [
 		^ self baseFont emphasized: (code bitOr: emphasis) ].
 	code = 0 ifTrue: [ ^ self ].
-
 	derivativeFonts ifNil: [ derivativeFonts := Dictionary new ].
 	derivativeFonts at: code ifPresent: [ :der | ^ der ]. "Already have this style"
+
+	"The family may still hold a catalogue face for this emphasis, unparsed. It parses that one
+	 face now and files the font it builds here, so the real face wins over anything synthetic."
+	family ifNotNil: [
+		(family fontForEmphasis: code pointSize: pointSize) ifNotNil: [ :realFont |
+			^ realFont ] ].
 
 	"Bold+Italic requested but not available.
 	Handle this case before decomposing, because neither can be built synthetic.
@@ -122,20 +126,19 @@ TrueTypeFont >> emphasized: code [
 		derivativeFonts at: 2 ifPresent: [ :der | ^ der ].
 		derivativeFonts at: 1 ifPresent: [ :der | ^ der ].
 		^ self baseFont ].
+
 	"Bold or Italic requested but not available. Just use base font."
 	code < 3 ifTrue: [ ^ self baseFont ].
 
 	"Dont have it -- derive from another with one with less emphasis"
 	addedEmphasis := 1 bitShift: code highBit - 1.
 	derivedFrom := self emphasized: code - addedEmphasis.
-
 	derivative := addedEmphasis caseOf: {
 		[ 4 ]  -> [ derivedFrom copy ].
 		[ 8 ]  -> [ derivedFrom copy ].
 		[ 16 ] -> [ derivedFrom syntheticSuperscript ].
 		[ 32 ] -> [ derivedFrom syntheticSubscript ]
 	}.
-
 	derivative baseFont: self.
 	derivative addEmphasis: code.
 	derivativeFonts at: code put: derivative.

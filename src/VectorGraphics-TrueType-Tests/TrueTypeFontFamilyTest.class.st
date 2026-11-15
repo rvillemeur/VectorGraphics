@@ -13,27 +13,6 @@ Class {
 	#tag : 'Tests'
 }
 
-{ #category : 'private' }
-TrueTypeFontFamilyTest >> catalogueOfThreeFacesInOneFamily [
-	"A family of three faces nobody wrote to disk: the plain face, a bold one and an italic one.
-	 The bytes carry a name table and an OS/2 table, which is all a scan reads, and no glyph
-	 tables at all — so a parse of one of them raises, which is how a test states which face a
-	 reader reached for and when."
-
-	| catalogue |
-	catalogue := TTFontCatalogue new.
-	{
-		{ 'Regular'. 400. false }.
-		{ 'Bold'. 700. false }.
-		{ 'Italic'. 400. true } } do: [ :style |
-		catalogue addBytes: (TTFontFixtures
-				 renderableFontBytesWithFamilyName: 'Fixture Sans'
-				 styleName: style first
-				 weightClass: style second
-				 italic: style third) ].
-	^ catalogue
-]
-
 { #category : 'helpers' }
 TrueTypeFontFamilyTest >> makeFamily [
 
@@ -65,7 +44,7 @@ TrueTypeFontFamilyTest >> testACatalogueFaceIsFiledUnderTheEmphasisItsStyleKeySt
 	 StrikeFont's, which is what TrueTypeFont >> emphasis answers."
 
 	| catalogue faces emphases |
-	catalogue := self catalogueOfThreeFacesInOneFamily.
+	catalogue := TTFontFixtures catalogueOfThreeFacesInOneFamily.
 	faces := catalogue entriesByFamilyName at: 'fixture sans'.
 	emphases := faces values
 		            collect: [ :each |
@@ -85,12 +64,9 @@ TrueTypeFontFamilyTest >> testAFamilyKeepsTheCatalogueFacesItWasGivenAndParsesNo
 	 it does not, and it parsed nothing on the way in — these fixtures carry no glyph tables, so
 	 any parse raises."
 
-	| catalogue family |
-	catalogue := self catalogueOfThreeFacesInOneFamily.
-	family := TrueTypeFontFamily baseCatalogueEntry:
-		          (catalogue entryOfFamilyNamed: 'Fixture Sans').
-	(catalogue entriesByFamilyName at: 'fixture sans') do: [ :entry |
-		family addCatalogueEntry: entry ].
+	| family |
+	family := TTFontFixtures familyOfThreeFacesInOneFamily.
+
 	self assert: family familyName equals: 'Fixture Sans'.
 	self
 		assert: (family catalogueEntryForEmphasis: 1) metadata styleName
@@ -100,6 +76,27 @@ TrueTypeFontFamilyTest >> testAFamilyKeepsTheCatalogueFacesItWasGivenAndParsesNo
 		equals: 'Italic'.
 	self assert: (family catalogueEntryForEmphasis: 3) equals: nil.
 	self assert: (family catalogueEntryForEmphasis: 0) equals: nil
+]
+
+{ #category : 'tests' }
+TrueTypeFontFamilyTest >> testAnEmphasisIsParsedOnlyWhenAFontOfThatEmphasisIsAskedFor [
+	"A family asked for a font of an emphasis it holds a face for parses that face, and that
+	 face alone, at the moment of the ask. Two facts: asking for the bold one reaches its bytes,
+	 which these fixtures prove by raising on the missing glyph tables, and asking for an
+	 emphasis no face carries answers nil rather than raising, which is what leaves the old
+	 fallbacks of TrueTypeFont >> emphasized: in charge."
+
+	| family |
+	family := TTFontFixtures familyOfThreeFacesInOneFamily.
+
+	self
+		should: [ family fontForEmphasis: 1 pointSize: 12 ]
+		raise: Error
+		withExceptionDo: [ :error |
+			self
+				assert: error messageText
+				equals: 'Missing required TrueType table: head' ].
+	self assert: (family fontForEmphasis: 3 pointSize: 12) equals: nil
 ]
 
 { #category : 'tests' }

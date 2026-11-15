@@ -77,6 +77,27 @@ TrueTypeFontTest >> testAddEmphasisNoCacheResetForBold [
 ]
 
 { #category : 'tests' }
+TrueTypeFontTest >> testEmphasizedAsksItsFamilyForAFaceItHasNotBuiltYet [
+	"A base font asked for an emphasis it holds no derivative for asks its family, which owns
+	 the catalogue faces and parses the one it needs. Two facts: the ask reaches the bold face —
+	 these fixtures carry no glyph tables, so the parse raises — and a family with no face of
+	 that emphasis answers nil, which leaves the synthetic derivation in charge."
+
+	| font |
+	font := self makeFontWithEmphasis: 0.
+	font instVarNamed: 'family' put: TTFontFixtures familyOfThreeFacesInOneFamily.
+
+	self
+		should: [ font emphasized: 1 ]
+		raise: Error
+		withExceptionDo: [ :error |
+			self
+				assert: error messageText
+				equals: 'Missing required TrueType table: head' ].
+	self assert: (font emphasized: 4) emphasis equals: 4
+]
+
+{ #category : 'tests' }
 TrueTypeFontTest >> testEmphasizedCodeZeroReturnsSelf [
 
 	| font |

@@ -166,6 +166,32 @@ TrueTypeFontFamily >> folderName [
 	^ self baseTTFontDescription folderName
 ]
 
+{ #category : 'accessing' }
+TrueTypeFontFamily >> fontForEmphasis: anInteger pointSize: aNumber [
+	"The font of this family for an emphasis, built from the catalogue face filed under that
+	 emphasis and parsed here, at the first ask — registration parses nothing. Answers nil when
+	 no face of this family carries the emphasis, which leaves the caller its own fallbacks."
+
+	| description baseFontOfSize font |
+	description := ttFontDescriptionsByEmphasis
+		               at: anInteger
+		               ifAbsent: [
+			               | entry parsed |
+			               entry := self catalogueEntryForEmphasis: anInteger.
+			               entry ifNil: [ ^ nil ].
+			               parsed := TTFontReader readTTFFrom: entry bytes.
+			               self addTTFontDescription: parsed.
+			               parsed ].
+	baseFontOfSize := self atPointSize: aNumber.
+	font := TrueTypeFont
+		        family: self
+		        ttFontDescription: description
+		        pointSize: aNumber.
+	font baseFont: baseFontOfSize.
+	baseFontOfSize addDerivativeFont: font.
+	^ font
+]
+
 { #category : 'testing' }
 TrueTypeFontFamily >> includesAscii [
 	"Answer true if we include the basic ASCII characters.
