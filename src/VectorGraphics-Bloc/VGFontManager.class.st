@@ -79,10 +79,18 @@ VGFontManager class >> installGlobally [
 	 family a text names and nobody holds, and a nil there would break in the drawing.
 	 Kept here as well as written upstream, so that startUp: can put the same object back after
 	 upstream nils its slot at every image start, and so that nothing of mine has to read a
-	 slot of Alexandrie's to know what it posed."
+	 slot of Alexandrie's to know what it posed.
+	 The same faces are registered with FontFamily, which is the other door onto them — the one
+	 the text classes ask. Nothing is parsed on the way: each family reads the outlines behind a
+	 face when a reader first asks for it. A default family or point size the image has not
+	 chosen is given the one this manager can draw with; a choice already made is left alone."
 
 	installedInstance := self newWithDefaultFaces.
 	AeFontManager globalInstance: installedInstance.
+	FontFamily addFamiliesFrom: installedInstance catalogue.
+	FontFamily defaultFamilyName ifNil: [
+		FontFamily defaultFamilyName: AeSourceSansPro_Regular familyName ].
+	FontFamily defaultPointSize ifNil: [ FontFamily defaultPointSize: 12 ].
 	^ installedInstance
 ]
 

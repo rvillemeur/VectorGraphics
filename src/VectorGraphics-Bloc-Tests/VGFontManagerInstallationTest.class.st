@@ -10,7 +10,8 @@ Class {
 	#superclass : 'TestCase',
 	#instVars : [
 		'previousGlobalInstance',
-		'previousInstalledInstance'
+		'previousInstalledInstance',
+		'previousFontFamilyState'
 	],
 	#category : 'VectorGraphics-Bloc-Tests',
 	#package : 'VectorGraphics-Bloc-Tests'
@@ -18,11 +19,16 @@ Class {
 
 { #category : 'running' }
 VGFontManagerInstallationTest >> setUp [
-	"Remember both slots before a test writes either of them."
+	"Remember both slots, and the three class variables of FontFamily an installation writes,
+	 before a test writes any of them. The dictionary of families is copied, since a test that
+	 registers a family would otherwise fill the very object tearDown puts back."
 
 	super setUp.
 	previousGlobalInstance := VGFontManager managerUpstreamHolds.
-	previousInstalledInstance := VGFontManager installedInstance
+	previousInstalledInstance := VGFontManager installedInstance.
+	previousFontFamilyState := #( AvailableFamilies DefaultFamilyName
+	                              DefaultPointSize ) collect: [ :name |
+		                          (FontFamily classPool at: name) copy ]
 ]
 
 { #category : 'running' }
@@ -30,12 +36,16 @@ VGFontManagerInstallationTest >> tearDown [
 	"Put the image back the way I found it, whichever way the test went. Upstream's slot is
 	 written through the project's own writer, since uninstallGlobally would leave it at nil and
 	 this image had a manager there before I ran. Ours is written directly, having no writer of
-	 its own."
+	 its own. FontFamily's three class variables go back by name, an installation having written
+	 all three."
 
 	(VGFontManager class slotNamed: #installedInstance)
 		write: previousInstalledInstance
 		to: VGFontManager.
 	VGFontManager restoreUpstreamManager: previousGlobalInstance.
+	#( AvailableFamilies DefaultFamilyName DefaultPointSize )
+		with: previousFontFamilyState
+		do: [ :name :value | FontFamily classPool at: name put: value ].
 	super tearDown
 ]
 
@@ -73,6 +83,34 @@ VGFontManagerInstallationTest >> testAnImageThatInstalledNothingLeavesUpstreamsO
 	VGFontManager startUp: true.
 	self assert: AeFontManager globalInstance identicalTo: theirs.
 	self assert: VGFontManager installedInstance isNil
+]
+
+{ #category : 'tests' }
+VGFontManagerInstallationTest >> testInstallingRegistersTheCatalogueFamiliesAndPosesADefaultOnlyWhenNoneIsSet [
+	"Installing makes the faces of the manager's catalogue reachable the other way too, through
+	 FontFamily, which is what a consumer of the text classes asks. Three facts: every family
+	 name of the catalogue is a registered family afterwards, an image with no default of its
+	 own is given one it can draw with, and a default already chosen is left alone."
+
+	| manager |
+	FontFamily classPool at: #AvailableFamilies put: nil.
+	FontFamily classPool at: #DefaultFamilyName put: nil.
+	FontFamily classPool at: #DefaultPointSize put: nil.
+
+	manager := VGFontManager installGlobally.
+
+	self
+		assertCollection: FontFamily familyNames asSet
+		includesAll: manager familyNames asSet.
+	self
+		assert: FontFamily defaultFamilyName
+		equals: AeSourceSansPro_Regular familyName.
+	self assert: FontFamily defaultPointSize equals: 12.
+
+	FontFamily defaultFamilyName: 'Fixture Sans' defaultPointSize: 42.
+	VGFontManager installGlobally.
+	self assert: FontFamily defaultFamilyName equals: 'Fixture Sans'.
+	self assert: FontFamily defaultPointSize equals: 42
 ]
 
 { #category : 'tests' }

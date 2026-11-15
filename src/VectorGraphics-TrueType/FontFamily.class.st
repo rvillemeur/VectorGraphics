@@ -138,18 +138,22 @@ FontFamily class >> familyName: aString pointSize: aNumber [
 	^ family atPointSize: aNumber
 ]
 
-{ #category : 'accessing fonts' }
+{ #category : 'accessing' }
 FontFamily class >> familyNamed: aString [
-	"	FontFamily familyNamed: FontFamily defaultFamilyName	"
+	"
+	FontFamily familyNamed: FontFamily defaultFamilyName
+	"
 
-	^ AvailableFamilies at: aString ifAbsent: [  ]
+	^ self availableFamilies at: aString ifAbsent: [  ]
 ]
 
 { #category : 'accessing' }
 FontFamily class >> familyNames [
-	"	FontFamily familyNames	"
+	"
+	FontFamily familyNames
+	"
 
-	^ AvailableFamilies keys sort
+	^ self availableFamilies keys sort
 ]
 
 { #category : 'accessing fonts' }
