@@ -103,7 +103,7 @@ TTFontFixtures class >> fontBytesWithTables: anArray [
 	 tag order, as the spec asks, while the data stays in the order given, so a fixture can put
 	 the name table at the far end of the file the way a real font does.
 	 A font with no glyf, no loca, no cmap and no hmtx is what tells a metadata reader apart from
-	 TTFontReader, which refuses a font missing any of the eight tables it needs."
+	 TTFontReader, which rejects a font missing any of the eight tables it needs."
 
 	^ self fontBytesWithVersion: #[ 0 1 0 0 ] tables: anArray
 ]

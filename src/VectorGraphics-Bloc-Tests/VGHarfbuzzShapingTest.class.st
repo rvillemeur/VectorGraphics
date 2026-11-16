@@ -17,11 +17,11 @@ Class {
 }
 
 { #category : 'tests' }
-VGHarfbuzzShapingTest >> testAFileTheReaderRefusedIsNotShapedAtAll [
-	"HarfBuzz would happily open a file this project's reader refuses — it parses the file
+VGHarfbuzzShapingTest >> testAFileTheReaderRejectedIsNotShapedAtAll [
+	"HarfBuzz would happily open a file this project's reader rejects — it parses the file
 	 itself and even reads a collection, which the reader rejects. The glyph identifiers it
 	 answered would then name glyphs of a face no Cairo font face of this project can draw, and
-	 the drawing would fail far from the cause. So the entry refuses first, naming the file and
+	 the drawing would fail far from the cause. So the entry rejects first, naming the file and
 	 the reason the reader gave."
 
 	| catalogue entry |
@@ -91,10 +91,10 @@ VGHarfbuzzShapingTest >> testAnEmbeddedFontShapesAWordIntoGlyphIdentifiersWithou
 { #category : 'tests' }
 VGHarfbuzzShapingTest >> testTheShapingViewShapesTheSampleWordAndIsOfferedOnDrawableEntriesOnly [
 	"The view a reader opens on an entry. It shapes rather than describes, so the scale it shows
-	 is the one HarfBuzz answers and the glyph rows are the glyphs it placed. A refused entry
+	 is the one HarfBuzz answers and the glyph rows are the glyphs it placed. A rejected entry
 	 cannot shape at all, so the tab is not offered on one."
 
-	| entry rows refused context |
+	| entry rows rejected context |
 	entry := TTFontCatalogue new addBytes:
 		         AeSourceSansPro_Regular fontContentsData.
 	rows := (entry inspectorShaping:
@@ -109,8 +109,8 @@ VGHarfbuzzShapingTest >> testTheShapingViewShapesTheSampleWordAndIsOfferedOnDraw
 	context := StInspectionContext new.
 	entry inspectorShapingContext: context.
 	self assert: context isActive.
-	refused := TTFontCatalogue new addBytes: 'StartFontMetrics 2.0' asByteArray.
+	rejected := TTFontCatalogue new addBytes: 'StartFontMetrics 2.0' asByteArray.
 	context := StInspectionContext new.
-	refused inspectorShapingContext: context.
+	rejected inspectorShapingContext: context.
 	self deny: context isActive
 ]

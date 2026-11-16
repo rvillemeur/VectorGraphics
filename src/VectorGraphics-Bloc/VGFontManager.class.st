@@ -3,11 +3,11 @@ I am the font registry Bloc asks for its faces, and I hold no FreeType library.
 
 Upstream `AeFontManager` keeps an `AeFTLibrary`, reads every font through it, and caches the `AeFTFace` handles it builds in an `LRUCache` capped at twenty. I answer the same questions, so what Bloc asks of me it would ask of upstream, and I answer them from `VGFontFace`, which reads a font's own bytes in Pharo and owns no handle at all. That is why my face cache is a plain `Dictionary`: what it holds costs to parse again and nothing to release, so a face lives for the session rather than being evicted.
 
-What I register, I register through `TTFontCatalogue`, which I own for the session. Every inherited way into the registry delegates to it — `registerFacesOnFile:` to `addFile:`, `registerFacesOnMemory:` to `addBytes:`, `scanDirectory:` and `scanDefaultDirectories` to its own, and `scanEmbeddedFonts` through the second of those without an override. The catalogue reads a few hundred bytes of each file, never the whole face, and judges a file by its content rather than by its name, so a font under an unexpected name is registered and a file that is not a font is a refusal it keeps.
+What I register, I register through `TTFontCatalogue`, which I own for the session. Every inherited way into the registry delegates to it — `registerFacesOnFile:` to `addFile:`, `registerFacesOnMemory:` to `addBytes:`, `scanDirectory:` and `scanDefaultDirectories` to its own, and `scanEmbeddedFonts` through the second of those without an override. The catalogue reads a few hundred bytes of each file, never the whole face, and judges a file by its content rather than by its name, so a font under an unexpected name is registered and a file that is not a font is a rejection it keeps.
 
 The catalogue is my only index, which is why the four inherited readers of `entriesByFamilyName` are overridden: each one reads that instance variable directly, and mine stays empty. It keys a family by name in lower case and then by what the font states of itself — its slant, its OS/2 weight class, its width class. Alexandrie keys by `AeFontSlant`, `AeFontWeight` and `AeFontStretch` read off the style name instead, and `entryForFamilyName:slant:weight:stretch:ifNone:` is the one place the two vocabularies meet.
 
-`faceAt:` builds the face from the entry's own bytes and keeps it, so a font is read once a session draws with it and never again; a file the reader refused is named in an error rather than parsed a second time. Every reader of mine asks through an accessor that checks the session first, so a manager left over from a dead session rebuilds its catalogue before it answers.
+`faceAt:` builds the face from the entry's own bytes and keeps it, so a font is read once a session draws with it and never again; a file the reader rejected is named in an error rather than parsed a second time. Every reader of mine asks through an accessor that checks the session first, so a manager left over from a dead session rebuilds its catalogue before it answers.
 
 Nothing of mine is posed anywhere until `installGlobally` is sent. It is my class that keeps what was posed, writes it into the slot `AeFontManager` answers `globalInstance` from, and puts it back from `startUp:` after upstream nils that slot at every image start. An image that installed nothing keeps the manager Alexandrie built for itself.
 "
@@ -266,18 +266,15 @@ VGFontManager >> faceAt: anEntry [
 	"The face of one entry, parsed once and then kept. Upstream's answers whatever its LRU
 	 cache holds and builds nothing, since its cache was given a factory that calls FreeType;
 	 mine builds the face here, out of the bytes the entry names.
-
 	 The bytes are read at this point and not before: a catalogue that scanned this machine
 	 knows 544 files and 262 MB in all, and a session draws with a handful of them.
-
-	 A refused entry is named rather than parsed. The entry says the refusal itself, since the
+	 A rejected entry is named rather than parsed. The entry says the rejection itself, since the
 	 sentence is about the file it names and not about me.
-
 	 The cache is asked through its accessor, which checks the session first, as upstream's
 	 does."
 
 	anEntry isRejected ifTrue: [
-		^ anEntry signalRefusal: 'No face can be built for it.' ].
+		^ anEntry signalRejection: 'No face can be built for it.' ].
 	^ self faceByEntryCache
 		  at: anEntry
 		  ifAbsentPut: [ VGFontFace newForBytes: anEntry bytes ]
@@ -285,8 +282,8 @@ VGFontManager >> faceAt: anEntry [
 
 { #category : 'accessing' }
 VGFontManager >> faceEntries [
-	"Every face I answer for, refusals left out. Upstream collects these out of its own index;
-	 the catalogue selects them out of everything it met, so a refused file is still there to
+	"Every face I answer for, rejections left out. Upstream collects these out of its own index;
+	 the catalogue selects them out of everything it met, so a rejected file is still there to
 	 report and is not one of these."
 
 	^ self catalogue drawableEntries
@@ -385,12 +382,11 @@ VGFontManager >> inspectorCacheContext: aContext [
 
 { #category : 'inspector' }
 VGFontManager >> inspectorState: aBuilder [
-
 	<inspectorPresentationOrder: 10 title: 'State'>
 	"What I am made of, in one table. Three slots upstream fills stay nil or empty here, and
 	 the registry rows go through my own readers, which read the catalogue — not through the
 	 slot upstream keeps its index in, which stays empty for ever. The three file rows
-	 reconcile: every file met is either an entry registered or a file refused.
+	 reconcile: every file met is either an entry registered or a file rejected.
 	 Every row asks through an accessor, so a manager left over from a dead session shows what
 	 it would answer now, rebuilt, rather than what it held then."
 
@@ -405,7 +401,7 @@ VGFontManager >> inspectorState: aBuilder [
 				  ('Families registered' -> self entriesByFamilyName size).
 				  ('Files met' -> self catalogue entries size).
 				  ('Entries registered' -> self faceEntries size).
-				  ('Files refused' -> self rejectedFiles size).
+				  ('Files rejected' -> self rejectedFiles size).
 				  ('Default face' -> self defaultFace).
 				  ('Default code face' -> self defaultCodeFace) };
 		  addColumn:
@@ -428,8 +424,8 @@ VGFontManager >> inspectorStateContext: aContext [
 VGFontManager >> registerFacesOnFile: aFileReference [
 	"Meet the face of one file. The catalogue reads its metadata off the stream, a few hundred
 	 bytes of a file that may be megabytes, where upstream read the whole face through FreeType.
-	 One face per file, never several: 1.3 of the font plan refuses a ttcf collection, so the
-	 index upstream iterates is always zero. Answers the entry, refused or not, which upstream
+	 One face per file, never several: 1.3 of the font plan rejects a ttcf collection, so the
+	 index upstream iterates is always zero. Answers the entry, rejected or not, which upstream
 	 had nothing to answer."
 
 	^ self catalogue addFile: aFileReference
@@ -447,7 +443,7 @@ VGFontManager >> registerFacesOnMemory: aByteArray [
 { #category : 'accessing' }
 VGFontManager >> rejectedFiles [
 	"The files I met and will not draw with, each carrying the reason the reader gave. A font
-	 this project cannot read is refused by name rather than passed over in silence, so a
+	 this project cannot read is rejected by name rather than passed over in silence, so a
 	 reader who cannot find a family can ask why. The catalogue derives the list from the
 	 entries it kept, so this is not a second collection that could fall out of step."
 
@@ -496,8 +492,8 @@ VGFontManager >> scanDirectory: aFileReference [
 	"Meet every file under this directory. The catalogue hands each one to its reader and reads
 	 no file name, where upstream drives an AeFontScanner whose shouldIgnoreFile: decides from
 	 the name and the extension. Decision 6 of unit 1.4 of the font plan: one rule is enough,
-	 and it is the refusal by content, so a font with an unexpected name is read and a file that
-	 is not a font becomes a refused entry rather than a file silently passed over."
+	 and it is the rejection by content, so a font with an unexpected name is read and a file
+	 that is not a font becomes a rejected entry rather than a file silently passed over."
 
 	^ self catalogue scanDirectory: aFileReference
 ]

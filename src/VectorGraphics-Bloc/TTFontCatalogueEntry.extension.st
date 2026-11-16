@@ -19,9 +19,9 @@ TTFontCatalogueEntry >> inspectorShaping: aBuilder [
 
 { #category : '*VectorGraphics-Bloc' }
 TTFontCatalogueEntry >> inspectorShapingContext: aContext [
-	"The Shaping view shapes a word with me, which a refused file cannot do: newHbFontScaledTo:
+	"The Shaping view shapes a word with me, which a rejected file cannot do: newHbFontScaledTo:
 	 signals rather than shape it. So the tab is there for a drawable entry only, and the
-	 refusal itself is already named by the Source view."
+	 rejection itself is already named by the Source view."
 
 	aContext active: self isRejected not
 ]
@@ -31,22 +31,20 @@ TTFontCatalogueEntry >> newHbFontScaledTo: aSize [
 	"A HarfBuzz font over the font I name, ready to shape a run at this pixel size. An extension
 	 of this project: upstream answers one from AeFaceEntry >> newHbFont, and I am not an
 	 AeFaceEntry.
-
-	 A refused file is refused here too, although HarfBuzz would read it: it parses a font file
+	 A rejected file is rejected here too, although HarfBuzz would read it: it parses a font file
 	 itself and accepts a collection, which this project's reader rejects. The glyph identifiers
-	 would then name glyphs of a face no font face of this project can draw. The refusal is said
-	 by signalRefusal:, which VGFontManager >> faceAt: sends for the same reason about a face.
-
+	 would then name glyphs of a face no font face of this project can draw. The rejection is
+	 said by signalRejection:, which VGFontManager >> faceAt: sends for the same reason about a
+	 face.
 	 The face index is 0 because I hold one font: a file holding several is a collection, which
-	 the reader refuses before I am made drawable.
-
+	 the reader rejects before I am made drawable.
 	 The scale is aSize * 64 on both axes. A font built from a blob is unscaled — its scale is
 	 the units per em of its face — while AeHbBuffer >> cairoGlyphArray reads every advance and
 	 offset as 26.6 fixed point. hb_ft_font_create_referenced posed this scale from the size
 	 set on the FreeType face; nothing poses it for us."
 
 	self isRejected ifTrue: [
-		^ self signalRefusal: 'Nothing can be shaped with it.' ].
+		^ self signalRejection: 'Nothing can be shaped with it.' ].
 	^ (self source newHbBlob newHbFaceAtIndex: 0) newHbFont
 		  scaleX: aSize * 64 y: aSize * 64;
 		  yourself

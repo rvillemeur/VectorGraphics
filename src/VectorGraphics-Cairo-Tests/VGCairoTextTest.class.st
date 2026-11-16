@@ -261,14 +261,14 @@ VGCairoTextTest >> testAFontFaceReadsItsOwnMetricsFromTheFontFile [
 ]
 
 { #category : 'tests' }
-VGCairoTextTest >> testAFontWithNoOutlineTableIsRefused [
+VGCairoTextTest >> testAFontWithNoOutlineTableIsRejected [
 	"A CFF OpenType font has no glyf table, and every glyph of it would be empty here, so the
-	 face refuses the font instead of drawing a page of nothing."
+	 face rejects the font instead of drawing a page of nothing."
 
 	self
 		should: [ VGFontFace newForBytes: (self fixtureFontBytesWithTheTableTagsRenamed: 'glyf') ]
 		raise: Error
-		description: 'a font with no glyf table must be refused'
+		description: 'a font with no glyf table must be rejected'
 ]
 
 { #category : 'tests - font lifetime' }

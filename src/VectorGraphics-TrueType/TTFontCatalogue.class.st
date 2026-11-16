@@ -5,7 +5,7 @@ Two registries read me and neither knows the other: a font manager for the Bloc 
 
 Three doors fill me. `scanDefaultDirectories` walks the places this platform keeps fonts, `scanDirectory:` walks one directory and its subdirectories, and `addBytes:` takes a font nobody wrote to disk. Every file under a directory I am given reaches `addFile:`: I read no file name, because the metadata reader says what a file is from its content, and one rule for that is enough.
 
-I keep every file I met in `entries`, in the order I met it, and index only the faces that can be drawn in `entriesByFamilyName`: the family name in lower case, then the `TTFontStyle` the face states, then the entry. The first source of a given face wins, as AeFontManager does. The files I refused are still mine — `rejectedEntries` answers them, with the reason each one gave — so a reader can see what the scan passed over rather than guessing.
+I keep every file I met in `entries`, in the order I met it, and index only the faces that can be drawn in `entriesByFamilyName`: the family name in lower case, then the `TTFontStyle` the face states, then the entry. The first source of a given face wins, as AeFontManager does. The files I rejected are still mine — `rejectedEntries` answers them, with the reason each one gave — so a reader can see what the scan passed over rather than guessing.
 
 A scan is cheap: reading the metadata of the 362 faces installed on this machine costs 14 ms, against 4.6 s to read all their bytes.
 "
@@ -38,7 +38,7 @@ TTFontCatalogue class >> defaultFontDirectories [
 { #category : 'adding' }
 TTFontCatalogue >> addBytes: aByteArray [
 	"Meet a font nobody wrote to disk: the embedded faces of a package, a font pulled over the
-	 network, a font built in a test. Answers the entry, refused or not."
+	 network, a font built in a test. Answers the entry, rejected or not."
 
 	^ self
 		  addSource: aByteArray
@@ -49,7 +49,7 @@ TTFontCatalogue >> addBytes: aByteArray [
 TTFontCatalogue >> addFile: aFileReference [
 	"Meet one file on disk. Its metadata is read off the stream, which pulls the offset table,
 	 the directory and three small tables — a few hundred bytes of a file that may be megabytes.
-	 Answers the entry, refused or not."
+	 Answers the entry, rejected or not."
 
 	^ self
 		  addSource: aFileReference
@@ -89,7 +89,7 @@ TTFontCatalogue >> drawableEntries [
 { #category : 'accessing' }
 TTFontCatalogue >> entries [
 	"Every file I have met, in the order I met it, each one an entry carrying its source and its
-	 metadata. The ones I refused are among them."
+	 metadata. The ones I rejected are among them."
 
 	^ entries
 ]
@@ -97,7 +97,8 @@ TTFontCatalogue >> entries [
 { #category : 'accessing' }
 TTFontCatalogue >> entriesByFamilyName [
 	"The faces I can answer for, keyed by family name in lower case, then by the TTFontStyle
-	 that tells two faces of one family apart. Refused files are not here."
+	 that tells two faces of one family apart. Rejected files are not here."
+
 	^ entriesByFamilyName
 ]
 
@@ -190,13 +191,13 @@ TTFontCatalogue >> inspectorFamilies: aBuilder [
 ]
 
 { #category : 'inspecting' }
-TTFontCatalogue >> inspectorRefusals: aBuilder [
+TTFontCatalogue >> inspectorRejections: aBuilder [
 	"What I passed over, grouped by the reason the file gave. The reasons are not listed here:
 	 they are collected from the entries themselves, so a cause added to the reader shows up
 	 without this view being touched. A font directory holds more files that are not drawable
 	 fonts than files that are — on this machine 182 of 544 — and this is where that shows."
 
-	<inspectorPresentationOrder: 20 title: 'Refusals'>
+	<inspectorPresentationOrder: 20 title: 'Rejections'>
 	| byReason |
 	byReason := self rejectedEntries groupedBy: [ :each | each rejectionReason ].
 	^ aBuilder newTable
@@ -237,7 +238,7 @@ TTFontCatalogue >> scanDefaultDirectories [
 TTFontCatalogue >> scanDirectory: aFileReference [
 	"Meet every file under this directory and its subdirectories. No file name is read: the
 	 reader says what a file is from its content, and a file that is not a font this project
-	 draws becomes a refused entry rather than an exception."
+	 draws becomes a rejected entry rather than an exception."
 
 	aFileReference allChildren do: [ :each |
 		each isFile ifTrue: [ self addFile: each ] ]

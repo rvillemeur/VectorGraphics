@@ -1,5 +1,5 @@
 "
-I test TTFontCatalogue: what a scan of a directory makes of the files it meets, how the entries it keeps are indexed, and what it answers about the files it refuses.
+I test TTFontCatalogue: what a scan of a directory makes of the files it meets, how the entries it keeps are indexed, and what it answers about the files it rejects.
 
 My fonts are the synthetic ones of TTFontFixtures, written into a FileSystem memory directory, so a scan is measured on an exact count of files rather than on what the machine running me happens to have installed.
 "
@@ -18,12 +18,12 @@ TTFontCatalogueTest >> catalogueScannedOverTheFixtureDirectory [
 
 	| catalogue |
 	catalogue := TTFontCatalogue new.
-	catalogue scanDirectory: self directoryOfSixFacesTwoFamiliesAndTwoRefusals.
+	catalogue scanDirectory: self directoryOfSixFacesTwoFamiliesAndTwoRejections.
 	^ catalogue
 ]
 
 { #category : 'fixtures' }
-TTFontCatalogueTest >> directoryOfSixFacesTwoFamiliesAndTwoRefusals [
+TTFontCatalogueTest >> directoryOfSixFacesTwoFamiliesAndTwoRejections [
 	"A font directory in memory: three styles each of two families, one file that is not a font
 	 at all, and one font cut short inside a table. That is what a real font directory holds —
 	 on this machine 544 files of which 362 are faces this project draws — at a size a test can
@@ -143,7 +143,7 @@ TTFontCatalogueTest >> testAFreshCatalogueAndAnEmptyDirectoryBothAnswerNothing [
 ]
 
 { #category : 'tests' }
-TTFontCatalogueTest >> testARefusedFileIsKeptWithItsReasonAndIsNotIndexed [
+TTFontCatalogueTest >> testARejectedFileIsKeptWithItsReasonAndIsNotIndexed [
 	"A font directory holds more files that are not drawable fonts than files that are. Each one
 	 is an entry carrying the reason it was passed over, and none of them reaches the index a
 	 consumer looks a family up in."
@@ -250,10 +250,10 @@ TTFontCatalogueTest >> testScanningADirectoryAnswersAFamilyPerNameAndAnEntryPerF
 ]
 
 { #category : 'tests' }
-TTFontCatalogueTest >> testTheDrawableEntriesAreTheOnesLeftWhenTheRefusalsAreTakenAway [
+TTFontCatalogueTest >> testTheDrawableEntriesAreTheOnesLeftWhenTheRejectionsAreTakenAway [
 	"The other side of rejectedEntries, and the question a consumer asks to pick a face to draw
 	 with. Six of the eight files of the fixture directory carry outlines and a name; the two
-	 refusals are not among them, and an empty catalogue answers nothing."
+	 rejections are not among them, and an empty catalogue answers nothing."
 	| catalogue |
 	catalogue := self catalogueScannedOverTheFixtureDirectory.
 	self assert: catalogue drawableEntries size equals: 6.
@@ -305,7 +305,7 @@ TTFontCatalogueTest >> testTheFirstSourceOfAFaceWinsAndTheSecondIsStillKept [
 ]
 
 { #category : 'tests' }
-TTFontCatalogueTest >> testTheRefusalsViewGroupsTheFilesByTheReasonTheyGave [
+TTFontCatalogueTest >> testTheRejectionsViewGroupsTheFilesByTheReasonTheyGave [
 	"One row a reason, collected from the entries rather than listed in the view: the fixture
 	 directory holds a file that is not a font and a font cut short inside a table, and both
 	 give the same reason, so one row of two files is right."
@@ -314,7 +314,7 @@ TTFontCatalogueTest >> testTheRefusalsViewGroupsTheFilesByTheReasonTheyGave [
 	builder := SpPresenterBuilder newApplication: SpApplication new.
 	presenter := (StInspectionContext new
 		              inspectedObject: self catalogueScannedOverTheFixtureDirectory;
-		              methodSelector: #inspectorRefusals:;
+		              methodSelector: #inspectorRejections:;
 		              yourself) basicNewInspectionPresenter: builder.
 	rows := presenter items collect: [ :item |
 		        presenter columns collect: [ :column |

@@ -13,7 +13,7 @@ VGFontManagerTest >> testADirectoryScanReadsEveryFileAndJudgesItByItsContent [
 	"The scanning door, and the rule it carries: a file is read because it is there, not because
 	 its name looks like a font. Upstream drives an AeFontScanner, whose shouldIgnoreFile: skips
 	 a file whose extension it does not know; a font saved under a name nobody expects is
-	 registered here, and a file that is not a font is a refusal the catalogue keeps rather than
+	 registered here, and a file that is not a font is a rejection the catalogue keeps rather than
 	 a file silently passed over."
 
 	| directory manager |
@@ -180,11 +180,11 @@ VGFontManagerTest >> testAskingForADefaultFaceNoFamilyOfTheListCanGiveRefusesByN
 ]
 
 { #category : 'tests' }
-VGFontManagerTest >> testAskingForTheFaceOfARefusedFileSaysWhichFileAndWhy [
-	"A reader holds my refused files since unit 3.3, so one of them can be handed back to me.
+VGFontManagerTest >> testAskingForTheFaceOfARejectedFileSaysWhichFileAndWhy [
+	"A reader holds my rejected files since unit 3.3, so one of them can be handed back to me.
 	 The reader of 1.3 has already said no to those bytes, so I say so by name rather than
 	 letting the font parser run off the end of them, and rather than the cache's own
-	 KeyNotFound, which says nothing of the refusal."
+	 KeyNotFound, which says nothing of the rejection."
 
 	| directory manager error |
 	directory := FileSystem memory root / 'fonts'.
@@ -200,7 +200,7 @@ VGFontManagerTest >> testAskingForTheFaceOfARefusedFileSaysWhichFileAndWhy [
 		         do: [ :each | each ].
 	self assert: error notNil.
 	self deny: (error isKindOf: KeyNotFound).
-	self assert: (error messageText includesSubstring: 'refused').
+	self assert: (error messageText includesSubstring: 'rejected').
 	self assert: (error messageText includesSubstring: 'readme.txt').
 	self assert: (error messageText includesSubstring: 'notAnSfntFont').
 	self assert: manager faceByEntryCache isEmpty
@@ -321,10 +321,10 @@ VGFontManagerTest >> testTheFaceLookupReachesTheCacheRatherThanTheEmptyInherited
 ]
 
 { #category : 'tests' }
-VGFontManagerTest >> testTheFilesRefusedAreKeptWithTheirReasonAndAFreshManagerRefusedNone [
+VGFontManagerTest >> testTheFilesRejectedAreKeptWithTheirReasonAndAFreshManagerRejectedNone [
 	"A file I met and will not draw with is not dropped: I answer for it, with the reason the
 	 reader gave, so a reader asking why a family is missing has somewhere to look. A manager
-	 that has met nothing refuses nothing."
+	 that has met nothing rejects nothing."
 
 	| directory manager |
 	self assert: VGFontManager new rejectedFiles isEmpty.

@@ -27,7 +27,7 @@ TTFontMetadataTest >> testMetadataAnswersTheStyleOfTheFaceItRead [
 ]
 
 { #category : 'tests' }
-TTFontMetadataTest >> testPrintingAFaceThatIsRefusedNamesTheReason [
+TTFontMetadataTest >> testPrintingAFaceThatIsRejectedNamesTheReason [
 	"More files in a font directory are not drawable fonts than are — 182 of the 544 on this
 	 machine — and fontNamesWithoutParsingGlyphs makes a reader inspect all of them at once. A
 	 face that prints its reason can be read in that list; one printing two nils cannot."
@@ -81,7 +81,7 @@ TTFontMetadataTest >> testTheIdentityViewOfAFaceWithNothingReadYetBuildsAndShows
 ]
 
 { #category : 'tests' }
-TTFontMetadataTest >> testTheIdentityViewShowsTheFactsAFaceIsMatchedOnAndWhyItIsRefused [
+TTFontMetadataTest >> testTheIdentityViewShowsTheFactsAFaceIsMatchedOnAndWhyItIsRejected [
 	"A reader opening a face must see what a font manager will match it on, in the font's own
 	 numbers — the OS/2 weight class, the OS/2 width class and the slant — and, when the face
 	 cannot be drawn, the reason the reader gave."

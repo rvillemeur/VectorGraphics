@@ -1,7 +1,7 @@
 "
 I am one font file, read with the VectorGraphics TrueType parsers, and I answer what the font itself says: the family and style it names itself, its metrics in font units, the glyph index of a code point, and the outline of a glyph.
 
-I am the replacement for AeCairoFreetypeFontFace, but I carry no FreeType face and no handle: I read the glyf, loca, cmap, head, hhea, hmtx and maxp tables of the bytes I am given. A font with no glyf table, a CFF OpenType font for instance, is refused rather than drawn wrongly.
+I am the replacement for AeCairoFreetypeFontFace, but I carry no FreeType face and no handle: I read the glyf, loca, cmap, head, hhea, hmtx and maxp tables of the bytes I am given. A font with no glyf table, a CFF OpenType font for instance, is rejected rather than drawn wrongly.
 
 Everything I answer is in font units, which are unitsPerEm to the em square. Scaling is the scaled font's business, because the same face serves every size, and VGScaledFont is what holds a font matrix. I cache the outline of each glyph I am asked for, so a repeated draw parses nothing twice.
 "
@@ -141,7 +141,7 @@ VGFontFace class >> newForFile: aFileReference [
 { #category : 'constants' }
 VGFontFace class >> requiredTableTags [
 	"The tables a TrueType outline font must carry for me to read it. A font missing one of them
-	 is refused in #readBytes:."
+	 is rejected in #readBytes:."
 
 	^ #( 'head' 'maxp' 'hhea' 'hmtx' 'loca' 'cmap' 'glyf' )
 ]
@@ -437,16 +437,16 @@ VGFontFace >> printOn: aStream [
 
 { #category : 'reading' }
 VGFontFace >> readBytes: aByteArray [
-	"Read the tables I need from the font's own bytes, each step one table or one refusal. The
+	"Read the tables I need from the font's own bytes, each step one table or one rejection. The
 	 metadata reader keeps its own judgement: I store what it answers whether or not it would
-	 have refused this font, since what I need to draw and what it needs to name are not the
+	 have rejected this font, since what I need to draw and what it needs to name are not the
 	 same tables."
 
 	| tables headData glyphCount |
 	bytes := aByteArray.
 	outlines := Dictionary new.
 	tables := TTFontReader buildTableDirectory: aByteArray offset: 0.
-	self refuseIfATableIsMissingFrom: tables.
+	self rejectIfATableIsMissingFrom: tables.
 	metadata := TTFontMetadataReader readBytes: aByteArray.
 	headData := (TTHeadTableParser on: (tables at: 'head')) process.
 	unitsPerEm := headData at: #units.
@@ -464,7 +464,7 @@ VGFontFace >> readBytes: aByteArray [
 { #category : 'private' }
 VGFontFace >> readComponentWithFlags: aFlagWord [
 	"One component record, with the entry standing on the glyph index that follows its flags. A
-	 record that matches two points instead of giving an offset is refused: no font we draw uses
+	 record that matches two points instead of giving an offset is rejected: no font we draw uses
 	 it, and guessing the placement would move the component silently."
 
 	| component |
@@ -575,10 +575,10 @@ VGFontFace >> readOutlineOfGlyphAt: aGlyphIndex [
 ]
 
 { #category : 'reading' }
-VGFontFace >> refuseIfATableIsMissingFrom: aTableDictionary [
+VGFontFace >> rejectIfATableIsMissingFrom: aTableDictionary [
 	"The tables I read every glyph and every metric from have to be there before I read any of
 	 them. A font with no glyf table carries its outlines in some other format, CFF for an
-	 OpenType font, and I would draw nothing for it, so it is refused here rather than at the
+	 OpenType font, and I would draw nothing for it, so it is rejected here rather than at the
 	 first glyph. Raises; the caller reads nothing further."
 
 	self class requiredTableTags do: [ :tag |

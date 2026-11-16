@@ -5,7 +5,7 @@ My source is a FileReference or a ByteArray, and I ask it for `fontBytes` rather
 
 I hold no face of either kind. A full parse costs 200 ms against the 1 ms my metadata cost, so the consumer that needs outlines builds its own face from my bytes, when it needs them.
 
-Unlike AeFileFaceEntry I carry no face index: a ttcf collection is refused before an entry is made for it, so the index of a face I can answer for is always zero.
+Unlike AeFileFaceEntry I carry no face index: a ttcf collection is rejected before an entry is made for it, so the index of a face I can answer for is always zero.
 "
 Class {
 	#name : 'TTFontCatalogueEntry',
@@ -112,17 +112,16 @@ TTFontCatalogueEntry >> rejectionReason [
 ]
 
 { #category : 'signalling' }
-TTFontCatalogueEntry >> signalRefusal: whatCannotBeDone [
-	"Signal that the reader refused the file I name, saying which file it was, the reason the
+TTFontCatalogueEntry >> signalRejection: whatCannotBeDone [
+	"Signal that the reader rejected the file I name, saying which file it was, the reason the
 	 reader gave, and what therefore cannot be done with me. The caller checks isRejected first
 	 and says only the last clause, so the first two are written once however many things a
-	 refused entry turns out not to be good for.
-
+	 rejected entry turns out not to be good for.
 	 The reason repeats what the reader already said rather than letting a parse fail a second
 	 time, deeper, on the same bytes."
 
 	^ Error signal:
-		  'The font reader refused ' , self fontSourceName , ': '
+		  'The font reader rejected ' , self fontSourceName , ': '
 		  , self rejectionReason asString , '. ' , whatCannotBeDone
 ]
 
