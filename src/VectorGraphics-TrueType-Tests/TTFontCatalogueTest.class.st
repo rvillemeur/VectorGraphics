@@ -150,10 +150,10 @@ TTFontCatalogueTest >> testARejectedFileIsKeptWithItsReasonAndIsNotIndexed [
 
 	| catalogue entry |
 	catalogue := TTFontCatalogue new.
-	entry := catalogue addBytes: TTFontFixtures otfFontBytes.
+	entry := catalogue addBytes: TTFontFixtures cidKeyedFontBytes.
 	self assert: catalogue entries asArray equals: { entry }.
 	self assert: catalogue rejectedEntries asArray equals: { entry }.
-	self assert: entry metadata rejectionReason equals: #noGlyfTable.
+	self assert: entry metadata rejectionReason equals: #cidKeyedFont.
 	self assert: entry metadata familyName equals: 'Waree'.
 	self assert: catalogue entriesByFamilyName isEmpty.
 	self assert: catalogue familyNames isEmpty
@@ -188,11 +188,11 @@ TTFontCatalogueTest >> testAnEntryNamesItsFaceAndItsSourceWhenPrinted [
 		assert: fileEntry printString
 		equals:
 		'a TTFontCatalogueEntry a TTFontMetadata ''Source Sans Pro'' ''Bold'' from Source Sans Pro-Bold.ttf'.
-	memoryEntry := catalogue addBytes: TTFontFixtures otfFontBytes.
+	memoryEntry := catalogue addBytes: TTFontFixtures cidKeyedFontBytes.
 	self
 		assert: memoryEntry printString
 		equals:
-		'a TTFontCatalogueEntry a TTFontMetadata ''Waree'' ''Oblique'' #noGlyfTable from 150 bytes'
+		'a TTFontCatalogueEntry a TTFontMetadata ''Waree'' ''Oblique'' #cidKeyedFont from 131 bytes'
 ]
 
 { #category : 'tests' }

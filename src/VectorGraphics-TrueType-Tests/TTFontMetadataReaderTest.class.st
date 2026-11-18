@@ -13,6 +13,33 @@ Class {
 	#tag : 'Tests'
 }
 
+{ #category : 'private' }
+TTFontMetadataReaderTest >> anInstalledOpenTypeFontFile [
+	"The first .otf file the font directories of this platform hold, or nil when they hold
+	 none. A gate built on a real font says nothing on a machine that has no such font."
+
+	TTFontCatalogue defaultFontDirectories do: [ :directory |
+		directory exists ifTrue: [
+			directory allFiles do: [ :file |
+				(file basename asLowercase endsWith: '.otf') ifTrue: [ ^ file ] ] ] ].
+	^ nil
+]
+
+{ #category : 'tests' }
+TTFontMetadataReaderTest >> testACidKeyedFontIsRejectedThroughBothDoors [
+	"A CID-keyed font is told from any other by its top dictionary, which the byte door and the
+	 stream door both reach: the stream door reads only the head of the CFF table, where that
+	 dictionary is."
+
+	| bytes fromBytes fromStream |
+	bytes := TTFontFixtures cidKeyedFontBytes.
+	fromBytes := TTFontMetadataReader readBytes: bytes.
+	fromStream := TTFontMetadataReader readStream: bytes readStream.
+	self assert: fromBytes rejectionReason equals: #cidKeyedFont.
+	self assert: fromStream rejectionReason equals: #cidKeyedFont.
+	self assert: fromStream familyName equals: 'Waree'
+]
+
 { #category : 'tests' }
 TTFontMetadataReaderTest >> testAColourFontIsRejectedThoughItCarriesOutlines [
 
@@ -35,6 +62,22 @@ TTFontMetadataReaderTest >> testAFileThatIsNotAFontIsRejected [
 	self
 		assert: (TTFontMetadataReader readBytes: #[ 0 1 0 0 ]) rejectionReason
 		equals: #notAnSfntFont
+]
+
+{ #category : 'tests' }
+TTFontMetadataReaderTest >> testAFontCarryingNeitherOutlineTableIsRejected [
+	"A font with neither glyf nor CFF carries its glyphs in some format this project does not
+	 read, or carries none at all. There is nothing to draw, so the face is rejected and the
+	 reason names outlines rather than one table."
+
+	| metadata |
+	metadata := TTFontMetadataReader readBytes: (TTFontFixtures fontBytesWithTables: {
+			            (TTFontMetadataReader nameTableTag
+			             -> (TTFontFixtures
+					             nameTableWithFamilyName: 'Source Sans Pro'
+					             styleName: 'Regular')) }).
+	self assert: metadata rejectionReason equals: #noOutlineTable.
+	self assert: metadata isRejected
 ]
 
 { #category : 'tests' }
@@ -152,15 +195,33 @@ TTFontMetadataReaderTest >> testAWeightClassOfZeroFallsBackToMacStyle [
 ]
 
 { #category : 'tests' }
-TTFontMetadataReaderTest >> testAnOtfFontIsRejectedForHavingNoGlyfTable [
-	"101 of the 466 font files on this machine are OTTO: readable names, CFF outlines this
-	 project cannot draw. The reader names the face and says why it is not renderable, and
-	 raises nothing."
+TTFontMetadataReaderTest >> testAnInstalledOpenTypeFontIsNamedAndNotRejected [
+	"A gate on a real file: a font nobody wrote for this suite is read through the stream door,
+	 named, and not rejected. The fixtures say what the reader does with bytes of our own; this
+	 says it holds for the OpenType fonts of this machine."
+
+	| file metadata |
+	file := self anInstalledOpenTypeFontFile.
+	file ifNil: [ ^ self skip: 'this machine has no .otf font installed' ].
+	metadata := file binaryReadStreamDo: [ :stream |
+		            TTFontMetadataReader readStream: stream ].
+	self
+		assert: metadata rejectionReason isNil
+		description: file basename , ' was rejected for '
+			, metadata rejectionReason printString.
+	self deny: metadata familyName isEmptyOrNil
+]
+
+{ #category : 'tests' }
+TTFontMetadataReaderTest >> testAnOtfFontIsAcceptedBecauseItsCffOutlinesAreDrawn [
+	"101 of the 466 font files on this machine are OTTO: readable names and CFF outlines, which
+	 this project draws since the charstring reader of FONT-PLAN section 8. The face is named
+	 and nothing rejects it."
 
 	| metadata |
 	metadata := TTFontMetadataReader readBytes: TTFontFixtures otfFontBytes.
-	self assert: metadata rejectionReason equals: #noGlyfTable.
-	self assert: metadata isRejected.
+	self assert: metadata rejectionReason isNil.
+	self deny: metadata isRejected.
 	self assert: metadata familyName equals: 'Waree'.
 	self assert: metadata styleName equals: 'Oblique'
 ]

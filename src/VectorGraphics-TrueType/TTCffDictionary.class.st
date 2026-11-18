@@ -87,6 +87,22 @@ TTCffDictionary >> inspectorEntries: aBuilder [
 ]
 
 { #category : 'reading' }
+TTCffDictionary >> numberFrom: aString [
+	"The characters the nibbles spelled, read as one number. CFF spells only the nibbles it
+	 needs, so .001 carries no zero in front of its point and -.5 none after its sign, while
+	 Pharo's number reader wants a digit there and raises without one."
+
+	| spelling |
+	spelling := (aString beginsWith: '.')
+		            ifTrue: [ '0' , aString ]
+		            ifFalse: [
+			            (aString beginsWith: '-.')
+				            ifTrue: [ '-0' , (aString allButFirst: 1) ]
+				            ifFalse: [ aString ] ].
+	^ spelling asNumber
+]
+
+{ #category : 'reading' }
 TTCffDictionary >> operandFrom: aStream firstByte: aByte [
 	"One operand. The first byte says both which encoding it is and, for the two short ones,
 	 part of the number itself. The bytes 22 to 27, 31 and 255 say no operand at all."
@@ -136,12 +152,13 @@ TTCffDictionary >> realFrom: aStream [
 
 	| digits |
 	digits := WriteStream on: String new.
-	[ aStream atEnd ] whileFalse: [ | byte |
+	[ aStream atEnd ] whileFalse: [
+		| byte |
 		byte := aStream next.
 		((self spellNibble: (byte bitShift: -4) on: digits) and: [
 			 self spellNibble: (byte bitAnd: 15) on: digits ]) ifFalse: [
-			^ digits contents asNumber ] ].
-	^ digits contents asNumber
+			^ self numberFrom: digits contents ] ].
+	^ self numberFrom: digits contents
 ]
 
 { #category : 'reading' }

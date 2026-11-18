@@ -30,6 +30,45 @@ TTFontMetadataReader class >> bytesReadForTableLengths: aDictionary [
 			   sum + (aDictionary at: tag ifAbsent: [ 0 ]) ])
 ]
 
+{ #category : 'accessing' }
+TTFontMetadataReader class >> cffHeadSize [
+	"How much of a CFF table the stream door reads: enough for the header, the font names and
+	 the top dictionary, which is what tells a CID-keyed font from any other. The header is at
+	 most 255 bytes, since it states its own size in one byte, the names are one short string
+	 for an OpenType font, and the dictionary is a few dozen bytes. The whole table is most of
+	 a file that may be megabytes, and reading it would cost the scan what the stream door was
+	 built to save."
+
+	^ 4096
+]
+
+{ #category : 'accessing' }
+TTFontMetadataReader class >> cffTableTag [
+	"The table holding CFF outlines, which an OpenType font carries in place of glyf. The tag
+	 is three letters and a space, as every sfnt tag is four bytes."
+
+	^ 'CFF '
+]
+
+{ #category : 'reading' }
+TTFontMetadataReader class >> cidRejectionFrom: anEntryByTag [
+	"Why a CFF font cannot be drawn although its directory says it can, or nil: a CID-keyed
+	 font reaches its glyphs through an FDArray and an FDSelect, which this project's
+	 charstring reader does not walk. A font with no CFF table is not asked the question.
+	 The stream door hands me the head of the CFF table rather than the whole of it, so a
+	 table whose first bytes cannot be walked answers nil: the face reads the table whole and
+	 says what is wrong with it, while a scan judges no font on a prefix."
+
+	| entry |
+	entry := anEntryByTag at: self cffTableTag ifAbsent: [ ^ nil ].
+	^ [
+	  (TTCffTableParser isKeyedByCharacterIdentifiers: entry)
+		  ifTrue: [ #cidKeyedFont ]
+		  ifFalse: [ nil ] ]
+		  on: Error
+		  do: [ :each | nil ]
+]
+
 { #category : 'constants' }
 TTFontMetadataReader class >> classifiedTableTags [
 	"The three tables a face is named and classified from. Together they are under a kilobyte of
@@ -91,7 +130,9 @@ TTFontMetadataReader class >> directorySizeOf: anOffsetTable [
 TTFontMetadataReader class >> entriesFrom: aStream directory: aDirectory [
 	"The tables of classifiedTableTags, pulled off the stream one seek at a time and wrapped as
 	 entries over their own bytes rather than over the whole font. A table the font does not
-	 carry is left out, which is how a missing head or OS/2 reaches the classifying step."
+	 carry is left out, which is how a missing head or OS/2 reaches the classifying step. The
+	 head of the CFF table joins them when the font carries one, because a CID-keyed font is
+	 told from any other by what the first bytes of that table say."
 
 	| entries |
 	entries := Dictionary new.
@@ -101,6 +142,12 @@ TTFontMetadataReader class >> entriesFrom: aStream directory: aDirectory [
 			entries
 				at: tag
 				put: (TTFontTableDirEntry onBytes: (aStream next: entry length)) ] ].
+	(aDirectory at: self cffTableTag ifAbsent: [ nil ]) ifNotNil: [ :entry |
+		aStream position: entry offset - 1.
+		entries
+			at: self cffTableTag
+			put: (TTFontTableDirEntry onBytes:
+					 (aStream next: (entry length min: self cffHeadSize))) ].
 	^ entries
 ]
 
@@ -114,10 +161,10 @@ TTFontMetadataReader class >> fsSelectionObliqueMask [
 	^ 2r1000000000
 ]
 
-{ #category : 'constants' }
+{ #category : 'accessing' }
 TTFontMetadataReader class >> glyfTableTag [
-	"The table holding TrueType outlines. A font without it has CFF outlines, which this project
-	 cannot draw."
+	"The table holding TrueType outlines. A font without it carries CFF outlines, which this
+	 project draws since FONT-PLAN section 8."
 
 	^ 'glyf'
 ]
@@ -166,12 +213,14 @@ TTFontMetadataReader class >> macStyleItalicMask [
 { #category : 'reading' }
 TTFontMetadataReader class >> metadataFromEntries: anEntryByTag lengths: aDictionary [
 	"My one answer: a TTFontMetadata named from the name table, classified from OS/2 and head,
-	 and carrying the first reason the directory gives not to draw the face."
+	 and carrying the first reason the directory gives not to draw the face, or the reason its
+	 CFF table gives when the directory gives none."
 
 	| metadata |
 	metadata := TTFontMetadata new.
 	metadata tableLengthsByTag: aDictionary.
-	metadata rejectionReason: (self rejectionFromTags: metadata tableTags).
+	metadata rejectionReason: ((self rejectionFromTags: metadata tableTags) ifNil: [
+			 self cidRejectionFrom: anEntryByTag ]).
 	(anEntryByTag includesKey: self nameTableTag) ifTrue: [
 		self readNamesInto: metadata fromEntries: anEntryByTag ].
 	self readStyleInto: metadata fromEntries: anEntryByTag.
@@ -234,6 +283,14 @@ TTFontMetadataReader class >> os2TableTag [
 	"The tag is written with the solidus: four characters, O, S, slash, 2."
 
 	^ 'OS/2'
+]
+
+{ #category : 'accessing' }
+TTFontMetadataReader class >> outlineTableTags [
+	"The tables a face is drawn from, one per outline format this project reads: TrueType
+	 outlines in glyf, CFF charstrings in CFF. A font carrying neither is rejected."
+
+	^ { self glyfTableTag. self cffTableTag }
 ]
 
 { #category : 'reading' }
@@ -315,11 +372,14 @@ TTFontMetadataReader class >> rejectedMetadata: aSymbol [
 { #category : 'reading' }
 TTFontMetadataReader class >> rejectionFromTags: aCollection [
 	"Why a font whose directory was read cannot be drawn, or nil when it can: no name to match
-	 the face by, no outlines to draw, or glyphs that are colour bitmaps or SVG documents rather
-	 than outlines. The first cause answers; the others are not looked for."
+	 the face by, no outlines in either format this project reads, or glyphs that are colour
+	 bitmaps or SVG documents rather than outlines. The first cause answers; the others are
+	 not looked for. A CID-keyed font reads as drawable here and is rejected by
+	 #cidRejectionFrom:, which needs the CFF table itself and not its tag."
 
 	(aCollection includes: self nameTableTag) ifFalse: [ ^ #noNameTable ].
-	(aCollection includes: self glyfTableTag) ifFalse: [ ^ #noGlyfTable ].
+	(self outlineTableTags anySatisfy: [ :tag | aCollection includes: tag ]) ifFalse: [
+		^ #noOutlineTable ].
 	(self colourTableTags anySatisfy: [ :tag | aCollection includes: tag ]) ifTrue: [
 		^ #colourFont ].
 	^ nil

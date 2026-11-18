@@ -37,12 +37,12 @@ TTFontMetadataTest >> testPrintingAFaceThatIsRejectedNamesTheReason [
 	named
 		familyName: 'Waree';
 		styleName: 'Oblique';
-		rejectionReason: #noGlyfTable.
+		rejectionReason: #noOutlineTable.
 	nameless := TTFontMetadata new.
 	nameless rejectionReason: #fontCollection.
 	self
 		assert: named printString
-		equals: 'a TTFontMetadata ''Waree'' ''Oblique'' #noGlyfTable'.
+		equals: 'a TTFontMetadata ''Waree'' ''Oblique'' #noOutlineTable'.
 	self
 		assert: nameless printString
 		equals: 'a TTFontMetadata nil nil #fontCollection'
@@ -94,7 +94,7 @@ TTFontMetadataTest >> testTheIdentityViewShowsTheFactsAFaceIsMatchedOnAndWhyItIs
 		weightClass: 400;
 		widthClass: 5;
 		slant: #oblique;
-		rejectionReason: #noGlyfTable.
+		rejectionReason: #cidKeyedFont.
 	builder := SpPresenterBuilder newApplication: SpApplication new.
 	presenter := (StInspectionContext new
 		              inspectedObject: metadata;
@@ -104,7 +104,7 @@ TTFontMetadataTest >> testTheIdentityViewShowsTheFactsAFaceIsMatchedOnAndWhyItIs
 		          (presenter columns last evaluation value: item) ].
 	self
 		assert: values asArray
-		equals: #( 'Waree' 'Oblique' '400' '5' 'oblique' 'noGlyfTable' )
+		equals: #( 'Waree' 'Oblique' '400' '5' 'oblique' 'cidKeyedFont' )
 ]
 
 { #category : 'tests' }

@@ -28,6 +28,21 @@ TTCffDictionaryTest >> testAByteThatSaysNoOperandIsRefusedAndTheErrorNamesIt [
 ]
 
 { #category : 'tests' }
+TTCffDictionaryTest >> testARealNumberWrittenWithNoDigitBeforeThePointIsRead [
+	"A CFF real number spells only the nibbles it needs, so .0001 is written without the zero
+	 in front of the point, and -.5 without the zero after the sign. Pharo's number reader
+	 wants a digit there, so the reader supplies it. Source Code Pro writes its private
+	 dictionary this way, and reading that font raised before this was fixed."
+
+	self
+		assert: (TTCffDictionary new realFrom: #[ 160 0 31 ] readStream)
+		equals: 0.0001.
+	self
+		assert: (TTCffDictionary new realFrom: #[ 234 95 255 ] readStream)
+		equals: -0.5
+]
+
+{ #category : 'tests' }
 TTCffDictionaryTest >> testARealOperandIsReadFromTheNibblesThatSpellIt [
 	"A real operand is the characters of the number, one nibble each: the digits, the point, the
 	 exponent, the minus sign, and a nibble that says the number has ended."

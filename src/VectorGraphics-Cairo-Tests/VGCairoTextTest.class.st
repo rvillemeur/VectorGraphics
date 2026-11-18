@@ -43,6 +43,21 @@ VGCairoTextTest class >> oneStepOfTheFixedPointGrid [
 	^ 1 / 256
 ]
 
+{ #category : 'private' }
+VGCairoTextTest >> anInstalledOpenTypeFontFile [
+	"The first .otf file this machine's font directory holds, or nil when it holds none. A
+	 gate built on a real font says nothing on a machine that has no such font. The directory
+	 is the one VGScaledFontExamples reads, because allowedDependencies forbids this package
+	 from naming the catalogue that knows all five of them."
+
+	| directory |
+	directory := VGScaledFontExamples fontDirectory.
+	directory exists ifFalse: [ ^ nil ].
+	directory allFiles do: [ :file |
+		(file basename asLowercase endsWith: '.otf') ifTrue: [ ^ file ] ].
+	^ nil
+]
+
 { #category : 'helpers' }
 VGCairoTextTest >> fixtureFontBytes [
 	"Source Sans Pro regular, embedded in Alexandrie, as raw TrueType bytes. The test package
@@ -139,6 +154,26 @@ VGCairoTextTest >> newTextSurface [
 	"Wide enough for the fixture string at size 30, which advances eighty-nine pixels."
 
 	^ VGCairoImageSurface extent: 128 @ 48
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testACffGlyphIsInterpretedOnlyWhenItsOutlineIsAsked [
+	"A CFF glyph is drawn by interpreting its charstring, which a face does glyph by glyph: a
+	 font of three thousand glyphs is read to draw the twenty a page shows. The font here
+	 carries one glyph no reader can walk, so reading the font eagerly would raise where
+	 reading it lazily raises only for that one glyph."
+
+	| face |
+	face := VGFontFace newForBytes:
+		        VGFontBytesFixture cffFontBytesWithAGlyphThatCannotBeRead.
+	self assert: face glyphCount equals: 2.
+	self assert: (face outlineOfGlyphAt: 0) contours isEmpty.
+	self
+		should: [
+			face outlineOfGlyphAt:
+				(face glyphIndexForCodePoint: VGFontBytesFixture firstMappedCodePoint) ]
+		raise: Error
+		description: 'a glyph whose charstring cannot be read must say so'
 ]
 
 { #category : 'tests' }
@@ -441,6 +476,36 @@ VGCairoTextTest >> testAFaceReadsTheNegativeNumbersOfTheHeadAndHheaTablesAsNegat
 ]
 
 { #category : 'tests' }
+VGCairoTextTest >> testAFaceReadsTheOutlineOfAGlyphFromACffTable [
+	"An OpenType font carries its outlines as CFF charstrings in one table, where a TrueType
+	 font carries them in glyf and loca. The face reads either: the outline of a glyph is the
+	 same object, in the same font units, with the same box, whichever table it was drawn
+	 from. The square is four straight segments, so every control point is its own end point."
+
+	| face outline |
+	face := VGFontFace newForBytes: VGFontBytesFixture cffFontBytes.
+	self assert: face glyphCount equals: 2.
+	outline := face outlineOfGlyphAt:
+		           (face glyphIndexForCodePoint:
+			            VGFontBytesFixture firstMappedCodePoint).
+	self assert: outline advance equals: VGFontBytesFixture advanceWidth.
+	self assert: outline contours size equals: 1.
+	self
+		assert: outline contours first asArray
+		equals: {
+				(50 @ 100).
+				(450 @ 100).
+				(450 @ 100).
+				(450 @ 400).
+				(450 @ 400).
+				(50 @ 400).
+				(50 @ 400).
+				(50 @ 100).
+				(50 @ 100) }.
+	self assert: outline boundsRectangle equals: (50 @ 100 corner: 450 @ 400)
+]
+
+{ #category : 'tests' }
 VGCairoTextTest >> testAFaceWithNoNameTableStillReadsAndNamesNothing [
 	"What I need to draw and what the metadata reader needs to name are not the same tables:
 	 the name table is in neither requiredTableTags nor what any glyph is read from. So a font
@@ -484,17 +549,19 @@ VGCairoTextTest >> testAFontFaceReadsItsOwnMetricsFromTheFontFile [
 
 { #category : 'tests' }
 VGCairoTextTest >> testAFontMissingAnyRequiredTableIsRejectedAndTheErrorNamesThatTable [
-	"Every tag of requiredTableTags is required: a font stripped of any one of them is rejected
-	 before a single glyph is read, and the error says which table was not there. One case per
-	 tag, so a tag dropped from the list, or a check that stops at the first tag, fails here."
+	"Every tag of requiredTableTags is required, and so is every tag of the outline format the
+	 font carries: a font stripped of any one of them is rejected before a single glyph is
+	 read, and the error says which table was not there. One case per tag, so a tag dropped
+	 from either list, or a check that stops at the first tag, fails here."
 
-	| records |
+	| records tables |
 	records := { (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100) }.
-	VGFontFace requiredTableTags do: [ :tag |
+	tables := VGFontBytesFixture tablesForGlyphRecords: records.
+	(VGFontFace requiredTableTags
+	 , (VGFontFace outlineTableTagsIn: (Dictionary newFrom: tables))) do: [ :tag |
 		| bytes error |
 		bytes := VGFontBytesFixture fontBytesWithTables:
-			         ((VGFontBytesFixture tablesForGlyphRecords: records) reject: [
-				          :each | each key = tag ]).
+			         (tables reject: [ :each | each key = tag ]).
 		error := [
 		         VGFontFace newForBytes: bytes.
 		         nil ] on: Error do: [ :each | each ].
@@ -667,6 +734,21 @@ VGCairoTextTest >> testATextVerbWithNoFontDrawsThroughTheDefaultFace [
 	withTheDefault flush.
 	self deny: (withNoFont data asArray allSatisfy: [ :each | each = 0 ]).
 	self assert: withNoFont data asArray equals: withTheDefault data asArray
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAnInstalledOpenTypeFontDrawsItsGlyphs [
+	"A gate on a real file: a face is built from an OpenType font nobody wrote for this suite,
+	 and the glyph of the letter a holds contours. The fixtures say what the reader does with
+	 a table of our own; this says it holds for the fonts of this machine."
+
+	| file face outline |
+	file := self anInstalledOpenTypeFontFile.
+	file ifNil: [ ^ self skip: 'this machine has no .otf font installed' ].
+	face := VGFontFace newForBytes: file binaryReadStream upToEnd.
+	outline := face outlineOfGlyphAt: (face glyphIndexForCodePoint: $a codePoint).
+	self deny: outline contours isEmpty description: file basename , ' draws no a'.
+	self assert: outline advance > 0
 ]
 
 { #category : 'tests' }

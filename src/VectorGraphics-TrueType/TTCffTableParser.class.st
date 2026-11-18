@@ -46,6 +46,17 @@ TTCffTableParser class >> defaultWidthXOperator [
 	^ 20
 ]
 
+{ #category : 'testing' }
+TTCffTableParser class >> isKeyedByCharacterIdentifiers: anEntry [
+	"Whether this table belongs to a CID-keyed font, read from its top dictionary alone. The
+	 header, the font names and that dictionary are the first bytes of a CFF table, so a
+	 reader that classifies a face answers the question from a prefix of a table that is
+	 megabytes."
+
+	^ (self on: anEntry) readTopDictionary includesOperator:
+		  self registryOrderingSupplementOperator
+]
+
 { #category : 'operators' }
 TTCffTableParser class >> nominalWidthXOperator [
 	"The private dictionary entry that says what a width stated by a charstring is counted from."
@@ -234,10 +245,7 @@ TTCffTableParser >> privateDictionary [
 TTCffTableParser >> process [
 	"Read everything the table says about the font, and nothing it says about a glyph."
 
-	tableStart := entry offset.
-	self readHeader.
-	TTCffIndex readFrom: entry. "the font names, which an OpenType font takes from its name table"
-	topDictionary := TTCffDictionary readFrom: ((TTCffIndex readFrom: entry) at: 1).
+	self readTopDictionary.
 	TTCffIndex readFrom: entry. "the strings, which only a glyph name or a CID font needs"
 	globalSubrs := TTCffIndex readFrom: entry.
 	self rejectIfKeyedByCharacterIdentifiers.
@@ -303,6 +311,18 @@ TTCffTableParser >> readPrivateDictionary [
 ]
 
 { #category : 'reading' }
+TTCffTableParser >> readTopDictionary [
+	"The header, the font names and the top dictionary: the head of the table, which says
+	 where everything else in it is. A reader that only classifies a face stops here."
+
+	tableStart := entry offset.
+	self readHeader.
+	TTCffIndex readFrom: entry. "the font names, which an OpenType font takes from its name table"
+	topDictionary := TTCffDictionary readFrom: ((TTCffIndex readFrom: entry) at: 1).
+	^ topDictionary
+]
+
+{ #category : 'reading' }
 TTCffTableParser >> rejectIfKeyedByCharacterIdentifiers [
 	"A CID-keyed font reaches a glyph through an FDArray and an FDSelect instead of one private
 	 dictionary. Reading it as if it were not draws the wrong hints and the wrong widths."
@@ -311,17 +331,18 @@ TTCffTableParser >> rejectIfKeyedByCharacterIdentifiers [
 		ifTrue: [ TTCffError signal: 'this font is CID-keyed, which this reader does not draw' ]
 ]
 
-{ #category : 'glyphs' }
+{ #category : 'reading' }
 TTCffTableParser >> setBoundsOf: aGlyph [
-	"The box of a glyph, which a CFF font does not state: it is read from the points the
-	 glyph is drawn with, control points included, so it holds the outline and may stand a
-	 little outside it. A glyph that draws nothing has a box of no width and no height."
+	"The box of a CFF glyph is computed from the points it draws, since a CFF font states no
+	 box of its own for a glyph. TTGlyph carries the box in the order the glyf table writes
+	 it — xMin, yMin, xMax, yMax — so what it calls the top is the smallest y and what it
+	 calls the bottom is the largest. A glyph that inks nothing has a box of no width and no
+	 height."
 
 	| points |
 	points := OrderedCollection new.
 	aGlyph contours do: [ :each |
-		1 to: each points size do: [ :index |
-			points add: (each points at: index) ] ].
+		1 to: each points size do: [ :index | points add: (each points at: index) ] ].
 	points ifEmpty: [
 		^ aGlyph
 			  boundsLeft: 0
@@ -331,8 +352,8 @@ TTCffTableParser >> setBoundsOf: aGlyph [
 	aGlyph
 		boundsLeft: (points min: [ :each | each x ])
 		boundsRight: (points max: [ :each | each x ])
-		boundsTop: (points max: [ :each | each y ])
-		boundsBottom: (points min: [ :each | each y ])
+		boundsTop: (points min: [ :each | each y ])
+		boundsBottom: (points max: [ :each | each y ])
 ]
 
 { #category : 'accessing' }

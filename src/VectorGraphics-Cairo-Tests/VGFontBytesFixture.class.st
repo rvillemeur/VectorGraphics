@@ -23,6 +23,62 @@ VGFontBytesFixture class >> advanceWidth [
 	^ 500
 ]
 
+{ #category : 'accessing' }
+VGFontBytesFixture class >> cffFontBytes [
+	"A two glyph OpenType font whose outlines are CFF: .notdef and the square of
+	 #cffTableBytes, which the character map sends $a to."
+
+	^ self fontBytesWithTables:
+		  (self cffTablesForGlyphCount: 2 table: self cffTableBytes)
+]
+
+{ #category : 'accessing' }
+VGFontBytesFixture class >> cffFontBytesWithAGlyphThatCannotBeRead [
+	"The same font as #cffFontBytes, whose second glyph carries a charstring no reader knows.
+	 A face reads this font: a CFF glyph is interpreted when it is asked for, not when the
+	 font is read."
+
+	^ self fontBytesWithTables:
+		  (self
+			   cffTablesForGlyphCount: 2
+			   table: self cffTableBytesWithAGlyphThatCannotBeRead)
+]
+
+{ #category : 'accessing' }
+VGFontBytesFixture class >> cffTableBytes [
+	"A CFF table of two charstrings: the empty .notdef every font keeps at glyph 0, and a
+	 square drawn from 50 @ 100 to 450 @ 400. These are the bytes TTCffBytesFixture writes for
+	 the charstrings 14 and 50 100 rmoveto 400 hlineto 300 vlineto -400 hlineto endchar; they
+	 are copied rather than built, because allowedDependencies forbids this package from naming
+	 that fixture."
+
+	^ #[ 1 0 4 2 0 1 1 1 8 70 105 120 116 117 114 101 0 1 1 1 6 169 17 139 189 18 0 0 0 0 0 2 1 1 2 15 14 189 239 21 248 36 6 247 192 7 252 36 6 14 0 0 ]
+]
+
+{ #category : 'accessing' }
+VGFontBytesFixture class >> cffTableBytesWithAGlyphThatCannotBeRead [
+	"The same table as #cffTableBytes, with the square replaced by the single byte 0: an
+	 operator no charstring reader knows. A face built from it reads every other glyph, and
+	 says why this one cannot be drawn when it is asked for."
+
+	^ #[ 1 0 4 2 0 1 1 1 8 70 105 120 116 117 114 101 0 1 1 1 6 169 17 139 177 18 0 0 0 0 0 2 1 1 2 3 14 0 0 0 ]
+]
+
+{ #category : 'accessing' }
+VGFontBytesFixture class >> cffTablesForGlyphCount: anInteger table: aByteArray [
+	"The six tables of a font whose outlines are CFF charstrings, as tag to bytes, in tag
+	 order: the five every font carries, and the CFF table where a TrueType font carries glyf
+	 and loca."
+
+	^ {
+		  ('CFF ' -> aByteArray).
+		  ('cmap' -> (self cmapTableForGlyphCount: anInteger - 1 platformId: 0)).
+		  ('head' -> self headTable).
+		  ('hhea' -> (self hheaTableForGlyphCount: anInteger)).
+		  ('hmtx' -> (self hmtxTableForGlyphCount: anInteger)).
+		  ('maxp' -> (self maxpTableForGlyphCount: anInteger)) }
+]
+
 { #category : 'tables' }
 VGFontBytesFixture class >> cmapTableForGlyphCount: anInteger platformId: anotherInteger [
 	"A character map of one subtable in format 6, the trimmed format: a first code point, a

@@ -90,6 +90,21 @@ VGScaledFontExamples class >> fontFaceOfASystemFont [
 	^ self fontFace
 ]
 
+{ #category : 'examples' }
+VGScaledFontExamples class >> fontFaceOfAnOpenTypeFont [
+	"The tables of an installed OpenType font, whose outlines are charstrings in a CFF table
+	 rather than contours in a glyf table. The face reads the same way either format is
+	 written: the same glyph count, the same metrics, the same outlines. Its glyphs draw
+	 themselves the first time one is asked for its shape, so opening the face reads no
+	 charstring at all.
+	 Open the Glyphs tab and click a glyph to see one drawn.
+
+	 VGScaledFontExamples fontFaceOfAnOpenTypeFont inspect"
+
+	<sampleInstance>
+	^ VGFontFace newForFile: self openTypeFontFile
+]
+
 { #category : 'fixture' }
 VGScaledFontExamples class >> fontFile [
 	"The first candidate font that is on this machine, searched for by name because the directory
@@ -120,6 +135,21 @@ VGScaledFontExamples class >> glyphMaskOfOneLetter [
 		moveTo: 8 @ 48;
 		showText: 'a'.
 	^ font atlas masks values detect: [ :each | each notNil ]
+]
+
+{ #category : 'private' }
+VGScaledFontExamples class >> openTypeFontFile [
+	"The first .otf file this machine has, searched for by extension rather than by name: an
+	 OpenType font carries its outlines in a CFF table, and which family a distribution
+	 installs in that format is its own business."
+
+	self fontDirectory exists ifFalse: [
+		^ Error signal: 'no font directory at ' , self fontDirectory fullName ].
+	^ (self fontDirectory allChildrenMatching: '*.otf')
+		  detect: [ :each | true ]
+		  ifNone: [
+		  Error signal: 'no OpenType font is installed under '
+			  , self fontDirectory fullName ]
 ]
 
 { #category : 'examples' }

@@ -34,6 +34,22 @@ TTFontFixtures class >> catalogueOfThreeFacesInOneFamily [
 	^ catalogue
 ]
 
+{ #category : 'accessing' }
+TTFontFixtures class >> cidKeyedFontBytes [
+	"An OTTO file whose CFF table carries ROS, the registry, ordering and supplement of a font
+	 keyed by character identifier. Its glyphs are reached through an FDArray and an FDSelect,
+	 which this project's charstring reader does not walk."
+
+	^ self
+		  fontBytesWithVersion: 'OTTO' asByteArray
+		  tables: {
+				  ('CFF ' -> (TTCffBytesFixture new
+					    topEntries: { (1230 -> #( 391 392 0 )) };
+					    yourself) tableBytes).
+				  (TTFontMetadataReader nameTableTag
+				   -> (self nameTableWithFamilyName: 'Waree' styleName: 'Oblique')) }
+]
+
 { #category : 'fixtures' }
 TTFontFixtures class >> colourFontBytes [
 	"A font with glyph outlines and a CBDT table of colour bitmaps beside them. The outlines are
@@ -236,15 +252,16 @@ TTFontFixtures class >> os2TableWithWeightClass: aWeightClass widthClass: aWidth
 		  7 timesRepeat: [ self putShort: 0 on: stream ] "char indexes and the four metrics" ]
 ]
 
-{ #category : 'fixtures' }
+{ #category : 'accessing' }
 TTFontFixtures class >> otfFontBytes [
 	"An OTTO file: a valid sfnt wrapper whose outlines are CFF, so it carries a CFF table and no
-	 glyf. Its name table is ordinary, which is why the reader can name a face it cannot render."
+	 glyf. Its CFF table is one TTCffBytesFixture writes, because a reader that classifies the
+	 face reads the head of that table to see whether the font is keyed by character identifier."
 
 	^ self
 		  fontBytesWithVersion: 'OTTO' asByteArray
 		  tables: {
-				  ('CFF ' -> (ByteArray new: 64)).
+				  ('CFF ' -> TTCffBytesFixture new tableBytes).
 				  (TTFontMetadataReader nameTableTag
 				   -> (self nameTableWithFamilyName: 'Waree' styleName: 'Oblique')) }
 ]

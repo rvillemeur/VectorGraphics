@@ -117,6 +117,15 @@ VGFontFace class >> defaultStyleName [
 	^ 'Regular'
 ]
 
+{ #category : 'testing' }
+VGFontFace class >> holdsTrueTypeOutlines: aTableDictionary [
+	"Whether the glyphs of this font are TrueType outlines rather than CFF charstrings. The
+	 rule is TTFontReader's, so the eager door onto a font and this one cannot disagree about
+	 which format a font is in."
+
+	^ TTFontReader holdsTrueTypeOutlines: aTableDictionary
+]
+
 { #category : 'constants' }
 VGFontFace class >> moreComponentsFlag [
 	^ 32
@@ -138,12 +147,22 @@ VGFontFace class >> newForFile: aFileReference [
 	^ self newForBytes: aFileReference binaryReadStream upToEnd
 ]
 
-{ #category : 'constants' }
-VGFontFace class >> requiredTableTags [
-	"The tables a TrueType outline font must carry for me to read it. A font missing one of them
-	 is rejected in #readBytes:."
+{ #category : 'accessing' }
+VGFontFace class >> outlineTableTagsIn: aTableDictionary [
+	"The tables I read the outlines of this font from, which is TTFontReader's rule: glyf and
+	 loca, or the one CFF table."
 
-	^ #( 'head' 'maxp' 'hhea' 'hmtx' 'loca' 'cmap' 'glyf' )
+	^ TTFontReader outlineTableTagsIn: aTableDictionary
+]
+
+{ #category : 'accessing' }
+VGFontFace class >> requiredTableTags [
+	"The tables a font must carry for me to read it whatever its outlines are drawn in. The
+	 tables the outlines themselves are read from are stated by #outlineTableTagsIn:, since
+	 they differ between the two formats. A font missing one of either list is rejected in
+	 #readBytes:."
+
+	^ #( 'head' 'maxp' 'hhea' 'hmtx' 'cmap' )
 ]
 
 { #category : 'default face' }
@@ -452,13 +471,25 @@ VGFontFace >> readBytes: aByteArray [
 	unitsPerEm := headData at: #units.
 	boundsRectangle := headData at: #bounds.
 	glyphCount := (TTMaxpTableParser on: (tables at: 'maxp')) process.
-	glyphDataOffsets := (TTLocaTableParser
-		                     on: (tables at: 'loca')
-		                     format: (headData at: #indexToLocFormat)
-		                     nGlyphs: glyphCount) process.
 	characterMap := (TTCmapTableParser on: (tables at: 'cmap')) process.
 	characterMap ifNil: [ ^ Error signal: 'the font maps no Unicode code point' ].
-	self readGlyphsAndHorizontalMetricsFrom: tables count: glyphCount
+	self
+		readGlyphsAndHorizontalMetricsFrom: tables
+		count: glyphCount
+		indexToLocFormat: (headData at: #indexToLocFormat)
+]
+
+{ #category : 'reading' }
+VGFontFace >> readCffGlyphRecordsFrom: aTableDictionary count: aGlyphCount [
+	"One record a glyph, each one drawn the first time something asks it for its contours or
+	 its box: a CFF glyph is one charstring interpreted on its own, where the glyf table is
+	 parsed whole. Reading the table itself reads what every glyph of it needs — the
+	 charstrings, the charset, the subroutines and the widths — and no glyph."
+
+	| parser |
+	parser := (TTCffTableParser on: (aTableDictionary at: 'CFF ')) process.
+	glyphs := (1 to: aGlyphCount) collect: [ :each |
+		          TTCffGlyph onTable: parser index: each ]
 ]
 
 { #category : 'private' }
@@ -502,28 +533,32 @@ VGFontFace >> readComponentWithFlags: aFlagWord [
 ]
 
 { #category : 'reading' }
-VGFontFace >> readGlyphRecordsFrom: aTableDictionary count: aGlyphCount [
-	"The glyphs the glyf table holds, read at the offsets loca gave. The glyf entry and its start
-	 are kept because a composite glyph is read from the table again: TTGlyfTableParser keeps the
-	 component glyphs of a composite and discards the offsets that place them."
+VGFontFace >> readGlyphRecordsFrom: aTableDictionary count: aGlyphCount indexToLocFormat: anInteger [
+	"One record a glyph, read from whichever outline table this font carries."
 
-	glyfEntry := aTableDictionary at: 'glyf'.
-	glyfStart := glyfEntry offset.
-	glyphs := (TTGlyfTableParser
-		           on: glyfEntry
-		           nGlyphs: aGlyphCount
-		           offsets: glyphDataOffsets) process
+	(self class holdsTrueTypeOutlines: aTableDictionary)
+		ifTrue: [
+			self
+				readTrueTypeGlyphRecordsFrom: aTableDictionary
+				count: aGlyphCount
+				indexToLocFormat: anInteger ]
+		ifFalse: [
+			self readCffGlyphRecordsFrom: aTableDictionary count: aGlyphCount ]
 ]
 
 { #category : 'reading' }
-VGFontFace >> readGlyphsAndHorizontalMetricsFrom: aTableDictionary count: aGlyphCount [
-	"The outlines and the advances, which are read together because hmtx fills the glyphs the
-	 glyf table gave. The order is the whole of what this method says: hhea states how many
-	 metrics hmtx holds, and hmtx needs the glyphs to write into."
+VGFontFace >> readGlyphsAndHorizontalMetricsFrom: aTableDictionary count: aGlyphCount indexToLocFormat: anInteger [
+	"The glyph records and the advances, which are read together because hmtx fills the records
+	 the outline table gave. The order is the whole of what this method says: hhea states how
+	 many metrics hmtx holds, and hmtx needs the records to write into. The loca format is the
+	 head table's, and only the TrueType route reads it."
 
 	| numHMetrics |
 	numHMetrics := self readHorizontalMetricsFrom: aTableDictionary.
-	self readGlyphRecordsFrom: aTableDictionary count: aGlyphCount.
+	self
+		readGlyphRecordsFrom: aTableDictionary
+		count: aGlyphCount
+		indexToLocFormat: anInteger.
 	self fillGlyphAdvancesFrom: aTableDictionary numHMetrics: numHMetrics
 ]
 
@@ -575,13 +610,33 @@ VGFontFace >> readOutlineOfGlyphAt: aGlyphIndex [
 ]
 
 { #category : 'reading' }
+VGFontFace >> readTrueTypeGlyphRecordsFrom: aTableDictionary count: aGlyphCount indexToLocFormat: anInteger [
+	"The glyphs the glyf table holds, read at the offsets loca gave. The glyf entry and its
+	 start are kept because a composite glyph is read from the table again: TTGlyfTableParser
+	 keeps the component glyphs of a composite and discards the offsets that place them."
+
+	glyphDataOffsets := (TTLocaTableParser
+		                     on: (aTableDictionary at: 'loca')
+		                     format: anInteger
+		                     nGlyphs: aGlyphCount) process.
+	glyfEntry := aTableDictionary at: 'glyf'.
+	glyfStart := glyfEntry offset.
+	glyphs := (TTGlyfTableParser
+		           on: glyfEntry
+		           nGlyphs: aGlyphCount
+		           offsets: glyphDataOffsets) process
+]
+
+{ #category : 'reading' }
 VGFontFace >> rejectIfATableIsMissingFrom: aTableDictionary [
 	"The tables I read every glyph and every metric from have to be there before I read any of
-	 them. A font with no glyf table carries its outlines in some other format, CFF for an
-	 OpenType font, and I would draw nothing for it, so it is rejected here rather than at the
-	 first glyph. Raises; the caller reads nothing further."
+	 them: the five every font carries, and the ones the outlines of this font are drawn from.
+	 A font carrying neither glyf nor CFF holds its glyphs in some format I do not read, or
+	 holds none, and is rejected here rather than at the first glyph. Raises; the caller reads
+	 nothing further."
 
-	self class requiredTableTags do: [ :tag |
+	(self class requiredTableTags
+	 , (self class outlineTableTagsIn: aTableDictionary)) do: [ :tag |
 		(aTableDictionary includesKey: tag) ifFalse: [
 			Error signal: 'the font has no ' , tag , ' table' ] ]
 ]

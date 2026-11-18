@@ -50,10 +50,9 @@ TTGlyph >> addContourDataTo: stream [
 	self addContourDataTo: stream tx: nil
 ]
 
-{ #category : 'primitive format' }
+{ #category : 'drawing' }
 TTGlyph >> addContourDataTo: stream tx: aGeometryTransformationOrNil [
-
-	contours do: [ :c | 
+	self contours do: [ :c |
 		c addContourDataTo: stream tx: aGeometryTransformationOrNil ]
 ]
 
@@ -148,9 +147,8 @@ TTGlyph >> drawGlyphOn: aVectorCanvas [
 
 { #category : 'drawing' }
 TTGlyph >> drawGlyphOn: aVectorCanvas geometryTransformation: txOrNil [
-
-	contours do: [ :contour | 
-		contour isEmpty ifFalse: [ 
+	self contours do: [ :contour |
+		contour isEmpty ifFalse: [
 			aVectorCanvas moveToX: 0 y: 0.
 			(contour initialMoveToCommand: txOrNil) runOn: aVectorCanvas.
 			(contour pathCommand: txOrNil) runOn: aVectorCanvas ] ]
@@ -187,7 +185,7 @@ TTGlyph >> inspectorContourEntries [
 	"Measure each contour the way the drawing code reads it. An empty contour is reported as
 	such rather than skipped, since drawGlyphOn:geometryTransformation: skips one silently."
 
-	^ contours collectWithIndex: [ :contour :index |
+	^ self contours collectWithIndex: [ :contour :index |
 		  | straight curved bounds |
 		  straight := 0.
 		  curved := 0.
@@ -202,10 +200,10 @@ TTGlyph >> inspectorContourEntries [
 					            ifNil: [ point corner: point ]
 					            ifNotNil: [ bounds encompass: point ] ] ].
 		  {
-			  index .
-			  contour points size .
-			  straight .
-			  curved .
+			  index.
+			  contour points size.
+			  straight.
+			  curved.
 			  (bounds ifNil: [ 'no point' ]) } ]
 ]
 
@@ -235,7 +233,7 @@ TTGlyph >> inspectorPointExtent [
 	| right bottom |
 	right := 0.
 	bottom := 0.
-	contours do: [ :contour |
+	self contours do: [ :contour |
 		contour points do: [ :point |
 			right := right max: point x.
 			bottom := bottom max: point y ] ].
@@ -285,6 +283,17 @@ TTGlyph >> printOn: aStream [
 ]
 
 { #category : 'private-initialization' }
+TTGlyph >> recomputeRightSideBearing [
+	"The room my box leaves at the end of my advance, computed from the box I hold now. A
+	 glyph that is drawn after its metrics are read computes it when it is drawn, which is
+	 why this is named apart from the hook hmtx sends."
+
+	"@@: Is the following really correct?!?!"
+	rightSideBearing := self advanceWidth - self leftSideBearing
+	                    - self boundsRight + self boundsLeft
+]
+
+{ #category : 'private-initialization' }
 TTGlyph >> replaceIndexesByComponentGlyphsIn: dummy [
 
 	"NOP"
@@ -306,21 +315,16 @@ TTGlyph >> rightSideBearing: aNumber [
 
 { #category : 'accessing' }
 TTGlyph >> topSideBearing [
-
-	"
-	https://www.freetype.org/freetype2/docs/glyphs/glyphs-3.html
+	"	https://www.freetype.org/freetype2/docs/glyphs/glyphs-3.html
 	"
 
-	^ boundsBottom
+	^ self boundsBottom
 ]
 
 { #category : 'private-initialization' }
 TTGlyph >> updateRightSideBearing [
+	"Update the right side bearing value. The hmtx table sends this to every glyph of a font
+	 as it reads it."
 
-	"Update the right side bearing value"
-
-	"@@: Is the following really correct?!?!"
-
-	rightSideBearing := advanceWidth - leftSideBearing - boundsRight
-	                    + boundsLeft
+	self recomputeRightSideBearing
 ]

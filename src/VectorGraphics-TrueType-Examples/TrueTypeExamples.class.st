@@ -131,6 +131,21 @@ TrueTypeExamples class >> cffGlyphOutlineBuilder [
 	^ builder
 ]
 
+{ #category : 'examples' }
+TrueTypeExamples class >> cffGlyphRecordNotYetDrawn [
+	"The record a face holds for one glyph of an OpenType font: it knows its table and its
+	 index, and it interprets its charstring the first time somebody asks for its shape. A
+	 face of four thousand glyphs holds four thousand of these and reads none of them, which
+	 is what makes opening the face cheap. The hmtx table still fills in every advance width,
+	 because that costs no charstring.
+	 The inspector reads the record without drawing it; send #contours to see it drawn.
+
+	 TrueTypeExamples cffGlyphRecordNotYetDrawn inspect"
+
+	<sampleInstance>
+	^ TTCffGlyph onTable: self cffTableOfATwoGlyphFont index: 2
+]
+
 { #category : 'examples - cff' }
 TrueTypeExamples class >> cffIndexOfThreeElements [
 	"One CFF INDEX, read from bytes written here rather than from a font: three elements of one,
@@ -420,11 +435,13 @@ TrueTypeExamples class >> preferredFontFamilyNames [
 { #category : 'examples' }
 TrueTypeExamples class >> rejectionReasonsOfTheInstalledFonts [
 	"One click: what the scan made of every file the font directories hold, as a count per
-	 reason, with nil counting the files it would draw. On this machine: 362 nil, 101
-	 #noGlyfTable — OpenType files whose outlines are CFF, which FreeType draws today and this
-	 project does not — 3 #fontCollection and 78 #notAnSfntFont, metrics and bitmap fonts that
-	 live beside the real ones. Nothing raises over the 544 files, which is the point of the
-	 refusal: a catalogue walks a whole directory without a handler.
+	 reason, with nil counting the files it would draw. On this machine: 462 nil — 362 TrueType
+	 files and 100 OpenType files, whose outlines are CFF and which this project draws since
+	 FONT-PLAN section 8 — 1 #noOutlineTable, 3 #fontCollection and 78 #notAnSfntFont, metrics
+	 and bitmap fonts that live beside the real ones. A CID-keyed font would count as
+	 #cidKeyedFont; this machine has none. Nothing raises over the 544 files, which is the
+	 point of the refusal: a catalogue walks a whole directory without a handler.
+
 	 TrueTypeExamples rejectionReasonsOfTheInstalledFonts inspect"
 
 	<sampleInstance>

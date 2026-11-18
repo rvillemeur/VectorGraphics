@@ -59,7 +59,9 @@ TTCffTableParserTest >> testAFontKeyedByCharacterIdentifiersIsRefusedAndTheError
 TTCffTableParserTest >> testAGlyphHoldsTheContoursItsCharstringDrawsAndABoxThatHoldsThem [
 	"A glyph is built from the charstring at its index: the contours it draws, turned into
 	 TrueType contours, and a box computed from the points of those contours, since a CFF
-	 font states no box of its own for a glyph."
+	 font states no box of its own for a glyph. TTGlyph names the smallest y of a glyph its
+	 top and the largest its bottom, because the glyf table writes the box as xMin, yMin,
+	 xMax, yMax; a CFF glyph carries its box the same way, so a face reads either the same."
 
 	| parser glyph |
 	parser := (TTCffTableParser on: (TTCffBytesFixture new
@@ -77,9 +79,9 @@ TTCffTableParserTest >> testAGlyphHoldsTheContoursItsCharstringDrawsAndABoxThatH
 				(450 @ 400).
 				(50 @ 400) }.
 	self assert: glyph boundsLeft equals: 50.
-	self assert: glyph boundsBottom equals: 100.
+	self assert: glyph boundsTop equals: 100.
 	self assert: glyph boundsRight equals: 450.
-	self assert: glyph boundsTop equals: 400
+	self assert: glyph boundsBottom equals: 400
 ]
 
 { #category : 'tests' }
@@ -194,4 +196,23 @@ TTCffTableParserTest >> testTheSubroutinesAreReadFromBothPlacesAFontKeepsThem [
 	self assert: (parser globalSubrs at: 1) equals: #[ 10 11 ] asByteArray.
 	self assert: parser localSubrs size equals: 2.
 	self assert: (parser localSubrs at: 2) equals: #[ 139 139 11 ] asByteArray
+]
+
+{ #category : 'tests' }
+TTCffTableParserTest >> testWhetherAFontIsCidKeyedIsReadFromTheHeadOfTheTableAlone [
+	"The header, the font names and the top dictionary are the first bytes of a CFF table. A
+	 reader that only classifies a face reads them and stops, so the question is answered from
+	 a prefix of the table, with the charstrings still unread."
+
+	| keyed plain |
+	keyed := (TTCffBytesFixture new
+		          topEntries: { (1230 -> #( 391 392 0 )) };
+		          yourself) tableBytes.
+	plain := TTCffBytesFixture new tableBytes.
+	self assert: (TTCffTableParser isKeyedByCharacterIdentifiers:
+			 (TTFontTableDirEntry onBytes: keyed)).
+	self deny: (TTCffTableParser isKeyedByCharacterIdentifiers:
+			 (TTFontTableDirEntry onBytes: plain)).
+	self assert: (TTCffTableParser isKeyedByCharacterIdentifiers:
+			 (TTFontTableDirEntry onBytes: (keyed first: keyed size - 1)))
 ]

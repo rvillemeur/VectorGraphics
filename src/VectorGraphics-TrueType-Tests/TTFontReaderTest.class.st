@@ -139,6 +139,29 @@ TTFontReaderTest >> testAMappedCodePointResolvesToItsOwnGlyph [
 ]
 
 { #category : 'tests' }
+TTFontReaderTest >> testAnInstalledOpenTypeFontIsReadIntoADescription [
+	"The eager door onto a font reads CFF outlines as well as TrueType ones: a description
+	 built from an OpenType file holds contour data, and the letter a draws something. A gate
+	 on a real file, because the fixtures of this package build glyphs and not whole fonts."
+
+	| file description |
+	file := TTFontCatalogue defaultFontDirectories
+		        inject: nil
+		        into: [ :found :directory |
+			        found ifNil: [
+				        directory exists ifTrue: [
+					        directory allFiles
+						        detect: [ :each |
+						        each basename asLowercase endsWith: '.otf' ]
+						        ifNone: [ nil ] ] ] ].
+	file ifNil: [ ^ self skip: 'this machine has no .otf font installed' ].
+	description := TTFontReader readTTFFrom: file binaryReadStream upToEnd.
+	self assert: description unitsPerEm > 0.
+	self
+		assert: (self advanceWidthForCodePoint: $a codePoint in: description) > 0
+]
+
+{ #category : 'tests' }
 TTFontReaderTest >> testAnUnmappedCodePointHasNoEntryOfItsOwn [
 	"A code point the font does not map gets no slot in the index table, so it resolves to the
 	 unknown glyph through the fallback in contourDataPositionForByte1:byte2:byte3:byte4:

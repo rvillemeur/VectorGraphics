@@ -124,9 +124,9 @@ TTFontMetadata >> printOn: aStream [
 { #category : 'accessing' }
 TTFontMetadata >> rejectionReason [
 	"Why this face cannot be drawn by this project, as a symbol, or nil when it can.
-	 #notAnSfntFont, #fontCollection, #noNameTable, #noGlyfTable or #colourFont: the first cause
-	 the reader met, in that order. A rejected face still carries every name and class the file
-	 did state, so a catalogue can say which font it passed over."
+	 #notAnSfntFont, #fontCollection, #noNameTable, #noOutlineTable, #cidKeyedFont or
+	 #colourFont: the first cause the reader met, in that order. A rejected face still carries
+	 every name and class the file did state, so a catalogue can say which font it passed over."
 
 	^ rejectionReason
 ]
