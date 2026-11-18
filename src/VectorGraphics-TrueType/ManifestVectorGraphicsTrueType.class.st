@@ -1,7 +1,7 @@
 "
-Reading a TrueType font: the `.ttf` table parsers, the glyphs and metrics they yield, and the
-font classes a caller asks for a face by name. No rendering happens here — a glyph is contours
-and advance widths until `VectorGraphics-Text` draws it.
+Reading an sfnt font: the table parsers of a `.ttf` or an `.otf` file, the glyphs and metrics
+they yield, and the font classes a caller asks for a face by name. No rendering happens here — a
+glyph is contours and advance widths until `VectorGraphics-Text` draws it.
 
 Two ways in:
 
@@ -10,7 +10,8 @@ Two ways in:
 
 Tags:
 
-- `Reading` — one parser per `.ttf` table, and the directory entry that locates each.
+- `Reading` — one parser per sfnt table, and the directory entry that locates each.
+- `CFF` — the INDEXes, dictionaries and Type 2 charstrings of a `CFF ` table, where an `.otf` file holds the outlines a `.ttf` holds in `glyf` and `loca`.
 - `Fonts` — the font and family classes, and the description that caches a file's glyphs.
 - `Glyphs` — a glyph's contours, composite glyphs, kern pairs and the point arrays they use.
 - `Manifest` — this comment and the Renraku rule configuration.

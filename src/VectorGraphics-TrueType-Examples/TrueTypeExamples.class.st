@@ -41,6 +41,20 @@ TrueTypeExamples class >> catalogueOfTheInstalledFonts [
 	^ catalogue
 ]
 
+{ #category : 'examples - cff' }
+TrueTypeExamples class >> cffIndexOfThreeElements [
+	"One CFF INDEX, read from bytes written here rather than from a font: three elements of one,
+	two and three bytes. Every list inside a CFF table is an INDEX of this shape, so this is the
+	structure the Elements view reports.
+
+	TrueTypeExamples cffIndexOfThreeElements inspect"
+
+	<sampleInstance>
+	| bytes |
+	bytes := #[ 0 3 1 1 2 4 7 65 66 67 68 69 70 ] asByteArray.
+	^ TTCffIndex readFrom: (TTFontTableDirEntry onBytes: bytes)
+]
+
 { #category : 'examples' }
 TrueTypeExamples class >> characterWidths [
 	"Inspect the advance widths of printable ASCII characters.
