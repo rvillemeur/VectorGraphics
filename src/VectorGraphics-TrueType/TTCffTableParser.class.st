@@ -60,6 +60,15 @@ TTCffTableParser class >> privateOperator [
 	^ 18
 ]
 
+{ #category : 'constants' }
+TTCffTableParser class >> quadraticTolerance [
+	"How far, in font units, a quadratic curve may stray from the cubic it replaces. A font
+	 unit is a thousandth of an em here, so a tenth of one is a hundredth of a pixel at a
+	 hundred pixels an em: finer than any rasteriser reads."
+
+	^ 0.1
+]
+
 { #category : 'operators' }
 TTCffTableParser class >> registryOrderingSupplementOperator [
 	"ROS: the top dictionary entry that only a CID-keyed font carries."
@@ -133,6 +142,24 @@ TTCffTableParser >> firstBytesOfCharstringAt: anIndex [
 { #category : 'accessing' }
 TTCffTableParser >> globalSubrs [
 	^ globalSubrs
+]
+
+{ #category : 'glyphs' }
+TTCffTableParser >> glyphAt: anIndex [
+	"The glyph at that index, drawn from its own charstring and from nothing else. The
+	 charstrings of the other glyphs are not read, which is what makes a face of four
+	 thousand glyphs cheap to open."
+
+	| interpreter contours glyph |
+	interpreter := TTCffCharstringInterpreter on: self.
+	contours := interpreter contoursOfGlyphAt: anIndex.
+	glyph := TTGlyph new.
+	glyph contours: (contours collect: [ :each |
+			 each contourConstructionWithinTolerance:
+				 self class quadraticTolerance ]).
+	glyph advanceWidth: interpreter width.
+	self setBoundsOf: glyph.
+	^ glyph
 ]
 
 { #category : 'accessing' }
@@ -282,6 +309,30 @@ TTCffTableParser >> rejectIfKeyedByCharacterIdentifiers [
 
 	(topDictionary includesOperator: self class registryOrderingSupplementOperator)
 		ifTrue: [ TTCffError signal: 'this font is CID-keyed, which this reader does not draw' ]
+]
+
+{ #category : 'glyphs' }
+TTCffTableParser >> setBoundsOf: aGlyph [
+	"The box of a glyph, which a CFF font does not state: it is read from the points the
+	 glyph is drawn with, control points included, so it holds the outline and may stand a
+	 little outside it. A glyph that draws nothing has a box of no width and no height."
+
+	| points |
+	points := OrderedCollection new.
+	aGlyph contours do: [ :each |
+		1 to: each points size do: [ :index |
+			points add: (each points at: index) ] ].
+	points ifEmpty: [
+		^ aGlyph
+			  boundsLeft: 0
+			  boundsRight: 0
+			  boundsTop: 0
+			  boundsBottom: 0 ].
+	aGlyph
+		boundsLeft: (points min: [ :each | each x ])
+		boundsRight: (points max: [ :each | each x ])
+		boundsTop: (points max: [ :each | each y ])
+		boundsBottom: (points min: [ :each | each y ])
 ]
 
 { #category : 'accessing' }

@@ -56,6 +56,50 @@ TTCffTableParserTest >> testAFontKeyedByCharacterIdentifiersIsRefusedAndTheError
 ]
 
 { #category : 'tests' }
+TTCffTableParserTest >> testAGlyphHoldsTheContoursItsCharstringDrawsAndABoxThatHoldsThem [
+	"A glyph is built from the charstring at its index: the contours it draws, turned into
+	 TrueType contours, and a box computed from the points of those contours, since a CFF
+	 font states no box of its own for a glyph."
+
+	| parser glyph |
+	parser := (TTCffTableParser on: (TTCffBytesFixture new
+			            charstrings: { (TTCffBytesFixture charstringBytesWith:
+					             #( 50 100 #rmoveto 400 #hlineto 300 #vlineto -400
+					                #hlineto #endchar )) };
+			            yourself) tableCursor) process.
+	glyph := parser glyphAt: 1.
+	self assert: glyph contourCount equals: 1.
+	self
+		assert: (glyph contours first points asArray collect: [ :each | each ])
+		equals: {
+				(50 @ 100).
+				(450 @ 100).
+				(450 @ 400).
+				(50 @ 400) }.
+	self assert: glyph boundsLeft equals: 50.
+	self assert: glyph boundsBottom equals: 100.
+	self assert: glyph boundsRight equals: 450.
+	self assert: glyph boundsTop equals: 400
+]
+
+{ #category : 'tests' }
+TTCffTableParserTest >> testAGlyphThatDrawsNothingHoldsNoContourAndAnEmptyBox [
+	"The space is drawn by a charstring that ends without moving anywhere. It is a glyph
+	 like any other, with no contour and a box of no width and no height."
+
+	| parser glyph |
+	parser := (TTCffTableParser on: (TTCffBytesFixture new
+			            charstrings: { #[ 14 ] asByteArray };
+			            yourself) tableCursor) process.
+	glyph := parser glyphAt: 1.
+	self assert: glyph contourCount equals: 0.
+	self assert: glyph boundsLeft equals: 0.
+	self assert: glyph boundsRight equals: 0.
+	self assert: glyph boundsTop equals: 0.
+	self assert: glyph boundsBottom equals: 0
+]
+
+{ #category : 'tests' }
 TTCffTableParserTest >> testAPrivateDictionaryThatStatesNoWidthMeansZeroForBoth [
 	"A private dictionary leaving out defaultWidthX and nominalWidthX says both are zero. The
 	 widths of every glyph of such a font are read against those two numbers."

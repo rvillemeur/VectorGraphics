@@ -42,6 +42,39 @@ TrueTypeExamples class >> catalogueOfTheInstalledFonts [
 ]
 
 { #category : 'examples - cff' }
+TrueTypeExamples class >> cffCubicCurve [
+	"One cubic curve of a glyph outline, deep enough that no single quadratic holds it: a
+	bowl three hundred units wide and three hundred tall. A TrueType glyph has to hold it
+	in quadratics, and the Quadratics view shows the chain it is split into.
+
+	TrueTypeExamples cffCubicCurve inspect"
+
+	<sampleInstance>
+	^ TTCffCubic
+		  from: 0 @ 0
+		  via: 0 @ 300
+		  and: 300 @ 300
+		  to: 300 @ 0
+]
+
+{ #category : 'examples - cff' }
+TrueTypeExamples class >> cffGlyph [
+	"The glyph the example table draws, built the way a face builds one: the charstring is
+	read, its cubics are held in quadratics, and the box is computed from the points,
+	since a CFF font states no box of its own for a glyph.
+
+	TrueTypeExamples cffGlyph inspect"
+
+	<sampleInstance>
+	| bytes |
+	bytes := #[ 1 0 4 2 0 1 1 1 8 70 105 120 116 117 114 101 0 1 1 1 6 169 17 145 193 18 0 0
+		            0 0 0 1 1 1 20 189 139 21 248 36 6 239 247 92 239 239 247 92 39 8 252 236 6
+		            14 248 116 20 247 15 21 0 0 ] asByteArray.
+	^ ((TTCffTableParser on: (TTFontTableDirEntry onBytes: bytes)) process
+		   glyphAt: 1)
+]
+
+{ #category : 'examples - cff' }
 TrueTypeExamples class >> cffGlyphContour [
 	"The one contour the example glyph draws: where it starts, and the line, curve and line
 	that bring it back. Every point of it is absolute and in font units, which is what the
