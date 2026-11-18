@@ -55,6 +55,22 @@ TrueTypeExamples class >> cffIndexOfThreeElements [
 	^ TTCffIndex readFrom: (TTFontTableDirEntry onBytes: bytes)
 ]
 
+{ #category : 'examples - cff' }
+TrueTypeExamples class >> cffTopDictionaryOfASmallFont [
+	"One CFF top dictionary, read from bytes written here rather than from a font: the font matrix
+	of a thousand-unit em, the font bounding box, where the charset is and where the charstrings
+	are. The operands come before their operator in the bytes, which is why a dictionary has to
+	be read before it can be asked anything.
+
+	TrueTypeExamples cffTopDictionaryOfASmallFont inspect"
+
+	<sampleInstance>
+	| bytes |
+	bytes := #[ 30 10 0 31 139 139 30 10 0 31 139 139 12 7 251 92 251 92 250 124 250 24 5 139 15
+		            28 4 210 17 ] asByteArray.
+	^ TTCffDictionary readFrom: bytes
+]
+
 { #category : 'examples' }
 TrueTypeExamples class >> characterWidths [
 	"Inspect the advance widths of printable ASCII characters.
