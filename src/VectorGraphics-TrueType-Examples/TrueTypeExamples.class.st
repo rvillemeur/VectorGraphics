@@ -42,6 +42,63 @@ TrueTypeExamples class >> catalogueOfTheInstalledFonts [
 ]
 
 { #category : 'examples - cff' }
+TrueTypeExamples class >> cffGlyphContour [
+	"The one contour the example glyph draws: where it starts, and the line, curve and line
+	that bring it back. Every point of it is absolute and in font units, which is what the
+	interpreter adds up from the steps the charstring states.
+
+	TrueTypeExamples cffGlyphContour inspect"
+
+	<sampleInstance>
+	^ self cffGlyphInterpreter contours first
+]
+
+{ #category : 'examples - cff' }
+TrueTypeExamples class >> cffGlyphInterpreter [
+	"The interpreter of one glyph, stopped where it finished drawing. The glyph is a line, a
+	cubic curve and a line back, written as a Type 2 charstring in a table built here
+	rather than read from a font.
+
+	The charstring says '50 0 rmoveto 400 hlineto 100 200 100 100 200 -100 rrcurveto -600
+	hlineto endchar': every number is a step from the point before, and endchar closes the
+	contour that rmoveto opened.
+
+	TrueTypeExamples cffGlyphInterpreter inspect"
+
+	<sampleInstance>
+	| bytes table interpreter |
+	bytes := #[ 1 0 4 2 0 1 1 1 8 70 105 120 116 117 114 101 0 1 1 1 6 169 17 145 193 18 0 0
+		            0 0 0 1 1 1 20 189 139 21 248 36 6 239 247 92 239 239 247 92 39 8 252 236 6
+		            14 248 116 20 247 15 21 0 0 ] asByteArray.
+	table := (TTCffTableParser on: (TTFontTableDirEntry onBytes: bytes)) process.
+	interpreter := TTCffCharstringInterpreter on: table.
+	interpreter contoursOfGlyphAt: 1.
+	^ interpreter
+]
+
+{ #category : 'examples - cff' }
+TrueTypeExamples class >> cffGlyphOutlineBuilder [
+	"A builder drawn in by hand, as the interpreter draws in one: a move opens a contour, a
+	line and a curve are drawn in it, and a second move closes it and opens another. The
+	steps are relative and the contours answered are absolute.
+
+	TrueTypeExamples cffGlyphOutlineBuilder inspect"
+
+	<sampleInstance>
+	| builder |
+	builder := TTCffOutlineBuilder new.
+	builder moveBy: 100 @ 100.
+	builder lineBy: 300 @ 0.
+	builder curveBy: 100 @ 100 by: 0 @ 100 by: -100 @ 100.
+	builder lineBy: -300 @ 0.
+	builder moveBy: 0 @ 400.
+	builder lineBy: 200 @ 0.
+	builder lineBy: 0 @ 200.
+	builder closeContour.
+	^ builder
+]
+
+{ #category : 'examples - cff' }
 TrueTypeExamples class >> cffIndexOfThreeElements [
 	"One CFF INDEX, read from bytes written here rather than from a font: three elements of one,
 	two and three bytes. Every list inside a CFF table is an INDEX of this shape, so this is the

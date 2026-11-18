@@ -12,6 +12,31 @@ Class {
 }
 
 { #category : 'tests' }
+TTCffTableParserTest >> testACharsetSaysWhichNameEachGlyphCarries [
+	"The charset gives one string identifier per glyph, the first glyph excepted: it is always
+	 .notdef. Format 0 lists them one by one, format 1 as runs of consecutive identifiers. A font
+	 that names no charset is read as the standard one, where the identifier is the glyph index."
+
+	| fourCharstrings listed inRuns silent |
+	fourCharstrings := (1 to: 4) collect: [ :each | #[ 14 ] asByteArray ].
+	listed := (TTCffTableParser on: (TTCffBytesFixture new
+		           charstrings: fourCharstrings;
+		           charsetIdentifiers: #( 5 9 7 );
+		           yourself) tableCursor) process.
+	inRuns := (TTCffTableParser on: (TTCffBytesFixture new
+		           charstrings: fourCharstrings;
+		           charsetIdentifiers: #( 5 6 7 );
+		           charsetFormat: 1;
+		           yourself) tableCursor) process.
+	silent := (TTCffTableParser on: (TTCffBytesFixture new
+		           charstrings: fourCharstrings;
+		           yourself) tableCursor) process.
+	self assert: listed charsetIdentifiers equals: #( 0 5 9 7 ).
+	self assert: inRuns charsetIdentifiers equals: #( 0 5 6 7 ).
+	self assert: silent charsetIdentifiers equals: #( 0 1 2 3 )
+]
+
+{ #category : 'tests' }
 TTCffTableParserTest >> testAFontKeyedByCharacterIdentifiersIsRefusedAndTheErrorSaysWhy [
 	"A CID-keyed font carries ROS in its top dictionary, and its glyphs are reached through an
 	 FDArray and an FDSelect instead of one private dictionary. This reader does not draw one, so

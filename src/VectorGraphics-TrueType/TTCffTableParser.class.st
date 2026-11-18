@@ -16,7 +16,8 @@ Class {
 		'privateDictionary',
 		'charstrings',
 		'globalSubrs',
-		'localSubrs'
+		'localSubrs',
+		'charsetIdentifiers'
 	],
 	#category : 'VectorGraphics-TrueType-CFF',
 	#package : 'VectorGraphics-TrueType',
@@ -28,6 +29,13 @@ TTCffTableParser class >> charStringsOperator [
 	"The top dictionary entry that says where the charstrings are."
 
 	^ 17
+]
+
+{ #category : 'operators' }
+TTCffTableParser class >> charsetOperator [
+	"The operator the top dictionary names the charset by."
+
+	^ 15
 ]
 
 { #category : 'operators' }
@@ -65,6 +73,29 @@ TTCffTableParser class >> subrsOperator [
 	 private dictionary itself."
 
 	^ 19
+]
+
+{ #category : 'parsing' }
+TTCffTableParser >> addRunOfFormat: aFormat from: aCursor to: aCollection [
+	"One run of consecutive identifiers: the one it starts at, and how many follow it. Format
+	 1 counts those in a byte, format 2 in two bytes, and nothing else is a charset."
+
+	| first left |
+	(aFormat between: 1 and: 2) ifFalse: [
+		^ TTCffError signal:
+			  'charset format ' , aFormat printString , ' is one this reader does not know' ].
+	first := aCursor nextUShort.
+	left := aFormat = 1
+		        ifTrue: [ aCursor nextByte ]
+		        ifFalse: [ aCursor nextUShort ].
+	0 to: left do: [ :each | aCollection add: first + each ]
+]
+
+{ #category : 'accessing' }
+TTCffTableParser >> charsetIdentifiers [
+	"The string identifier of every glyph, the first of them .notdef with the identifier 0."
+
+	^ charsetIdentifiers
 ]
 
 { #category : 'accessing' }
@@ -109,6 +140,14 @@ TTCffTableParser >> glyphCount [
 	"One charstring a glyph, including the glyph of no name at index 1."
 
 	^ charstrings size
+]
+
+{ #category : 'accessing' }
+TTCffTableParser >> glyphIndexOfIdentifier: anInteger [
+	"Which glyph carries this string identifier, counted as my charstrings are counted. A
+	 font that holds no glyph for it answers nil."
+
+	^ charsetIdentifiers indexOf: anInteger ifAbsent: [ nil ]
 ]
 
 { #category : 'inspector' }
@@ -178,8 +217,29 @@ TTCffTableParser >> process [
 	charstrings := TTCffIndex readFrom:
 		               (self cursorAtTableOffset:
 			                (topDictionary at: self class charStringsOperator) first).
+	self readCharset.
 	self readPrivateDictionary.
 	^ self
+]
+
+{ #category : 'parsing' }
+TTCffTableParser >> readCharset [
+	"Which string identifier each glyph carries. A font that names no charset, or one of the
+	 standard ones, is read as the standard order, where the identifier is the glyph index.
+	 The first glyph is .notdef and is in no charset."
+
+	| offset cursor format identifiers |
+	offset := (topDictionary at: self class charsetOperator ifAbsent: [ #( 0 ) ]) first.
+	offset <= 2 ifTrue: [
+		^ charsetIdentifiers := (0 to: self glyphCount - 1) asArray ].
+	cursor := self cursorAtTableOffset: offset.
+	format := cursor nextByte.
+	identifiers := OrderedCollection with: 0.
+	[ identifiers size < self glyphCount ] whileTrue: [
+		format = 0
+			ifTrue: [ identifiers add: cursor nextUShort ]
+			ifFalse: [ self addRunOfFormat: format from: cursor to: identifiers ] ].
+	charsetIdentifiers := (identifiers first: self glyphCount) asArray
 ]
 
 { #category : 'reading' }

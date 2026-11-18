@@ -16,12 +16,29 @@ Class {
 		'privateEntries',
 		'localSubrs',
 		'globalSubrs',
-		'headerSize'
+		'headerSize',
+		'charsetIdentifiers',
+		'charsetFormat'
 	],
 	#category : 'VectorGraphics-TrueType-Tests-Fixtures',
 	#package : 'VectorGraphics-TrueType-Tests',
 	#tag : 'Fixtures'
 }
+
+{ #category : 'building' }
+TTCffBytesFixture class >> charstringBytesWith: aCollection [
+	"The bytes of a Type 2 charstring, written from operands and operator names in the order a
+	 charstring holds them: #( 100 0 #rmoveto 50 #hlineto #endchar ). A byte array among them
+	 is written as it stands, which is how the bytes of a hint mask are given."
+
+	^ ByteArray streamContents: [ :stream |
+		  aCollection do: [ :each |
+			  each isSymbol
+				  ifTrue: [ self putCharstringOperator: each on: stream ]
+				  ifFalse: [ each isNumber
+						  ifTrue: [ self putCharstringNumber: each on: stream ]
+						  ifFalse: [ stream nextPutAll: each ] ] ] ]
+]
 
 { #category : 'building' }
 TTCffBytesFixture class >> dictBytesWithEntries: aCollectionOfAssociations [
@@ -122,6 +139,30 @@ TTCffBytesFixture class >> putCard16: anInteger on: aStream [
 ]
 
 { #category : 'building' }
+TTCffBytesFixture class >> putCharstringNumber: aNumber on: aStream [
+	"An operand of a Type 2 charstring. The integer encodings are the dictionary's own, bar the
+	 32-bit one, which a charstring spells as a 16.16 fixed-point number behind the byte 255."
+
+	aNumber isInteger ifFalse: [ | fixed |
+		fixed := (aNumber * 65536) rounded \\ 4294967296.
+		aStream nextPut: 255.
+		self putCard16: fixed // 65536 on: aStream.
+		^ self putCard16: fixed \\ 65536 on: aStream ].
+	(aNumber between: -1131 and: 1131) ifTrue: [
+		^ self putDictInteger: aNumber on: aStream ].
+	aStream nextPut: 28.
+	self putCard16: aNumber \\ 65536 on: aStream
+]
+
+{ #category : 'building' }
+TTCffBytesFixture class >> putCharstringOperator: aSymbol on: aStream [
+	"An operator, named as the specification names it. The escaped ones are keyed as 1200 plus
+	 the second byte, which is how the interpreter keys them."
+
+	self putDictOperator: (TTCffCharstringInterpreter codeOfOperatorNamed: aSymbol) on: aStream
+]
+
+{ #category : 'building' }
 TTCffBytesFixture class >> putDictInteger: anInteger on: aStream [
 	"An operand of a CFF dictionary, in the narrowest of the four encodings that can say it:
 	 one byte from -107 to 107, two bytes to 1131 either way, then the 16-bit and 32-bit forms."
@@ -176,6 +217,35 @@ TTCffBytesFixture class >> putOffset: anInteger size: aByteCount on: aStream [
 ]
 
 { #category : 'building' }
+TTCffBytesFixture >> charsetBytes [
+	"The charset, in the format asked for. A run of format 1 holds the identifier it starts at
+	 and how many follow it, so a list of consecutive identifiers is one run."
+
+	^ ByteArray streamContents: [ :stream |
+		  stream nextPut: charsetFormat.
+		  charsetFormat = 0
+			  ifTrue: [ charsetIdentifiers do: [ :each |
+					   self class putCard16: each on: stream ] ]
+			  ifFalse: [
+				  self class putCard16: charsetIdentifiers first on: stream.
+				  stream nextPut: charsetIdentifiers size - 1 ] ]
+]
+
+{ #category : 'building' }
+TTCffBytesFixture >> charsetFormat: anInteger [
+	"How the charset lists its identifiers: 0 one by one, 1 as runs of consecutive ones."
+
+	charsetFormat := anInteger
+]
+
+{ #category : 'building' }
+TTCffBytesFixture >> charsetIdentifiers: aCollection [
+	"The string identifier of every glyph but the first, which is .notdef and named by none."
+
+	charsetIdentifiers := aCollection
+]
+
+{ #category : 'building' }
 TTCffBytesFixture >> charstrings: aCollectionOfByteArrays [
 	charstrings := aCollectionOfByteArrays
 ]
@@ -206,7 +276,7 @@ TTCffBytesFixture >> headerSize: anInteger [
 { #category : 'initialization' }
 TTCffBytesFixture >> initialize [
 	"The smallest table there is: one charstring that draws nothing, no extra entry in either
-	 dictionary, no subroutine, and a header of the four bytes it needs."
+	 dictionary, no subroutine, no charset of its own, and a header of the four bytes it needs."
 
 	super initialize.
 	charstrings := { #[ 14 ] asByteArray }.
@@ -214,6 +284,8 @@ TTCffBytesFixture >> initialize [
 	privateEntries := #(  ).
 	localSubrs := #(  ).
 	globalSubrs := #(  ).
+	charsetIdentifiers := nil.
+	charsetFormat := 0.
 	headerSize := 4
 ]
 
@@ -230,25 +302,32 @@ TTCffBytesFixture >> privateEntries: aCollectionOfAssociations [
 { #category : 'building' }
 TTCffBytesFixture >> tableBytes [
 	"The bytes of a whole CFF table, laid out the way a font writes one: the header, the four
-	 INDEXes, then the charstrings, the private dictionary and the local subroutines. The two
-	 offsets the top dictionary carries point at what follows it, and writing them changes its
-	 size, so they are settled by writing it again."
+	 INDEXes, then the charstrings, the charset, the private dictionary and the local
+	 subroutines. The offsets the top dictionary carries point at what follows it, and
+	 writing them changes its size, so they are settled by writing it again."
 
-	| header nameIndex stringIndex globalIndex charstringsIndex localIndex private top prefixSize charstringsOffset privateOffset |
+	| header nameIndex stringIndex globalIndex charstringsIndex localIndex private charset top prefixSize charstringsOffset charsetOffset privateOffset |
 	header := self headerBytes.
 	nameIndex := self class indexBytesWithElements: { 'Fixture' asByteArray }.
 	stringIndex := self class indexBytesWithElements: #(  ).
 	globalIndex := self class indexBytesWithElements: globalSubrs.
 	charstringsIndex := self class indexBytesWithElements: charstrings.
 	localIndex := self class indexBytesWithElements: localSubrs.
+	charset := charsetIdentifiers
+		           ifNil: [ #[  ] asByteArray ]
+		           ifNotNil: [ self charsetBytes ].
 	private := self class
 		           privateDictBytesWithEntries: privateEntries
 		           localSubrs: localSubrs notEmpty.
 	charstringsOffset := 0.
+	charsetOffset := 0.
 	privateOffset := 0.
 	top := nil.
 	3 timesRepeat: [
-		top := self class dictBytesWithEntries: (topEntries , {
+		top := self class dictBytesWithEntries: (topEntries
+				        , (charsetIdentifiers
+						         ifNil: [ #(  ) ]
+						         ifNotNil: [ { (15 -> { charsetOffset }) } ]) , {
 				        (17 -> { charstringsOffset }).
 				        (18 -> {
 					         private size.
@@ -257,9 +336,10 @@ TTCffBytesFixture >> tableBytes [
 		              + (self class indexBytesWithElements: { top }) size + stringIndex size
 		              + globalIndex size.
 		charstringsOffset := prefixSize.
-		privateOffset := prefixSize + charstringsIndex size ].
+		charsetOffset := prefixSize + charstringsIndex size.
+		privateOffset := charsetOffset + charset size ].
 	^ header , nameIndex , (self class indexBytesWithElements: { top }) , stringIndex
-	  , globalIndex , charstringsIndex , private , localIndex
+	  , globalIndex , charstringsIndex , charset , private , localIndex
 ]
 
 { #category : 'building' }
