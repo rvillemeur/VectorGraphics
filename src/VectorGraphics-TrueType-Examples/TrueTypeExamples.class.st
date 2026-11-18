@@ -56,6 +56,25 @@ TrueTypeExamples class >> cffIndexOfThreeElements [
 ]
 
 { #category : 'examples - cff' }
+TrueTypeExamples class >> cffTableOfATwoGlyphFont [
+	"A whole CFF table, written here rather than read from a font: two charstrings, a private
+	dictionary that states both widths, one local subroutine and one global one. This is the
+	shape an .otf file holds its outlines in, where a .ttf holds them in glyf and loca.
+
+	The table is read without a single charstring being interpreted, which is what reading a
+	face of four thousand glyphs has to cost.
+
+	TrueTypeExamples cffTableOfATwoGlyphFont inspect"
+
+	<sampleInstance>
+	| bytes |
+	bytes := #[ 1 0 4 2 0 1 1 1 8 70 105 120 116 117 114 101 0 1 1 1 13 139 139 248 136 249 80
+		            5 181 17 147 191 18 0 0 0 1 1 1 3 10 11 0 2 1 1 2 5 14 139 139 14 248 116 20
+		            247 15 21 147 19 0 1 1 1 2 11 ] asByteArray.
+	^ (TTCffTableParser on: (TTFontTableDirEntry onBytes: bytes)) process
+]
+
+{ #category : 'examples - cff' }
 TrueTypeExamples class >> cffTopDictionaryOfASmallFont [
 	"One CFF top dictionary, read from bytes written here rather than from a font: the font matrix
 	of a thousand-unit em, the font bounding box, where the charset is and where the charstrings

@@ -21,6 +21,14 @@ Class {
 }
 
 { #category : 'instance creation' }
+TTCffIndex class >> empty [
+	"An INDEX of no element, for a font that leaves one out altogether rather than writing an
+	 empty one: a private dictionary with no local subroutines, say."
+
+	^ self new readFrom: (TTFontTableDirEntry onBytes: #[ 0 0 ] asByteArray)
+]
+
+{ #category : 'instance creation' }
 TTCffIndex class >> readFrom: anEntry [
 	"Read the INDEX the cursor is positioned at, and leave the cursor just past it."
 

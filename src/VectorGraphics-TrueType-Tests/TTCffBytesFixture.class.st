@@ -1,13 +1,23 @@
 "
-I build the bytes of CFF structures, on my class side, for the tests that read a CFF table without a font file on disk.
+I build the bytes of CFF structures for the tests that read a CFF table without a font file on disk.
 
-What I build is the smallest run of bytes that still answers the question being asked: an INDEX of given elements, a DICT of given operands and operators, a charstring of given operators. I hold no state and nobody instantiates me.
+On my class side I write one structure at a time: an INDEX of given elements, a dictionary of given operands and operators. On my instance side I write a whole `CFF ` table around what a test sets: its charstrings, the extra entries of its two dictionaries, its subroutines and the size it claims for its header. Everything a test does not set is as small as a table can be.
 
-I exist beside TTFontFixtures, which builds whole sfnt fonts: the structures inside a CFF table are a subject of their own, and the tests of the CFF reader ask about them one at a time.
+What I write is the smallest run of bytes that still answers the question being asked, which is why an offset width a real font would never choose can be asked for here.
+
+I exist beside TTFontFixtures, which builds whole sfnt fonts: the structures inside a CFF table are a subject of their own.
 "
 Class {
 	#name : 'TTCffBytesFixture',
 	#superclass : 'Object',
+	#instVars : [
+		'charstrings',
+		'topEntries',
+		'privateEntries',
+		'localSubrs',
+		'globalSubrs',
+		'headerSize'
+	],
 	#category : 'VectorGraphics-TrueType-Tests-Fixtures',
 	#package : 'VectorGraphics-TrueType-Tests',
 	#tag : 'Fixtures'
@@ -58,6 +68,53 @@ TTCffBytesFixture class >> indexBytesWithElements: aCollectionOfByteArrays offSi
 ]
 
 { #category : 'building' }
+TTCffBytesFixture class >> nibbleFor: aCharacter in: aStream [
+	"The nibble that spells one character of a real operand: a digit, 10 for the point, 14 for
+	 a minus sign, and 11 or 12 for an exponent, which eats the minus sign that follows it."
+
+	aCharacter isDigit ifTrue: [ ^ aCharacter digitValue ].
+	aCharacter = $. ifTrue: [ ^ 10 ].
+	aCharacter = $- ifTrue: [ ^ 14 ].
+	aCharacter = $e ifTrue: [
+		aStream peek = $- ifFalse: [ ^ 11 ].
+		aStream next.
+		^ 12 ].
+	^ self error: aCharacter printString , ' spells no part of a real number'
+]
+
+{ #category : 'building' }
+TTCffBytesFixture class >> nibblesOf: aString [
+	"The nibbles that spell a real operand, ended by 15 and padded to a whole number of bytes."
+
+	| nibbles |
+	nibbles := OrderedCollection new.
+	aString readStreamDo: [ :stream |
+		[ stream atEnd ] whileFalse: [
+			nibbles add: (self nibbleFor: stream next in: stream) ] ].
+	nibbles add: 15.
+	nibbles size odd ifTrue: [ nibbles add: 15 ].
+	^ nibbles
+]
+
+{ #category : 'building' }
+TTCffBytesFixture class >> privateDictBytesWithEntries: aCollectionOfAssociations localSubrs: aBoolean [
+	"A private dictionary. The offset of the local subroutines is counted from the start of the
+	 dictionary itself, and the subroutines follow it, so the offset is the dictionary's own
+	 size: writing it changes that size, and the two are settled by writing it again."
+
+	| bytes size |
+	size := 0.
+	bytes := nil.
+	3 timesRepeat: [
+		bytes := self dictBytesWithEntries: (aCollectionOfAssociations ,
+				         (aBoolean
+					          ifTrue: [ { (19 -> { size }) } ]
+					          ifFalse: [ #(  ) ])).
+		size := bytes size ].
+	^ bytes
+]
+
+{ #category : 'building' }
 TTCffBytesFixture class >> putCard16: anInteger on: aStream [
 	aStream
 		nextPut: (anInteger bitShift: -8) \\ 256;
@@ -102,27 +159,12 @@ TTCffBytesFixture class >> putDictOperator: anInteger on: aStream [
 
 { #category : 'building' }
 TTCffBytesFixture class >> putDictReal: aString on: aStream [
-	"A real operand, spelled as a font spells it: the characters of the number, one nibble each,
-	 then the end marker. The spelling is the test's, because a font chooses its own."
+	"A real operand, spelled as a font spells it: the characters of the number, one nibble each.
+	 The spelling is the test's, because a font chooses its own."
 
-	| nibbles |
-	nibbles := OrderedCollection new.
-	aString readStreamDo: [ :stream |
-		[ stream atEnd ] whileFalse: [ | character |
-			character := stream next.
-			character isDigit ifTrue: [ nibbles add: character digitValue ].
-			character = $. ifTrue: [ nibbles add: 10 ].
-			character = $- ifTrue: [ nibbles add: 14 ].
-			character = $e ifTrue: [
-				stream peek = $-
-					ifTrue: [
-						stream next.
-						nibbles add: 12 ]
-					ifFalse: [ nibbles add: 11 ] ] ] ].
-	nibbles add: 15.
-	nibbles size odd ifTrue: [ nibbles add: 15 ].
 	aStream nextPut: 30.
-	nibbles pairsDo: [ :high :low | aStream nextPut: (high bitShift: 4) + low ]
+	(self nibblesOf: aString) pairsDo: [ :high :low |
+		aStream nextPut: (high bitShift: 4) + low ]
 ]
 
 { #category : 'building' }
@@ -131,4 +173,105 @@ TTCffBytesFixture class >> putOffset: anInteger size: aByteCount on: aStream [
 
 	aByteCount to: 1 by: -1 do: [ :each |
 		aStream nextPut: (anInteger bitShift: 8 - (each * 8)) \\ 256 ]
+]
+
+{ #category : 'building' }
+TTCffBytesFixture >> charstrings: aCollectionOfByteArrays [
+	charstrings := aCollectionOfByteArrays
+]
+
+{ #category : 'building' }
+TTCffBytesFixture >> globalSubrs: aCollectionOfByteArrays [
+	globalSubrs := aCollectionOfByteArrays
+]
+
+{ #category : 'building' }
+TTCffBytesFixture >> headerBytes [
+	^ ByteArray streamContents: [ :stream |
+		  stream
+			  nextPut: 1;
+			  nextPut: 0;
+			  nextPut: headerSize;
+			  nextPut: 2.
+		  headerSize - 4 timesRepeat: [ stream nextPut: 0 ] ]
+]
+
+{ #category : 'building' }
+TTCffBytesFixture >> headerSize: anInteger [
+	"What the header claims its own size is. A font may leave room after the four bytes it needs."
+
+	headerSize := anInteger
+]
+
+{ #category : 'initialization' }
+TTCffBytesFixture >> initialize [
+	"The smallest table there is: one charstring that draws nothing, no extra entry in either
+	 dictionary, no subroutine, and a header of the four bytes it needs."
+
+	super initialize.
+	charstrings := { #[ 14 ] asByteArray }.
+	topEntries := #(  ).
+	privateEntries := #(  ).
+	localSubrs := #(  ).
+	globalSubrs := #(  ).
+	headerSize := 4
+]
+
+{ #category : 'building' }
+TTCffBytesFixture >> localSubrs: aCollectionOfByteArrays [
+	localSubrs := aCollectionOfByteArrays
+]
+
+{ #category : 'building' }
+TTCffBytesFixture >> privateEntries: aCollectionOfAssociations [
+	privateEntries := aCollectionOfAssociations
+]
+
+{ #category : 'building' }
+TTCffBytesFixture >> tableBytes [
+	"The bytes of a whole CFF table, laid out the way a font writes one: the header, the four
+	 INDEXes, then the charstrings, the private dictionary and the local subroutines. The two
+	 offsets the top dictionary carries point at what follows it, and writing them changes its
+	 size, so they are settled by writing it again."
+
+	| header nameIndex stringIndex globalIndex charstringsIndex localIndex private top prefixSize charstringsOffset privateOffset |
+	header := self headerBytes.
+	nameIndex := self class indexBytesWithElements: { 'Fixture' asByteArray }.
+	stringIndex := self class indexBytesWithElements: #(  ).
+	globalIndex := self class indexBytesWithElements: globalSubrs.
+	charstringsIndex := self class indexBytesWithElements: charstrings.
+	localIndex := self class indexBytesWithElements: localSubrs.
+	private := self class
+		           privateDictBytesWithEntries: privateEntries
+		           localSubrs: localSubrs notEmpty.
+	charstringsOffset := 0.
+	privateOffset := 0.
+	top := nil.
+	3 timesRepeat: [
+		top := self class dictBytesWithEntries: (topEntries , {
+				        (17 -> { charstringsOffset }).
+				        (18 -> {
+					         private size.
+					         privateOffset }) }).
+		prefixSize := header size + nameIndex size
+		              + (self class indexBytesWithElements: { top }) size + stringIndex size
+		              + globalIndex size.
+		charstringsOffset := prefixSize.
+		privateOffset := prefixSize + charstringsIndex size ].
+	^ header , nameIndex , (self class indexBytesWithElements: { top }) , stringIndex
+	  , globalIndex , charstringsIndex , private , localIndex
+]
+
+{ #category : 'building' }
+TTCffBytesFixture >> tableCursor [
+	"A cursor over the table I build, as a font reader hands one to a parser."
+
+	^ TTFontTableDirEntry onBytes: self tableBytes
+]
+
+{ #category : 'building' }
+TTCffBytesFixture >> topEntries: aCollectionOfAssociations [
+	"Entries of the top dictionary beyond the two it must carry, CharStrings and Private."
+
+	topEntries := aCollectionOfAssociations
 ]
