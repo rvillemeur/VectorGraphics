@@ -142,6 +142,179 @@ VGCairoTextTest >> newTextSurface [
 ]
 
 { #category : 'tests' }
+VGCairoTextTest >> testAComponentPlacedByMatchingPointsIsRejectedRatherThanGuessed [
+	"A component record whose arguments are point numbers to match, rather than an offset, is
+	 not supported: placing the component would mean guessing, and a guess moves a letter
+	 silently. The record here holds neither the offsets flag nor a transform, and the font is
+	 rejected while it is read."
+
+	| bytes error |
+	bytes := VGFontBytesFixture fontBytesWithGlyphRecords: {
+			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: 0
+						           glyphIndex: 1
+						           arguments: #( 1 2 )
+						           transform: #(  )) }) }.
+	error := [
+	         VGFontFace newForBytes: bytes.
+	         nil ] on: Error do: [ :each | each ].
+	self deny: error isNil.
+	self assert: (error messageText includesSubstring: 'points')
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAComponentThatIsItselfACompositeIsReadThroughItsOwnComponents [
+	"A component may name a composite glyph, and the two placements then compose: the square
+	 moved ten to the right by the glyph in the middle, and that glyph moved twenty up by the
+	 glyph on top."
+
+	| face square nested |
+	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
+			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: VGFontFace argumentsAreOffsetsFlag
+						           glyphIndex: 1
+						           arguments: #( 10 0 )
+						           transform: #(  )) }).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: VGFontFace argumentsAreOffsetsFlag
+						           glyphIndex: 2
+						           arguments: #( 0 20 )
+						           transform: #(  )) }) }).
+	square := face outlineOfGlyphAt: 1.
+	nested := face outlineOfGlyphAt: 3.
+	self
+		assert: nested contours first
+		equals: (square contours first collect: [ :each | each + (10 @ 20) ])
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testACompositeComponentPlacedByByteOffsetsReadsThemSigned [
+	"A component record that does not hold the words flag places its glyph with two single
+	 bytes, and those bytes are signed: 128 is minus 128, not 128, so a component pushed left
+	 by the most a byte can say has to land left of the glyph and not far to its right. The
+	 offsets here are the two bounds of a signed byte."
+
+	| face square moved |
+	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
+			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: VGFontFace argumentsAreOffsetsFlag
+						           glyphIndex: 1
+						           arguments: #( -128 127 )
+						           transform: #(  )) }) }).
+	square := face outlineOfGlyphAt: 1.
+	moved := face outlineOfGlyphAt: 2.
+	self
+		assert: moved contours first
+		equals: (square contours first collect: [ :each | each + (-128 @ 127) ])
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testACompositeComponentPlacedByWordOffsetsReadsThemSigned [
+	"With the words flag set the two arguments are 16 bit, and signed as well, so a component
+	 can be pushed further than a byte reaches and in either direction. Reading them as bytes
+	 would both lose the range and leave the entry two bytes short of the next field."
+
+	| face square moved flags |
+	flags := VGFontFace argumentsAreOffsetsFlag
+	         + VGFontFace argumentsAreWordsFlag.
+	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
+			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: flags
+						           glyphIndex: 1
+						           arguments: #( -1000 1000 )
+						           transform: #(  )) }) }).
+	square := face outlineOfGlyphAt: 1.
+	moved := face outlineOfGlyphAt: 2.
+	self
+		assert: moved contours first
+		equals: (square contours first collect: [ :each | each + (-1000 @ 1000) ])
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testACompositeComponentWithATwoByTwoMatrixTurnsThePointsOfItsGlyph [
+	"A component record may carry a full two by two matrix, and the face has to apply it rather
+	 than place the component square. The matrix here is a quarter turn, xx 0, xy 1, yx -1,
+	 yy 0, which the record states as F2Dot14 numbers, so every point of the component lands at
+	 minus its own y over its own x."
+
+	| face square turned flags |
+	flags := VGFontFace argumentsAreOffsetsFlag
+	         + VGFontFace componentHasMatrixFlag.
+	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
+			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: flags
+						           glyphIndex: 1
+						           arguments: #( 0 0 )
+						           transform: #( 0 1 -1 0 )) }) }).
+	square := face outlineOfGlyphAt: 1.
+	turned := face outlineOfGlyphAt: 2.
+	self assert: turned contours size equals: square contours size.
+	self
+		assert: turned contours first
+		equals: (square contours first collect: [ :each | each y negated @ each x ])
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testACompositeComponentWithOneScaleScalesBothAxesOfItsGlyphByIt [
+	"The shortest transform a component record carries is one F2Dot14 number, which scales both
+	 axes alike. Reading it as a matrix, or as two scales, would walk off the end of the
+	 record and place the component by whatever followed it."
+
+	| face square scaled flags |
+	flags := VGFontFace argumentsAreOffsetsFlag
+	         + VGFontFace componentHasOneScaleFlag.
+	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
+			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: flags
+						           glyphIndex: 1
+						           arguments: #( 0 0 )
+						           transform: #( 1.5 )) }) }).
+	square := face outlineOfGlyphAt: 1.
+	scaled := face outlineOfGlyphAt: 2.
+	self
+		assert: scaled contours first
+		equals: (square contours first collect: [ :each | each * 1.5 ])
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testACompositeComponentWithTwoScalesStretchesEachAxisOfItsGlyphOnItsOwn [
+	"A component record may scale its glyph by one number on x and another on y, which is two
+	 F2Dot14 numbers and not a matrix. The face has to read both, and read them in that order:
+	 the glyph here is one and a half times as wide and half as tall as the component it names."
+
+	| face square scaled flags |
+	flags := VGFontFace argumentsAreOffsetsFlag
+	         + VGFontFace componentHasTwoScalesFlag.
+	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
+			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: flags
+						           glyphIndex: 1
+						           arguments: #( 0 0 )
+						           transform: #( 1.5 0.5 )) }) }).
+	square := face outlineOfGlyphAt: 1.
+	scaled := face outlineOfGlyphAt: 2.
+	self
+		assert: scaled contours first
+		equals: (square contours first collect: [ :each |
+				 each x * 1.5 @ (each y * 0.5) ])
+]
+
+{ #category : 'tests' }
 VGCairoTextTest >> testACompositeGlyphIsReadThroughItsComponentsAtTheirOffsets [
 	"The letter i of this font is a composite glyph: a stem and a dot, each a glyph of its own and
 	 each placed by an offset the composite carries. VectorGraphics' own TTGlyfTableParser reads
@@ -159,6 +332,33 @@ VGCairoTextTest >> testACompositeGlyphIsReadThroughItsComponentsAtTheirOffsets [
 	self assert: (points collect: [ :each | each x ]) max equals: 179.
 	self assert: (points collect: [ :each | each y ]) min equals: 0.
 	self assert: (points collect: [ :each | each y ]) max equals: 694
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testACompositeGlyphReadsEveryComponentWhileTheMoreComponentsFlagIsSet [
+	"The component records of a composite run on while one of them sets the more components
+	 flag, and the face reads them all. Two copies of the same square, side by side, make a
+	 glyph of two contours covering twice the width of one."
+
+	| face composed points |
+	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
+			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: VGFontFace argumentsAreOffsetsFlag
+						           glyphIndex: 1
+						           arguments: #( 0 0 )
+						           transform: #(  )).
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: VGFontFace argumentsAreOffsetsFlag
+						           glyphIndex: 1
+						           arguments: #( 100 0 )
+						           transform: #(  )) }) }).
+	composed := face outlineOfGlyphAt: 2.
+	self assert: composed contours size equals: 2.
+	points := composed contours flatCollect: [ :each | each ].
+	self assert: (points collect: [ :each | each x ]) min equals: 0.
+	self assert: (points collect: [ :each | each x ]) max equals: 200
 ]
 
 { #category : 'tests' }
@@ -219,6 +419,28 @@ VGCairoTextTest >> testAFaceParsesAGlyphOnceAndKeepsIt [
 ]
 
 { #category : 'tests' }
+VGCairoTextTest >> testAFaceReadsTheNegativeNumbersOfTheHeadAndHheaTablesAsNegative [
+	"The box in head and the descent in hhea are signed 16 bit numbers, and both of them are
+	 negative in a real font: the box reaches left of the origin and below the baseline, and
+	 the descent is stated downwards. Read unsigned, minus 200 comes back as 65336, which is a
+	 line height off by two em squares."
+
+	| tables bytes face |
+	tables := VGFontBytesFixture tablesForGlyphRecords:
+		          { (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100) }.
+	bytes := VGFontBytesFixture fontBytesWithTables: (tables collect: [ :each |
+			         each key = 'head'
+				         ifTrue: [
+					         'head' -> (VGFontBytesFixture headTableWithBounds:
+							           (-300 @ -400 corner: 500 @ 600)) ]
+				         ifFalse: [ each ] ]).
+	face := VGFontFace newForBytes: bytes.
+	self assert: face boundsRectangle equals: (-300 @ -400 corner: 500 @ 600).
+	self assert: face descent equals: -200.
+	self assert: face ascent equals: 800
+]
+
+{ #category : 'tests' }
 VGCairoTextTest >> testAFaceWithNoNameTableStillReadsAndNamesNothing [
 	"What I need to draw and what the metadata reader needs to name are not the same tables:
 	 the name table is in neither requiredTableTags nor what any glyph is read from. So a font
@@ -258,6 +480,52 @@ VGCairoTextTest >> testAFontFaceReadsItsOwnMetricsFromTheFontFile [
 	self assert: face ascent equals: 984.
 	self assert: face descent equals: -273.
 	self assert: face lineGap equals: 0
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFontMissingAnyRequiredTableIsRejectedAndTheErrorNamesThatTable [
+	"Every tag of requiredTableTags is required: a font stripped of any one of them is rejected
+	 before a single glyph is read, and the error says which table was not there. One case per
+	 tag, so a tag dropped from the list, or a check that stops at the first tag, fails here."
+
+	| records |
+	records := { (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100) }.
+	VGFontFace requiredTableTags do: [ :tag |
+		| bytes error |
+		bytes := VGFontBytesFixture fontBytesWithTables:
+			         ((VGFontBytesFixture tablesForGlyphRecords: records) reject: [
+				          :each | each key = tag ]).
+		error := [
+		         VGFontFace newForBytes: bytes.
+		         nil ] on: Error do: [ :each | each ].
+		self deny: error isNil description: 'a font with no ' , tag , ' table must be rejected'.
+		self
+			assert: (error messageText includesSubstring: tag)
+			description: 'the error must name the ' , tag , ' table' ]
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFontWhoseCharacterMapHoldsNoUnicodeSubtableIsRejected [
+	"The cmap table is there, so the check for a missing table says nothing, but it carries a
+	 subtable of another platform only. The reader answers nothing for such a table, and a face
+	 that cannot turn a code point into a glyph is of no use to a drawing, so it is rejected
+	 with the reason rather than kept with an empty map."
+
+	| tables bytes error |
+	tables := VGFontBytesFixture tablesForGlyphRecords:
+		          { (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100) }.
+	bytes := VGFontBytesFixture fontBytesWithTables: (tables collect: [ :each |
+			         each key = 'cmap'
+				         ifTrue: [
+					         'cmap' -> (VGFontBytesFixture
+						          cmapTableForGlyphCount: 1
+						          platformId: 3) ]
+				         ifFalse: [ each ] ]).
+	error := [
+	         VGFontFace newForBytes: bytes.
+	         nil ] on: Error do: [ :each | each ].
+	self deny: error isNil.
+	self assert: (error messageText includesSubstring: 'Unicode')
 ]
 
 { #category : 'tests' }
@@ -338,6 +606,26 @@ VGCairoTextTest >> testAGlyphThatInksNothingIsLookedAtOnceAndRasterisedNever [
 	self assert: font atlas renderedGlyphCount equals: 0.
 	self assert: font atlas size equals: 1.
 	self assert: surface data asArray asSet asArray equals: #( 0 )
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testASimpleGlyphDrawnLeftOfTheOriginKeepsItsNegativeCoordinates [
+	"The points of a glyph are stated as steps from the point before, and those steps are
+	 signed: a glyph sitting left of the origin and below the baseline, as a comma or a
+	 parenthesis does, walks backwards from 0 @ 0. Read unsigned, its points land some
+	 65 thousand units away and nothing of the letter is drawn where it belongs."
+
+	| face outline points |
+	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords:
+			        { (VGFontBytesFixture
+				         simpleGlyphRecordFrom: -200 @ -100
+				         to: -50 @ -25) }).
+	outline := face outlineOfGlyphAt: 1.
+	points := outline contours first.
+	self assert: (points collect: [ :each | each x ]) min equals: -200.
+	self assert: (points collect: [ :each | each y ]) min equals: -100.
+	self assert: (points collect: [ :each | each x ]) max equals: -50.
+	self assert: (points collect: [ :each | each y ]) max equals: -25
 ]
 
 { #category : 'tests' }
