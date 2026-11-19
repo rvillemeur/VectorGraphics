@@ -122,10 +122,9 @@ TTFontReader >> glyphsFrom: aTableDictionary count: anInteger indexToLocFormat: 
 						    format: anotherInteger
 						    nGlyphs: anInteger) process) process ]
 		  ifFalse: [
-			  | parser |
-			  parser := (TTCffTableParser on: (aTableDictionary at: 'CFF ')) process.
-			  (1 to: anInteger) collect: [ :each |
-				  TTCffGlyph onTable: parser index: each ] ]
+			  TTCffGlyph
+				  onTable: (TTCffTableParser on: (aTableDictionary at: 'CFF ')) process
+				  count: anInteger ]
 ]
 
 { #category : 'private' }

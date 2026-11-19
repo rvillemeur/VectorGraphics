@@ -479,17 +479,15 @@ VGFontFace >> readBytes: aByteArray [
 		indexToLocFormat: (headData at: #indexToLocFormat)
 ]
 
-{ #category : 'reading' }
+{ #category : 'private - reading' }
 VGFontFace >> readCffGlyphRecordsFrom: aTableDictionary count: aGlyphCount [
-	"One record a glyph, each one drawn the first time something asks it for its contours or
-	 its box: a CFF glyph is one charstring interpreted on its own, where the glyf table is
-	 parsed whole. Reading the table itself reads what every glyph of it needs — the
-	 charstrings, the charset, the subroutines and the widths — and no glyph."
+	"The glyphs of an OpenType font: the CFF table is read for everything it says about the
+	 font and for nothing it says about a glyph, and each record draws itself the first time
+	 somebody asks for its shape."
 
-	| parser |
-	parser := (TTCffTableParser on: (aTableDictionary at: 'CFF ')) process.
-	glyphs := (1 to: aGlyphCount) collect: [ :each |
-		          TTCffGlyph onTable: parser index: each ]
+	glyphs := TTCffGlyph
+		          onTable: (TTCffTableParser on: (aTableDictionary at: 'CFF ')) process
+		          count: aGlyphCount
 ]
 
 { #category : 'private' }

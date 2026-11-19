@@ -19,6 +19,15 @@ Class {
 }
 
 { #category : 'instance creation' }
+TTCffGlyph class >> onTable: aTableParser count: anInteger [
+	"One record a glyph of a font whose outlines are that CFF table, counted from one. Not a
+	 charstring is read: each record draws itself the first time somebody asks for its shape."
+
+	^ (1 to: anInteger) collect: [ :each |
+		  self onTable: aTableParser index: each ]
+]
+
+{ #category : 'instance creation' }
 TTCffGlyph class >> onTable: aTableParser index: anInteger [
 	"The glyph the charstring at this index of this table draws. Nothing is interpreted here."
 
