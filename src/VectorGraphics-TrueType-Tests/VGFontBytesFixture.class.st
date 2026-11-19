@@ -285,9 +285,9 @@ VGFontBytesFixture class >> putF2Dot14: aNumber on: aStream [
 	 minus two and a test asking for it would read a glyph mirrored rather than scaled. That is
 	 the fixture lying to the test, so it is refused here."
 
-	(aNumber between: -2 and: 2 - (1 / TTGlyfGlyphSource twoDotFourteenScale)) ifFalse: [
+	(aNumber between: -2 and: 2 - (1 / TTFontTableDirEntry twoDotFourteenScale)) ifFalse: [
 		Error signal: aNumber printString , ' is outside what an F2Dot14 number can say' ].
-	self putShort: (aNumber * TTGlyfGlyphSource twoDotFourteenScale) rounded on: aStream
+	self putShort: (aNumber * TTFontTableDirEntry twoDotFourteenScale) rounded on: aStream
 ]
 
 { #category : 'writing' }

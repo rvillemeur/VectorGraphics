@@ -71,6 +71,33 @@ TTFontTableDirEntryTest >> testNextShortPositive [
 ]
 
 { #category : 'tests' }
+TTFontTableDirEntryTest >> testNextSignedByteReadsTheTopHalfOfTheRangeAsNegative [
+	"A byte over 127 states a negative number, and the entry advances one byte either way."
+
+	| entry |
+	entry := TTFontTableDirEntry onBytes: #[ 127 128 255 1 ].
+	self assert: entry nextSignedByte equals: 127.
+	self assert: entry nextSignedByte equals: -128.
+	self assert: entry nextSignedByte equals: -1.
+	self assert: entry nextSignedByte equals: 1
+]
+
+{ #category : 'tests' }
+TTFontTableDirEntryTest >> testNextTwoDotFourteenReadsASignedFractionOfFourteenBits [
+	"An F2Dot14 is the signed short it holds over 16384, so one unit of the form is 1 and
+	 the number reaches the whole of [-2, 2)."
+
+	| entry |
+	entry := TTFontTableDirEntry onBytes: (ByteArray streamContents: [ :stream |
+			          VGFontBytesFixture putF2Dot14: 1.5 on: stream.
+			          VGFontBytesFixture putF2Dot14: -2 on: stream.
+			          stream nextPutAll: #[ 0 1 ] ]).
+	self assert: entry nextTwoDotFourteen equals: 3 / 2.
+	self assert: entry nextTwoDotFourteen equals: -2.
+	self assert: entry nextTwoDotFourteen equals: 1 / 16384
+]
+
+{ #category : 'tests' }
 TTFontTableDirEntryTest >> testNextUShort [
 
 	| bytes entry |

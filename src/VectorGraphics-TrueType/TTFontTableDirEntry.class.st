@@ -18,6 +18,8 @@ each entry to the corresponding TTFontParser class method for parsing.
 - `nextUShort`       — read 2-byte unsigned big-endian integer
 - `nextLong`         — read 4-byte signed big-endian integer
 - `nextULong`        — read 4-byte unsigned big-endian integer
+- `nextSignedByte`   — read 1 signed byte (a component record's arguments are signed)
+- `nextTwoDotFourteen` — read an F2Dot14: a signed short over 16384
 - `skip: n`          — advance offset by n bytes
 - `stringAt:length:multiByte:` — read a name-table string (Mac or Windows encoding)
 - `nextBytes:into:startingAt:` — bulk-copy bytes into an existing array
@@ -56,6 +58,14 @@ TTFontTableDirEntry class >> onBytes: aByteArray [
 		  instVarNamed: 'fontData' put: aByteArray;
 		  instVarNamed: 'offset' put: 1;
 		  yourself
+]
+
+{ #category : 'constants' }
+TTFontTableDirEntry class >> twoDotFourteenScale [
+	"An F2Dot14 is a signed 16 bit fraction with fourteen bits after the point, so the number
+	 it states is the short it holds over this scale. Component matrices are written this way."
+
+	^ 16384
 ]
 
 { #category : 'accessing' }
@@ -98,6 +108,25 @@ TTFontTableDirEntry >> nextShort [
 	value := fontData shortAt: offset bigEndian: true.
 	offset := offset + 2.
 	^ value
+]
+
+{ #category : 'reading' }
+TTFontTableDirEntry >> nextSignedByte [
+	"The next byte, read signed: my nextByte reads one unsigned, and the arguments of a
+	 component record are signed."
+
+	| value |
+	value := self nextByte.
+	^ value > 127
+		  ifTrue: [ value - 256 ]
+		  ifFalse: [ value ]
+]
+
+{ #category : 'reading' }
+TTFontTableDirEntry >> nextTwoDotFourteen [
+	"The next F2Dot14 number: a signed short over the scale that form states."
+
+	^ self nextShort / self class twoDotFourteenScale
 ]
 
 { #category : 'accessing' }

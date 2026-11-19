@@ -60,24 +60,16 @@ TTGlyfGlyphSource class >> moreComponentsFlag [
 	^ 32
 ]
 
-{ #category : 'constants' }
-TTGlyfGlyphSource class >> twoDotFourteenScale [
-	"A component matrix holds each of its numbers as an F2Dot14: a signed 16 bit fraction with
-	 fourteen bits after the point."
-
-	^ 16384
-]
-
 { #category : 'reading' }
 TTGlyfGlyphSource >> applyMatrixTo: aComponent [
 	"The four F2Dot14 numbers of a full two by two matrix, in the order the record writes
 	 them: xx, xy, yx, yy."
 
 	aComponent
-		xx: self nextTwoDotFourteen
-		xy: self nextTwoDotFourteen
-		yx: self nextTwoDotFourteen
-		yy: self nextTwoDotFourteen
+		xx: glyfEntry nextTwoDotFourteen
+		xy: glyfEntry nextTwoDotFourteen
+		yx: glyfEntry nextTwoDotFourteen
+		yy: glyfEntry nextTwoDotFourteen
 ]
 
 { #category : 'reading' }
@@ -86,7 +78,7 @@ TTGlyfGlyphSource >> applyOneScaleTo: aComponent [
 	 carries."
 
 	| scale |
-	scale := self nextTwoDotFourteen.
+	scale := glyfEntry nextTwoDotFourteen.
 	aComponent
 		xx: scale
 		xy: 0
@@ -115,12 +107,12 @@ TTGlyfGlyphSource >> applyTwoScalesTo: aComponent [
 	"One scale for x and another for y, in that order, and nothing off the diagonal."
 
 	| xScale |
-	xScale := self nextTwoDotFourteen.
+	xScale := glyfEntry nextTwoDotFourteen.
 	aComponent
 		xx: xScale
 		xy: 0
 		yx: 0
-		yy: self nextTwoDotFourteen
+		yy: glyfEntry nextTwoDotFourteen
 ]
 
 { #category : 'inspector' }
@@ -201,29 +193,13 @@ TTGlyfGlyphSource >> inspectorGlyphs: aBuilder [
 ]
 
 { #category : 'reading' }
-TTGlyfGlyphSource >> nextSignedByte [
-	"TTFontTableDirEntry reads a byte unsigned, and a component offset is signed."
-
-	| value |
-	value := glyfEntry nextByte.
-	^ value > 127
-		  ifTrue: [ value - 256 ]
-		  ifFalse: [ value ]
-]
-
-{ #category : 'reading' }
-TTGlyfGlyphSource >> nextTwoDotFourteen [
-	^ glyfEntry nextShort / self class twoDotFourteenScale
-]
-
-{ #category : 'reading' }
 TTGlyfGlyphSource >> offsetFromFlags: aFlagWord [
 	"Where a component record places the glyph it names, read from the entry standing on the
 	 two arguments. They are words or bytes as the flags say, and signed either way."
 
 	^ (aFlagWord allMask: self class argumentsAreWordsFlag)
 		  ifTrue: [ glyfEntry nextShort @ glyfEntry nextShort ]
-		  ifFalse: [ self nextSignedByte @ self nextSignedByte ]
+		  ifFalse: [ glyfEntry nextSignedByte @ glyfEntry nextSignedByte ]
 ]
 
 { #category : 'reading' }
