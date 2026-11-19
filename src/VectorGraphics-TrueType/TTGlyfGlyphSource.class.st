@@ -68,6 +68,61 @@ TTGlyfGlyphSource class >> twoDotFourteenScale [
 	^ 16384
 ]
 
+{ #category : 'reading' }
+TTGlyfGlyphSource >> applyMatrixTo: aComponent [
+	"The four F2Dot14 numbers of a full two by two matrix, in the order the record writes
+	 them: xx, xy, yx, yy."
+
+	aComponent
+		xx: self nextTwoDotFourteen
+		xy: self nextTwoDotFourteen
+		yx: self nextTwoDotFourteen
+		yy: self nextTwoDotFourteen
+]
+
+{ #category : 'reading' }
+TTGlyfGlyphSource >> applyOneScaleTo: aComponent [
+	"One F2Dot14 number scaling both axes alike, which is the shortest transform a record
+	 carries."
+
+	| scale |
+	scale := self nextTwoDotFourteen.
+	aComponent
+		xx: scale
+		xy: 0
+		yx: 0
+		yy: scale
+]
+
+{ #category : 'reading' }
+TTGlyfGlyphSource >> applyTransformFromFlags: aFlagWord to: aComponent [
+	"The transform a component record states, read from the entry standing on it. The three
+	 forms are mutually exclusive and are tested in the order the specification writes them,
+	 because each reads a different number of F2Dot14 numbers and reading the wrong one leaves
+	 the entry over the next field. A record stating none of the three leaves the component
+	 with the identity it was built with."
+
+	(aFlagWord allMask: self class componentHasMatrixFlag) ifTrue: [
+		^ self applyMatrixTo: aComponent ].
+	(aFlagWord allMask: self class componentHasTwoScalesFlag) ifTrue: [
+		^ self applyTwoScalesTo: aComponent ].
+	(aFlagWord allMask: self class componentHasOneScaleFlag) ifTrue: [
+		^ self applyOneScaleTo: aComponent ]
+]
+
+{ #category : 'reading' }
+TTGlyfGlyphSource >> applyTwoScalesTo: aComponent [
+	"One scale for x and another for y, in that order, and nothing off the diagonal."
+
+	| xScale |
+	xScale := self nextTwoDotFourteen.
+	aComponent
+		xx: xScale
+		xy: 0
+		yx: 0
+		yy: self nextTwoDotFourteen
+]
+
 { #category : 'inspector' }
 TTGlyfGlyphSource >> boxDescriptionOf: aGlyph [
 	"The four edges of the box a glyph states, in the order the glyf table writes them. A
@@ -162,6 +217,16 @@ TTGlyfGlyphSource >> nextTwoDotFourteen [
 ]
 
 { #category : 'reading' }
+TTGlyfGlyphSource >> offsetFromFlags: aFlagWord [
+	"Where a component record places the glyph it names, read from the entry standing on the
+	 two arguments. They are words or bytes as the flags say, and signed either way."
+
+	^ (aFlagWord allMask: self class argumentsAreWordsFlag)
+		  ifTrue: [ glyfEntry nextShort @ glyfEntry nextShort ]
+		  ifFalse: [ self nextSignedByte @ self nextSignedByte ]
+]
+
+{ #category : 'reading' }
 TTGlyfGlyphSource >> readComponentWithFlags: aFlagWord [
 	"One component record, with the entry standing on the glyph index that follows its flags. A
 	 record that matches two points instead of giving an offset is rejected: no font we draw uses
@@ -171,33 +236,8 @@ TTGlyfGlyphSource >> readComponentWithFlags: aFlagWord [
 	component := VGGlyphComponent glyphIndex: glyfEntry nextUShort.
 	(aFlagWord allMask: self class argumentsAreOffsetsFlag) ifFalse: [
 		^ Error signal: 'a component placed by matching points is not supported' ].
-	component offset: ((aFlagWord allMask: self class argumentsAreWordsFlag)
-			 ifTrue: [ glyfEntry nextShort @ glyfEntry nextShort ]
-			 ifFalse: [ self nextSignedByte @ self nextSignedByte ]).
-	(aFlagWord allMask: self class componentHasMatrixFlag)
-		ifTrue: [
-			component
-				xx: self nextTwoDotFourteen
-				xy: self nextTwoDotFourteen
-				yx: self nextTwoDotFourteen
-				yy: self nextTwoDotFourteen ]
-		ifFalse: [
-			(aFlagWord allMask: self class componentHasTwoScalesFlag)
-				ifTrue: [
-					component
-						xx: self nextTwoDotFourteen
-						xy: 0
-						yx: 0
-						yy: self nextTwoDotFourteen ]
-				ifFalse: [
-					(aFlagWord allMask: self class componentHasOneScaleFlag) ifTrue: [
-						| scale |
-						scale := self nextTwoDotFourteen.
-						component
-							xx: scale
-							xy: 0
-							yx: 0
-							yy: scale ] ] ].
+	component offset: (self offsetFromFlags: aFlagWord).
+	self applyTransformFromFlags: aFlagWord to: component.
 	^ component
 ]
 
