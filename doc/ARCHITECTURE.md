@@ -217,6 +217,14 @@ Two details the chain depends on:
   answers whether it had any.
 - An OpenType font states its outlines in a `CFF ` table instead of `glyf`, and  `TTFontReader class >> holdsTrueTypeOutlines:` is the one place that decides which route a  file takes. `TTCffTableParser` reads everything the table says about the font, and one  `TTCffGlyph` a glyph interprets its Type 2 charstring the first time somebody asks for its  shape: `TTCffCharstringInterpreter` runs the charstring against `TTCffOutlineBuilder`, a cubic  becomes the quadratics of `TTCffCubic`, and `TTCffContour` segments come out as the contours of  an ordinary `TTGlyph`, whose box is computed from its points because CFF states none. So no  method of `TTGlyph` may read the state of a glyph behind its own accessors, which  `TTGlyphTest >> testOnlyTheGetterOfAnInstanceVariableReadsItDirectly` pins. A CID-keyed font  is rejected with `#cidKeyedFont`, and the CFF2 table of a variable font is not read.
 
+- The records themselves belong to a glyph source rather than to the face.
+  `TTGlyphSource class >> on:count:indexToLocFormat:` asks
+  `TTFontReader class >> holdsTrueTypeOutlines:` which format the file carries and answers a
+  `TTGlyfGlyphSource` or a `TTCffGlyphSource`. Both answer `glyphCount`, `glyphAt:` and
+  `outlineOfGlyphAt:`, so `VGFontFace` holds one source, memoises the outlines it has been
+  asked for, and names neither format. The flags and the lengths of a composite glyph record
+  are class-side constants of `TTGlyfGlyphSource`, because only the glyf route reads them.
+
 ## 10. The three caches, and who clears them — `VectorGraphics-TrueType`
 
 | Cache | Lives in | Cleared by |
