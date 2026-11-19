@@ -22,7 +22,8 @@ TTCffGlyphSourceTest >> testTheGlyphsViewSaysWhichCharstringsAreDrawnAndDrawsNon
 	"The view a reader opens on the source of a CFF font says, of every glyph, whether its
 	 charstring has been interpreted yet and the advance width hmtx filled in, which costs no
 	 charstring. Opening the view must leave every glyph undrawn, or the inspector would
-	 answer the question it is asked by changing the object it is showing."
+	 answer the question it is asked by changing the object it is showing. The columns are
+	 named, because a column of figures nobody can name says nothing."
 
 	| source builder presenter rows |
 	source := self sourceForFontBytes: self subjectFontBytes.
@@ -31,6 +32,9 @@ TTCffGlyphSourceTest >> testTheGlyphsViewSaysWhichCharstringsAreDrawnAndDrawsNon
 		              inspectedObject: source;
 		              methodSelector: #inspectorGlyphs:;
 		              yourself) basicNewInspectionPresenter: builder.
+	self
+		assert: (presenter columns collect: [ :each | each title ]) asArray
+		equals: #( 'Glyph' 'Drawn' 'Advance' ).
 	rows := presenter items collect: [ :item |
 		        presenter columns collect: [ :column |
 			        column evaluation value: item ] ].

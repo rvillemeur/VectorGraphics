@@ -23,7 +23,8 @@ TTGlyfGlyphSourceTest >> testTheGlyphsViewListsEveryGlyphWithItsContourCountAndB
 	"The view a reader opens on the source of a glyf font says, of every glyph the font holds,
 	 how many contours it owns, whether it is a composite that owns none of its points, the
 	 advance width hmtx filled in and the box the font states, all in font units. The glyph
-	 the fixture draws is a square; glyph zero is the empty one every font begins with."
+	 the fixture draws is a square; glyph zero is the empty one every font begins with. The
+	 columns are named, because a column of figures nobody can name says nothing."
 
 	| source builder presenter rows |
 	source := self sourceForFontBytes: self subjectFontBytes.
@@ -32,6 +33,9 @@ TTGlyfGlyphSourceTest >> testTheGlyphsViewListsEveryGlyphWithItsContourCountAndB
 		              inspectedObject: source;
 		              methodSelector: #inspectorGlyphs:;
 		              yourself) basicNewInspectionPresenter: builder.
+	self
+		assert: (presenter columns collect: [ :each | each title ]) asArray
+		equals: #( 'Glyph' 'Contours' 'Composite' 'Advance' 'Box (l b r t)' ).
 	rows := presenter items collect: [ :item |
 		        presenter columns collect: [ :column |
 			        column evaluation value: item ] ].
