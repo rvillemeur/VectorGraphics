@@ -88,6 +88,22 @@ TTGlyphSource >> glyphEntries [
 ]
 
 { #category : 'inspector' }
+TTGlyphSource >> glyphTableThrough: aBuilder [
+	"The table every source shows its glyphs in: one row per glyph, and the index the font
+	 asks for it by in the first column. A subclass adds the columns its own format can
+	 state for free, which is why the view itself is not shared."
+
+	^ aBuilder newTable
+		  addColumn: ((SpStringTableColumn
+				    title: 'Glyph'
+				    evaluated: [ :each | each key printString ])
+				   width: 70;
+				   yourself);
+		  items: self glyphEntries;
+		  yourself
+]
+
+{ #category : 'inspector' }
 TTGlyphSource >> inspectorGlyphs: aBuilder [
 	"The glyphs of the font, one row each, built through the presenter builder. Every source
 	 states its own columns, because the facts a reader can be shown for free differ by

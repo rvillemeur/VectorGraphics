@@ -20,12 +20,7 @@ TTCffGlyphSource >> inspectorGlyphs: aBuilder [
 	 advance width comes from hmtx and costs no charstring. Open the Contours tab of a glyph
 	 to draw that one, then come back here to see its row say so."
 
-	^ aBuilder newTable
-		  addColumn: ((SpStringTableColumn
-				    title: 'Glyph'
-				    evaluated: [ :each | each key printString ])
-				   width: 70;
-				   yourself);
+	^ (self glyphTableThrough: aBuilder)
 		  addColumn: (SpStringTableColumn
 				   title: 'Drawn'
 				   evaluated: [ :each |
@@ -35,7 +30,6 @@ TTCffGlyphSource >> inspectorGlyphs: aBuilder [
 		  addColumn: (SpStringTableColumn
 				   title: 'Advance'
 				   evaluated: [ :each | each value advanceWidth printString ]);
-		  items: self glyphEntries;
 		  yourself
 ]
 

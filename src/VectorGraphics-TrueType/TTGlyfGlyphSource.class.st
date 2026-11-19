@@ -115,18 +115,6 @@ TTGlyfGlyphSource >> applyTwoScalesTo: aComponent [
 		yy: glyfEntry nextTwoDotFourteen
 ]
 
-{ #category : 'inspector' }
-TTGlyfGlyphSource >> boxDescriptionOf: aGlyph [
-	"The four edges of the box a glyph states, in the order the glyf table writes them. A
-	 Rectangle is not used: an empty one is normalised into one that holds points, and a glyph
-	 whose top is above its bottom in font units would be rewritten rather than shown."
-
-	^ String streamContents: [ :stream |
-		  { aGlyph boundsLeft. aGlyph boundsBottom. aGlyph boundsRight. aGlyph boundsTop }
-			  do: [ :each | stream print: each ]
-			  separatedBy: [ stream space ] ]
-]
-
 { #category : 'reading' }
 TTGlyfGlyphSource >> componentsOfCompositeGlyphAt: aGlyphIndex [
 	"Read the component records of a composite glyph straight from the glyf table. Each record
@@ -167,12 +155,7 @@ TTGlyfGlyphSource >> inspectorGlyphs: aBuilder [
 	 from the records the table parser already built, so showing them parses nothing and moves
 	 no cursor: a composite is left to the Contours tab of the glyph itself."
 
-	^ aBuilder newTable
-		  addColumn: ((SpStringTableColumn
-				    title: 'Glyph'
-				    evaluated: [ :each | each key printString ])
-				   width: 70;
-				   yourself);
+	^ (self glyphTableThrough: aBuilder)
 		  addColumn: (SpStringTableColumn
 				   title: 'Contours'
 				   evaluated: [ :each | each value contourCount printString ]);
@@ -187,8 +170,7 @@ TTGlyfGlyphSource >> inspectorGlyphs: aBuilder [
 				   evaluated: [ :each | each value advanceWidth printString ]);
 		  addColumn: (SpStringTableColumn
 				   title: 'Box (l b r t)'
-				   evaluated: [ :each | self boxDescriptionOf: each value ]);
-		  items: self glyphEntries;
+				   evaluated: [ :each | each value boundsDescription ]);
 		  yourself
 ]
 

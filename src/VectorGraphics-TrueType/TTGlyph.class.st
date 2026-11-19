@@ -79,6 +79,19 @@ TTGlyph >> boundsBottom [
 	"
 ]
 
+{ #category : 'printing' }
+TTGlyph >> boundsDescription [
+	"The four edges of my box, in the order the glyf table writes them: left, bottom, right,
+	 top. A Rectangle is not used to say it: an empty one is normalised into one that holds
+	 points, and a glyph whose top is above its bottom in font units would be rewritten
+	 rather than shown."
+
+	^ String streamContents: [ :stream |
+		  { self boundsLeft. self boundsBottom. self boundsRight. self boundsTop }
+			  do: [ :each | stream print: each ]
+			  separatedBy: [ stream space ] ]
+]
+
 { #category : 'accessing' }
 TTGlyph >> boundsLeft [
 

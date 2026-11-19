@@ -153,6 +153,21 @@ TTGlyphTest >> testReplaceIndexesByComponentGlyphsIsNoop [
 ]
 
 { #category : 'tests' }
+TTGlyphTest >> testTheBoundsDescriptionStatesTheFourEdgesInTheOrderTheTableWritesThem [
+	"Left, bottom, right then top, in font units, and a negative edge says so rather than
+	 being folded into a box that holds points."
+
+	| glyph |
+	glyph := TTGlyph new.
+	glyph
+		boundsLeft: -20
+		boundsRight: 450
+		boundsTop: 400
+		boundsBottom: -10.
+	self assert: glyph boundsDescription equals: '-20 -10 450 400'
+]
+
+{ #category : 'tests' }
 TTGlyphTest >> testTopSideBearingReturnsYMax [
 
 	"In the Pharo port boundsBottom stores yMax (TrueType Y-up).
