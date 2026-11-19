@@ -112,6 +112,29 @@ TTGlyphTest >> testMakePointsAbsolute [
 ]
 
 { #category : 'tests' }
+TTGlyphTest >> testOnlyTheGetterOfAnInstanceVariableReadsItDirectly [
+	"A lazy glyph draws itself when one of its accessors is sent, so a method that reads an
+	 instance variable instead answers the state of a glyph nobody has drawn yet. Only the getter
+	 of a variable may read it, with two exceptions: the methods that fill a glyph in before
+	 anybody can look at it, which draw nothing and are classified apart for that reason, and
+	 printOn:, which reports what the object holds at this instant and must never be the thing
+	 that makes it draw itself."
+
+	| offenders |
+	offenders := OrderedCollection new.
+	TTGlyph methods do: [ :method |
+		(method protocolName = 'private-initialization' or: [
+			 method selector = #printOn: ]) ifFalse: [
+			TTGlyph allSlots do: [ :slot |
+				((method readsSlot: slot) and: [ method selector ~= slot name ]) ifTrue: [
+					offenders add: method selector , ' reads ' , slot name ] ] ] ].
+	self
+		assert: offenders isEmpty
+		description: 'these read the state of a glyph instead of asking for it: '
+			, offenders asArray printString
+]
+
+{ #category : 'tests' }
 TTGlyphTest >> testPrintOn [
 
 	| glyph stream |

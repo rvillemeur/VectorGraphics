@@ -123,8 +123,7 @@ TTGlyph >> boundsTop [
 
 { #category : 'accessing' }
 TTGlyph >> contourCount [
-
-	^ contours count: [ :each | each isEmpty not ]
+	^ self contours count: [ :each | each isEmpty not ]
 ]
 
 { #category : 'accessing' }
