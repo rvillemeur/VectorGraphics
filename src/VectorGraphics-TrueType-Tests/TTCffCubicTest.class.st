@@ -56,6 +56,30 @@ TTCffCubicTest >> distanceOf: aPoint fromSegmentFrom: aStartPoint to: anEndPoint
 ]
 
 { #category : 'tests' }
+TTCffCubicTest >> testACubicIsCutAtThePointItReachesHalfwayAlongItself [
+	"Halving is what makes the chain converge, so the two halves must draw the same curve: each
+	 ends where the parameter says the cubic is at that point, they join at the middle, and a
+	 point of a half is the point of the cubic at half that parameter."
+
+	| cubic halves |
+	cubic := TTCffCubic
+		         from: 0 @ 0
+		         via: 0 @ 100
+		         and: 100 @ 100
+		         to: 100 @ 0.
+	halves := cubic halves.
+	self assert: (cubic pointAt: 0) equals: 0 @ 0.
+	self assert: (cubic pointAt: 1) equals: 100 @ 0.
+	self assert: (cubic pointAt: 1 / 2) equals: 50 @ 75.
+	self assert: halves first start equals: 0 @ 0.
+	self assert: halves first end equals: (cubic pointAt: 1 / 2).
+	self assert: halves first quadraticControl equals: 25 / 4 @ 75.
+	self assert: halves second start equals: (cubic pointAt: 1 / 2).
+	self assert: halves second end equals: 100 @ 0.
+	self assert: (halves first pointAt: 1 / 2) equals: (cubic pointAt: 1 / 4)
+]
+
+{ #category : 'tests' }
 TTCffCubicTest >> testACubicThatIsAQuadraticInDisguiseIsAnsweredAsOneQuadratic [
 	"Every quadratic can be written as a cubic, by pulling its control point two thirds of the
 	 way towards each end. Such a cubic needs no splitting and no approximation: the one
@@ -71,6 +95,44 @@ TTCffCubicTest >> testACubicThatIsAQuadraticInDisguiseIsAnsweredAsOneQuadratic [
 	self assert: quadratics size equals: 1.
 	self assert: quadratics first first equals: 100 @ 200.
 	self assert: quadratics first second equals: 200 @ 0
+]
+
+{ #category : 'tests' }
+TTCffCubicTest >> testAPointIsMeasuredToTheNearestPointOfASegmentAndNotToItsEnds [
+	"The measurement the inspector view shows, and the one the tolerance test of this class
+	 reads: a point beside a segment is as far from it as its perpendicular, a point beyond an
+	 end is as far as that end, and a segment of no length is one point."
+
+	| cubic |
+	cubic := TTCffCubic
+		         from: 0 @ 0
+		         via: 0 @ 100
+		         and: 100 @ 100
+		         to: 100 @ 0.
+	self
+		assert: (cubic
+				 distanceOf: 50 @ 10
+				 fromSegmentFrom: 0 @ 0
+				 to: 100 @ 0)
+		closeTo: 10.
+	self
+		assert: (cubic
+				 distanceOf: -30 @ 0
+				 fromSegmentFrom: 0 @ 0
+				 to: 100 @ 0)
+		closeTo: 30.
+	self
+		assert: (cubic
+				 distanceOf: 130 @ 0
+				 fromSegmentFrom: 0 @ 0
+				 to: 100 @ 0)
+		closeTo: 30.
+	self
+		assert: (cubic
+				 distanceOf: 3 @ 4
+				 fromSegmentFrom: 0 @ 0
+				 to: 0 @ 0)
+		closeTo: 5
 ]
 
 { #category : 'tests' }
@@ -121,4 +183,21 @@ TTCffCubicTest >> testTheChainStartsAndEndsWhereTheCubicDoesAndJoinsEndToEnd [
 					 fromChainOf: { each }
 					 startingAt: (quadratics at: index) second)
 			equals: 0 ]
+]
+
+{ #category : 'tests' }
+TTCffCubicTest >> testTheOneQuadraticMeetsTheTangentsOfTheCubicAndStraysByTheThirdDifference [
+	"The two facts the chain is built on, read off a cubic whose figures are round: the control
+	 point of the single quadratic is where the two tangents meet, and the distance that
+	 quadratic can stray from the cubic is the length of its third difference times the square
+	 root of three over thirty-six."
+
+	| cubic |
+	cubic := TTCffCubic
+		         from: 0 @ 0
+		         via: 0 @ 100
+		         and: 100 @ 100
+		         to: 100 @ 0.
+	self assert: cubic quadraticControl equals: 50 @ 150.
+	self assert: cubic deviationFromQuadratic closeTo: 3 sqrt / 36 * 200
 ]

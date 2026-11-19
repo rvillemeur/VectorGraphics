@@ -50,20 +50,26 @@ TTCffGlyphTest >> testEveryFactOfAGlyphIsAnsweredWhicheverSelectorDrawsIt [
 { #category : 'tests' }
 TTCffGlyphTest >> testTheRecordViewReadsTheGlyphWithoutDrawingIt [
 	"The view a reader opens on a lazy record says what the record knows before any charstring
-	 is read: which glyph it is, that it is not drawn, and how many bytes its charstring holds.
-	 Opening it must leave the record undrawn, or the inspector would answer a question by
-	 changing the object it is showing."
+	 is read: which glyph it is, that it is not drawn, how many bytes its charstring holds and
+	 the three widths it will be drawn with. Opening it must leave the record undrawn, or the
+	 inspector would answer a question by changing the object it is showing."
 
-	| glyph builder presenter values |
+	| glyph builder presenter rows |
 	glyph := self glyphAtIndex: 1.
 	builder := SpPresenterBuilder newApplication: SpApplication new.
 	presenter := (StInspectionContext new
 		              inspectedObject: glyph;
 		              methodSelector: #inspectorRecord:;
 		              yourself) basicNewInspectionPresenter: builder.
-	values := presenter items collect: [ :item |
-		          (presenter columns last evaluation value: item) ].
-	self assert: (values includes: 'false').
-	self assert: (values includes: '1').
+	rows := presenter items collect: [ :item |
+		        (presenter columns first evaluation value: item)
+		        -> (presenter columns last evaluation value: item) ].
+	self assert: rows asArray equals: {
+			('glyph index' -> '1').
+			('drawn' -> 'false').
+			('charstring bytes' -> '13').
+			('advance width' -> '0').
+			('default width x' -> '0').
+			('nominal width x' -> '0') }.
 	self assert: glyph printString equals: 'TTCffGlyph(1, not drawn)'
 ]
