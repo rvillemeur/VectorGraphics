@@ -25,5 +25,7 @@ VGTrueTypeDocumentationTest class >> packageUnderTest [
 VGTrueTypeDocumentationTest >> viewSubjects [
 	^ {
 		TTGlyph -> (TrueTypeExamples -> #glyphWithContours) .
-		TTFontDescription -> (TrueTypeExamples -> #glyphMap) }
+		TTFontDescription -> (TrueTypeExamples -> #glyphMap) .
+		TTGlyfGlyphSource -> (TrueTypeExamples -> #glyfGlyphSource) .
+		TTCffGlyphSource -> (TrueTypeExamples -> #cffGlyphSource) }
 ]

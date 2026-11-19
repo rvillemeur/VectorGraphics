@@ -53,7 +53,8 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
-					   'VectorGraphics-Conformance' ) ];
+					   'VectorGraphics-Conformance' 'VectorGraphics-TrueType'
+					   'VectorGraphics-TrueType-Tests' ) ];
 		package: 'VectorGraphics-Bloc'
 		with: [
 			spec requires: #( 'Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-TrueType' ) ];

@@ -10,7 +10,7 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'bytes',
-		'glyphs',
+		'glyphSource',
 		'characterMap',
 		'unitsPerEm',
 		'ascent',
@@ -19,9 +19,6 @@ Class {
 		'maxAdvanceWidth',
 		'boundsRectangle',
 		'outlines',
-		'glyfEntry',
-		'glyfStart',
-		'glyphDataOffsets',
 		'metadata'
 	],
 	#classInstVars : [
@@ -31,43 +28,6 @@ Class {
 	#package : 'VectorGraphics-Cairo',
 	#tag : 'Text'
 }
-
-{ #category : 'constants' }
-VGFontFace class >> argumentsAreOffsetsFlag [
-	"The two placement arguments are an offset, not a pair of point indices to match."
-
-	^ 2
-]
-
-{ #category : 'constants' }
-VGFontFace class >> argumentsAreWordsFlag [
-	"The two placement arguments of a component record are 16 bit, not 8 bit."
-
-	^ 1
-]
-
-{ #category : 'constants' }
-VGFontFace class >> componentHasMatrixFlag [
-	^ 128
-]
-
-{ #category : 'constants' }
-VGFontFace class >> componentHasOneScaleFlag [
-	^ 8
-]
-
-{ #category : 'constants' }
-VGFontFace class >> componentHasTwoScalesFlag [
-	^ 64
-]
-
-{ #category : 'constants' }
-VGFontFace class >> compositeBoundsAndCountLength [
-	"The number of contours and the four bounds of a glyph record, which the component records
-	 follow."
-
-	^ 10
-]
 
 { #category : 'default face' }
 VGFontFace class >> default [
@@ -126,11 +86,6 @@ VGFontFace class >> holdsTrueTypeOutlines: aTableDictionary [
 	^ TTFontReader holdsTrueTypeOutlines: aTableDictionary
 ]
 
-{ #category : 'constants' }
-VGFontFace class >> moreComponentsFlag [
-	^ 32
-]
-
 { #category : 'instance creation' }
 VGFontFace class >> newForBytes: aByteArray [
 	"The face of a font held in memory."
@@ -181,14 +136,6 @@ VGFontFace class >> sampleCharacters [
 	^ 'Hagi A1' asArray
 ]
 
-{ #category : 'constants' }
-VGFontFace class >> twoDotFourteenScale [
-	"A component matrix holds each of its numbers as an F2Dot14: a signed 16 bit fraction with
-	 fourteen bits after the point."
-
-	^ 16384
-]
-
 { #category : 'accessing' }
 VGFontFace >> ascent [
 	^ ascent
@@ -214,52 +161,6 @@ VGFontFace >> cachedGlyphCount [
 	^ outlines size
 ]
 
-{ #category : 'private' }
-VGFontFace >> componentsOfCompositeGlyphAt: aGlyphIndex [
-	"Read the component records of a composite glyph straight from the glyf table. Each record
-	 names a glyph, places it and may transform it; the records run on while one of them sets the
-	 more components flag."
-
-	| components flags |
-	glyfEntry offset: glyfStart + (glyphDataOffsets at: aGlyphIndex + 1).
-	glyfEntry skip: self class compositeBoundsAndCountLength.
-	components := OrderedCollection new.
-	[
-	flags := glyfEntry nextUShort.
-	components add: (self readComponentWithFlags: flags).
-	flags allMask: self class moreComponentsFlag ] whileTrue.
-	^ components asArray
-]
-
-{ #category : 'private' }
-VGFontFace >> contoursOfGlyphAt: aGlyphIndex [
-	"The contours of one glyph in font units. A composite glyph draws the contours of its
-	 components, each one placed and transformed by its own record, and a component may itself be
-	 a composite."
-
-	| glyph |
-	glyph := glyphs at: aGlyphIndex + 1.
-	glyph isComposite ifFalse: [ ^ self contoursOfSimpleGlyph: glyph ].
-	^ (self componentsOfCompositeGlyphAt: aGlyphIndex) flatCollect: [ :component |
-		  (self contoursOfGlyphAt: component glyphIndex) collect: [ :contour |
-			  contour collect: [ :point | component transformedPoint: point ] ] ]
-]
-
-{ #category : 'private' }
-VGFontFace >> contoursOfSimpleGlyph: aGlyph [
-	"Walk the glyph's contours once. TTContourConstruction answers a quadratic's end point and
-	 its control point, in that order, and both absolute, so the odd-sized array of points I
-	 build is the contour as it is drawn."
-
-	^ (aGlyph contours reject: [ :each | each isEmpty ]) collect: [ :each |
-		  Array streamContents: [ :stream |
-			  stream nextPut: each points first.
-			  each quadraticBeziersDo: [ :endPoint :controlPoint |
-				  stream
-					  nextPut: controlPoint;
-					  nextPut: endPoint ] ] ]
-]
-
 { #category : 'accessing' }
 VGFontFace >> descent [
 	"Negative in a TrueType font, because it is measured upwards from the baseline like every
@@ -276,23 +177,12 @@ VGFontFace >> familyName [
 	^ metadata familyName
 ]
 
-{ #category : 'reading' }
-VGFontFace >> fillGlyphAdvancesFrom: aTableDictionary numHMetrics: anInteger [
-	"The advances the hmtx table states, written into the glyphs the glyf table gave. The glyphs
-	 have to be read first: hmtx fills them rather than answering anything of its own."
-
-	(TTHmtxTableParser
-		 on: (aTableDictionary at: 'hmtx')
-		 glyphs: glyphs
-		 numHMetrics: anInteger) process
-]
-
 { #category : 'accessing' }
 VGFontFace >> glyphCount [
 	"How many glyphs the font holds, index zero included: that one is the glyph a code point the
 	 font does not map is drawn with."
 
-	^ glyphs size
+	^ glyphSource glyphCount
 ]
 
 { #category : 'accessing' }
@@ -419,28 +309,14 @@ VGFontFace >> newScaledFontWithFontMatrix: aFontMatrix userToDeviceMatrix: aUser
 		  options: aFontOptions
 ]
 
-{ #category : 'private' }
-VGFontFace >> nextSignedByte [
-	"TTFontTableDirEntry reads a byte unsigned, and a component offset is signed."
-
-	| value |
-	value := glyfEntry nextByte.
-	^ value > 127
-		  ifTrue: [ value - 256 ]
-		  ifFalse: [ value ]
-]
-
-{ #category : 'private' }
-VGFontFace >> nextTwoDotFourteen [
-	^ glyfEntry nextShort / self class twoDotFourteenScale
-]
-
 { #category : 'accessing' }
 VGFontFace >> outlineOfGlyphAt: aGlyphIndex [
 	"The glyph's shape in font units, read once and kept, because a page of text asks for the
 	 same few glyphs again and again."
 
-	^ outlines at: aGlyphIndex ifAbsentPut: [ self readOutlineOfGlyphAt: aGlyphIndex ]
+	^ outlines
+		  at: aGlyphIndex
+		  ifAbsentPut: [ glyphSource outlineOfGlyphAt: aGlyphIndex ]
 ]
 
 { #category : 'printing' }
@@ -479,85 +355,20 @@ VGFontFace >> readBytes: aByteArray [
 		indexToLocFormat: (headData at: #indexToLocFormat)
 ]
 
-{ #category : 'private - reading' }
-VGFontFace >> readCffGlyphRecordsFrom: aTableDictionary count: aGlyphCount [
-	"The glyphs of an OpenType font: the CFF table is read for everything it says about the
-	 font and for nothing it says about a glyph, and each record draws itself the first time
-	 somebody asks for its shape."
-
-	glyphs := TTCffGlyph
-		          onTable: (TTCffTableParser on: (aTableDictionary at: 'CFF ')) process
-		          count: aGlyphCount
-]
-
-{ #category : 'private' }
-VGFontFace >> readComponentWithFlags: aFlagWord [
-	"One component record, with the entry standing on the glyph index that follows its flags. A
-	 record that matches two points instead of giving an offset is rejected: no font we draw uses
-	 it, and guessing the placement would move the component silently."
-
-	| component |
-	component := VGGlyphComponent glyphIndex: glyfEntry nextUShort.
-	(aFlagWord allMask: self class argumentsAreOffsetsFlag) ifFalse: [
-		^ Error signal: 'a component placed by matching points is not supported' ].
-	component offset: ((aFlagWord allMask: self class argumentsAreWordsFlag)
-			 ifTrue: [ glyfEntry nextShort @ glyfEntry nextShort ]
-			 ifFalse: [ self nextSignedByte @ self nextSignedByte ]).
-	(aFlagWord allMask: self class componentHasMatrixFlag)
-		ifTrue: [
-			component
-				xx: self nextTwoDotFourteen
-				xy: self nextTwoDotFourteen
-				yx: self nextTwoDotFourteen
-				yy: self nextTwoDotFourteen ]
-		ifFalse: [
-			(aFlagWord allMask: self class componentHasTwoScalesFlag)
-				ifTrue: [
-					component
-						xx: self nextTwoDotFourteen
-						xy: 0
-						yx: 0
-						yy: self nextTwoDotFourteen ]
-				ifFalse: [
-					(aFlagWord allMask: self class componentHasOneScaleFlag) ifTrue: [
-						| scale |
-						scale := self nextTwoDotFourteen.
-						component
-							xx: scale
-							xy: 0
-							yx: 0
-							yy: scale ] ] ].
-	^ component
-]
-
-{ #category : 'reading' }
-VGFontFace >> readGlyphRecordsFrom: aTableDictionary count: aGlyphCount indexToLocFormat: anInteger [
-	"One record a glyph, read from whichever outline table this font carries."
-
-	(self class holdsTrueTypeOutlines: aTableDictionary)
-		ifTrue: [
-			self
-				readTrueTypeGlyphRecordsFrom: aTableDictionary
-				count: aGlyphCount
-				indexToLocFormat: anInteger ]
-		ifFalse: [
-			self readCffGlyphRecordsFrom: aTableDictionary count: aGlyphCount ]
-]
-
 { #category : 'reading' }
 VGFontFace >> readGlyphsAndHorizontalMetricsFrom: aTableDictionary count: aGlyphCount indexToLocFormat: anInteger [
 	"The glyph records and the advances, which are read together because hmtx fills the records
 	 the outline table gave. The order is the whole of what this method says: hhea states how
-	 many metrics hmtx holds, and hmtx needs the records to write into. The loca format is the
-	 head table's, and only the TrueType route reads it."
+	 many metrics hmtx holds, and hmtx needs the records to write into. Which outline table the
+	 font carries is the source's business, not mine."
 
 	| numHMetrics |
 	numHMetrics := self readHorizontalMetricsFrom: aTableDictionary.
-	self
-		readGlyphRecordsFrom: aTableDictionary
-		count: aGlyphCount
-		indexToLocFormat: anInteger.
-	self fillGlyphAdvancesFrom: aTableDictionary numHMetrics: numHMetrics
+	glyphSource := TTGlyphSource
+		               on: aTableDictionary
+		               count: aGlyphCount
+		               indexToLocFormat: anInteger.
+	glyphSource fillAdvancesFrom: aTableDictionary numHMetrics: numHMetrics
 ]
 
 { #category : 'reading' }
@@ -590,39 +401,6 @@ VGFontFace >> readMaxAdvanceWidthFrom: aTableDirEntry [
 	value := aTableDirEntry nextUShort.
 	aTableDirEntry offset: start.
 	^ value
-]
-
-{ #category : 'private' }
-VGFontFace >> readOutlineOfGlyphAt: aGlyphIndex [
-	"The advance and the box come from the glyph's own record; the contours come from the glyph
-	 itself, or from its components when it is a composite."
-
-	| glyph |
-	glyph := glyphs at: aGlyphIndex + 1.
-	^ VGGlyphOutline
-		  advance: glyph advanceWidth
-		  boundsRectangle:
-		  (glyph boundsLeft @ glyph boundsTop
-		   corner: glyph boundsRight @ glyph boundsBottom)
-		  contours: (self contoursOfGlyphAt: aGlyphIndex)
-]
-
-{ #category : 'reading' }
-VGFontFace >> readTrueTypeGlyphRecordsFrom: aTableDictionary count: aGlyphCount indexToLocFormat: anInteger [
-	"The glyphs the glyf table holds, read at the offsets loca gave. The glyf entry and its
-	 start are kept because a composite glyph is read from the table again: TTGlyfTableParser
-	 keeps the component glyphs of a composite and discards the offsets that place them."
-
-	glyphDataOffsets := (TTLocaTableParser
-		                     on: (aTableDictionary at: 'loca')
-		                     format: anInteger
-		                     nGlyphs: aGlyphCount) process.
-	glyfEntry := aTableDictionary at: 'glyf'.
-	glyfStart := glyfEntry offset.
-	glyphs := (TTGlyfTableParser
-		           on: glyfEntry
-		           nGlyphs: aGlyphCount
-		           offsets: glyphDataOffsets) process
 ]
 
 { #category : 'reading' }

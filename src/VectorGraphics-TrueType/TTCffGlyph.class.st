@@ -122,6 +122,14 @@ TTCffGlyph >> inspectorRecord: aBuilder [
 		  yourself
 ]
 
+{ #category : 'testing' }
+TTCffGlyph >> isDrawn [
+	"Has my charstring been interpreted yet? Answering it must not draw me, which is why
+	 nobody can learn it by asking me for my contours."
+
+	^ drawn
+]
+
 { #category : 'printing' }
 TTCffGlyph >> printOn: aStream [
 	"Printing me never draws me: an inspector walks a font of three thousand glyphs, and a

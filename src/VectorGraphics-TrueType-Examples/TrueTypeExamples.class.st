@@ -146,6 +146,23 @@ TrueTypeExamples class >> cffGlyphRecordNotYetDrawn [
 	^ TTCffGlyph onTable: self cffTableOfATwoGlyphFont index: 2
 ]
 
+{ #category : 'examples' }
+TrueTypeExamples class >> cffGlyphSource [
+	"The glyph source of a real OpenType font, whose outlines are charstrings in a CFF table
+	 rather than points in glyf. The same factory reads it, so a face cannot tell the two
+	 formats apart, and the Glyphs tab says of every glyph whether its charstring has been
+	 interpreted yet: opening the font interprets none of them.
+	 Answers nil on a machine with no .otf file installed.
+	TrueTypeExamples cffGlyphSource inspect"
+
+	<sampleInstance>
+	| path |
+	path := self openTypeFontPath.
+	path ifNil: [ ^ nil ].
+	^ self glyphSourceForFontBytes:
+		  (path asFileReference binaryReadStreamDo: [ :stream | stream contents ])
+]
+
 { #category : 'examples - cff' }
 TrueTypeExamples class >> cffIndexOfThreeElements [
 	"One CFF INDEX, read from bytes written here rather than from a font: three elements of one,
@@ -355,12 +372,50 @@ TrueTypeExamples class >> forgetDefaultFontPath [
 ]
 
 { #category : 'examples' }
+TrueTypeExamples class >> glyfGlyphSource [
+	"The glyph source of a real TrueType font: the records of the glyf and loca tables, one per
+	 glyph, with the advance width hmtx holds already filled in. Inspect it, then read the
+	 Glyphs tab: every row is a glyph as the font wrote it, in font units, and a composite row
+	 says so rather than pretending to own its points.
+	 Answers nil on a machine with no .ttf file installed.
+	TrueTypeExamples glyfGlyphSource inspect"
+
+	<sampleInstance>
+	| path |
+	path := self trueTypeFontPath.
+	path ifNil: [ ^ nil ].
+	^ self glyphSourceForFontBytes:
+		  (path asFileReference binaryReadStreamDo: [ :stream | stream contents ])
+]
+
+{ #category : 'examples' }
 TrueTypeExamples class >> glyphMap [
 	"Inspect the font's UTF-8 to glyph map: the Glyph map tab lists every code point the font
 	maps and the Map density tab says what those code points cost in floats and index entries.
 	TrueTypeExamples glyphMap inspect"
 <sampleInstance>
 	^ self loadFontFrom: self defaultFontPath
+]
+
+{ #category : 'support' }
+TrueTypeExamples class >> glyphSourceForFontBytes: aByteArray [
+	"The glyph source of a font, built the way VGFontFace builds one: the table directory of
+	 the bytes, the glyph count maxp states, the loca format head states, then the advances
+	 hmtx holds. Whether the outlines are in glyf or in a CFF table is the business of the
+	 factory, so these three lines read either format."
+
+	| tables source |
+	tables := TTFontReader buildTableDirectory: aByteArray offset: 0.
+	source := TTGlyphSource
+		          on: tables
+		          count: (TTMaxpTableParser on: (tables at: 'maxp')) process
+		          indexToLocFormat:
+		          ((TTHeadTableParser on: (tables at: 'head')) process at: #indexToLocFormat).
+	source
+		fillAdvancesFrom: tables
+		numHMetrics:
+			((TTHheaTableParser on: (tables at: 'hhea')) process at: #numHMetrics).
+	^ source
 ]
 
 { #category : 'examples' }
@@ -385,6 +440,24 @@ TrueTypeExamples class >> glyphWithContours [
 		boundsTop: 0
 		boundsBottom: 700.
 	^ glyph
+]
+
+{ #category : 'support' }
+TrueTypeExamples class >> installedFontPathEndingWith: anExtensionString [
+	"The absolute path of the first installed font file whose name ends with this extension,
+	 or nil when this machine has none. The examples of the reader need a font of a stated
+	 format: .ttf keeps its outlines in glyf, .otf keeps them in a CFF table, and
+	 defaultFontPath answers whichever of the two the preferred families lead to, which on
+	 this machine is a .otf. The directories are the ones the catalogue scans."
+
+	TTFontCatalogue defaultFontDirectories do: [ :each |
+		| directory |
+		directory := each asFileReference.
+		directory exists ifTrue: [
+			directory allFiles do: [ :file |
+				(file basename asLowercase endsWith: anExtensionString) ifTrue: [
+					^ file fullName ] ] ] ].
+	^ nil
 ]
 
 { #category : 'accessing' }
@@ -417,6 +490,13 @@ TrueTypeExamples class >> newContourFromAbsolutePoints: anArrayOfPairs [
 		points at: index putX: pair first.
 		points at: index putY: pair second ].
 	^ TTContourConstruction on: points
+]
+
+{ #category : 'support' }
+TrueTypeExamples class >> openTypeFontPath [
+	"The path of an installed font whose outlines are charstrings in a CFF table."
+
+	^ self installedFontPathEndingWith: '.otf'
 ]
 
 { #category : 'accessing' }
@@ -490,4 +570,11 @@ TrueTypeExamples class >> styleOfTheBoldestFaceOfThisMachine [
 		  each weightClass > boldest weightClass
 			  ifTrue: [ each ]
 			  ifFalse: [ boldest ] ]
+]
+
+{ #category : 'support' }
+TrueTypeExamples class >> trueTypeFontPath [
+	"The path of an installed font whose outlines are points in the glyf table."
+
+	^ self installedFontPathEndingWith: '.ttf'
 ]

@@ -13,9 +13,9 @@ Class {
 		'boundsRectangle',
 		'contours'
 	],
-	#category : 'VectorGraphics-Cairo-Text',
-	#package : 'VectorGraphics-Cairo',
-	#tag : 'Text'
+	#category : 'VectorGraphics-TrueType-Reading',
+	#package : 'VectorGraphics-TrueType',
+	#tag : 'Reading'
 }
 
 { #category : 'instance creation' }

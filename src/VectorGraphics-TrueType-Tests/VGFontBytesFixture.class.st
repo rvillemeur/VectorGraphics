@@ -10,8 +10,8 @@ I hold no state and nobody instantiates me.
 Class {
 	#name : 'VGFontBytesFixture',
 	#superclass : 'Object',
-	#category : 'VectorGraphics-Cairo-Tests-Fixtures',
-	#package : 'VectorGraphics-Cairo-Tests',
+	#category : 'VectorGraphics-TrueType-Tests-Fixtures',
+	#package : 'VectorGraphics-TrueType-Tests',
 	#tag : 'Fixtures'
 }
 
@@ -113,7 +113,7 @@ VGFontBytesFixture class >> componentRecordWithFlags: aFlagWord glyphIndex: anIn
 	^ ByteArray streamContents: [ :stream |
 		  self putShort: aFlagWord on: stream.
 		  self putShort: anInteger on: stream.
-		  (aFlagWord allMask: VGFontFace argumentsAreWordsFlag)
+		  (aFlagWord allMask: TTGlyfGlyphSource argumentsAreWordsFlag)
 			  ifTrue: [
 				  aCollection do: [ :each | self putShort: each on: stream ] ]
 			  ifFalse: [
@@ -138,9 +138,9 @@ VGFontBytesFixture class >> compositeGlyphRecordWithComponents: anArray [
 				  ifTrue: [ stream nextPutAll: each ]
 				  ifFalse: [
 					  stream nextPut: (each first bitOr:
-								   (VGFontFace moreComponentsFlag bitShift: -8)).
+								   (TTGlyfGlyphSource moreComponentsFlag bitShift: -8)).
 					  stream nextPut: (each second bitOr:
-								   (VGFontFace moreComponentsFlag bitAnd: 255)).
+								   (TTGlyfGlyphSource moreComponentsFlag bitAnd: 255)).
 					  stream nextPutAll: (each allButFirst: 2) ] ] ]
 ]
 
@@ -285,9 +285,9 @@ VGFontBytesFixture class >> putF2Dot14: aNumber on: aStream [
 	 minus two and a test asking for it would read a glyph mirrored rather than scaled. That is
 	 the fixture lying to the test, so it is refused here."
 
-	(aNumber between: -2 and: 2 - (1 / VGFontFace twoDotFourteenScale)) ifFalse: [
+	(aNumber between: -2 and: 2 - (1 / TTGlyfGlyphSource twoDotFourteenScale)) ifFalse: [
 		Error signal: aNumber printString , ' is outside what an F2Dot14 number can say' ].
-	self putShort: (aNumber * VGFontFace twoDotFourteenScale) rounded on: aStream
+	self putShort: (aNumber * TTGlyfGlyphSource twoDotFourteenScale) rounded on: aStream
 ]
 
 { #category : 'writing' }

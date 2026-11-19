@@ -210,13 +210,13 @@ VGCairoTextTest >> testAComponentThatIsItselfACompositeIsReadThroughItsOwnCompon
 			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
 			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
 					          (VGFontBytesFixture
-						           componentRecordWithFlags: VGFontFace argumentsAreOffsetsFlag
+						           componentRecordWithFlags: TTGlyfGlyphSource argumentsAreOffsetsFlag
 						           glyphIndex: 1
 						           arguments: #( 10 0 )
 						           transform: #(  )) }).
 			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
 					          (VGFontBytesFixture
-						           componentRecordWithFlags: VGFontFace argumentsAreOffsetsFlag
+						           componentRecordWithFlags: TTGlyfGlyphSource argumentsAreOffsetsFlag
 						           glyphIndex: 2
 						           arguments: #( 0 20 )
 						           transform: #(  )) }) }).
@@ -239,7 +239,7 @@ VGCairoTextTest >> testACompositeComponentPlacedByByteOffsetsReadsThemSigned [
 			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
 			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
 					          (VGFontBytesFixture
-						           componentRecordWithFlags: VGFontFace argumentsAreOffsetsFlag
+						           componentRecordWithFlags: TTGlyfGlyphSource argumentsAreOffsetsFlag
 						           glyphIndex: 1
 						           arguments: #( -128 127 )
 						           transform: #(  )) }) }).
@@ -257,8 +257,8 @@ VGCairoTextTest >> testACompositeComponentPlacedByWordOffsetsReadsThemSigned [
 	 would both lose the range and leave the entry two bytes short of the next field."
 
 	| face square moved flags |
-	flags := VGFontFace argumentsAreOffsetsFlag
-	         + VGFontFace argumentsAreWordsFlag.
+	flags := TTGlyfGlyphSource argumentsAreOffsetsFlag
+	         + TTGlyfGlyphSource argumentsAreWordsFlag.
 	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
 			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
 			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
@@ -282,8 +282,8 @@ VGCairoTextTest >> testACompositeComponentWithATwoByTwoMatrixTurnsThePointsOfIts
 	 minus its own y over its own x."
 
 	| face square turned flags |
-	flags := VGFontFace argumentsAreOffsetsFlag
-	         + VGFontFace componentHasMatrixFlag.
+	flags := TTGlyfGlyphSource argumentsAreOffsetsFlag
+	         + TTGlyfGlyphSource componentHasMatrixFlag.
 	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
 			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
 			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
@@ -307,8 +307,8 @@ VGCairoTextTest >> testACompositeComponentWithOneScaleScalesBothAxesOfItsGlyphBy
 	 record and place the component by whatever followed it."
 
 	| face square scaled flags |
-	flags := VGFontFace argumentsAreOffsetsFlag
-	         + VGFontFace componentHasOneScaleFlag.
+	flags := TTGlyfGlyphSource argumentsAreOffsetsFlag
+	         + TTGlyfGlyphSource componentHasOneScaleFlag.
 	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
 			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
 			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
@@ -331,8 +331,8 @@ VGCairoTextTest >> testACompositeComponentWithTwoScalesStretchesEachAxisOfItsGly
 	 the glyph here is one and a half times as wide and half as tall as the component it names."
 
 	| face square scaled flags |
-	flags := VGFontFace argumentsAreOffsetsFlag
-	         + VGFontFace componentHasTwoScalesFlag.
+	flags := TTGlyfGlyphSource argumentsAreOffsetsFlag
+	         + TTGlyfGlyphSource componentHasTwoScalesFlag.
 	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
 			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
 			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
@@ -380,12 +380,12 @@ VGCairoTextTest >> testACompositeGlyphReadsEveryComponentWhileTheMoreComponentsF
 			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
 			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
 					          (VGFontBytesFixture
-						           componentRecordWithFlags: VGFontFace argumentsAreOffsetsFlag
+						           componentRecordWithFlags: TTGlyfGlyphSource argumentsAreOffsetsFlag
 						           glyphIndex: 1
 						           arguments: #( 0 0 )
 						           transform: #(  )).
 					          (VGFontBytesFixture
-						           componentRecordWithFlags: VGFontFace argumentsAreOffsetsFlag
+						           componentRecordWithFlags: TTGlyfGlyphSource argumentsAreOffsetsFlag
 						           glyphIndex: 1
 						           arguments: #( 100 0 )
 						           transform: #(  )) }) }).

@@ -81,9 +81,14 @@ VGArchitectureTest class >> allowedDependencies [
 			  'VectorGraphics-Cairo-Examples'
 			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Tests'
 				    'VectorGraphics-Conformance' ).
+			  "The Cairo tests name the font reader and its fixtures since the glyph source of
+			   review point 4: the flags of a composite glyph record are TTGlyfGlyphSource's
+			   constants now, and VGFontBytesFixture, which builds a font byte by byte, moved to
+			   VectorGraphics-TrueType-Tests so the tests of a source can read it too."
 			  'VectorGraphics-Cairo-Tests'
 			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
-				    'VectorGraphics-Conformance' ).
+				    'VectorGraphics-Conformance' 'VectorGraphics-TrueType'
+				    'VectorGraphics-TrueType-Tests' ).
 			  "The Bloc renderer names the font reader as well as the Cairo backend since
 			   unit 3.2 of the font plan: VGFontManager is an adapter onto TTFontCatalogue,
 			   which reads the fonts the FreeType library used to read. Its examples and
@@ -106,7 +111,7 @@ VGArchitectureTest class >> allowedDependencies [
 			  'VectorGraphics-Vulkan-Examples'
 			  -> #( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc' 'VectorGraphics-Cairo'
 				    'VectorGraphics-Vulkan' ).
-			  "The edge to the Cairo tests is the one edge this project allows between two test
+			  "The edge to the Cairo tests is one of the two edges this project allows between two test
 			   packages: VGVulkanExamplesTest subclasses VGCairoExamplesTest and the backend tests
 			   draw the frame fixture the engine tests draw, rather than keeping a second copy of
 			   either."
@@ -827,7 +832,10 @@ VGArchitectureTest >> testTheCairoExampleAndTestGroupsNameNoBlocClass [
 	 fetches Bloc and wants PharoVulkan, which a user of the Cairo backend wants neither of.
 	 Neither group brings the front page or the other three packages of the rasteriser, because
 	 the Cairo backend names the font reader alone. The conformance corpus arrives with both
-	 groups, because the examples open it and the gate reads it. Alexandrie is not asked
+	 groups, because the examples open it and the gate reads it. The tests group also brings
+	 the font reader's own test and examples packages, and through them the rasteriser tests,
+	 since VGFontBytesFixture moved to VectorGraphics-TrueType-Tests with the glyph source:
+	 the face tests that reject a font missing a table read that fixture. None of it is Bloc. Alexandrie is not asked
 	 about here —
 	 blocPackageNames says why. A group that does not exist would pass on an empty scan, so the
 	 packages each one must bring in are named first."
@@ -842,7 +850,8 @@ VGArchitectureTest >> testTheCairoExampleAndTestGroupsNameNoBlocClass [
 		assert: (self class packagesLoadedByGroupNamed: 'cairo-tests')
 		equals: #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
 			   'VectorGraphics-Cairo-Tests' 'VectorGraphics-Conformance' 'VectorGraphics-Paths'
-			   'VectorGraphics-TrueType' ) asSet.
+			   'VectorGraphics-Tests' 'VectorGraphics-TrueType'
+			   'VectorGraphics-TrueType-Examples' 'VectorGraphics-TrueType-Tests' ) asSet.
 	offenders := #( 'cairo-examples' 'cairo-tests' ) flatCollect: [ :group |
 		             (self class packagesLoadedByGroupNamed: group) asSortedCollection asArray
 			             flatCollect: [ :package |
