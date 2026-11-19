@@ -57,7 +57,10 @@ TTFontMetadataReader class >> cidRejectionFrom: anEntryByTag [
 	 charstring reader does not walk. A font with no CFF table is not asked the question.
 	 The stream door hands me the head of the CFF table rather than the whole of it, so a
 	 table whose first bytes cannot be walked answers nil: the face reads the table whole and
-	 says what is wrong with it, while a scan judges no font on a prefix."
+	 says what is wrong with it, while a scan judges no font on a prefix. Those are the two
+	 errors a prefix provokes — the parser's own, and the read that runs off the end of the
+	 bytes — and no other, because an error from anywhere else is a defect in this reader and
+	 would be read here as a font that draws."
 
 	| entry |
 	entry := anEntryByTag at: self cffTableTag ifAbsent: [ ^ nil ].
@@ -65,7 +68,7 @@ TTFontMetadataReader class >> cidRejectionFrom: anEntryByTag [
 	  (TTCffTableParser isKeyedByCharacterIdentifiers: entry)
 		  ifTrue: [ #cidKeyedFont ]
 		  ifFalse: [ nil ] ]
-		  on: Error
+		  on: TTCffError , SubscriptOutOfBounds
 		  do: [ :each | nil ]
 ]
 

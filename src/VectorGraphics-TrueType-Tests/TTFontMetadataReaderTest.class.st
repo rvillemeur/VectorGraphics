@@ -172,6 +172,22 @@ TTFontMetadataReaderTest >> testAPlainFaceIsNormalInEveryRespect [
 ]
 
 { #category : 'tests' }
+TTFontMetadataReaderTest >> testAProgrammingErrorInTheCidTestIsNotTakenForAnUnreadableTable [
+	"The CID question is asked of a prefix of the CFF table, so a table cut short raises and the
+	 answer is nil. Everything else that can raise there is a defect in this reader, and a defect
+	 that answers nil is a font silently classified as drawable. Only the two errors a short
+	 prefix provokes may be caught."
+
+	self
+		should: [
+			TTFontMetadataReader cidRejectionFrom:
+				(Dictionary new
+					 at: TTFontMetadataReader cffTableTag put: #notAnEntryAtAll;
+					 yourself) ]
+		raise: MessageNotUnderstood
+]
+
+{ #category : 'tests' }
 TTFontMetadataReaderTest >> testARenderableFontIsNotRejected [
 
 	| metadata |
