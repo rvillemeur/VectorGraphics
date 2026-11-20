@@ -141,7 +141,7 @@ VGFrameProfile class >> stageByPackageAndTag [
 	 covers, `paintSource` the colour a pattern answers at a pixel, `compositing` the operators,
 	 and `pixelAccess` the surface and its pixel format, which is both the reading and writing of
 	 a pixel and the byte arithmetic that quantises a colour or a coverage into one. Then `text`,
-	 `blur` and `handover`. `text` holds the three tags of `VectorGraphics-TrueType` as well as
+	 `blur` and `handover`. `text` holds the four tags of `VectorGraphics-TrueType` as well as
 	 the Cairo font code, because `VGFontFace` reads a face and its glyphs through that layer.
 	 `harness` is this class, which runs inside the frame it measures. `notInTheFrame` is code
 	 that cannot appear in a frame: the exporters, the reflection and inventory helpers, the
@@ -170,6 +170,7 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-TrueType/Fonts' -> #text).
 			  ('VectorGraphics-TrueType/Glyphs' -> #text).
 			  ('VectorGraphics-TrueType/Reading' -> #text).
+			  ('VectorGraphics-TrueType/CFF' -> #text).
 			  ('VectorGraphics-Cairo/Blur' -> #blur).
 			  ('VectorGraphics-Vulkan/Blur' -> #blur).
 			  ('VectorGraphics-Bloc/Hosts' -> #handover).
@@ -180,6 +181,8 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Cairo/Reflection' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc/Exporters' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc-Examples/Uncategorized' -> #notInTheFrame).
+			  ('VectorGraphics-Bloc-FontEngine/Installation' -> #notInTheFrame).
+			  ('VectorGraphics-Bloc-FontEngine-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc-Examples/Text' -> #notInTheFrame).
 			  ('VectorGraphics-Cairo-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics-Vulkan/Budget' -> #notInTheFrame).

@@ -34,7 +34,10 @@ Metacello new
 
 Every layer above that is a group: `bloc` brings the renderer and Bloc itself, `cairo-tests` brings
 the conformance corpus without Bloc, `vulkan` brings the device path and needs PharoVulkan loaded
-by hand, because it is not published. `README.md` lists every group and `doc/USAGE.md` says
+by hand, because it is not published. `fonts` brings the renderer and poses it, together with
+this project's font manager, as the load runs: its package carries a `postLoadDoIt:` sending
+`VGFontEngine install`, so an image that drew text through FreeType draws it through this project
+when the load returns, with nothing left to evaluate. `README.md` lists every group and `doc/USAGE.md` says
 which group each level of use needs. Change a group or an edge in `BaselineOfVectorGraphics` only
 together with the test that states it.
 

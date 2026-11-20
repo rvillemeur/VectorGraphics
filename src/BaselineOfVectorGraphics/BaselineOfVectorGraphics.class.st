@@ -15,18 +15,22 @@ Class {
 { #category : 'baselines' }
 BaselineOfVectorGraphics >> baseline: spec [
 	<baseline>
-	"The load declaration of this project, in five parts so that no one method holds a block
+	"The load declaration of this project, in six parts so that no one method holds a block
 	 per package: the external projects a layer needs, the rasteriser's own twelve packages,
-	 the three backends above it, the corpus and the benchmarks beside them, and the groups.
+	 the three backends above it, the font engine above the Bloc renderer, the corpus and the
+	 benchmarks beside them, and the groups.
 	 The default group is the rasteriser and the Cairo backend. The Bloc renderer is a group of
 	 its own because this project is Alexandrie's replacement inside Bloc, not a part of Bloc:
 	 loading the default group must work in an image where no Bloc class exists, and VGRenderer
-	 is a subclass of BARenderer. VGArchitectureTest holds both halves of that."
+	 is a subclass of BARenderer. VGArchitectureTest holds both halves of that.
+	 The font engine is a group apart again: it writes the slots that decide what every space
+	 of the image draws with, which loading a renderer must not do on its own."
 
 	spec for: #common do: [
 		self declareExternalProjectsOn: spec.
 		self declareRasteriserPackagesOn: spec.
 		self declareBackendPackagesOn: spec.
+		self declareFontEnginePackagesOn: spec.
 		self declareSupportPackagesOn: spec.
 		self declareGroupsOn: spec ]
 ]
@@ -102,6 +106,37 @@ BaselineOfVectorGraphics >> declareExternalProjectsOn: spec [
 ]
 
 { #category : 'baselines' }
+BaselineOfVectorGraphics >> declareFontEnginePackagesOn: spec [
+	"The font engine, in three packages of its own above the Bloc renderer. It is apart from
+	 VectorGraphics-Bloc because it does one thing that package must not do on its own: write
+	 Bloc's renderer slot and upstream's font manager slot, which changes what every space of
+	 the image draws with. A reader who wants the renderer and no such change loads 'bloc'; one
+	 who wants the change loads 'fonts'.
+	 The postLoadDoIt: is what makes that group transparent: Metacello sends it to me once the
+	 engine's package is in, and the route is posed before the load returns. It is attached to
+	 the package rather than to the group, so it runs once however the package arrives.
+	 The tests require the Cairo test package, which the dependency table cannot state:
+	 VGFontEngineExamplesTest subclasses VGCairoExamplesTest and names it nowhere in a method."
+
+	spec
+		package: 'VectorGraphics-Bloc-FontEngine'
+		with: [
+			spec
+				requires: #( 'VectorGraphics-Bloc' );
+				postLoadDoIt: #installTheFontEngine ];
+		package: 'VectorGraphics-Bloc-FontEngine-Examples'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Bloc-FontEngine' 'VectorGraphics-TrueType' ) ];
+		package: 'VectorGraphics-Bloc-FontEngine-Tests'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-FontEngine'
+					   'VectorGraphics-Bloc-FontEngine-Examples' 'VectorGraphics-Cairo-Tests'
+					   'VectorGraphics-TrueType' ) ]
+]
+
+{ #category : 'baselines' }
 BaselineOfVectorGraphics >> declareGroupsOn: spec [
 	"One group per layer, and a default group of the rasteriser and the Cairo backend. A layer
 	 above them is opt-in: 'bloc' is the renderer that replaces Alexandrie's canvas inside
@@ -146,6 +181,11 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 		group: 'bloc' with: #( 'core' 'VectorGraphics-Bloc' );
 		group: 'bloc-examples' with: #( 'VectorGraphics-Bloc-Examples' );
 		group: 'bloc-tests' with: #( 'VectorGraphics-Bloc-Tests' );
+		group: 'fonts'
+			with: #( 'truetype' 'cairo' 'VectorGraphics-Bloc'
+			   'VectorGraphics-Bloc-FontEngine' );
+		group: 'fonts-examples' with: #( 'VectorGraphics-Bloc-FontEngine-Examples' );
+		group: 'fonts-tests' with: #( 'VectorGraphics-Bloc-FontEngine-Tests' );
 		group: 'vulkan' with: #( 'core' 'VectorGraphics-Vulkan' );
 		group: 'vulkan-examples' with: #( 'VectorGraphics-Vulkan-Examples' );
 		group: 'vulkan-tests' with: #( 'VectorGraphics-Vulkan-Tests' );
@@ -153,10 +193,11 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 		group: 'benchmarks' with: #( 'VectorGraphics-Benchmarks' );
 		group: 'examples'
 		with: #( 'paths-examples' 'engine-examples' 'truetype-examples' 'text-examples'
-			   'cairo-examples' 'bloc-examples' 'vulkan-examples' );
+			   'cairo-examples' 'bloc-examples' 'fonts-examples'
+			   'vulkan-examples' );
 		group: 'tests'
 		with: #( 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests' 'cairo-tests'
-			   'bloc-tests' 'vulkan-tests' );
+			   'bloc-tests' 'fonts-tests' 'vulkan-tests' );
 		group: 'default' with: #( 'core' 'cairo' );
 		group: 'dev'
 		with: #( 'default' 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests'
@@ -234,4 +275,18 @@ BaselineOfVectorGraphics >> declareSupportPackagesOn: spec [
 			spec requires:
 					#( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Conformance'
 					   'VectorGraphics-Vulkan' ) ]
+]
+
+{ #category : 'baselines' }
+BaselineOfVectorGraphics >> installTheFontEngine [
+	"The hook the engine's package carries, sent by Metacello once that package is loaded: it
+	 poses the font manager and the renderer that make Bloc draw text with this project's
+	 glyphs. A machine holding none of the families VGFontManager class >>
+	 preferredTextFamilyNames names raises VGFontManagerHasNoUsableFamily here, and the load
+	 fails — which is the decision taken for this group: an image that cannot draw with our
+	 fonts must say so, not keep FreeType and look as though it had switched.
+	 The class is named through the environment, because the hook is compiled into a baseline
+	 that must still load in an image where this project is absent."
+
+	^ (self class environment at: #VGFontEngine) install
 ]

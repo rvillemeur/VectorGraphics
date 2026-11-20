@@ -32,7 +32,6 @@ VGArchitectureTest class >> allowedDependencies [
 	 same as what a package needs in order to load: the four documentation gates subclass
 	 VectorGraphicsDocumentationTest without naming it in a method, so the baseline declares
 	 that edge and this table cannot."
-
 	^ Dictionary newFrom: {
 			  "The front page holds no code since the split, only the package comment that says
 			   which package holds what, so it names nothing and nothing names it."
@@ -102,6 +101,16 @@ VGArchitectureTest class >> allowedDependencies [
 			  'VectorGraphics-Bloc-Tests'
 			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples'
 				    'VectorGraphics-Cairo' 'VectorGraphics-TrueType' ).
+			  "The font engine is the one object the fonts group loads for: it poses the manager
+			   and the renderer that make Bloc draw text with glyphs of this project, so it names
+			   the package holding both and nothing else. Its examples name it alone, and its
+			   tests name the three packages of the route they install and give back."
+			  'VectorGraphics-Bloc-FontEngine' -> #( 'VectorGraphics-Bloc' ).
+			  'VectorGraphics-Bloc-FontEngine-Examples'
+			  -> #( 'VectorGraphics-Bloc-FontEngine' 'VectorGraphics-TrueType' ).
+			  'VectorGraphics-Bloc-FontEngine-Tests'
+			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-FontEngine'
+				    'VectorGraphics-Bloc-FontEngine-Examples' 'VectorGraphics-TrueType' ).
 			  "The device path reads the frame unit 1.11 profiles, which is drawn through the Bloc
 			   renderer, so binning and the budget name that package as well as the display list."
 			  'VectorGraphics-Vulkan' -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ).
@@ -922,8 +931,8 @@ VGArchitectureTest >> testTheDocumentationGatePackageStaysInsideItsAllowedDepend
 VGArchitectureTest >> testTheExamplesAndTestsGroupsAreTheUnionOfTheirLayerGroups [
 	"One group per layer for examples and for tests, and the project-wide group is their union.
 	 Stating the union as the layer group names rather than as package names is what keeps the
-	 two from drifting apart when a layer gains a package. Seven layers since the split: the
-	 four packages of the rasteriser, then Cairo, Bloc and Vulkan."
+	 two from drifting apart when a layer gains a package. Eight layers since the font engine:
+	 the four packages of the rasteriser, then Cairo, Bloc, the font engine and Vulkan."
 
 	| groups |
 	groups := Dictionary new.
@@ -931,9 +940,9 @@ VGArchitectureTest >> testTheExamplesAndTestsGroupsAreTheUnionOfTheirLayerGroups
 		groups at: each name put: each includes asArray ].
 	self assert: (groups at: 'examples') equals: #( 'paths-examples' 'engine-examples'
 			 'truetype-examples' 'text-examples' 'cairo-examples' 'bloc-examples'
-			 'vulkan-examples' ).
+			 'fonts-examples' 'vulkan-examples' ).
 	self assert: (groups at: 'tests') equals: #( 'paths-tests' 'engine-tests' 'truetype-tests'
-			 'text-tests' 'cairo-tests' 'bloc-tests' 'vulkan-tests' ).
+			 'text-tests' 'cairo-tests' 'bloc-tests' 'fonts-tests' 'vulkan-tests' ).
 	#( 'examples' 'tests' ) do: [ :name |
 		self
 			assert: (self class packagesLoadedByGroupNamed: name)
@@ -941,6 +950,53 @@ VGArchitectureTest >> testTheExamplesAndTestsGroupsAreTheUnionOfTheirLayerGroups
 					 all
 						 addAll: (self class packagesLoadedByGroupNamed: layer);
 						 yourself ]) ]
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testTheFontEngineExamplesStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Bloc-FontEngine-Examples'
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testTheFontEngineStaysInsideItsAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Bloc-FontEngine'
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testTheFontEngineTestsStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Bloc-FontEngine-Tests'
+]
+
+{ #category : 'tests - groups' }
+VGArchitectureTest >> testTheFontsGroupLoadsTheRouteItInstallsAndNothingElse [
+	"The group a reader asks for to have Bloc drawing with this project's fonts after the load
+	 and nothing left to evaluate. It brings the engine, the renderer package that engine
+	 poses, the Cairo backend that renderer rasterises through and the font reader the glyphs
+	 come from — and none of the rasteriser the Cairo backend does not need, nor a Vulkan
+	 package, which would ask a device of a machine that may hold none."
+
+	| loaded |
+	loaded := self class packagesLoadedByGroupNamed: 'fonts'.
+
+	self assert: (loaded includes: 'VectorGraphics-Bloc-FontEngine').
+	self assert: (loaded includes: 'VectorGraphics-Bloc').
+	self assert: (loaded includes: 'VectorGraphics-Cairo').
+	self assert: (loaded includes: 'VectorGraphics-TrueType').
+	self assert: (loaded noneSatisfy: [ :each | each includesSubstring: 'Vulkan' ]).
+	self deny: (loaded includes: 'VectorGraphics-Engine')
+]
+
+{ #category : 'tests - groups' }
+VGArchitectureTest >> testTheFontsGroupPosesTheRouteAsItLoads [
+	"What makes the switch transparent: the engine's package carries a postLoadDoIt:, so
+	 Metacello poses the route itself and a reader of the group has nothing to evaluate
+	 afterwards. The hook is read from the spec, not named here, so moving it breaks this."
+
+	| spec |
+	spec := BaselineOfVectorGraphics project version packages detect: [ :each |
+		        each name = 'VectorGraphics-Bloc-FontEngine' ].
+
+	self assert: spec postLoadDoIt notNil
 ]
 
 { #category : 'tests - dependencies' }
