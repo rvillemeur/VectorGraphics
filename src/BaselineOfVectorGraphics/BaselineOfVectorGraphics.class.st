@@ -38,21 +38,27 @@ BaselineOfVectorGraphics >> baseline: spec [
 
 { #category : 'baselines' }
 BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
-	"The backends above the rasteriser: the canvas, which is three packages of its own since the
+	"The backends above the rasteriser: the canvas, which is four packages of its own since the
 	 split of 2026-11, the Bloc renderer that replaces Alexandrie's canvas, and the Vulkan device
 	 path. Each names every package it really depends on, and not only the nearest one that would
 	 drag the rest in: VGArchitectureTest holds this declaration against the references the code
 	 makes.
-	 The canvas trio is a chain. The font layer is a leaf, so it names the font reader and
-	 nothing else of this project. The canvas names the renderer and the font layer. The
+	 The canvas is a chain. The font layer is a leaf, so it names the font reader and nothing
+	 else of this project. The path geometry is a leaf too, and names nothing at all: the two
+	 methods of a path that read the renderer''s segments are extensions the renderer owns,
+	 so the cairo route of the fonts group loads a path with no canvas behind it. The
+	 renderer requires the geometry all the same, because those two extension methods cannot
+	 load before the class they extend; the dependency table cannot state that edge, which
+	 reads the classes a method names rather than the class it is installed on. The canvas
+	 names the renderer, the font layer and the geometry. The
 	 renderer names no package of this project: it read the canvas back four times until unit 8
-	 of the split removed those references, so the trio has no cycle of its own and no edge of it
+	 of the split removed those references, so the canvas has no cycle of its own and no edge of it
 	 is left out here. One edge is still left out, the canvas examples on the canvas tests, which
 	 is the cycle the mirror packages make: the tests build their subject from an example and an
 	 example of the architecture table reads the test class that holds it. VGArchitectureTest
 	 class >> edgesTheBaselineCannotDeclare holds that edge, since a pair declared both ways has
 	 no load order.
-	 Each of the three has its own examples and tests package, declared from the references each
+	 Each of the four has its own examples and tests package, declared from the references each
 	 one makes. The tests of the canvas require the tests of the renderer, which is an edge
 	 between two test packages this project already allows elsewhere: the canvas tests draw a
 	 frame through the backend fixture.
@@ -69,11 +75,14 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 	spec
 		package: 'VectorGraphics-Canvas-Fonts'
 		with: [ spec requires: #( 'VectorGraphics-TrueType' ) ];
-		package: 'VectorGraphics-Canvas-Raster';
+		package: 'VectorGraphics-Canvas-Paths';
+		package: 'VectorGraphics-Canvas-Raster'
+		with: [ spec requires: #( 'VectorGraphics-Canvas-Paths' ) ];
 		package: 'VectorGraphics-Canvas'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Raster' ) ];
+					#( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Paths'
+					   'VectorGraphics-Canvas-Raster' ) ];
 		package: 'VectorGraphics-Canvas-Fonts-Examples'
 		with: [
 			spec requires:
@@ -88,30 +97,40 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 		package: 'VectorGraphics-Canvas-Raster-Tests'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
-					   'VectorGraphics-Conformance' ) ];
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths'
+					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance' ) ];
 		package: 'VectorGraphics-Canvas-Examples'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
-					   'VectorGraphics-Conformance' ) ];
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths-Examples'
+					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance' ) ];
 		package: 'VectorGraphics-Canvas-Raster-Examples'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Examples'
-					   'VectorGraphics-Canvas-Raster' ) ];
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths'
+					   'VectorGraphics-Canvas-Paths-Examples' 'VectorGraphics-Canvas-Raster' ) ];
+		package: 'VectorGraphics-Canvas-Paths-Examples'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths' ) ];
+		package: 'VectorGraphics-Canvas-Paths-Tests'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster' ) ];
 		package: 'VectorGraphics-Canvas-Tests'
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Examples'
-					   'VectorGraphics-Canvas-Fonts-Examples' 'VectorGraphics-Canvas-Raster'
+					   'VectorGraphics-Canvas-Fonts-Examples'
+					   'VectorGraphics-Canvas-Paths-Examples' 'VectorGraphics-Canvas-Raster'
 					   'VectorGraphics-Canvas-Raster-Examples'
 					   'VectorGraphics-Canvas-Raster-Tests' 'VectorGraphics-Conformance' ) ];
 		package: 'VectorGraphics-Bloc'
 		with: [
 			spec requires:
 					#( 'Bloc' 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
-					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-TrueType' ) ];
+					   'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster'
+					   'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Bloc-Examples'
 		with: [
 			spec requires:
@@ -203,11 +222,14 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 	 reader with no scan-line rasteriser, or the rasteriser with no font code: 'paths',
 	 'engine', 'truetype' and 'text', with 'core' their union plus the front page. 'core' keeps
 	 the name every existing loader uses, so loading it still brings the whole rasteriser.
-	 The canvas is three groups of its own since the split of 2026-11, for the same reason:
+	 The canvas is four groups of its own, three since the split of 2026-11 and the path
+	 geometry since unit 1 of FONTS-LOAD-PLAN, for the same reason:
 	 'canvas' is the canvas API and, through its requires, the renderer and the font layer below
 	 it; 'canvas-raster' is the scan-line renderer of a display list, which needs no device, no
 	 library and no window; 'canvas-fonts' is the font and glyph layer, a leaf above the font
-	 reader. 'default' names the three one by one rather than 'canvas' alone, so what it loads
+	 reader; 'canvas-paths' is a path, its subpaths and the builder that records one, which the
+	 cairo route of 'fonts' loads with no canvas behind it. 'default' names the four one by one
+	 rather than 'canvas' alone, so what it loads
 	 is read from the group list and not from a chain of requires.
 	 The examples and the tests of each layer are a group of their own, because the
 	 project-wide 'examples' and 'tests' groups span every layer: asking for them fetches
@@ -250,6 +272,10 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 		group: 'canvas-fonts-examples'
 			with: #( 'VectorGraphics-Canvas-Fonts-Examples' );
 		group: 'canvas-fonts-tests' with: #( 'VectorGraphics-Canvas-Fonts-Tests' );
+		group: 'canvas-paths' with: #( 'VectorGraphics-Canvas-Paths' );
+		group: 'canvas-paths-examples'
+			with: #( 'VectorGraphics-Canvas-Paths-Examples' );
+		group: 'canvas-paths-tests' with: #( 'VectorGraphics-Canvas-Paths-Tests' );
 		group: 'bloc' with: #( 'core' 'VectorGraphics-Bloc' );
 		group: 'bloc-examples' with: #( 'VectorGraphics-Bloc-Examples' );
 		group: 'bloc-tests' with: #( 'VectorGraphics-Bloc-Tests' );
@@ -266,15 +292,19 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 		group: 'examples'
 		with: #( 'paths-examples' 'engine-examples' 'truetype-examples' 'text-examples'
 			   'canvas-examples' 'canvas-raster-examples' 'canvas-fonts-examples'
+			   'canvas-paths-examples'
 			   'bloc-examples' 'fonts-examples' 'vulkan-examples' );
 		group: 'tests'
 		with: #( 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests' 'canvas-tests'
-			   'canvas-raster-tests' 'canvas-fonts-tests' 'bloc-tests' 'fonts-tests'
+			   'canvas-raster-tests' 'canvas-fonts-tests' 'canvas-paths-tests'
+			   'bloc-tests' 'fonts-tests'
 			   'vulkan-tests' );
-		group: 'default' with: #( 'core' 'canvas' 'canvas-raster' 'canvas-fonts' );
+		group: 'default'
+			with: #( 'core' 'canvas' 'canvas-raster' 'canvas-fonts' 'canvas-paths' );
 		group: 'dev'
 		with: #( 'default' 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests'
-			   'canvas-tests' 'canvas-raster-tests' 'canvas-fonts-tests' 'MuTalk' )
+			   'canvas-tests' 'canvas-raster-tests' 'canvas-fonts-tests' 'canvas-paths-tests'
+			   'MuTalk' )
 ]
 
 { #category : 'baselines' }

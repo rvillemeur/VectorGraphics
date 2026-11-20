@@ -6,8 +6,8 @@ My examples rebuild their object on every call and assert nothing: open one from
 Class {
 	#name : 'VGPathExamples',
 	#superclass : 'Object',
-	#category : 'VectorGraphics-Canvas-Examples-Examples',
-	#package : 'VectorGraphics-Canvas-Examples',
+	#category : 'VectorGraphics-Canvas-Paths-Examples-Examples',
+	#package : 'VectorGraphics-Canvas-Paths-Examples',
 	#tag : 'Examples'
 }
 

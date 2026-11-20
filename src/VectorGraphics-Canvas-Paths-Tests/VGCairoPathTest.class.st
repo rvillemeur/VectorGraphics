@@ -9,8 +9,8 @@ the display list.
 Class {
 	#name : 'VGCairoPathTest',
 	#superclass : 'TestCase',
-	#category : 'VectorGraphics-Canvas-Tests-Tests',
-	#package : 'VectorGraphics-Canvas-Tests',
+	#category : 'VectorGraphics-Canvas-Paths-Tests-Tests',
+	#package : 'VectorGraphics-Canvas-Paths-Tests',
 	#tag : 'Tests'
 }
 

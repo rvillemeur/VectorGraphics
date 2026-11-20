@@ -17,8 +17,8 @@ Class {
 		'startTangent',
 		'endTangent'
 	],
-	#category : 'VectorGraphics-Canvas-Path',
-	#package : 'VectorGraphics-Canvas',
+	#category : 'VectorGraphics-Canvas-Paths-Path',
+	#package : 'VectorGraphics-Canvas-Paths',
 	#tag : 'Path'
 }
 

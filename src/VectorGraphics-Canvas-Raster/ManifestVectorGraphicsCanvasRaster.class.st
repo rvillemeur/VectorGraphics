@@ -19,15 +19,18 @@ Tags:
 
 - `Backend` — the abstract backend, its failure, and the software one.
 - `Rasterising` — the rasteriser, the span scanner, the edge index and the clip.
-- `Path` — `VGStroker` and `VGSegments`, the stroke geometry a fill is made from.
+- `Path` — `VGStroker` and `VGSegments`, the stroke geometry a fill is made from, and the two
+  methods of `VGPath` that read a set of segments, which are extensions this package owns.
 - `Paint` — `VGMeshRaster` and `VGCoonsPatch`, the mesh a gradient patch is rasterised as.
 - `Blur` — the A8 Gaussian filter, which blurs a mask and nothing else.
 - `Display list` — `VGCairoSurfaceMask`, the mask entry a drain writes through.
 - `Manifest` — this comment and the Renraku rule configuration.
 
-Four methods of this package read a class of `VectorGraphics-Canvas`: three convenience
-constructors reading a default state, and one colour conversion. That edge is a cycle, declared
-rather than hidden, and section 8 of `CANVAS-SPLIT-PLAN.md` is the plan to remove it.
+This package names no other package of this project. It read a class of
+`VectorGraphics-Canvas` in four methods until section 8 of `CANVAS-SPLIT-PLAN.md` removed those
+references: the default antialias is a constant of this package now and the colour conversion
+is a `Color` extension it owns. It does require `VectorGraphics-Canvas-Paths` to load, because
+the two extension methods it owns on `VGPath` cannot be installed before that class exists.
 `VectorGraphics-Canvas-Raster-Examples` holds a runnable example per subject.
 "
 Class {

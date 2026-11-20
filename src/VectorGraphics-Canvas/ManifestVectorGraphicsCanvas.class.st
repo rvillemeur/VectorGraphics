@@ -20,7 +20,6 @@ Tags:
 - `Surface` — the image surface and its pixel format.
 - `Context` — the recording context, the state it keeps and the stroke style.
 - `Display list` — the list and the two kinds of entry, a fill and a blit.
-- `Path` — the path, its builder and the sub-path, as the canvas holds them.
 - `Paint` — what a fill is made of: a colour, a gradient, a surface, a mesh.
 - `Pattern` — the Cairo pattern objects that carry a paint across the API.
 - `Compositing` — one class per Porter-Duff and blend operator.
@@ -31,9 +30,12 @@ Tags:
 - `Skeleton` — the root object, the status enumeration and the not-yet-implemented signal.
 - `Manifest` — this comment and the Renraku rule configuration.
 
-The renderer is `VectorGraphics-Canvas-Raster` and the glyph layer is
-`VectorGraphics-Canvas-Fonts`; this package names both. `CANVAS-SPLIT-PLAN.md` holds the split
-that made the three, and `VectorGraphics-Canvas-Examples` holds a runnable example per subject.
+The renderer is `VectorGraphics-Canvas-Raster`, the glyph layer is
+`VectorGraphics-Canvas-Fonts` and the path geometry is `VectorGraphics-Canvas-Paths`; this
+package names all three. `CANVAS-SPLIT-PLAN.md` holds the split that made the first three and
+`FONTS-LOAD-PLAN.md` the unit that took the geometry out, so that a font drawn on cairo loads
+a path with no canvas behind it. `VectorGraphics-Canvas-Examples` holds a runnable example per
+subject.
 "
 Class {
 	#name : 'ManifestVectorGraphicsCanvas',

@@ -11,8 +11,8 @@ Class {
 	#instVars : [
 		'subPaths'
 	],
-	#category : 'VectorGraphics-Canvas-Path',
-	#package : 'VectorGraphics-Canvas',
+	#category : 'VectorGraphics-Canvas-Paths-Path',
+	#package : 'VectorGraphics-Canvas-Paths',
 	#tag : 'Path'
 }
 
@@ -135,19 +135,6 @@ VGPath >> printOn: aStream [
 		nextPutAll: ' runs, ';
 		print: self pointCount;
 		nextPutAll: ' points)' 
-]
-
-{ #category : 'geometry' }
-VGPath >> segmentsWithFillRule: aSymbol [
-	^ VGSegments coordinates: self edgeCoordinates fillRule: aSymbol
-]
-
-{ #category : 'converting' }
-VGPath >> segmentsWithFillRule: aSymbol antialias: anotherSymbol [
-	^ VGSegments
-		  coordinates: self edgeCoordinates
-		  fillRule: aSymbol
-		  antialias: anotherSymbol
 ]
 
 { #category : 'initialization' }

@@ -81,9 +81,19 @@ VGArchitectureTest class >> allowedDependencies [
 			   them: the default antialias is a constant of the renderer itself and the colour
 			   conversion is a Color extension the renderer owns."
 			  'VectorGraphics-Canvas'
-			  -> #( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Raster' ).
+			  -> #( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Paths'
+				    'VectorGraphics-Canvas-Raster' ).
 			  'VectorGraphics-Canvas-Raster' -> #( ).
 			  'VectorGraphics-Canvas-Fonts' -> #( 'VectorGraphics-TrueType' ).
+			  "The path geometry, a leaf of its own since unit 1 of FONTS-LOAD-PLAN: a path, its
+			   subpaths, and the builder that records one. It names nothing, because the two
+			   methods that read the renderer''s segments are extensions the renderer owns. The
+			   cairo route loads this package without the canvas, which is what the plan was for."
+			  'VectorGraphics-Canvas-Paths' -> #(  ).
+			  'VectorGraphics-Canvas-Paths-Examples'
+			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths' ).
+			  'VectorGraphics-Canvas-Paths-Tests'
+			  -> #( 'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster' ).
 			  "Each of the three has its examples and its tests package, as of unit 6.6 of the
 			   split: a test or an examples class belongs to the package of its subject, so the
 			   layering the trio has is the layering its mirrors have.
@@ -94,21 +104,23 @@ VGArchitectureTest class >> allowedDependencies [
 			   and it is the half of that cycle the baseline leaves out."
 			  'VectorGraphics-Canvas-Examples'
 			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
+				    'VectorGraphics-Canvas-Paths-Examples'
 				    'VectorGraphics-Canvas-Tests' 'VectorGraphics-Conformance' ).
 			  "The canvas tests name every mirror below them, and the tests of the renderer as
 			   well: the frame fixture and the backend stubs are the renderer's, and a canvas
 			   test that draws a frame builds it through them rather than keeping a second copy."
 			  'VectorGraphics-Canvas-Tests'
 			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Examples'
-				    'VectorGraphics-Canvas-Fonts-Examples' 'VectorGraphics-Canvas-Raster'
+				    'VectorGraphics-Canvas-Fonts-Examples' 'VectorGraphics-Canvas-Paths-Examples'
+				    'VectorGraphics-Canvas-Raster'
 				    'VectorGraphics-Canvas-Raster-Examples'
 				    'VectorGraphics-Canvas-Raster-Tests' 'VectorGraphics-Conformance' ).
 			  'VectorGraphics-Canvas-Raster-Examples'
-			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Examples'
-				    'VectorGraphics-Canvas-Raster' ).
+			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths'
+				    'VectorGraphics-Canvas-Paths-Examples' 'VectorGraphics-Canvas-Raster' ).
 			  'VectorGraphics-Canvas-Raster-Tests'
-			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
-				    'VectorGraphics-Conformance' ).
+			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths'
+				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance' ).
 			  'VectorGraphics-Canvas-Fonts-Examples'
 			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 				    'VectorGraphics-Conformance' ).
@@ -129,7 +141,8 @@ VGArchitectureTest class >> allowedDependencies [
 			   name the renderer."
 			  'VectorGraphics-Bloc'
 			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
-				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-TrueType' ).
+				    'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster'
+				    'VectorGraphics-TrueType' ).
 			  'VectorGraphics-Bloc-Examples'
 			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
 				    'VectorGraphics-Canvas-Fonts' 'VectorGraphics-TrueType' ).
@@ -529,6 +542,21 @@ VGArchitectureTest >> testCanvasFontsTestsStayInsideTheirAllowedDependencies [
 ]
 
 { #category : 'tests' }
+VGArchitectureTest >> testCanvasPathsExamplesStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Canvas-Paths-Examples'
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testCanvasPathsStaysInsideItsAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Canvas-Paths'
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testCanvasPathsTestsStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Canvas-Paths-Tests'
+]
+
+{ #category : 'tests' }
 VGArchitectureTest >> testCanvasRasterExamplesStayInsideTheirAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Canvas-Raster-Examples'
 ]
@@ -914,16 +942,20 @@ VGArchitectureTest >> testTheBlocLayerRequiresTheExternalBlocProject [
 		self deny: ((requires at: each) includes: 'Bloc') ]
 ]
 
-{ #category : 'tests - groups' }
+{ #category : 'tests' }
 VGArchitectureTest >> testTheCanvasExampleAndTestGroupsNameNoBlocClass [
-	"The examples and the tests of the canvas load without Bloc too, six groups of them since
-	 unit 6.6 of the split: the project-wide examples and tests groups span every layer, so
-	 asking for them fetches Bloc and wants PharoVulkan, which a user of the canvas wants
-	 neither of. Each group brings the font reader, because the canvas's font layer names it,
-	 and the conformance corpus, because the examples open it and the gate reads it. The font
-	 tests group also brings the font reader's own test and examples packages, and through them
-	 the rasteriser tests, since VGFontBytesFixture moved to VectorGraphics-TrueType-Tests with
-	 the glyph source: the face tests that reject a font missing a table read that fixture.
+	"The examples and the tests of the canvas load without Bloc too, eight groups of them: six
+	 since unit 6.6 of the split and two since unit 1 of FONTS-LOAD-PLAN, where the path
+	 geometry became a package of its own. The project-wide examples and tests groups span every
+	 layer, so asking for them fetches Bloc and wants PharoVulkan, which a user of the canvas
+	 wants neither of. Most of these groups bring the font reader, because the canvas's font
+	 layer names it, and the conformance corpus, because the examples open it and the gate reads
+	 it. The font tests group also brings the font reader's own test and examples packages, and
+	 through them the rasteriser tests, since VGFontBytesFixture moved to
+	 VectorGraphics-TrueType-Tests with the glyph source: the face tests that reject a font
+	 missing a table read that fixture. The path tests group brings neither the font reader nor
+	 the corpus: a path, its subpaths and the builder are geometry, and the renderer below them
+	 is all they need.
 	 None of it is Bloc. Alexandrie is not asked about here — blocPackageNames says why. A group
 	 that does not exist would pass on an empty scan, so the packages each one must bring in are
 	 named first."
@@ -933,43 +965,59 @@ VGArchitectureTest >> testTheCanvasExampleAndTestGroupsNameNoBlocClass [
 	expected := Dictionary newFrom: {
 			            'canvas-examples'
 			            -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Examples'
-				               'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Raster'
-				               'VectorGraphics-Conformance' 'VectorGraphics-Paths'
-				               'VectorGraphics-TrueType' ).
+				               'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Paths'
+				               'VectorGraphics-Canvas-Paths-Examples'
+				               'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance'
+				               'VectorGraphics-Paths' 'VectorGraphics-TrueType' ).
 			            'canvas-tests'
 			            -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Examples'
 				               'VectorGraphics-Canvas-Fonts'
 				               'VectorGraphics-Canvas-Fonts-Examples'
+				               'VectorGraphics-Canvas-Paths'
+				               'VectorGraphics-Canvas-Paths-Examples'
 				               'VectorGraphics-Canvas-Raster'
 				               'VectorGraphics-Canvas-Raster-Examples'
 				               'VectorGraphics-Canvas-Raster-Tests'
 				               'VectorGraphics-Canvas-Tests' 'VectorGraphics-Conformance'
 				               'VectorGraphics-Paths' 'VectorGraphics-TrueType' ).
 			            'canvas-raster-examples'
-			            -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Examples'
-				               'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Raster'
-				               'VectorGraphics-Canvas-Raster-Examples'
-				               'VectorGraphics-Conformance' 'VectorGraphics-Paths'
+			            -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
+				               'VectorGraphics-Canvas-Paths'
+				               'VectorGraphics-Canvas-Paths-Examples'
+				               'VectorGraphics-Canvas-Raster'
+				               'VectorGraphics-Canvas-Raster-Examples' 'VectorGraphics-Paths'
 				               'VectorGraphics-TrueType' ).
 			            'canvas-raster-tests'
 			            -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
-				               'VectorGraphics-Canvas-Raster'
+				               'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster'
 				               'VectorGraphics-Canvas-Raster-Tests'
 				               'VectorGraphics-Conformance' 'VectorGraphics-Paths'
 				               'VectorGraphics-TrueType' ).
 			            'canvas-fonts-examples'
 			            -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 				               'VectorGraphics-Canvas-Fonts-Examples'
-				               'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance'
-				               'VectorGraphics-Paths' 'VectorGraphics-TrueType' ).
+				               'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster'
+				               'VectorGraphics-Conformance' 'VectorGraphics-Paths'
+				               'VectorGraphics-TrueType' ).
 			            'canvas-fonts-tests'
 			            -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 				               'VectorGraphics-Canvas-Fonts-Examples'
 				               'VectorGraphics-Canvas-Fonts-Tests'
-				               'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance'
-				               'VectorGraphics-Paths' 'VectorGraphics-Tests'
-				               'VectorGraphics-TrueType' 'VectorGraphics-TrueType-Examples'
-				               'VectorGraphics-TrueType-Tests' ) }.
+				               'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster'
+				               'VectorGraphics-Conformance' 'VectorGraphics-Paths'
+				               'VectorGraphics-Tests' 'VectorGraphics-TrueType'
+				               'VectorGraphics-TrueType-Examples'
+				               'VectorGraphics-TrueType-Tests' ).
+			            'canvas-paths-examples'
+			            -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
+				               'VectorGraphics-Canvas-Paths'
+				               'VectorGraphics-Canvas-Paths-Examples'
+				               'VectorGraphics-Canvas-Raster' 'VectorGraphics-Paths'
+				               'VectorGraphics-TrueType' ).
+			            'canvas-paths-tests'
+			            -> #( 'VectorGraphics-Canvas-Paths'
+				               'VectorGraphics-Canvas-Paths-Tests'
+				               'VectorGraphics-Canvas-Raster' ) }.
 	expected keysAndValuesDo: [ :group :packages |
 		self
 			assert: (self class packagesLoadedByGroupNamed: group)
@@ -985,19 +1033,21 @@ VGArchitectureTest >> testTheCanvasExampleAndTestGroupsNameNoBlocClass [
 	self assert: offenders asSortedCollection asArray equals: #(  )
 ]
 
-{ #category : 'tests - groups' }
+{ #category : 'tests' }
 VGArchitectureTest >> testTheDefaultGroupLoadsTheRasteriserAndTheCanvasAlone [
 	"What `Metacello load: 'VectorGraphics'` brings in, named here so the group cannot grow a
 	 layer back by accident. The rasteriser is four packages since the split and the default
 	 group brings all four, because that is what the one package it replaced held. The canvas
-	 is three packages since the split of 2026-11 and the group brings all three, for the same
-	 reason. Every layer above them is a group of its own."
+	 is four packages, three since the split of 2026-11 and the path geometry since unit 1 of
+	 FONTS-LOAD-PLAN, and the group brings all four, for the same reason. Every layer above
+	 them is a group of its own."
 
 	self
 		assert: (self class packagesLoadedByGroupNamed: 'default') asSortedCollection asArray
 		equals: #( 'VectorGraphics' 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
-			   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Engine' 'VectorGraphics-Paths'
-			   'VectorGraphics-Text' 'VectorGraphics-TrueType' )
+			   'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster'
+			   'VectorGraphics-Engine' 'VectorGraphics-Paths' 'VectorGraphics-Text'
+			   'VectorGraphics-TrueType' )
 ]
 
 { #category : 'tests - groups' }
@@ -1019,12 +1069,12 @@ VGArchitectureTest >> testTheDevGroupBringsNoBlocAndNoVulkanPackage [
 		self assert: (loaded includes: 'VectorGraphics-' , layer , '-Tests') ]
 ]
 
-{ #category : 'tests - groups' }
+{ #category : 'tests' }
 VGArchitectureTest >> testTheDevGroupLoadsTheDefaultStackItsTestsAndMuTalk [
 	"The group a developer of this project loads: what `default` loads, the tests of those same
 	 layers, and MuTalk. MuTalk mutates production methods and asks whether a test notices, so a
 	 dev group without the tests of the code under test would report everything as survived.
-	 The four layer test groups and the three of the canvas are named one by one rather than
+	 The four layer test groups and the four of the canvas are named one by one rather than
 	 through the project-wide `tests` group, because that one spans every layer: it fetches Bloc
 	 and wants PharoVulkan, neither of which a mutation run of the canvas needs."
 
@@ -1035,8 +1085,9 @@ VGArchitectureTest >> testTheDevGroupLoadsTheDefaultStackItsTestsAndMuTalk [
 	self assert: (groups includesKey: 'dev').
 	self
 		assert: (groups at: 'dev') asSortedCollection asArray
-		equals: #( 'MuTalk' 'canvas-fonts-tests' 'canvas-raster-tests' 'canvas-tests'
-			   'default' 'engine-tests' 'paths-tests' 'text-tests' 'truetype-tests' )
+		equals: #( 'MuTalk' 'canvas-fonts-tests' 'canvas-paths-tests' 'canvas-raster-tests'
+			   'canvas-tests' 'default' 'engine-tests' 'paths-tests' 'text-tests'
+			   'truetype-tests' )
 ]
 
 { #category : 'tests - dependencies' }
@@ -1044,13 +1095,13 @@ VGArchitectureTest >> testTheDocumentationGatePackageStaysInsideItsAllowedDepend
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Tests'
 ]
 
-{ #category : 'tests - groups' }
+{ #category : 'tests' }
 VGArchitectureTest >> testTheExamplesAndTestsGroupsAreTheUnionOfTheirLayerGroups [
 	"One group per layer for examples and for tests, and the project-wide group is their union.
 	 Stating the union as the layer group names rather than as package names is what keeps the
-	 two from drifting apart when a layer gains a package. Ten layers since the split of the
-	 canvas: the four packages of the rasteriser, then the canvas, its renderer and its font
-	 layer, then Bloc, the font engine and Vulkan."
+	 two from drifting apart when a layer gains a package. Eleven layers: the four packages of
+	 the rasteriser, then the canvas, its renderer, its font layer and its path geometry, then
+	 Bloc, the font engine and Vulkan."
 
 	| groups |
 	groups := Dictionary new.
@@ -1058,11 +1109,11 @@ VGArchitectureTest >> testTheExamplesAndTestsGroupsAreTheUnionOfTheirLayerGroups
 		groups at: each name put: each includes asArray ].
 	self assert: (groups at: 'examples') equals: #( 'paths-examples' 'engine-examples'
 			 'truetype-examples' 'text-examples' 'canvas-examples'
-			 'canvas-raster-examples' 'canvas-fonts-examples' 'bloc-examples'
-			 'fonts-examples' 'vulkan-examples' ).
+			 'canvas-raster-examples' 'canvas-fonts-examples' 'canvas-paths-examples'
+			 'bloc-examples' 'fonts-examples' 'vulkan-examples' ).
 	self assert: (groups at: 'tests') equals: #( 'paths-tests' 'engine-tests' 'truetype-tests'
 			 'text-tests' 'canvas-tests' 'canvas-raster-tests' 'canvas-fonts-tests'
-			 'bloc-tests' 'fonts-tests' 'vulkan-tests' ).
+			 'canvas-paths-tests' 'bloc-tests' 'fonts-tests' 'vulkan-tests' ).
 	#( 'examples' 'tests' ) do: [ :name |
 		self
 			assert: (self class packagesLoadedByGroupNamed: name)
