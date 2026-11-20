@@ -20,6 +20,13 @@ TTCmapTableParser class >> bmpEncodingId [
 ]
 
 { #category : 'constants' }
+TTCmapTableParser class >> byteEncodingFormat [
+	"cmap subtable format 0: one byte of glyph index per code point, 256 of them."
+
+	^ 0
+]
+
+{ #category : 'constants' }
 TTCmapTableParser class >> everyPlaneEncodingId [
 	"The Windows encoding of Unicode over every plane. It reaches the code points above the
 	 Basic Multilingual Plane, which is why it is preferred over #bmpEncodingId."
@@ -37,6 +44,21 @@ TTCmapTableParser class >> prcEncodingId [
 ]
 
 { #category : 'constants' }
+TTCmapTableParser class >> segmentMappingFormat [
+	"cmap subtable format 4: segments of the basic multilingual plane mapped by delta."
+
+	^ 4
+]
+
+{ #category : 'constants' }
+TTCmapTableParser class >> segmentedCoverageFormat [
+	"cmap subtable format 12: groups of code points, the only format of this reader that
+	 reaches above the basic multilingual plane."
+
+	^ 12
+]
+
+{ #category : 'constants' }
 TTCmapTableParser class >> subtablePreferences [
 	"The platform and encoding pairs that name a Unicode character map, best first.
 	 Platform 0 is Unicode itself, whatever its encoding; of the Windows platform only
@@ -49,6 +71,13 @@ TTCmapTableParser class >> subtablePreferences [
 		  { self windowsPlatformId. self everyPlaneEncodingId }.
 		  { self unicodePlatformId. nil }.
 		  { self windowsPlatformId. self bmpEncodingId } }
+]
+
+{ #category : 'constants' }
+TTCmapTableParser class >> trimmedTableFormat [
+	"cmap subtable format 6: one run of code points, a glyph index per code point."
+
+	^ 6
 ]
 
 { #category : 'constants' }
@@ -97,55 +126,68 @@ TTCmapTableParser >> inspectorSubtables: aBuilder [
 
 { #category : 'parsing' }
 TTCmapTableParser >> parseFormat [
+	"The character map of the subtable at the current position of the entry, or nil when its
+	 format is one this reader does not know. Each format reads the rest of its own header,
+	 because the formats do not agree on it: 0, 4 and 6 carry a short length and a short
+	 language, 12 a reserved short and long ones."
 
-	"Parse a cmap subtable starting at the current entry position.
-	Dispatches to format 0, 4, or 6. Returns an Array or nil."
-
-	| cmapFmt length entryCount segCount segments offset cmap firstCode |
-	cmapFmt := entry nextUShort.
-	cmapFmt = 12 ifTrue: [ ^ self parseFormatTwelve ]. "its header is not the one below"
-	length := entry nextUShort.
-	entry skip: 2. "skip version"
-
-	cmapFmt = 0 ifTrue: [ "byte encoded table"
-		length := length - 6. "should be always 256"
-		length <= 0 ifTrue: [ ^ nil ].
-		cmap := Array new: length.
-		entry nextBytes: length into: cmap startingAt: entry offset.
-		^ cmap ].
-
-	cmapFmt = 4 ifTrue: [ "segment mapping to delta values"
-		segCount := entry nextUShort // 2.
-		entry skip: 6. "skip searchRange, entrySelector, rangeShift"
-		segments := (1 to: segCount) collect: [ :e | Array new: 4 ].
-		1 to: segCount do: [ :i | (segments at: i) at: 2 put: entry nextUShort ]. "endCount"
-		entry skip: 2. "skip reservedPad"
-		1 to: segCount do: [ :i | (segments at: i) at: 1 put: entry nextUShort ]. "startCount"
-		1 to: segCount do: [ :i | (segments at: i) at: 3 put: entry nextShort ]. "idDelta"
-		offset := entry offset.
-		1 to: segCount do: [ :i | (segments at: i) at: 4 put: entry nextUShort ]. "idRangeOffset"
-		entryCount := segments inject: 0 into: [ :max :seg | max max: seg second ].
-		cmap := Array new: entryCount + 1 withAll: 0.
-		segments withIndexDo: [ :seg :si |
-			| code |
-			seg first to: seg second do: [ :i |
-				seg last > 0
-					ifTrue: [
-						entry offset: i - seg first - 1 * 2 + seg last + si + si + offset.
-						code := entry nextUShort.
-						code > 0 ifTrue: [ code := code + seg third ] ]
-					ifFalse: [ code := i + seg third ].
-				cmap at: i + 1 put: code ] ].
-		^ cmap ].
-
-	cmapFmt = 6 ifTrue: [ "trimmed table"
-		firstCode := entry nextUShort.
-		entryCount := entry nextUShort.
-		cmap := Array new: entryCount + firstCode withAll: 0.
-		entryCount timesRepeat: [
-			cmap at: (firstCode := firstCode + 1) put: entry nextUShort ].
-		^ cmap ].
+	| cmapFormat |
+	cmapFormat := entry nextUShort.
+	cmapFormat = self class byteEncodingFormat ifTrue: [ ^ self parseFormatZero ].
+	cmapFormat = self class segmentMappingFormat ifTrue: [ ^ self parseFormatFour ].
+	cmapFormat = self class trimmedTableFormat ifTrue: [ ^ self parseFormatSix ].
+	cmapFormat = self class segmentedCoverageFormat ifTrue: [
+		^ self parseFormatTwelve ].
 	^ nil
+]
+
+{ #category : 'parsing' }
+TTCmapTableParser >> parseFormatFour [
+	"The subtable of format 4, segment mapping to delta values, read from just past its format
+	 word: the segments of the basic multilingual plane, each with an end code, a start code, a
+	 delta and an offset into the glyph array that follows. A segment of offset zero maps by
+	 delta alone; one of offset greater than zero reads its glyph from that array, and a glyph
+	 of zero there stays zero rather than taking the delta."
+
+	| segCount segments offset entryCount characterMap |
+	entry skip: 4. "length and language"
+	segCount := entry nextUShort // 2.
+	entry skip: 6. "searchRange, entrySelector, rangeShift"
+	segments := (1 to: segCount) collect: [ :each | Array new: 4 ].
+	1 to: segCount do: [ :i | (segments at: i) at: 2 put: entry nextUShort ]. "endCount"
+	entry skip: 2. "reservedPad"
+	1 to: segCount do: [ :i | (segments at: i) at: 1 put: entry nextUShort ]. "startCount"
+	1 to: segCount do: [ :i | (segments at: i) at: 3 put: entry nextShort ]. "idDelta"
+	offset := entry offset.
+	1 to: segCount do: [ :i | (segments at: i) at: 4 put: entry nextUShort ]. "idRangeOffset"
+	entryCount := segments inject: 0 into: [ :max :seg | max max: seg second ].
+	characterMap := Array new: entryCount + 1 withAll: 0.
+	segments withIndexDo: [ :seg :si |
+		| code |
+		seg first to: seg second do: [ :i |
+			seg last > 0
+				ifTrue: [
+					entry offset: i - seg first - 1 * 2 + seg last + si + si + offset.
+					code := entry nextUShort.
+					code > 0 ifTrue: [ code := code + seg third ] ]
+				ifFalse: [ code := i + seg third ].
+			characterMap at: i + 1 put: code ] ].
+	^ characterMap
+]
+
+{ #category : 'parsing' }
+TTCmapTableParser >> parseFormatSix [
+	"The subtable of format 6, trimmed table, read from just past its format word: one run of
+	 code points, starting at a first code point, with a glyph index per code point."
+
+	| firstCode entryCount characterMap |
+	entry skip: 4. "length and language"
+	firstCode := entry nextUShort.
+	entryCount := entry nextUShort.
+	characterMap := Array new: entryCount + firstCode withAll: 0.
+	entryCount timesRepeat: [
+		characterMap at: (firstCode := firstCode + 1) put: entry nextUShort ].
+	^ characterMap
 ]
 
 { #category : 'parsing' }
@@ -176,6 +218,21 @@ TTCmapTableParser >> parseFormatTwelve [
 			characterMap
 				at: codePoint + 1
 				put: group third + codePoint - group first ] ].
+	^ characterMap
+]
+
+{ #category : 'parsing' }
+TTCmapTableParser >> parseFormatZero [
+	"The subtable of format 0, byte encoded, read from just past its format word: a glyph index
+	 per code point over the 256 code points of a single byte. A length that leaves no byte
+	 after the header answers nothing, so #process tries the next subtable."
+
+	| length characterMap |
+	length := entry nextUShort - 6. "the header it counts: format, length and language"
+	entry skip: 2. "language"
+	length <= 0 ifTrue: [ ^ nil ].
+	characterMap := Array new: length.
+	entry nextBytes: length into: characterMap startingAt: entry offset.
 	^ characterMap
 ]
 
