@@ -19,10 +19,14 @@ VGAeCanvasTest >> testPrepareForSurfaceStaysDerivedFromUpstream [
 	 context is built by our class instead of being asked of the surface, because an extension
 	 that redefines `AeCairoSurface >> newContext` cannot leave that checkout clean. The two are
 	 held together here, so a change upstream fails a test instead of quietly leaving a frame
-	 without its device scale or its quality options."
+	 without its device scale or its quality options. The guard that reinstalls our font manager
+	 is dropped before the comparison: it is a statement upstream has no reason to hold, and the
+	 pin is about the rest of the method."
 
 	| ours upstream |
-	ours := (VGAeCanvas >> #prepareForSurface:) sourceCode
+	ours := ((VGAeCanvas >> #prepareForSurface:) sourceCode
+		         copyReplaceAll: 'VGFontManager ensureUpstreamHoldsMine.'
+		         with: '')
 		        copyReplaceAll: 'VGAeTextContext unownedNewFor: aeCairoSurface'
 		        with: 'cairoSurface newContext'.
 	upstream := (AeCanvas >> #prepareForSurface:) sourceCode.

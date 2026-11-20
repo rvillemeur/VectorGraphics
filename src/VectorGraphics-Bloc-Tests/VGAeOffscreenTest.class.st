@@ -29,10 +29,14 @@ VGAeOffscreenTest >> tearDown [
 VGAeOffscreenTest >> testEnsureReadyStaysDerivedFromUpstream [
 	"My single override is Alexandrie's own method with the canvas class changed. Holding it
 	 against the upstream source means an upstream change to how the measurer is built is noticed
-	 here, and not in a layout that silently measures through the wrong fonts."
+	 here, and not in a layout that silently measures through the wrong fonts. The guard that
+	 reinstalls our font manager is dropped before the comparison: it is a statement upstream has
+	 no reason to hold, and the pin is about the rest of the method."
 
 	| ours upstream |
-	ours := (VGAeOffscreen >> #ensureReady) sourceCode
+	ours := ((VGAeOffscreen >> #ensureReady) sourceCode
+		         copyReplaceAll: 'VGFontManager ensureUpstreamHoldsMine.'
+		         with: '')
 		        copyReplaceAll: 'VGAeCanvas extent:'
 		        with: 'AeCanvas extent:'.
 	upstream := (BAOffscreen >> #ensureReady) sourceCode.
