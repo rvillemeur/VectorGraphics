@@ -18,6 +18,16 @@ Class {
 	#package : 'VectorGraphics-Bloc-FontEngine-Tests'
 }
 
+{ #category : 'accessing' }
+VGFontEngineTest >> defaultTimeLimit [
+	"Every test here poses the route, and posing it reads the fonts of this machine off the
+	 disk: VGFontManager class >> installGlobally builds a manager with scanDefaultDirectories
+	 every time, which is seconds rather than the ten SUnit allows a test. Without this a run
+	 reports a timeout where it should report which half of the route is wrong."
+
+	^ 2 minutes
+]
+
 { #category : 'running' }
 VGFontEngineTest >> setUp [
 	"Remember every piece of global state an installation writes, before a test writes any of
@@ -85,6 +95,22 @@ VGFontEngineTest >> testInstallingPosesTheCairoRouteWithOurFonts [
 	self
 		assert: VGFontManager managerUpstreamHolds
 		identicalTo: VGFontManager installedInstance
+]
+
+{ #category : 'tests' }
+VGFontEngineTest >> testTheBaselineHookPosesTheRouteItself [
+	"What a reader of the fonts group gets: Metacello sends this hook to the baseline once the
+	 engine's package is in, and the route is posed with nothing left to evaluate. The hook is
+	 run here rather than described, because it reaches the class through the environment —
+	 it is compiled into a baseline that must still load where this project is absent — and a
+	 wrong name there would be found by no other test."
+
+	VGFontEngine uninstall.
+	self deny: VGFontEngine isInstalled.
+
+	BaselineOfVectorGraphics new installTheFontEngine.
+
+	self assert: VGFontEngine isInstalled
 ]
 
 { #category : 'tests' }
