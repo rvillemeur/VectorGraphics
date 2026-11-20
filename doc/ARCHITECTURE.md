@@ -18,6 +18,11 @@ reader, which is why the glue sits in a package of its own: no edge runs from th
 font code or back. `VGArchitectureTest class >> allowedDependencies` states every edge, and its
 tests hold the statement against what the code really names. Sections 12 and 13 span all four.
 
+The canvas above them — `VectorGraphics-Canvas`, `VectorGraphics-Canvas-Raster` and
+`VectorGraphics-Canvas-Fonts`, which stand in for the Cairo layer — is not described here. Each of
+the three carries a package comment naming its tags and its entry points, and
+`CANVAS-SPLIT-PLAN.md` holds why they are three packages and what may name what between them.
+
 ## 1. Coordinate spaces — `VectorGraphics-Engine`
 
 There are two, and only one conversion between them.

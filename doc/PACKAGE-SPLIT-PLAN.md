@@ -5,6 +5,10 @@ loaded, tested and reused one at a time, each with its own tests package and its
 package.
 
 Written 5 November 2026, against `VectorGraphics` repository head `443fe8f9`, working copy clean.
+Done. The package names and the group names below are the ones of November 2026; the layer that was
+`VectorGraphics-Cairo` was split again in `CANVAS-SPLIT-PLAN.md`, into `VectorGraphics-Canvas`,
+`VectorGraphics-Canvas-Raster` and `VectorGraphics-Canvas-Fonts`, so read a `cairo` name below as
+the canvas trio.
 
 ## 1. What exists today
 

@@ -113,7 +113,7 @@ outgoing edge, and its examples have always lived in its own `Examples` tag.
 The gate is a third set of tests in the same new test class, and it is deliberately a small copy of
 what `VGCairoExamplesTest` does for the layers above. It cannot be a subclass of it:
 `VGArchitectureTest class >> allowedDependencies` gives `'VectorGraphics' -> #( )`, so no class of
-this package may name a class of `VectorGraphics-Cairo-Tests`. The tests: every example rebuilds its
+this package may name a class of `VectorGraphics-Canvas-Tests`. The tests: every example rebuilds its
 object on each call, every holder has a class comment, every view builds and fills its cells, and
 every view that has a gate answers it both ways.
 

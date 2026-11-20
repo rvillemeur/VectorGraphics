@@ -21,7 +21,7 @@ default renderer therefore stays Alexandrie's; this project is the replacement a
 
 ## Loading into Pharo
 
-The default load is the rasteriser and the Cairo replacement alone. Neither names a class of Bloc
+The default load is the rasteriser and the three canvas packages alone. None of them names a class of Bloc
 or of Alexandrie, so both load in an image that holds neither.
 
 ```smalltalk
@@ -32,7 +32,7 @@ Metacello new
     load
 ```
 
-Every layer above that is a group: `bloc` brings the renderer and Bloc itself, `cairo-tests` brings
+Every layer above that is a group: `bloc` brings the renderer and Bloc itself, `canvas-tests` brings
 the conformance corpus without Bloc, `vulkan` brings the device path and needs PharoVulkan loaded
 by hand, because it is not published. `fonts` brings the renderer and poses it, together with
 this project's font manager, as the load runs: its package carries a `postLoadDoIt:` sending
@@ -48,10 +48,17 @@ except the rasteriser, whose tests live in the `Tests` tag of `VectorGraphics` i
 
 | Where | Test classes |
 |---|---|
-| `VectorGraphics`, tag `Tests` | 22 classes: `VectorEngineAbstractTest`, `VectorEnginePixelTest`, `VectorEngineWholePixelTest`, `VectorCanvasTest`, the eight `Path…Test`, the nine `TT…`/`TrueType…Test`, `Int16PointArrayTest`, `FontFamilyTest`, `FormGlyphTest` |
-| `VectorGraphics-Cairo-Tests` | 21 classes: the `VGCairo…Test` family, `VGPaintTest`, `VGMeshTest`, `VGBlurTest`, `VGRasteriserTest`, and the gates `VGConformanceTest`, `VGAlexandrieCorpusTest`, `VGArchitectureTest`, `VGBackendSelectionTest`, `VGCairoExamplesTest` |
-| `VectorGraphics-Bloc-Tests` | `VGCanvasTest`, `VGRendererTest`, `VGFrameProfileTest`, `VGBlocExamplesTest` |
-| `VectorGraphics-Vulkan-Tests` | 18 classes: the `VGTiled…Test` family, `VGVulkan…Test`, the two benchmark tests, `VGKernelVisitCensusTest`, `VGBlurRoundingTest`, `VGVulkanExamplesTest` |
+| `VectorGraphics-Engine-Tests` | 8: `VectorEngineAbstractTest`, `VectorEnginePixelTest`, `VectorEngineWholePixelTest`, `VectorEngineBoundsFinderTest`, `VectorCanvasTest`, `PathCommandRunOnTest`, and the gates `VGEngineDocumentationTest` and `VGEngineExamplesTest` |
+| `VectorGraphics-Paths-Tests` | 6: the four `Path…Test`, and the gates of the package |
+| `VectorGraphics-TrueType-Tests` | 31: the `TT…`/`TrueType…Test` family, the twelve `TTCff…Test` of the Type 2 reader, `Int16PointArrayTest`, `FontFamilyTest`, `FormGlyphTest`, and the gates |
+| `VectorGraphics-Text-Tests` | 3: `VGTextDrawingTest` and the gates |
+| `VectorGraphics-Tests` | 1: `VectorGraphicsDocumentationTest`, the abstract gate the four above subclass |
+| `VectorGraphics-Canvas-Tests` | 15: the `VGCairo…Test` family, `VGPaintTest`, `VGMeshTest`, and the gates `VGConformanceTest`, `VGAlexandrieCorpusTest`, `VGArchitectureTest`, `VGCairoExamplesTest` |
+| `VectorGraphics-Canvas-Raster-Tests` | 5: `VGRasteriserTest`, `VGCairoClipTest`, `VGCairoStrokeTest`, `VGBlurTest`, `VGBackendSelectionTest` |
+| `VectorGraphics-Canvas-Fonts-Tests` | 1: `VGCairoTextTest` |
+| `VectorGraphics-Bloc-Tests` | 12: the canvas, renderer, offscreen, text and font manager suites, `VGFrameProfileTest`, `VGBlocExamplesTest` |
+| `VectorGraphics-Bloc-FontEngine-Tests` | 2: `VGFontEngineTest`, `VGFontEngineExamplesTest` |
+| `VectorGraphics-Vulkan-Tests` | 17: the `VGTiled…Test` family, `VGVulkan…Test`, the two benchmark tests, `VGKernelVisitCensusTest`, `VGBlurRoundingTest`, `VGVulkanExamplesTest` |
 
 ```smalltalk
 VGCairoDrawingTest suite run.
@@ -70,49 +77,52 @@ Three things about the counts and the runs are worth knowing before trusting eit
 
 ## Package Structure
 
-Ten packages, source layout `src/<PackageName>/` in Tonel format. Iceberg manages commits of
-`src/` — do not use git directly for it, and never hand-edit a `.class.st` file.
+Thirty-five packages, source layout `src/<PackageName>/` in Tonel format. Iceberg manages commits
+of `src/` — do not use git directly for it, and never hand-edit a `.class.st` file. Each code
+package has a sibling `-Examples` and a sibling `-Tests` package; the table names the code ones and
+the counts are of classes in the image.
 
 | Package | Classes | Holds |
 |---|---|---|
-| `VectorGraphics` | 68 | The rasteriser, under tags `Kernel`, `PathCommands`, `TrueType`, `SVG`, plus its own `Examples` and `Tests` tags |
-| `VectorGraphics-Cairo` | 73 | The Cairo replacement: `Surface`, `Context`, `Path`, `Paint`, `Pattern`, `Text`, `Matrix`, `Blur`, `Compositing`, `Display list`, `Rasterising`, `Export`, `Backend`, `Skeleton`, `Inventory`, `Reflection` |
-| `VectorGraphics-Bloc` | 8 | `Backend` (`VGCanvas`, `VGRenderer`, `VGOffscreen`), `Hosts`, `Exporters`, `Profiling` |
-| `VectorGraphics-Vulkan` | 36 | The device path: `Backend`, `Tiles`, `Kernels`, `Blur`, `Budget`, `Present` |
-| `VectorGraphics-Cairo-Examples` | 25 | One `<Subject>Examples` class per subject of the Cairo layer |
-| `VectorGraphics-Bloc-Examples` | 3 | The canvas, the renderer and the host examples |
-| `VectorGraphics-Vulkan-Examples` | 13 | The device, tile, kernel and benchmark examples |
-| `VectorGraphics-Cairo-Tests` | 26 | Tags `Tests`, `Fixtures` and `Conformance`, which holds `VGConformanceTest`, the gate that reads the corpus |
-| `VectorGraphics-Bloc-Tests` | 6 | The renderer, canvas and frame profile suites |
-| `VectorGraphics-Vulkan-Tests` | 22 | Tags `Tests` and `Fixtures` |
-| `VectorGraphics-Conformance` | 7 | The corpus every backend is compared against: the cases, the ported Alexandrie corpus, the `Form` comparison. No `TestCase` |
-| `VectorGraphics-Benchmarks` | 3 | The frame harness: the drawing kit, the stage benchmark and the device benchmark. No `TestCase` |
+| `VectorGraphics` | 1 | The front page: the package comment and the Renraku rule configuration, no code |
+| `VectorGraphics-Engine` | 7 | The scan-line rasteriser, tag `Kernel`: the canvas and the three engines |
+| `VectorGraphics-Paths` | 15 | The SVG path commands, tag `Commands`, and the parser, tag `SVG` |
+| `VectorGraphics-TrueType` | 44 | Reading a `.ttf`: tags `Reading`, `Glyphs`, `Fonts` and `CFF`, the Type 2 charstring reader |
+| `VectorGraphics-Text` | 1 | The glue that draws a string with the engine: extension methods only |
+| `VectorGraphics-Canvas` | 47 | The canvas that replaces Cairo: `Surface`, `Context`, `Display list`, `Path`, `Paint`, `Pattern`, `Compositing`, `Matrix`, `Export`, `Inventory`, `Reflection`, `Skeleton` |
+| `VectorGraphics-Canvas-Raster` | 14 | Its software renderer: `Backend`, `Rasterising`, `Path` (the stroker), `Paint` (the mesh), `Blur` |
+| `VectorGraphics-Canvas-Fonts` | 13 | Its scaled fonts, tag `Text`: the face, the scaled font, the glyph atlas and the extents |
+| `VectorGraphics-Bloc` | 16 | `Backend` (`VGCanvas`, `VGRenderer`, `VGOffscreen`), `Hosts`, `Exporters`, `Profiling`, `Fonts`, `Text` |
+| `VectorGraphics-Bloc-FontEngine` | 1 | `VGFontEngine`: one send that poses this project's fonts in Bloc, and one that gives the image back |
+| `VectorGraphics-Vulkan` | 37 | The device path: `Backend`, `Tiles`, `Kernels`, `Blur`, `Budget`, `Present` |
+| `VectorGraphics-Conformance` | 8 | The corpus every backend is compared against: the cases, the ported Alexandrie corpus, the `Form` comparison. No `TestCase` |
+| `VectorGraphics-Benchmarks` | 4 | The frame harness: the drawing kit, the stage benchmark and the device benchmark. No `TestCase` |
 
 ## Which package may name which
 
 This file does not say. `VGArchitectureTest class >> allowedDependencies` does, with one entry per
-package, and its 45 tests hold the code, the baseline and the table to each other: a package absent
+package, and its 60 tests hold the code, the baseline and the table to each other: a package absent
 from the table fails a test, and so does a reference no entry allows. Adding a dependency means
 stating it in the table and in `BaselineOfVectorGraphics`, in the commit that needs it.
 
 Four facts of that table are easy to get wrong.
 
-- The engine depends on nothing. The default group — the engine and the Cairo replacement — names
+- The engine depends on nothing. The default group — the engine and the canvas — names
   no class of Bloc or of Alexandrie, and two tests hold that in both directions, by literal and by
   superclass.
-- `VectorGraphics-Cairo-Examples` and `VectorGraphics-Cairo-Tests` name each other, because
+- `VectorGraphics-Canvas-Examples` and `VectorGraphics-Canvas-Tests` name each other, because
   `VGArchitectureExamples` has the architecture gate itself for a subject. The baseline states
   one direction only, since a cycle has no load order. It is the one pair left: the conformance
   corpus and the benchmark harness moved into packages of their own in the review of 2026-11,
   which ended the second cycle.
-- The Cairo tests do name Alexandrie, on purpose: proving this rasteriser matches live Cairo byte
+- The canvas tests do name Alexandrie, on purpose: proving this rasteriser matches live Cairo byte
   for byte needs that positive control. No other package may.
 - Only the Vulkan family may name a PharoVulkan class. That rule lives in
   `VGBackendSelectionTest`, through `VGCairoReferenceScanner`, not in `allowedDependencies`.
 
 ## Architecture
 
-### The rasteriser (`VectorGraphics`)
+### The rasteriser (`VectorGraphics-Engine`)
 
 ```
 VectorCanvas (subclass of Canvas)
@@ -175,14 +185,20 @@ FontFamily                    registry of available families; class-side Availab
 `Int16PointArray` (subclass of `DoubleByteArray`) stores signed 16-bit x/y glyph coordinates
 efficiently.
 
-### The Cairo replacement (`VectorGraphics-Cairo`)
+### The canvas (`VectorGraphics-Canvas`, `-Canvas-Raster`, `-Canvas-Fonts`)
 
 `VGCairoImageSurface` and `VGCairoContext` answer the selectors of `AeCairoImageSurface` and
 `AeCairoContext`. A surface owns a `VGDisplayList` and every context drawing on it records
-there, so that two contexts on one surface draw in the order their calls were made. A backend
-drains the list through `drainInto:`: `VGSoftwareBackend` rasterises it with the engine above,
-`VGVulkanBackend` fills it on the device. `VGCairoReferenceScanner`, in the `Reflection` tag,
-is how the architecture tests read what a package really names.
+there, so that two contexts on one surface draw in the order their calls were made. No class of
+`VectorGraphics-Canvas` calls a renderer: a backend drains the list through `drainInto:`, and
+`VGSoftwareBackend`, in `VectorGraphics-Canvas-Raster`, rasterises it with the engine above, while
+`VGVulkanBackend` fills it on the device. `VectorGraphics-Canvas-Fonts` holds a face at a size,
+its glyph atlas and the extents text is measured by; it is a leaf, so a font can be scaled with no
+renderer loaded. `VGCairoReferenceScanner`, in the `Reflection` tag, is how the architecture tests
+read what a package really names. The class names keep the `VGCairo` prefix: they are the Cairo
+selectors this layer stands in for, and renaming them would break every caller.
+`CANVAS-SPLIT-PLAN.md` holds the split of November 2026, and each package comment holds its own
+tags and entry points.
 
 ### The Bloc backend (`VectorGraphics-Bloc`)
 
@@ -231,6 +247,7 @@ its `…Context:` gate. Then run the critics on what changed.
 
 ## Where the rest is written down
 
-`README.md` holds the packages and the thirteen groups. `doc/USAGE.md` holds the three levels of
+`README.md` holds every package and every group. `doc/USAGE.md` holds the three levels of
 use and the corpus. The unit specs and every measurement live in `VECTORCANVAS-PLAN.md` and
 `VECTORCANVAS-PRESENT-PLAN.md`, kept in the PharoVulkan working directory beside this checkout.
+out.

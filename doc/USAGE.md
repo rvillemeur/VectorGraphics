@@ -12,24 +12,24 @@ The groups of the baseline follow these levels, and the default load stops below
 
 | Level | Group | What the group brings |
 |---|---|---|
-| A surface and a context | the default load | `VectorGraphics` and `VectorGraphics-Cairo`, which name no class of Bloc or of Alexandrie |
+| A surface and a context | the default load | `VectorGraphics` and the three canvas packages, which name no class of Bloc or of Alexandrie |
 | A canvas, and all of Bloc | `bloc` | `VectorGraphics-Bloc`, and Bloc itself from `github://pharo-graphics/Bloc:master` |
 | The experiment corpus | `conformance` | `VectorGraphics-Conformance`, with no test package and no Bloc |
-| The corpus and the suites that read it | `cairo-tests` | `VectorGraphics-Cairo-Tests`, the Cairo examples and the corpus below them, still without Bloc |
-| The frame benchmarks | `benchmarks` | `VectorGraphics-Benchmarks`, which drives the Cairo, Bloc and Vulkan paths over one frame |
+| The corpus and the suites that read it | `canvas-tests` | `VectorGraphics-Canvas-Tests`, the canvas examples and the corpus below them, still without Bloc |
+| The frame benchmarks | `benchmarks` | `VectorGraphics-Benchmarks`, which drives the canvas, Bloc and Vulkan paths over one frame |
 
 ```smalltalk
 Metacello new
 	baseline: 'VectorGraphics';
 	repository: 'github://rvillemeur/VectorGraphics:main/src';
-	load: 'bloc'.    "or 'cairo-tests', or nothing at all for the default"
+	load: 'bloc'.    "or 'canvas-tests', or nothing at all for the default"
 ```
 
-## The Cairo layer: a surface and a context
+## The canvas: a surface and a context
 
 `VGCairoImageSurface` stands in for `AeCairoImageSurface` and answers a `VGCairoContext`, which
 carries the selectors of `AeCairoContext`.
-Both are in `VectorGraphics-Cairo`, which the default load brings, so this level runs in an image
+Both are in `VectorGraphics-Canvas`, which the default load brings, so this level runs in an image
 that holds neither Bloc nor Alexandrie.
 
 ```smalltalk
@@ -98,7 +98,7 @@ measurements is `VGOffscreen instance textMeasurer`.
 This baseline does not load BookletGraphics, so load it from its own repository before a walk of
 the corpus; Alexandrie itself ships with Pharo.
 The corpus is in `VectorGraphics-Conformance`, which the `conformance` group brings on its own:
-it holds no `TestCase`, so a comparison can be drawn with no suite in the image. `cairo-tests`
+it holds no `TestCase`, so a comparison can be drawn with no suite in the image. `canvas-tests`
 brings it too, for the gate that reads it.
 The classes there do name Alexandrie, on purpose: a comparison against live Cairo needs that
 positive control, and `VGArchitectureTest` states the exception.
