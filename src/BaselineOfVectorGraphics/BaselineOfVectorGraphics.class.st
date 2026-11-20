@@ -43,14 +43,15 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 	 path. Each names every package it really depends on, and not only the nearest one that would
 	 drag the rest in: VGArchitectureTest holds this declaration against the references the code
 	 makes.
-	 The canvas trio is nearly a chain. The font layer is a leaf, so it names the font reader and
+	 The canvas trio is a chain. The font layer is a leaf, so it names the font reader and
 	 nothing else of this project. The canvas names the renderer and the font layer. The
-	 renderer names the canvas back, four times, which is the one cycle of the trio and the one
-	 edge left out here: VGArchitectureTest class >> edgesTheBaselineCannotDeclare holds it,
-	 since a pair declared both ways has no load order. The second such edge is the canvas
-	 examples on the canvas tests, which is the cycle the mirror packages make: the tests build
-	 their subject from an example and an example of the architecture table reads the test class
-	 that holds it.
+	 renderer names no package of this project: it read the canvas back four times until unit 8
+	 of the split removed those references, so the trio has no cycle of its own and no edge of it
+	 is left out here. One edge is still left out, the canvas examples on the canvas tests, which
+	 is the cycle the mirror packages make: the tests build their subject from an example and an
+	 example of the architecture table reads the test class that holds it. VGArchitectureTest
+	 class >> edgesTheBaselineCannotDeclare holds that edge, since a pair declared both ways has
+	 no load order.
 	 Each of the three has its own examples and tests package, declared from the references each
 	 one makes. The tests of the canvas require the tests of the renderer, which is an edge
 	 between two test packages this project already allows elsewhere: the canvas tests draw a

@@ -365,6 +365,26 @@ VGRasteriserTest >> testTheCoverageOfACircleSumsToItsArea [
 ]
 
 { #category : 'tests' }
+VGRasteriserTest >> testTheDefaultAntialiasOfTheRendererIsTheModeACanvasStateStartsIn [
+	"The mode a caller who names none gets. The renderer keeps the name itself, so that no class
+	 of it needs a class of the canvas to say what the default is, and this test is the one place
+	 the two sides are held together."
+
+	self
+		assert: VGSegments defaultAntialias
+		equals: VGCairoState antialiasNames first.
+	self
+		assert: (VGSegments coordinates: #( ) fillRule: #winding) antialias
+		equals: VGSegments defaultAntialias.
+	self
+		assert: (VGRasteriser
+				 segments: (VGSegments coordinates: #( ) fillRule: #winding)
+				 fillRule: #winding
+				 clip: (VGClip bounds: (0 @ 0 corner: 1 @ 1))) segments antialias
+		equals: VGSegments defaultAntialias
+]
+
+{ #category : 'tests' }
 VGRasteriserTest >> testTheHoleOfANestedSquareIsEnclosedUnderWindingAndNotUnderEvenOdd [
 	"The question is asked under the fill rule the shape carries, and not of its outline: the
 	 middle of two nested squares wound the same way is solid under the winding rule and hollow

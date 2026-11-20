@@ -43,8 +43,10 @@ VGStrokerExamples class >> strokerOnAFlattenedCurve [
 		curveVia: 20 @ 4 via: 44 @ 60 to: 58 @ 16.
 	^ VGStroker
 		  path: builder path
-		  matrix: VGCairoMatrix newIdentity
-		  lineWidth: 6.0
+		  state: (VGCairoState new
+				   matrix: VGCairoMatrix newIdentity;
+				   lineWidth: 6.0;
+				   yourself)
 ]
 
 { #category : 'examples' }
@@ -60,7 +62,12 @@ VGStrokerExamples class >> strokerUnderAnAnisotropicScale [
 	builder
 		moveTo: (matrix value: 4 @ 8);
 		lineTo: (matrix value: 28 @ 8).
-	^ VGStroker path: builder path matrix: matrix lineWidth: 2.0
+	^ VGStroker
+		  path: builder path
+		  state: (VGCairoState new
+				   matrix: matrix;
+				   lineWidth: 2.0;
+				   yourself)
 ]
 
 { #category : 'examples' }

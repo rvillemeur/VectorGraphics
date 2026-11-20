@@ -45,7 +45,7 @@ VGCoonsPatch class >> channelsOf: aColorOrChannels [
 
 	^ aColorOrChannels isCollection
 		  ifTrue: [ aColorOrChannels asArray ]
-		  ifFalse: [ VGPaint rgbaOf: aColorOrChannels ]
+		  ifFalse: [ aColorOrChannels asVGChannels ]
 ]
 
 { #category : 'constants' }

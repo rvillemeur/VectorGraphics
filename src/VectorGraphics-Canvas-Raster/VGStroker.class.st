@@ -5,7 +5,7 @@ My path is in device space, as every built path is, and the line width is a user
 
 I emit one quadrilateral per segment and a disc at every vertex where two segments meet, all wound the same way so the winding rule sees their union. Cairo's real caps, joins and miter limit arrive in unit 1.4; a disc is the join that needs no orientation and never leaves the stroke.
 
-`VGStroker path: aPath matrix: aMatrix lineWidth: aNumber` then `segments` is the whole of my protocol.
+`VGStroker path: aPath state: aState` then `segments` is the whole of my protocol. My state is any object that answers `matrix`, `lineWidth`, `strokeStyle`, `tolerance` and `antialias`: the canvas passes a `VGCairoState`, and naming no class of the canvas is what keeps this package a leaf.
 "
 Class {
 	#name : 'VGStroker',
@@ -25,17 +25,6 @@ VGStroker class >> minimumDiscPointCount [
 	 tolerance the shape stops mattering, but a triangle would still look like a triangle."
 
 	^ 8
-]
-
-{ #category : 'instance creation' }
-VGStroker class >> path: aPath matrix: aMatrix lineWidth: aNumber [
-	"The two numbers that were all a stroke needed before the caps, joins and dashes of unit 1.4,
-	 as a state of their own. Every other parameter keeps its Cairo default."
-
-	^ self path: aPath state: (VGCairoState new
-			   matrix: aMatrix;
-			   lineWidth: aNumber;
-			   yourself)
 ]
 
 { #category : 'instance creation' }

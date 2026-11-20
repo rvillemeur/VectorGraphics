@@ -150,16 +150,10 @@ VGPaint class >> paintTag [
 
 { #category : 'converting' }
 VGPaint class >> rgbaOf: aColor [
-	"The four channels of a colour as floats in zero to one. A Pharo Color stores ten bits a
-	 channel, so this is where the quantisation stops: every interpolation past this point is in
-	 floating point, which is what live Cairo does. Alexandrie reads the same four accessors off
-	 the same Color, so an input colour quantises identically on both sides."
+	"The four channels of a colour as floats in zero to one, which Color answers itself: the
+	 conversion lives there so that the renderer reads it without naming a class of mine."
 
-	^ {
-		  aColor red asFloat.
-		  aColor green asFloat.
-		  aColor blue asFloat.
-		  aColor alpha asFloat }
+	^ aColor asVGChannels
 ]
 
 { #category : 'abi' }

@@ -28,7 +28,7 @@ VGSegments class >> coordinates: anArray fillRule: aSymbol [
 	^ self
 		  coordinates: anArray
 		  fillRule: aSymbol
-		  antialias: VGCairoState antialiasNames first
+		  antialias: self defaultAntialias
 ]
 
 { #category : 'instance creation' }
@@ -37,6 +37,16 @@ VGSegments class >> coordinates: anArray fillRule: aSymbol antialias: anotherSym
 		  setCoordinates: anArray
 		  fillRule: aSymbol
 		  antialias: anotherSymbol
+]
+
+{ #category : 'constants' }
+VGSegments class >> defaultAntialias [
+	"The antialiasing mode a caller who names none gets, which is Cairo's own default: the
+	 backend decides. The name lives here and not with the state of the canvas because the
+	 renderer is what acts on it: a renderer loaded on its own must still know what a caller
+	 who named no mode meant. VGRasteriserTest holds it against the state's own list."
+
+	^ #default
 ]
 
 { #category : 'instance creation' }

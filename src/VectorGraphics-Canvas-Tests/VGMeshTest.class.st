@@ -102,6 +102,28 @@ VGMeshTest >> straightBoundaryThrough: fourCorners [
 ]
 
 { #category : 'tests' }
+VGMeshTest >> testAColourGivesTheSameFourChannelsToAPaintAndToAPatch [
+	"The quantisation of a Pharo Color into four floats happens once, on the Color itself, so
+	 that the renderer converts a corner colour without naming a class of the canvas. A paint
+	 and a patch read the same conversion."
+
+	| colour |
+	colour := Color r: 0.25 g: 0.5 b: 0.75 alpha: 0.5.
+	self
+		assert: colour asVGChannels
+		equals: {
+				colour red asFloat.
+				colour green asFloat.
+				colour blue asFloat.
+				colour alpha asFloat }.
+	self assert: (VGPaint rgbaOf: colour) equals: colour asVGChannels.
+	self assert: (VGCoonsPatch channelsOf: colour) equals: colour asVGChannels.
+	self
+		assert: (VGCoonsPatch channelsOf: colour asVGChannels)
+		equals: colour asVGChannels
+]
+
+{ #category : 'tests' }
 VGMeshTest >> testAMeshOfNoPatchesPaintsNothing [
 	"The degenerate state. A pattern asked for before a patch is begun, or one whose patch has
 	 fewer than three sides, paints nothing anywhere, as a gradient of no stops does."

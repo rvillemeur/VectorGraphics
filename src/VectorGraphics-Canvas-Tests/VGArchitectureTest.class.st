@@ -76,12 +76,13 @@ VGArchitectureTest class >> allowedDependencies [
 			   which needs no device, no library and no window; VectorGraphics-Canvas-Fonts is
 			   the font and glyph layer, a leaf above the font reader that names nothing else of
 			   this project.
-			   The renderer names the canvas back, four times, which is the one cycle of the
-			   trio: it is the deferred review point of the split, and the half the baseline
-			   leaves out, which edgesTheBaselineCannotDeclare states."
+			   The renderer names no package of this project. The four references it made to
+			   the canvas were the deferred review point of the split, and unit 8 removed
+			   them: the default antialias is a constant of the renderer itself and the colour
+			   conversion is a Color extension the renderer owns."
 			  'VectorGraphics-Canvas'
 			  -> #( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Raster' ).
-			  'VectorGraphics-Canvas-Raster' -> #( 'VectorGraphics-Canvas' ).
+			  'VectorGraphics-Canvas-Raster' -> #( ).
 			  'VectorGraphics-Canvas-Fonts' -> #( 'VectorGraphics-TrueType' ).
 			  "Each of the three has its examples and its tests package, as of unit 6.6 of the
 			   split: a test or an examples class belongs to the package of its subject, so the
@@ -241,13 +242,12 @@ VGArchitectureTest class >> edgesTheBaselineCannotDeclare [
 	 cycle: the reverse edge is declared, so declaring this one as well would leave Metacello
 	 with no load order. testEveryEdgeTheBaselineCannotDeclareIsOneHalfOfACycle reads the
 	 reverse out of the baseline, so an edge nobody declared cannot hide here.
-	 The canvas examples name the architecture test their own example opens; the renderer names
-	 three defaults and one colour conversion of the canvas, which is the deferred review point
-	 of the split of 2026-11."
+	 The canvas examples name the architecture test their own example opens, which is the
+	 one edge left of the two the split had: the renderer's four references to the canvas
+	 went in unit 8."
 
 	^ {
-		  ('VectorGraphics-Canvas-Examples' -> 'VectorGraphics-Canvas-Tests').
-		  ('VectorGraphics-Canvas-Raster' -> 'VectorGraphics-Canvas') }
+		  ('VectorGraphics-Canvas-Examples' -> 'VectorGraphics-Canvas-Tests') }
 ]
 
 { #category : 'layering' }

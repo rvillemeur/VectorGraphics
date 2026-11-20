@@ -47,7 +47,7 @@ VGRasteriser class >> segments: anArray fillRule: aSymbol clip: aClip [
 	^ self
 		  segments: anArray
 		  fillRule: aSymbol
-		  antialias: VGCairoState antialiasNames first
+		  antialias: VGSegments defaultAntialias
 		  clip: aClip
 ]
 
