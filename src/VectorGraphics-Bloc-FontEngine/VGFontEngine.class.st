@@ -78,10 +78,12 @@ VGFontEngine class >> install [
 VGFontEngine class >> isInstalled [
 	"Whether the route is posed right now. The question is put to the image rather than to a
 	 flag of mine: a flag and the two slots it describes could fall out of step, and a reader
-	 who posed a renderer by hand after loading this package deserves the honest answer."
+	 who posed a renderer by hand after loading this package deserves the honest answer. The
+	 manager is read from the slot every drawing reads, not from the memory of my own
+	 installation, because a reset of that slot takes the route away without telling me."
 
 	^ BlHostRenderer preferableClass == VGAeRenderer and: [
-		  VGFontManager installedInstance notNil ]
+		  VGFontManager managerUpstreamHolds isKindOf: VGFontManager ]
 ]
 
 { #category : 'installing' }

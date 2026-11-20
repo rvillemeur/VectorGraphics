@@ -12,7 +12,8 @@ Class {
 		'previousRenderer',
 		'previousGlobalInstance',
 		'previousInstalledInstance',
-		'previousFontFamilyState'
+		'previousFontFamilyState',
+		'previousEngineMemory'
 	],
 	#category : 'VectorGraphics-Bloc-FontEngine-Tests',
 	#package : 'VectorGraphics-Bloc-FontEngine-Tests'
@@ -29,34 +30,59 @@ VGFontEngineTest >> defaultTimeLimit [
 ]
 
 { #category : 'running' }
+VGFontEngineTest >> poseNoRoute [
+	"Leave the image as one that never posed the route: a renderer of Bloc's that is not ours,
+	 no manager of ours anywhere, and nothing remembered by VGFontEngine. The slots of the
+	 engine are written directly, having no writer of their own, which is how tearDown puts
+	 back what was there."
+
+	BlHostRenderer preferableClass: (BlHostRenderer availableClasses
+			 detect: [ :each | each ~~ VGAeRenderer ]).
+	VGFontManager uninstallGlobally.
+	#( previousRenderer previousManager ) do: [ :name |
+		(VGFontEngine class slotNamed: name) write: nil to: VGFontEngine ]
+]
+
+{ #category : 'running' }
 VGFontEngineTest >> setUp [
 	"Remember every piece of global state an installation writes, before a test writes any of
-	 it: Bloc's renderer choice, upstream's manager slot, ours, and the three class variables
-	 of FontFamily. The dictionary of families is copied, since an installation registers into
-	 the very object tearDown puts back."
+	 it: Bloc's renderer choice, upstream's manager slot, ours, the two slots this class
+	 remembers an image by, and the three class variables of FontFamily. The dictionary of
+	 families is copied, since an installation registers into the very object tearDown puts
+	 back.
+
+	 Then put the image in the state these tests start from, the route not posed: an image that
+	 loaded the fonts group has it posed already, and a test of what installing does to an
+	 image that never posed it would read what the load did instead."
 
 	super setUp.
 	previousRenderer := BlHostRenderer preferableClass.
 	previousGlobalInstance := VGFontManager managerUpstreamHolds.
 	previousInstalledInstance := VGFontManager installedInstance.
+	previousEngineMemory := #( previousRenderer previousManager ) collect: [ :name |
+		                        (VGFontEngine class slotNamed: name) read: VGFontEngine ].
 	previousFontFamilyState := #( AvailableFamilies DefaultFamilyName
 	                              DefaultPointSize ) collect: [ :name |
-		                          (FontFamily classPool at: name) copy ]
+		                          (FontFamily classPool at: name) copy ].
+	self poseNoRoute
 ]
 
 { #category : 'running' }
 VGFontEngineTest >> tearDown [
 	"Put the image back the way I found it, whichever way the test went. Upstream's slot is
 	 written through the project's own writer, since uninstallGlobally would leave it nil and
-	 this image had a manager there before I ran; ours is written directly, having no writer of
-	 its own. Both offscreens are reset because each caches an AeCanvas whose faces were
-	 resolved through whichever manager was posed when it was built."
+	 this image had a manager there before I ran; ours and the two the engine remembers an
+	 image by are written directly, having no writer of their own. Both offscreens are reset
+	 because each caches an AeCanvas whose faces were resolved through whichever manager was
+	 posed when it was built."
 
 	BlHostRenderer preferableClass: previousRenderer.
 	(VGFontManager class slotNamed: #installedInstance)
 		write: previousInstalledInstance
 		to: VGFontManager.
 	VGFontManager restoreUpstreamManager: previousGlobalInstance.
+	#( previousRenderer previousManager ) with: previousEngineMemory do: [ :name :value |
+		(VGFontEngine class slotNamed: name) write: value to: VGFontEngine ].
 	#( AvailableFamilies DefaultFamilyName DefaultPointSize )
 		with: previousFontFamilyState
 		do: [ :name :value | FontFamily classPool at: name put: value ].
@@ -98,6 +124,24 @@ VGFontEngineTest >> testInstallingPosesTheCairoRouteWithOurFonts [
 ]
 
 { #category : 'tests' }
+VGFontEngineTest >> testNoFaceOfFreeTypeIsResolvedOnceTheRouteIsPosed [
+	"The point of the engine: with the route posed, nothing a drawing asks for answers a face of
+	 FreeType, neither a family the catalogue holds nor one it does not — an unknown family is
+	 answered the manager's own default face, which is ours too."
+
+	| converter resolved |
+	VGFontEngine install.
+	converter := BAFontConverter new.
+	resolved := #( 'DejaVu Sans' 'Source Sans Pro' 'No Such Family At All' ) collect: [ :familyName |
+		            converter faceFor: (BlFont new
+				             familyName: familyName;
+				             yourself) ].
+	resolved do: [ :each |
+		self assert: each class equals: VGFontFace.
+		self deny: (each isKindOf: AeFTFace) ]
+]
+
+{ #category : 'tests' }
 VGFontEngineTest >> testTheBaselineHookPosesTheRouteItself [
 	"What a reader of the fonts group gets: Metacello sends this hook to the baseline once the
 	 engine's package is in, and the route is posed with nothing left to evaluate. The hook is
@@ -111,6 +155,58 @@ VGFontEngineTest >> testTheBaselineHookPosesTheRouteItself [
 	BaselineOfVectorGraphics new installTheFontEngine.
 
 	self assert: VGFontEngine isInstalled
+]
+
+{ #category : 'tests' }
+VGFontEngineTest >> testTheFaceADrawingResolvesIsStillOursAfterUpstreamsSlotWasReset [
+	"The other half of the route: a canvas built to draw, not to measure. A reader who emptied
+	 upstream's slot and then draws must still draw with our faces, since the canvas is ours
+	 and marshals no face of another kind."
+
+	| font |
+	VGFontEngine install.
+	AeFontManager resetGlobalInstance.
+	VGAeCanvas extent: 1 @ 1.
+
+	font := BlFont new
+		        familyName: BlFont defaultFamilyName;
+		        yourself.
+	self assert: (BAFontConverter new faceFor: font) class equals: VGFontFace
+]
+
+{ #category : 'tests' }
+VGFontEngineTest >> testTheFaceAReaderResolvesIsStillOursAfterUpstreamsSlotWasReset [
+	"The one place a drawing gets a face is BAFontConverter >> faceFor:, which reads
+	 AeFontManager globalInstance and falls back on its default face. A reader who empties that
+	 slot — AeFontManager resetGlobalInstance, which an example of Album sends before scanning
+	 the fonts itself — leaves a stock manager of FreeType faces there, and our scaled font
+	 dies on one with 'AeFTFace >> #unitsPerEm'. Measuring is where our route starts, so the
+	 manager this class installed is back in the slot by the time a face is asked for."
+
+	| font |
+	VGFontEngine install.
+	AeFontManager resetGlobalInstance.
+	VGAeOffscreen instance ensureReady.
+
+	font := BlFont new
+		        familyName: BlFont defaultFamilyName;
+		        yourself.
+	self assert: (BAFontConverter new faceFor: font) class equals: VGFontFace
+]
+
+{ #category : 'tests' }
+VGFontEngineTest >> testTheRouteIsNotPosedOnceUpstreamsOwnSlotHasBeenReset [
+	"AeFontManager resetGlobalInstance empties the slot every drawing reads, and the next
+	 reader of that slot builds a stock manager of FreeType faces. The route is gone at that
+	 point, whatever this class remembers of its own installation: an example of Album does
+	 exactly this reset before scanning the fonts itself, and a true answer here would say the
+	 drawings go through our faces while they go through upstream's."
+
+	VGFontEngine install.
+	self assert: VGFontEngine isInstalled.
+
+	AeFontManager resetGlobalInstance.
+	self deny: VGFontEngine isInstalled
 ]
 
 { #category : 'tests' }

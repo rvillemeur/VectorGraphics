@@ -17,13 +17,17 @@ Class {
 
 { #category : 'initialization' }
 VGAeCanvas >> prepareForSurface: aeCairoSurface [
-	"Alexandrie's own method with one send changed: the context is built by `VGAeTextContext`
+	"Alexandrie''s own method with two sends changed. The context is built by `VGAeTextContext`
 	 rather than asked of the surface, which would answer an `AeCairoContext` and die marshalling
 	 one of our scaled fonts. Substituting the context at `AeCairoSurface >> newContext` was
 	 withdrawn in unit 4.6 of the font plan, because an extension that redefines an upstream
 	 method cannot leave that checkout clean, so the decision is taken here instead.
-	 `VGAeCanvasTest` holds the rest of the method against the upstream source."
+	 The manager is checked for the same reason it is checked when measuring: the faces this
+	 canvas draws come from the slot upstream nils at every image start, and a face of
+	 upstream''s own kind breaks in our scaled font.	 Nothing holds the rest of the method against the upstream source: a change of Alexandrie's
+	 own prepareForSurface: has to be read by hand when the dependency is raised."
 
+	VGFontManager ensureUpstreamHoldsMine.
 	cairoSurface := aeCairoSurface.
 	cairoContext := VGAeTextContext unownedNewFor: aeCairoSurface.
 	deviceScaleMatrix := cairoSurface deviceScaleMatrix.

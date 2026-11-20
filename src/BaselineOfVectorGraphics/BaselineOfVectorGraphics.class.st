@@ -132,8 +132,8 @@ BaselineOfVectorGraphics >> declareFontEnginePackagesOn: spec [
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-FontEngine'
-					   'VectorGraphics-Bloc-FontEngine-Examples' 'VectorGraphics-Cairo-Tests'
-					   'VectorGraphics-TrueType' ) ]
+					   'VectorGraphics-Bloc-FontEngine-Examples' 'VectorGraphics-Cairo'
+					   'VectorGraphics-Cairo-Tests' 'VectorGraphics-TrueType' ) ]
 ]
 
 { #category : 'baselines' }

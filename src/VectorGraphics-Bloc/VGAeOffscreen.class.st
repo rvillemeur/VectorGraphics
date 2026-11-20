@@ -21,8 +21,12 @@ Class {
 { #category : 'api' }
 VGAeOffscreen >> ensureReady [
 	"The inherited method builds the measuring canvas by naming `AeCanvas`, which is the only
-	 backend decision in this class."
+	 backend decision in this class.
+	 Every measurement reaches this method through BAOffscreen >> textMeasurer, which is why
+	 the manager is checked here: the faces a measurement resolves come from the slot upstream
+	 nils at every image start, and a face of upstream''s own kind breaks in our scaled font."
 
+	VGFontManager ensureUpstreamHoldsMine.
 	(aeCanvas notNil and: [ aeCanvas isValid ]) ifTrue: [ ^ self ].
 	aeCanvas := VGAeCanvas extent: 1 @ 1.
 	textMeasurer := BATextMeasurer new

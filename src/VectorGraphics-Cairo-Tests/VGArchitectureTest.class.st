@@ -104,13 +104,16 @@ VGArchitectureTest class >> allowedDependencies [
 			  "The font engine is the one object the fonts group loads for: it poses the manager
 			   and the renderer that make Bloc draw text with glyphs of this project, so it names
 			   the package holding both and nothing else. Its examples name it alone, and its
-			   tests name the three packages of the route they install and give back."
+			   tests name the three packages of the route they install and give back, and the
+			   face class of the Cairo package, which is what the engine makes every drawing
+			   resolve instead of a face of FreeType."
 			  'VectorGraphics-Bloc-FontEngine' -> #( 'VectorGraphics-Bloc' ).
 			  'VectorGraphics-Bloc-FontEngine-Examples'
 			  -> #( 'VectorGraphics-Bloc-FontEngine' 'VectorGraphics-TrueType' ).
 			  'VectorGraphics-Bloc-FontEngine-Tests'
 			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-FontEngine'
-				    'VectorGraphics-Bloc-FontEngine-Examples' 'VectorGraphics-TrueType' ).
+				    'VectorGraphics-Bloc-FontEngine-Examples' 'VectorGraphics-Cairo'
+				    'VectorGraphics-TrueType' ).
 			  "The device path reads the frame unit 1.11 profiles, which is drawn through the Bloc
 			   renderer, so binning and the budget name that package as well as the display list."
 			  'VectorGraphics-Vulkan' -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ).
@@ -355,7 +358,9 @@ VGArchitectureTest class >> packagesLoadedByGroupNamed: aGroupName [
 { #category : 'layering' }
 VGArchitectureTest class >> packagesNamedBy: aCompiledMethod [
 	"The packages of this project whose classes aCompiledMethod names, reading the literals of
-	 every block inside it as well as its own, to any depth."
+	 every block inside it as well as its own, to any depth. A block reaches the literals
+	 either as a CompiledBlock or, when the compiler finds it clean, as a closure of its own,
+	 and both answer #isBlock."
 
 	| found scan |
 	found := Set new.
@@ -369,7 +374,7 @@ VGArchitectureTest class >> packagesNamedBy: aCompiledMethod [
 						        (package name beginsWith: self projectPackageNamePrefix)
 							        ifTrue: [ found add: package name asString ] ] ] ]
 			        ifFalse: [
-				        literal class = CompiledBlock ifTrue: [ scan value: literal ] ] ] ].
+				        literal isBlock ifTrue: [ scan value: literal ] ] ] ].
 	scan value: aCompiledMethod.
 	^ found
 ]

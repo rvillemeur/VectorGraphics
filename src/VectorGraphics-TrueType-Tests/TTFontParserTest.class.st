@@ -51,6 +51,40 @@ TTFontParserTest >> putUShort: value at: pos in: bytes [
 ]
 
 { #category : 'tests - cmap' }
+TTFontParserTest >> testCmapProcessFallsBackOnASubtableItCanReadWhenThePreferredOneIsOfAnUnknownFormat [
+	"Droid Sans Fallback carries two Windows subtables: encoding 10, Unicode over every plane,
+	 in format 12, and encoding 1, the Basic Multilingual Plane, in a format this parser reads.
+	 Encoding 10 maps more code points, so it is preferred, but a format nobody here reads
+	 answers nothing: the reader then goes on down its order of preference instead of rejecting
+	 a font whose second subtable it understands."
+
+	| bytes entry cmap |
+	bytes := ByteArray new: 40.
+	self putUShort: 0 at: 1 in: bytes. "cmap version"
+	self putUShort: 2 at: 3 in: bytes. "two subtables"
+	self putUShort: 3 at: 5 in: bytes. "platform 3: Windows"
+	self putUShort: 10 at: 7 in: bytes. "encoding 10: Unicode, every plane"
+	self putULong: 20 at: 9 in: bytes. "its subtable, at byte 21"
+	self putUShort: 3 at: 13 in: bytes. "platform 3: Windows"
+	self putUShort: 1 at: 15 in: bytes. "encoding 1: Unicode BMP"
+	self putULong: 28 at: 17 in: bytes. "its subtable, at byte 29"
+	self putUShort: 12 at: 21 in: bytes. "format 12: a format this parser does not read"
+	self putUShort: 0 at: 23 in: bytes. "its reserved half of the length"
+	self putULong: 16 at: 25 in: bytes. "its length"
+	self putUShort: 6 at: 29 in: bytes. "format 6"
+	self putUShort: 12 at: 31 in: bytes. "length"
+	self putUShort: 0 at: 33 in: bytes. "language"
+	self putUShort: 0 at: 35 in: bytes. "firstCode"
+	self putUShort: 1 at: 37 in: bytes. "entryCount"
+	self putUShort: 42 at: 39 in: bytes. "the glyph of the first code point"
+	entry := TTFontTableDirEntry onBytes: bytes.
+	cmap := (TTCmapTableParser on: entry) process.
+	self deny: cmap isNil.
+	self assert: cmap size equals: 1.
+	self assert: (cmap at: 1) equals: 42
+]
+
+{ #category : 'tests - cmap' }
 TTFontParserTest >> testCmapProcessFindsUnicodePlatformSubtable [
 
 	"2 subtables: platformID=3 (Windows) first, platformID=0 (Unicode) second.
@@ -85,19 +119,146 @@ TTFontParserTest >> testCmapProcessFindsUnicodePlatformSubtable [
 ]
 
 { #category : 'tests - cmap' }
-TTFontParserTest >> testCmapProcessReturnsNilWhenNoPlatformZero [
+TTFontParserTest >> testCmapProcessIgnoresAFormatTwelveSubtableOfNoGroup [
+	"A format 12 subtable claiming no group maps nothing, so the reader passes over it and tries
+	 the next subtable the font carries — here a format 6 one of the Windows platform."
 
-	"1 subtable with platformID=3 (Windows) only. No Unicode platform → nil."
+	| bytes entry cmap |
+	bytes := ByteArray new: 48.
+	self putUShort: 0 at: 1 in: bytes. "cmap version"
+	self putUShort: 2 at: 3 in: bytes. "two subtables"
+	self putUShort: 3 at: 5 in: bytes.
+	self putUShort: 10 at: 7 in: bytes. "the preferred one: Unicode, every plane"
+	self putULong: 20 at: 9 in: bytes.
+	self putUShort: 3 at: 13 in: bytes.
+	self putUShort: 1 at: 15 in: bytes. "Unicode, basic multilingual plane"
+	self putULong: 36 at: 17 in: bytes.
+	self putUShort: 12 at: 21 in: bytes. "format 12, and then no group at all"
+	self putUShort: 0 at: 23 in: bytes.
+	self putULong: 16 at: 25 in: bytes.
+	self putULong: 0 at: 29 in: bytes.
+	self putULong: 0 at: 33 in: bytes.
+	self putUShort: 6 at: 37 in: bytes. "format 6: trimmed table"
+	self putUShort: 12 at: 39 in: bytes.
+	self putUShort: 0 at: 41 in: bytes. "language"
+	self putUShort: 65 at: 43 in: bytes. "first code point: $A"
+	self putUShort: 1 at: 45 in: bytes. "one code point, mapped to glyph 42"
+	self putUShort: 42 at: 47 in: bytes.
+	entry := TTFontTableDirEntry onBytes: bytes.
+	cmap := (TTCmapTableParser on: entry) process.
+	self assert: (cmap at: 66) equals: 42
+]
+
+{ #category : 'tests - cmap' }
+TTFontParserTest >> testCmapProcessReadsAFormatTwelveSubtableGroupByGroup [
+	"Format 12, segmented coverage: a count of groups, then one group per run of code points
+	 giving its first code point, its last, and the glyph of the first — the glyphs of a run
+	 follow one another. It is the only format that reaches a code point above the Basic
+	 Multilingual Plane, and DroidSansJapanese.ttf carries nothing else, so a reader without it
+	 refuses that font."
+
+	| bytes entry cmap |
+	bytes := ByteArray new: 52.
+	self putUShort: 0 at: 1 in: bytes. "cmap version"
+	self putUShort: 1 at: 3 in: bytes. "one subtable"
+	self putUShort: 3 at: 5 in: bytes. "platform 3: Windows"
+	self putUShort: 10 at: 7 in: bytes. "encoding 10: Unicode, every plane"
+	self putULong: 12 at: 9 in: bytes. "the subtable follows this header"
+	self putUShort: 12 at: 13 in: bytes. "format 12"
+	self putUShort: 0 at: 15 in: bytes. "reserved"
+	self putULong: 40 at: 17 in: bytes. "length"
+	self putULong: 0 at: 21 in: bytes. "language"
+	self putULong: 2 at: 25 in: bytes. "two groups"
+	self putULong: 65 at: 29 in: bytes. "first group: $A"
+	self putULong: 66 at: 33 in: bytes. "to $B"
+	self putULong: 7 at: 37 in: bytes. "mapped from glyph 7 up"
+	self putULong: 300 at: 41 in: bytes. "second group: one code point above the Latin block"
+	self putULong: 300 at: 45 in: bytes.
+	self putULong: 20 at: 49 in: bytes. "glyph 20"
+	entry := TTFontTableDirEntry onBytes: bytes.
+	cmap := (TTCmapTableParser on: entry) process.
+	self assert: cmap size equals: 301.
+	self assert: (cmap at: 66) equals: 7.
+	self assert: (cmap at: 67) equals: 8.
+	self assert: (cmap at: 301) equals: 20.
+	self assert: (cmap at: 1) equals: 0
+]
+
+{ #category : 'tests - cmap' }
+TTFontParserTest >> testCmapProcessReadsTheWindowsUnicodeSubtableOfAFontWithNoUnicodePlatformSubtable [
+	"Platform 3 encoding 1 is Unicode of the Basic Multilingual Plane, the most common
+	 character map a font on a desktop carries: the fonts of the Droid and Open Sans families
+	 hold that subtable and no subtable of platform 0 at all. A reader that looks for the
+	 Unicode platform alone answers nothing for them, and a face is then rejected for mapping
+	 no code point, so the subtable is read here as the Unicode map it is."
+
+	| bytes entry cmap |
+	bytes := ByteArray new: 24.
+	self putUShort: 0 at: 1 in: bytes. "cmap version"
+	self putUShort: 1 at: 3 in: bytes. "one subtable"
+	self putUShort: 3 at: 5 in: bytes. "platform 3: Windows"
+	self putUShort: 1 at: 7 in: bytes. "encoding 1: Unicode BMP"
+	self putULong: 12 at: 9 in: bytes. "the subtable follows this header"
+	self putUShort: 6 at: 13 in: bytes. "format 6"
+	self putUShort: 12 at: 15 in: bytes. "length"
+	self putUShort: 0 at: 17 in: bytes. "language"
+	self putUShort: 0 at: 19 in: bytes. "firstCode"
+	self putUShort: 1 at: 21 in: bytes. "entryCount"
+	self putUShort: 42 at: 23 in: bytes. "the glyph of the first code point"
+	entry := TTFontTableDirEntry onBytes: bytes.
+	cmap := (TTCmapTableParser on: entry) process.
+	self deny: cmap isNil.
+	self assert: cmap size equals: 1.
+	self assert: (cmap at: 1) equals: 42
+]
+
+{ #category : 'tests - cmap' }
+TTFontParserTest >> testCmapProcessReturnsNilWhenNoSubtableIsUnicode [
+	"Two subtables, neither of them a Unicode map: the Macintosh platform, whose encodings are
+	 code pages of their own, and the Windows platform under encoding 3, which is a Chinese
+	 code page. Neither offset is ever read, because a map this parser cannot turn into code
+	 points is not one it follows."
 
 	| bytes entry |
-	bytes := ByteArray new: 12.
-	self putUShort: 0   at: 1 in: bytes. "cmap version"
-	self putUShort: 1   at: 3 in: bytes. "nSubTables=1"
-	self putUShort: 3   at: 5 in: bytes. "pID=3 (Windows, not Unicode)"
-	self putUShort: 1   at: 7 in: bytes. "sID=1"
-	self putULong:  100 at: 9 in: bytes. "offset (never used)"
+	bytes := ByteArray new: 20.
+	self putUShort: 0 at: 1 in: bytes. "cmap version"
+	self putUShort: 2 at: 3 in: bytes. "two subtables"
+	self putUShort: 1 at: 5 in: bytes. "platform 1: Macintosh"
+	self putUShort: 0 at: 7 in: bytes. "encoding 0: Roman"
+	self putULong: 100 at: 9 in: bytes. "offset, never used"
+	self putUShort: 3 at: 13 in: bytes. "platform 3: Windows"
+	self putUShort: 3 at: 15 in: bytes. "encoding 3: a Chinese code page"
+	self putULong: 100 at: 17 in: bytes. "offset, never used"
 	entry := TTFontTableDirEntry onBytes: bytes.
-	self assert: ((TTCmapTableParser on: entry) process) isNil
+	self assert: (TTCmapTableParser on: entry) process isNil
+]
+
+{ #category : 'tests - cmap' }
+TTFontParserTest >> testCmapSubtableDescriptionsStateThePlatformEncodingPreferenceAndFormatOfEachSubtable [
+	"What the reader saw in the subtable directory, which is what the inspector view of the
+	 parser shows: the pair of each subtable, where that pair stands in the order of
+	 preference, and the format word of the subtable itself. Reading the directory must not
+	 move the parser's own position, so the same answer comes back twice."
+
+	| bytes entry descriptions |
+	bytes := ByteArray new: 40.
+	self putUShort: 0 at: 1 in: bytes. "cmap version"
+	self putUShort: 2 at: 3 in: bytes. "two subtables"
+	self putUShort: 3 at: 5 in: bytes. "platform 3: Windows"
+	self putUShort: 10 at: 7 in: bytes. "encoding 10: Unicode, every plane"
+	self putULong: 20 at: 9 in: bytes. "its subtable, at byte 21"
+	self putUShort: 3 at: 13 in: bytes. "platform 3: Windows"
+	self putUShort: 3 at: 15 in: bytes. "encoding 3: a Chinese code page"
+	self putULong: 28 at: 17 in: bytes. "its subtable, at byte 29"
+	self putUShort: 12 at: 21 in: bytes. "format 12"
+	self putUShort: 0 at: 29 in: bytes. "format 0"
+	entry := TTFontTableDirEntry onBytes: bytes.
+	descriptions := (TTCmapTableParser on: entry) subtableDescriptions.
+	self assert: descriptions asArray equals: { 
+			{ 3. 10. 1. 12 }.
+			{ 3. 3. nil. 0 } }.
+	self assert: (TTCmapTableParser on: entry) subtableDescriptions asArray
+		equals: descriptions asArray
 ]
 
 { #category : 'tests - glyf' }

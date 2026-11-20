@@ -331,6 +331,30 @@ VGCairoTextTest >> testAFaceParsesAGlyphOnceAndKeepsIt [
 	self assert: face cachedGlyphCount equals: 2
 ]
 
+{ #category : 'tests - faces' }
+VGCairoTextTest >> testAFaceReadsACharacterMapOfTheWindowsPlatformAlone [
+	"The fonts of the Droid and the Open Sans families carry a Windows subtable of Unicode over
+	 the Basic Multilingual Plane and no subtable of platform 0, so a reader that looks for the
+	 Unicode platform alone rejects them all. The face takes that pair as the Unicode map it
+	 is, and maps the code points of the subtable to the glyphs of the font."
+
+	| tables bytes face |
+	tables := VGFontBytesFixture tablesForGlyphRecords:
+		          { (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100) }.
+	bytes := VGFontBytesFixture fontBytesWithTables: (tables collect: [ :each |
+			         each key = 'cmap'
+				         ifTrue: [
+					         'cmap' -> (VGFontBytesFixture
+						          cmapTableForGlyphCount: 1
+						          platformId: TTCmapTableParser windowsPlatformId
+						          encodingId: TTCmapTableParser bmpEncodingId) ]
+				         ifFalse: [ each ] ]).
+	face := VGFontFace newForBytes: bytes.
+	self
+		assert: (face glyphIndexForCodePoint: VGFontBytesFixture firstMappedCodePoint)
+		equals: 1
+]
+
 { #category : 'tests' }
 VGCairoTextTest >> testAFaceReadsTheNegativeNumbersOfTheHeadAndHheaTablesAsNegative [
 	"The box in head and the descent in hhea are signed 16 bit numbers, and both of them are
@@ -449,12 +473,13 @@ VGCairoTextTest >> testAFontMissingAnyRequiredTableIsRejectedAndTheErrorNamesTha
 			description: 'the error must name the ' , tag , ' table' ]
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests - faces' }
 VGCairoTextTest >> testAFontWhoseCharacterMapHoldsNoUnicodeSubtableIsRejected [
-	"The cmap table is there, so the check for a missing table says nothing, but it carries a
-	 subtable of another platform only. The reader answers nothing for such a table, and a face
-	 that cannot turn a code point into a glyph is of no use to a drawing, so it is rejected
-	 with the reason rather than kept with an empty map."
+	"The cmap table is there, so the check for a missing table says nothing, but its one
+	 subtable is the Windows platform under the encoding of a Chinese code page, which is no
+	 Unicode map. The reader answers nothing for such a table, and a face that cannot turn a
+	 code point into a glyph is of no use to a drawing, so it is rejected with the reason
+	 rather than kept with an empty map."
 
 	| tables bytes error |
 	tables := VGFontBytesFixture tablesForGlyphRecords:
@@ -464,7 +489,8 @@ VGCairoTextTest >> testAFontWhoseCharacterMapHoldsNoUnicodeSubtableIsRejected [
 				         ifTrue: [
 					         'cmap' -> (VGFontBytesFixture
 						          cmapTableForGlyphCount: 1
-						          platformId: 3) ]
+						          platformId: TTCmapTableParser windowsPlatformId
+						          encodingId: TTCmapTableParser prcEncodingId) ]
 				         ifFalse: [ each ] ]).
 	error := [
 	         VGFontFace newForBytes: bytes.

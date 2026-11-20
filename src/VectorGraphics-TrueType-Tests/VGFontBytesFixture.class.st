@@ -72,26 +72,28 @@ VGFontBytesFixture class >> cffTablesForGlyphCount: anInteger table: aByteArray 
 
 	^ {
 		  ('CFF ' -> aByteArray).
-		  ('cmap' -> (self cmapTableForGlyphCount: anInteger - 1 platformId: 0)).
+		  ('cmap' -> (self cmapTableForGlyphCount: anInteger - 1
+				                    platformId: TTCmapTableParser unicodePlatformId
+				                    encodingId: TTCmapTableParser bmpEncodingId)).
 		  ('head' -> self headTable).
 		  ('hhea' -> (self hheaTableForGlyphCount: anInteger)).
 		  ('hmtx' -> (self hmtxTableForGlyphCount: anInteger)).
 		  ('maxp' -> (self maxpTableForGlyphCount: anInteger)) }
 ]
 
-{ #category : 'tables' }
-VGFontBytesFixture class >> cmapTableForGlyphCount: anInteger platformId: anotherInteger [
+{ #category : 'bytes' }
+VGFontBytesFixture class >> cmapTableForGlyphCount: anInteger platformId: aPlatformId encodingId: anEncodingId [
 	"A character map of one subtable in format 6, the trimmed format: a first code point, a
 	 count, and one glyph index per code point after that. It sends $a to glyph 1 and the code
-	 points after it to the glyphs after it. The platform is the caller's, because a reader of
-	 Unicode text looks for platform 0 and has to answer nothing for a font that carries no
-	 subtable of that platform."
+	 points after it to the glyphs after it. The platform and the encoding are the caller''s,
+	 because they are what decides whether the reader takes the subtable as a Unicode map at
+	 all: a test of a font that maps no code point builds a pair the reader leaves out."
 
 	^ ByteArray streamContents: [ :stream |
 		  self putShort: 0 on: stream. "version"
 		  self putShort: 1 on: stream. "one subtable"
-		  self putShort: anotherInteger on: stream. "platform"
-		  self putShort: 3 on: stream. "encoding 3: BMP"
+		  self putShort: aPlatformId on: stream.
+		  self putShort: anEncodingId on: stream.
 		  self putLong: 12 on: stream. "the subtable follows this header"
 		  self putShort: 6 on: stream. "format 6"
 		  self putShort: 10 + (2 * anInteger) on: stream. "length"
@@ -353,7 +355,9 @@ VGFontBytesFixture class >> tablesForGlyphRecords: anArray [
 	| glyphCount |
 	glyphCount := anArray size + 1.
 	^ {
-		  ('cmap' -> (self cmapTableForGlyphCount: anArray size platformId: 0)).
+		  ('cmap' -> (self cmapTableForGlyphCount: anArray size
+				                    platformId: TTCmapTableParser unicodePlatformId
+				                    encodingId: TTCmapTableParser bmpEncodingId)).
 		  ('glyf' -> (ByteArray streamContents: [ :stream |
 				    anArray do: [ :each | stream nextPutAll: each ] ])).
 		  ('head' -> self headTable).

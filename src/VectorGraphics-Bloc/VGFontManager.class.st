@@ -25,6 +25,22 @@ Class {
 	#tag : 'Fonts'
 }
 
+{ #category : 'installation' }
+VGFontManager class >> ensureUpstreamHoldsMine [
+	"Put my manager back in the slot every consumer of a face reaches, if it is not there
+	 already. Upstream nils that slot at every image start and anyone may nil it by hand with
+	 resetGlobalInstance; the next reader of it then gets a stock manager of FreeType faces,
+	 and a scaled font of this project dies on one with 'AeFTFace >> #unitsPerEm'. The
+	 manager posed is the one already built, never a new one: building scans every font
+	 directory of the machine, which is seconds, and this runs before every measurement.
+	 A nil slot of mine means hands off: an image that never installed the route keeps
+	 whatever manager upstream built for itself."
+
+	installedInstance ifNil: [ ^ self ].
+	self managerUpstreamHolds == installedInstance ifTrue: [ ^ self ].
+	AeFontManager globalInstance: installedInstance
+]
+
 { #category : 'class initialization' }
 VGFontManager class >> initialize [
 	"Register for the image start. The priority is 115: above the 110 where upstream registers
@@ -48,10 +64,15 @@ VGFontManager class >> inspectorInstallation: aBuilder [
 	 Reads my own slot only, through the accessor: sending AeFontManager globalInstance would
 	 build a complete FreeType manager at the moment a reader opens an inspector, which is the
 	 opposite of what this unit is for. A reader who wants the real route asks
-	 AeFontManager globalInstance in a playground and accepts that it builds one."
+	 AeFontManager globalInstance in a playground and accepts that it builds one.
+	 The second row is the fact #ensureUpstreamHoldsMine keeps true: a reader who emptied
+	 upstream''s slot sees it false here until the next measurement or drawing poses the
+	 route again."
 
 	^ aBuilder newTable
-		  items: { ('Installed manager' -> self installedInstance) };
+		  items: {
+				  ('Installed manager' -> self installedInstance).
+				  ('Upstream slot holds it' -> (self managerUpstreamHolds == self installedInstance)) };
 		  addColumn:
 			  (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
 		  addColumn: (SpStringTableColumn
@@ -169,15 +190,12 @@ VGFontManager class >> startUp: isResuming [
 	"Put my manager back after upstream nils its slot. I am registered at GUI priority 115 and
 	 upstream at 110, and a category starts its handlers by rising priority, so this runs after
 	 its reset and before AeCanvas initialises its font options at 120.
-	 I run in every image this package is loaded in, installed or not, so a nil slot of mine
-	 means hands off: upstream keeps whatever manager it built.
 	 The manager kept here is the one the dead session held. It answers nothing of that session:
 	 every reader of it checks the session first and rebuilds its catalogue, which is what unit
 	 3.4 is for."
 
 	isResuming ifFalse: [ ^ self ].
-	installedInstance ifNil: [ ^ self ].
-	AeFontManager globalInstance: installedInstance
+	self ensureUpstreamHoldsMine
 ]
 
 { #category : 'installing' }

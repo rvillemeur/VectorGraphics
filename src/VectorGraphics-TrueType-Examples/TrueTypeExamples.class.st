@@ -212,6 +212,56 @@ TrueTypeExamples class >> cffTopDictionaryOfASmallFont [
 	^ TTCffDictionary readFrom: bytes
 ]
 
+{ #category : 'examples - catalogue' }
+TrueTypeExamples class >> characterMapOfAFormatTwelveFont [
+	"One click: the character map of a font whose only subtable is of format 12, segmented
+	 coverage. DroidSansJapanese.ttf is such a font on this machine: one subtable, platform 3
+	 encoding 10, format 12, 6619 code points mapped out of a map 65440 long, and no Latin at
+	 all — its first group starts at U+203E. Hiragana a, U+3042, answers glyph 26.
+	 A reader with no such font installed gets nil, which is the answer and not a failure.
+
+	 TrueTypeExamples characterMapOfAFormatTwelveFont inspect"
+
+	<sampleInstance>
+	| path directory |
+	"The finder lowercases the name it compares, so the name asked for is lowercase too."
+	path := self installedFontPathEndingWith: 'droidsansjapanese.ttf'.
+	path ifNil: [ ^ nil ].
+	directory := TTFontReader
+		             buildTableDirectory: path asFileReference binaryReadStream contents
+		             offset: 0.
+	^ (TTCmapTableParser on: (directory at: 'cmap')) process
+]
+
+{ #category : 'examples - catalogue' }
+TrueTypeExamples class >> characterMapsOfTheInstalledFonts [
+	"One click: the character map every font of this machine carries, as a count per platform
+	 and encoding pair over the faces the scan would draw. On this machine, of 462 faces, eleven shapes, and 22
+	 faces carry Windows subtables and no subtable of platform 0 at all: 20 of them (3 -> 1)
+	 alone, one both (3 -> 1) and (3 -> 10), one (3 -> 10) alone. That is why this reader takes
+	 the Windows platform as Unicode and not only platform 0 — the Droid and the Open Sans
+	 families are those 22, and every one of them was refused before. The last of them,
+	 DroidSansJapanese.ttf, carries its one subtable in format 12; since that format is read
+	 too, every one of the 462 faces answers a map.
+
+	 Inspect a parser of the list to see the subtable rows of one font.
+
+	 TrueTypeExamples characterMapsOfTheInstalledFonts inspect"
+
+	<sampleInstance>
+	| counts |
+	counts := Dictionary new.
+	(self catalogueOfTheInstalledFonts entries reject: [ :each | each isRejected ]) do: [ :entry |
+		| directory cmap |
+		directory := TTFontReader buildTableDirectory: entry bytes offset: 0.
+		cmap := directory at: 'cmap' ifAbsent: [ nil ].
+		cmap ifNotNil: [ | pairs |
+			pairs := ((TTCmapTableParser on: cmap) subtableDescriptions collect: [ :each |
+				          each first -> each second ]) asArray.
+			counts at: pairs put: (counts at: pairs ifAbsent: [ 0 ]) + 1 ] ].
+	^ counts
+]
+
 { #category : 'examples' }
 TrueTypeExamples class >> characterWidths [
 	"Inspect the advance widths of printable ASCII characters.
