@@ -207,7 +207,10 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Text-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics-TrueType/Manifest' -> #notInTheFrame).
 			  ('VectorGraphics-TrueType-Examples/Examples' -> #notInTheFrame).
-			  ('VectorGraphics/Manifest' -> #notInTheFrame) }
+			  ('VectorGraphics/Manifest' -> #notInTheFrame).
+			  ('VectorGraphics-Canvas/Manifest' -> #notInTheFrame).
+			  ('VectorGraphics-Canvas-Raster/Manifest' -> #notInTheFrame).
+			  ('VectorGraphics-Canvas-Fonts/Manifest' -> #notInTheFrame) }
 ]
 
 { #category : 'stages' }
