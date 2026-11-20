@@ -329,15 +329,18 @@ VGConformanceTest >> testTheMeshCasesCoverEverySideAndFoldOfAPatch [
 VGConformanceTest >> unitsWithNoSkeletonLeft [
 	"The units whose selectors are all written: no method of the replacement still raises the
 	 not-yet-implemented error naming them. Asked of the code rather than kept as a list, so it
-	 cannot say a unit is done while a selector of it is still a skeleton."
+	 cannot say a unit is done while a selector of it is still a skeleton. The replacement is
+	 three packages since the split of 2026-11, and a skeleton may be in any of them."
 
 	| pending |
-	pending := ((Smalltalk packageOrganizer packageNamed: 'VectorGraphics-Cairo') methods
-		            select: [ :each |
-		            each messages includes: #notYetImplementedIn:selector: ]
-		            thenCollect: [ :each |
-		            each literals detect: [ :one |
-			            one isString and: [ one first isDigit ] ] ]) asSet.
+	pending := (#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
+	               'VectorGraphics-Canvas-Fonts' ) flatCollect: [ :name |
+		             (Smalltalk packageOrganizer packageNamed: name) methods
+			             select: [ :each |
+			             each messages includes: #notYetImplementedIn:selector: ]
+			             thenCollect: [ :each |
+			             each literals detect: [ :one |
+				             one isString and: [ one first isDigit ] ] ] ]) asSet.
 	^ VGCairoInventory planUnits reject: [ :each | pending includes: each ]
 ]
 

@@ -13,9 +13,10 @@ Class {
 
 { #category : 'accessing' }
 VGCairoSkeletonTest >> packagesUnderTest [
-	"The three packages this project owns."
-
-	^ #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Tests'
+	"The five packages of the canvas: the three of code since the split of 2026-11, and the
+	 tests and the examples beside them."
+	^ #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
+	     'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Cairo-Tests'
 	     'VectorGraphics-Cairo-Examples' ) collect: [ :each |
 		  Smalltalk packageOrganizer packageNamed: each ]
 ]
@@ -23,10 +24,12 @@ VGCairoSkeletonTest >> packagesUnderTest [
 { #category : 'accessing' }
 VGCairoSkeletonTest >> skeletonMethods [
 	"Every method of the Cairo replacement that is still a skeleton, found by its send rather than
-	 by its protocol name, so that renaming a protocol cannot hide one."
-
-	^ (Smalltalk packageOrganizer packageNamed: 'VectorGraphics-Cairo') methods select: [ :each |
-		  each messages includes: #notYetImplementedIn:selector: ]
+	 by its protocol name, so that renaming a protocol cannot hide one. The replacement is three
+	 packages since the split of 2026-11, and a skeleton may be in any of them."
+	^ #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
+	     'VectorGraphics-Canvas-Fonts' ) flatCollect: [ :each |
+		  (Smalltalk packageOrganizer packageNamed: each) methods select: [ :method |
+			  method messages includes: #notYetImplementedIn:selector: ] ]
 ]
 
 { #category : 'tests' }

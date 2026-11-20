@@ -67,9 +67,9 @@ VGCairoStrokeStyle class >> joinNames [
 VGCairoStrokeStyle class >> nameIn: aCollection for: anObject [
 	"Answer the name aCollection holds for anything that names one of its entries: the name
 	 itself, Cairo's integer code, or an Alexandrie enumeration value, which answers its code to
-	 #asInteger. Taking the Alexandrie value this way is what lets the VectorGraphics-Cairo
-	 package stay free of Ae class names while AeCanvas passes Alexandrie's own constants
-	 straight through, as VGCairoSurfaceFormat already does for a pixel format."
+	 #asInteger. Taking the Alexandrie value this way is what lets the canvas packages stay
+	 free of Ae class names while AeCanvas passes Alexandrie's own constants straight through,
+	 as VGCairoSurfaceFormat already does for a pixel format."
 
 	^ (aCollection includes: anObject)
 		  ifTrue: [ anObject ]

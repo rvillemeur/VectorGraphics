@@ -134,6 +134,10 @@ VGFrameProfile class >> stageByPackageAndTag [
 	"The stage each package and tag of this project belongs to, keyed by `'<package>/<tag>'`. The
 	 tag is the unit rather than the class, so a class moved between tags moves stage with it and
 	 nothing here has to be touched; `VGFrameProfileTest` holds these keys against the organiser.
+	 A tag name travels with its classes, so the split of the canvas into three packages of
+	 2026-11 re-keyed these entries and changed no stage: `Path`, `Paint` and `Display list` are
+	 a tag of the canvas and a tag of its renderer both, and the two halves of each are the
+	 same stage.
 	 The stages are the frame read as a pipeline. `canvasApi` is the drawing verbs and the state
 	 they keep, `transforms` the matrices they multiply, `pathAndStroke` the flattening and the
 	 stroke outlines, `displayList` the recording and the draining of a frame and the binning of
@@ -142,43 +146,46 @@ VGFrameProfile class >> stageByPackageAndTag [
 	 and `pixelAccess` the surface and its pixel format, which is both the reading and writing of
 	 a pixel and the byte arithmetic that quantises a colour or a coverage into one. Then `text`,
 	 `blur` and `handover`. `text` holds the four tags of `VectorGraphics-TrueType` as well as
-	 the Cairo font code, because `VGFontFace` reads a face and its glyphs through that layer.
-	 `harness` is this class, which runs inside the frame it measures. `notInTheFrame` is code
-	 that cannot appear in a frame: the exporters, the reflection and inventory helpers, the
+	 the font layer of the canvas, because `VGFontFace` reads a face and its glyphs through that
+	 layer. `harness` is this class, which runs inside the frame it measures. `notInTheFrame` is
+	 code that cannot appear in a frame: the exporters, the reflection and inventory helpers, the
 	 examples, the package manifests, the budget measurement that weighs a device round trip
 	 against a frame of this profile, and the pure Pharo rasteriser and path commands of
 	 `VectorGraphics-Engine` and `VectorGraphics-Paths`, which no frame of this profile enters."
 	^ Dictionary newFrom: {
-			  ('VectorGraphics-Cairo/Context' -> #canvasApi).
-			  ('VectorGraphics-Cairo/Skeleton' -> #canvasApi).
+			  ('VectorGraphics-Canvas/Context' -> #canvasApi).
+			  ('VectorGraphics-Canvas/Skeleton' -> #canvasApi).
 			  ('VectorGraphics-Bloc/Backend' -> #canvasApi).
-			  ('VectorGraphics-Cairo/Matrix' -> #transforms).
-			  ('VectorGraphics-Cairo/Path' -> #pathAndStroke).
-			  ('VectorGraphics-Cairo/Backend' -> #displayList).
-			  ('VectorGraphics-Cairo/Display list' -> #displayList).
+			  ('VectorGraphics-Canvas/Matrix' -> #transforms).
+			  ('VectorGraphics-Canvas/Path' -> #pathAndStroke).
+			  ('VectorGraphics-Canvas-Raster/Path' -> #pathAndStroke).
+			  ('VectorGraphics-Canvas-Raster/Backend' -> #displayList).
+			  ('VectorGraphics-Canvas/Display list' -> #displayList).
+			  ('VectorGraphics-Canvas-Raster/Display list' -> #displayList).
 			  ('VectorGraphics-Vulkan/Backend' -> #displayList).
 			  ('VectorGraphics-Vulkan/Tiles' -> #displayList).
 			  ('VectorGraphics-Vulkan/Kernels' -> #displayList).
-			  ('VectorGraphics-Cairo/Rasterising' -> #coverage).
-			  ('VectorGraphics-Cairo/Paint' -> #paintSource).
-			  ('VectorGraphics-Cairo/Pattern' -> #paintSource).
-			  ('VectorGraphics-Cairo/Compositing' -> #compositing).
-			  ('VectorGraphics-Cairo/Surface' -> #pixelAccess).
-			  ('VectorGraphics-Cairo/Text' -> #text).
+			  ('VectorGraphics-Canvas-Raster/Rasterising' -> #coverage).
+			  ('VectorGraphics-Canvas/Paint' -> #paintSource).
+			  ('VectorGraphics-Canvas-Raster/Paint' -> #paintSource).
+			  ('VectorGraphics-Canvas/Pattern' -> #paintSource).
+			  ('VectorGraphics-Canvas/Compositing' -> #compositing).
+			  ('VectorGraphics-Canvas/Surface' -> #pixelAccess).
+			  ('VectorGraphics-Canvas-Fonts/Text' -> #text).
 			  ('VectorGraphics-Bloc/Fonts' -> #text).
 			  ('VectorGraphics-Bloc/Text' -> #text).
 			  ('VectorGraphics-TrueType/Fonts' -> #text).
 			  ('VectorGraphics-TrueType/Glyphs' -> #text).
 			  ('VectorGraphics-TrueType/Reading' -> #text).
 			  ('VectorGraphics-TrueType/CFF' -> #text).
-			  ('VectorGraphics-Cairo/Blur' -> #blur).
+			  ('VectorGraphics-Canvas-Raster/Blur' -> #blur).
 			  ('VectorGraphics-Vulkan/Blur' -> #blur).
 			  ('VectorGraphics-Bloc/Hosts' -> #handover).
 			  ('VectorGraphics-Vulkan/Present' -> #handover).
 			  ('VectorGraphics-Bloc/Profiling' -> #harness).
-			  ('VectorGraphics-Cairo/Export' -> #notInTheFrame).
-			  ('VectorGraphics-Cairo/Inventory' -> #notInTheFrame).
-			  ('VectorGraphics-Cairo/Reflection' -> #notInTheFrame).
+			  ('VectorGraphics-Canvas/Export' -> #notInTheFrame).
+			  ('VectorGraphics-Canvas/Inventory' -> #notInTheFrame).
+			  ('VectorGraphics-Canvas/Reflection' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc/Exporters' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc-Examples/Uncategorized' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc-FontEngine/Installation' -> #notInTheFrame).

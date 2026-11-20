@@ -21,7 +21,7 @@ VGCairoStrokeTest >> alphaMask [
 { #category : 'helpers' }
 VGCairoStrokeTest >> cairoFormOf: aBlock [
 	"The same script drawn by live Cairo. A test package may name an Alexandrie class; the
-	 VectorGraphics-Cairo package may not."
+	 canvas packages may not."
 
 	| surface |
 	surface := AeCairoImageSurface extent: self caseExtent.

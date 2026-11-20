@@ -70,79 +70,102 @@ VGArchitectureTest class >> allowedDependencies [
 			  "The abstract documentation gate the four concrete ones subclass. It reads its
 			   package from the subclass hook and the organiser, so it names no package of ours."
 			  'VectorGraphics-Tests' -> #(  ).
-			  "The Cairo backend draws text through the font reader and knows nothing of the
-			   other three packages of the rasteriser."
-			  'VectorGraphics-Cairo' -> #( 'VectorGraphics-TrueType' ).
+			  "The canvas, in three packages since the split of 2026-11. VectorGraphics-Canvas
+			   is the API a drawing is written against and the display list it records;
+			   VectorGraphics-Canvas-Raster is the renderer that turns that list into pixels,
+			   which needs no device, no library and no window; VectorGraphics-Canvas-Fonts is
+			   the font and glyph layer, a leaf above the font reader that names nothing else of
+			   this project.
+			   The renderer names the canvas back, four times, which is the one cycle of the
+			   trio: it is the deferred review point of the split, and the half the baseline
+			   leaves out, which edgesTheBaselineCannotDeclare states."
+			  'VectorGraphics-Canvas'
+			  -> #( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Raster' ).
+			  'VectorGraphics-Canvas-Raster' -> #( 'VectorGraphics-Canvas' ).
+			  'VectorGraphics-Canvas-Fonts' -> #( 'VectorGraphics-TrueType' ).
 			  "An examples class names its subject. These examples open the conformance corpora,
 			   the Form comparison and the font lifetime, which live in VectorGraphics-Conformance
 			   since the review of 2026-11. The one edge left from the examples to the test package
 			   is VGArchitectureExamples, whose subject is the architecture gate itself."
 			  'VectorGraphics-Cairo-Examples'
-			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Tests'
+			  -> #( 'VectorGraphics-Cairo-Tests' 'VectorGraphics-Canvas'
+				    'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Raster'
 				    'VectorGraphics-Conformance' ).
 			  "The Cairo tests name the font reader and its fixtures since the glyph source of
 			   review point 4: the flags of a composite glyph record are TTGlyfGlyphSource's
 			   constants now, and VGFontBytesFixture, which builds a font byte by byte, moved to
 			   VectorGraphics-TrueType-Tests so the tests of a source can read it too."
 			  'VectorGraphics-Cairo-Tests'
-			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
+			  -> #( 'VectorGraphics-Cairo-Examples' 'VectorGraphics-Canvas'
+				    'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Raster'
 				    'VectorGraphics-Conformance' 'VectorGraphics-TrueType'
 				    'VectorGraphics-TrueType-Tests' ).
-			  "The Bloc renderer names the font reader as well as the Cairo backend since
-			   unit 3.2 of the font plan: VGFontManager is an adapter onto TTFontCatalogue,
-			   which reads the fonts the FreeType library used to read. Its examples and
-			   its tests name the reader too since unit 3.7, where a catalogue entry is
-			   what a run of text is shaped from."
+			  "The Bloc renderer names the font reader as well as the canvas since unit 3.2 of
+			   the font plan: VGFontManager is an adapter onto TTFontCatalogue, which reads the
+			   fonts the FreeType library used to read. Its examples and its tests name the
+			   reader too since unit 3.7, where a catalogue entry is what a run of text is
+			   shaped from. The examples name no renderer class: they build a canvas and let it
+			   name the renderer."
 			  'VectorGraphics-Bloc'
-			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-TrueType' ).
+			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
+				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-TrueType' ).
 			  'VectorGraphics-Bloc-Examples'
-			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo'
-				    'VectorGraphics-TrueType' ).
+			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
+				    'VectorGraphics-Canvas-Fonts' 'VectorGraphics-TrueType' ).
 			  'VectorGraphics-Bloc-Tests'
 			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples'
-				    'VectorGraphics-Cairo' 'VectorGraphics-TrueType' ).
+				    'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
+				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-TrueType' ).
 			  "The font engine is the one object the fonts group loads for: it poses the manager
 			   and the renderer that make Bloc draw text with glyphs of this project, so it names
 			   the package holding both and nothing else. Its examples name it alone, and its
 			   tests name the three packages of the route they install and give back, and the
-			   face class of the Cairo package, which is what the engine makes every drawing
+			   face class of the font layer, which is what the engine makes every drawing
 			   resolve instead of a face of FreeType."
 			  'VectorGraphics-Bloc-FontEngine' -> #( 'VectorGraphics-Bloc' ).
 			  'VectorGraphics-Bloc-FontEngine-Examples'
 			  -> #( 'VectorGraphics-Bloc-FontEngine' 'VectorGraphics-TrueType' ).
 			  'VectorGraphics-Bloc-FontEngine-Tests'
 			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-FontEngine'
-				    'VectorGraphics-Bloc-FontEngine-Examples' 'VectorGraphics-Cairo'
+				    'VectorGraphics-Bloc-FontEngine-Examples' 'VectorGraphics-Canvas-Fonts'
 				    'VectorGraphics-TrueType' ).
 			  "The device path reads the frame unit 1.11 profiles, which is drawn through the Bloc
-			   renderer, so binning and the budget name that package as well as the display list."
-			  'VectorGraphics-Vulkan' -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' ).
+			   renderer, so binning and the budget name that package as well as the display list.
+			   The three Vulkan sets are read from their Tonel files, since no image this project
+			   is developed in loads them: none of the three names a class of the font layer."
+			  'VectorGraphics-Vulkan'
+			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
+				    'VectorGraphics-Canvas-Raster' ).
 			  "The budget — the two benchmarks and the drawing kit — lives in
 			   VectorGraphics-Benchmarks, a package of its own since the review of 2026-11, so the
 			   examples that open a benchmark name no test package."
 			  'VectorGraphics-Vulkan-Examples'
-			  -> #( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc' 'VectorGraphics-Cairo'
-				    'VectorGraphics-Vulkan' ).
+			  -> #( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
+				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-Vulkan' ).
 			  "The edge to the Cairo tests is one of the two edges this project allows between two test
 			   packages: VGVulkanExamplesTest subclasses VGCairoExamplesTest and the backend tests
 			   draw the frame fixture the engine tests draw, rather than keeping a second copy of
 			   either."
 			  'VectorGraphics-Vulkan-Tests'
-			  -> #( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc' 'VectorGraphics-Cairo'
-				    'VectorGraphics-Cairo-Tests' 'VectorGraphics-Conformance' 'VectorGraphics-Vulkan'
+			  -> #( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc' 'VectorGraphics-Cairo-Tests'
+				    'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
+				    'VectorGraphics-Conformance' 'VectorGraphics-Vulkan'
 				    'VectorGraphics-Vulkan-Examples' ).
 			  "Neither of these two holds a TestCase, and both were filed in a -Tests package until
 			   the review of 2026-11, which made an examples package depend on a test package. The
-			   corpus names the backend it is compared against; the benchmarks name the corpus they
+			   corpus names the canvas it is compared against; the benchmarks name the corpus they
 			   measure and the backends they drive."
 			  "The corpus names the font reader since unit 5.2 of the font plan: the experiments
 			   ported from Alexandrie read their font out of a TTFontCatalogue, where they read it
 			   out of the global FreeType font manager before. It names no Bloc class, because the
-			   Cairo groups load it and bring no Bloc package."
+			   Cairo groups load it and bring no Bloc package. The benchmarks name no font class:
+			   they measure a frame of the corpus through a backend."
 			  'VectorGraphics-Conformance'
-			  -> #( 'VectorGraphics-Cairo' 'VectorGraphics-TrueType' ).
+			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
+				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-TrueType' ).
 			  'VectorGraphics-Benchmarks'
-			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Cairo' 'VectorGraphics-Conformance'
+			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
+				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance'
 				    'VectorGraphics-Vulkan' ) }
 ]
 
@@ -195,15 +218,17 @@ VGArchitectureTest class >> edgesOf: aPackageName [
 VGArchitectureTest class >> edgesTheBaselineCannotDeclare [
 	"The edges of allowedDependencies that BaselineOfVectorGraphics may not state, because the
 	 reverse edge is stated and Metacello loads requires in order: a pair declared both ways is
-	 a cycle and no load order exists for it. One pair qualifies, since the review of 2026-11
-	 moved the conformance corpus and the benchmarks out of the test packages: the Cairo
-	 examples name VGArchitectureTest, whose own examples holder they are, and the Cairo tests
-	 name that holder. The two packages always load together, so nothing is lost by leaving
-	 one half out.
+	 a cycle and no load order exists for it. Two pairs qualify. The Cairo examples name
+	 VGArchitectureTest, whose own examples holder they are, and the Cairo tests name that
+	 holder: that pair appeared in the review of 2026-11, which moved the conformance corpus
+	 and the benchmarks out of the test packages. The canvas's renderer names the canvas back
+	 four times, which the split of 2026-11 left in place as a deferred review point.
+	 Each pair always loads together, so nothing is lost by leaving one half out.
 	 Every entry is held by testEveryEdgeTheBaselineCannotDeclareIsOneHalfOfACycle, which reads
 	 the reverse from the baseline rather than taking this comment on trust."
 	^ {
-		  ('VectorGraphics-Cairo-Examples' -> 'VectorGraphics-Cairo-Tests') }
+		  ('VectorGraphics-Cairo-Examples' -> 'VectorGraphics-Cairo-Tests').
+		  ('VectorGraphics-Canvas-Raster' -> 'VectorGraphics-Canvas') }
 ]
 
 { #category : 'layering' }
@@ -470,13 +495,23 @@ VGArchitectureTest >> testCairoExamplesStayInsideTheirAllowedDependencies [
 ]
 
 { #category : 'tests' }
-VGArchitectureTest >> testCairoStaysInsideItsAllowedDependencies [
-	self assertEdgesOfPackageNamed: 'VectorGraphics-Cairo'
+VGArchitectureTest >> testCairoTestsStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Cairo-Tests'
 ]
 
 { #category : 'tests' }
-VGArchitectureTest >> testCairoTestsStayInsideTheirAllowedDependencies [
-	self assertEdgesOfPackageNamed: 'VectorGraphics-Cairo-Tests'
+VGArchitectureTest >> testCanvasFontsStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Canvas-Fonts'
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testCanvasRasterStaysInsideItsAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Canvas-Raster'
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testCanvasStaysInsideItsAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Canvas'
 ]
 
 { #category : 'tests' }
@@ -841,30 +876,32 @@ VGArchitectureTest >> testTheBlocLayerRequiresTheExternalBlocProject [
 
 { #category : 'tests - groups' }
 VGArchitectureTest >> testTheCairoExampleAndTestGroupsNameNoBlocClass [
-	"The examples and the tests of the Cairo layer load without Bloc too, each from a group of
+	"The examples and the tests of the canvas load without Bloc too, each from a group of
 	 its own: the project-wide examples and tests groups span every layer, so asking for them
-	 fetches Bloc and wants PharoVulkan, which a user of the Cairo backend wants neither of.
-	 Neither group brings the front page or the other three packages of the rasteriser, because
-	 the Cairo backend names the font reader alone. The conformance corpus arrives with both
+	 fetches Bloc and wants PharoVulkan, which a user of the canvas wants neither of.
+	 Neither group brings the front page or the scan-line engine of the rasteriser, because the
+	 canvas's font layer names the font reader alone. The conformance corpus arrives with both
 	 groups, because the examples open it and the gate reads it. The tests group also brings
 	 the font reader's own test and examples packages, and through them the rasteriser tests,
 	 since VGFontBytesFixture moved to VectorGraphics-TrueType-Tests with the glyph source:
-	 the face tests that reject a font missing a table read that fixture. None of it is Bloc. Alexandrie is not asked
-	 about here —
-	 blocPackageNames says why. A group that does not exist would pass on an empty scan, so the
-	 packages each one must bring in are named first."
+	 the face tests that reject a font missing a table read that fixture. None of it is Bloc.
+	 Alexandrie is not asked about here — blocPackageNames says why. A group that does not
+	 exist would pass on an empty scan, so the packages each one must bring in are named first."
 
 	| scanner offenders |
 	scanner := VGCairoReferenceScanner new.
 	self
 		assert: (self class packagesLoadedByGroupNamed: 'cairo-examples')
-		equals: #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
-			   'VectorGraphics-Conformance' 'VectorGraphics-Paths' 'VectorGraphics-TrueType' ) asSet.
+		equals: #( 'VectorGraphics-Cairo-Examples' 'VectorGraphics-Canvas'
+			   'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Raster'
+			   'VectorGraphics-Conformance' 'VectorGraphics-Paths'
+			   'VectorGraphics-TrueType' ) asSet.
 	self
 		assert: (self class packagesLoadedByGroupNamed: 'cairo-tests')
-		equals: #( 'VectorGraphics-Cairo' 'VectorGraphics-Cairo-Examples'
-			   'VectorGraphics-Cairo-Tests' 'VectorGraphics-Conformance' 'VectorGraphics-Paths'
-			   'VectorGraphics-Tests' 'VectorGraphics-TrueType'
+		equals: #( 'VectorGraphics-Cairo-Examples' 'VectorGraphics-Cairo-Tests'
+			   'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
+			   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance'
+			   'VectorGraphics-Paths' 'VectorGraphics-Tests' 'VectorGraphics-TrueType'
 			   'VectorGraphics-TrueType-Examples' 'VectorGraphics-TrueType-Tests' ) asSet.
 	offenders := #( 'cairo-examples' 'cairo-tests' ) flatCollect: [ :group |
 		             (self class packagesLoadedByGroupNamed: group) asSortedCollection asArray
@@ -878,16 +915,18 @@ VGArchitectureTest >> testTheCairoExampleAndTestGroupsNameNoBlocClass [
 ]
 
 { #category : 'tests - groups' }
-VGArchitectureTest >> testTheDefaultGroupLoadsTheRasteriserAndTheCairoBackendAlone [
+VGArchitectureTest >> testTheDefaultGroupLoadsTheRasteriserAndTheCanvasAlone [
 	"What `Metacello load: 'VectorGraphics'` brings in, named here so the group cannot grow a
 	 layer back by accident. The rasteriser is four packages since the split and the default
-	 group brings all four, because that is what the one package it replaced held. Every layer
-	 above it is a group of its own."
+	 group brings all four, because that is what the one package it replaced held. The canvas
+	 is three packages since the split of 2026-11 and the group brings all three, for the same
+	 reason. Every layer above them is a group of its own."
 
 	self
 		assert: (self class packagesLoadedByGroupNamed: 'default') asSortedCollection asArray
-		equals: #( 'VectorGraphics' 'VectorGraphics-Cairo' 'VectorGraphics-Engine'
-			   'VectorGraphics-Paths' 'VectorGraphics-Text' 'VectorGraphics-TrueType' )
+		equals: #( 'VectorGraphics' 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
+			   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Engine' 'VectorGraphics-Paths'
+			   'VectorGraphics-Text' 'VectorGraphics-TrueType' )
 ]
 
 { #category : 'tests - groups' }
@@ -976,16 +1015,18 @@ VGArchitectureTest >> testTheFontEngineTestsStayInsideTheirAllowedDependencies [
 VGArchitectureTest >> testTheFontsGroupLoadsTheRouteItInstallsAndNothingElse [
 	"The group a reader asks for to have Bloc drawing with this project's fonts after the load
 	 and nothing left to evaluate. It brings the engine, the renderer package that engine
-	 poses, the Cairo backend that renderer rasterises through and the font reader the glyphs
-	 come from — and none of the rasteriser the Cairo backend does not need, nor a Vulkan
-	 package, which would ask a device of a machine that may hold none."
+	 poses, the canvas that renderer rasterises through, the canvas's own font layer and the
+	 font reader the glyphs come from — and none of the scan-line engine of the rasteriser,
+	 which the canvas does not need, nor a Vulkan package, which would ask a device of a
+	 machine that may hold none."
 
 	| loaded |
 	loaded := self class packagesLoadedByGroupNamed: 'fonts'.
-
 	self assert: (loaded includes: 'VectorGraphics-Bloc-FontEngine').
 	self assert: (loaded includes: 'VectorGraphics-Bloc').
-	self assert: (loaded includes: 'VectorGraphics-Cairo').
+	self assert: (loaded includes: 'VectorGraphics-Canvas').
+	self assert: (loaded includes: 'VectorGraphics-Canvas-Fonts').
+	self assert: (loaded includes: 'VectorGraphics-Canvas-Raster').
 	self assert: (loaded includes: 'VectorGraphics-TrueType').
 	self assert: (loaded noneSatisfy: [ :each | each includesSubstring: 'Vulkan' ]).
 	self deny: (loaded includes: 'VectorGraphics-Engine')
