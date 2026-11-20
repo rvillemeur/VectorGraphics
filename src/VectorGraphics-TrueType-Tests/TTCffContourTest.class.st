@@ -34,6 +34,19 @@ TTCffContourTest >> rowsOf: aPresenter [
 ]
 
 { #category : 'tests' }
+TTCffContourTest >> testAContourOfTwoPointsThatReturnsToItsStartKeepsOnlyOne [
+	"The smallest contour that closes on itself: one segment drawn back to the point it
+	 started at. The closing point is written once here too, so the array holds one point
+	 and not the same point twice, which a reader would draw a segment of no length from."
+
+	| contour construction |
+	contour := TTCffContour startingAt: 10 @ 10.
+	contour addSegment: { (10 @ 10) }.
+	construction := contour contourConstructionWithinTolerance: 0.1.
+	self assert: construction points asArray equals: { (10 @ 10) }
+]
+
+{ #category : 'tests' }
 TTCffContourTest >> testAContourWithNoSegmentTurnsIntoItsStartAlone [
 	"The degenerate contour a font writes when one move follows another. It holds its start
 	 and nothing else, and the closing point is not dropped here: a single point is not a
