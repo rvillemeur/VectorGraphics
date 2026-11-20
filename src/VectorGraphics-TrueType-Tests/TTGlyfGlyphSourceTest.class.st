@@ -56,6 +56,26 @@ TTGlyfGlyphSourceTest >> testAComponentPlacedByByteOffsetsReadsThemSigned [
 ]
 
 { #category : 'tests' }
+TTGlyfGlyphSourceTest >> testAComponentPlacedByWordOffsetsReadsThemSigned [
+	"With the words flag set the two arguments are 16 bit, and signed as well, so a component
+	 reaches further than a byte says and in either direction. Reading them as bytes would both
+	 lose the range and leave the entry two bytes short of the next field."
+
+	| source square moved |
+	source := self
+		          sourceWithAComponentWithFlags:
+		          TTGlyfGlyphSource argumentsAreWordsFlag
+		          arguments: #( -1000 1000 )
+		          transform: #(  ).
+	square := source outlineOfGlyphAt: 1.
+	moved := source outlineOfGlyphAt: 2.
+	self
+		assert: moved contours first asArray
+		equals: (square contours first collect: [ :each | each + (-1000 @ 1000) ])
+			        asArray
+]
+
+{ #category : 'tests' }
 TTGlyfGlyphSourceTest >> testAComponentWithATwoByTwoMatrixTurnsThePointsOfItsGlyph [
 	"A component may carry a full two by two matrix, which is four F2Dot14 numbers read as xx,
 	 xy, yx then yy. The matrix here is a quarter turn, so every point of the component lands
