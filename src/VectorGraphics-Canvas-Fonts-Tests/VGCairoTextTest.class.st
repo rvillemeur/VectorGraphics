@@ -1,0 +1,1124 @@
+"
+I gate unit 1.8: the font face, the scaled font, the glyph atlas and the text verbs of the context.
+
+My fixture is the Source Sans Pro regular font that Alexandrie embeds, because it is a real glyf-based TrueType font that is present in any image with Alexandrie loaded and needs no file system. The engine itself reads the font file with the VectorGraphics TrueType parsers, so what I assert about a glyph is what the font says, and the metrics tests compare that with FreeType through Alexandrie.
+"
+Class {
+	#name : 'VGCairoTextTest',
+	#superclass : 'TestCase',
+	#category : 'VectorGraphics-Canvas-Fonts-Tests-Tests',
+	#package : 'VectorGraphics-Canvas-Fonts-Tests',
+	#tag : 'Tests'
+}
+
+{ #category : 'fixture constants' }
+VGCairoTextTest class >> cairoAdvanceOfTheFixtureRun [
+	"The advance live Cairo reports for the fixture run ''Cairo A'' at size 30 with the metrics
+	 unhinted. Two tests hold the font to it: the one that measures the run''s extents, and the one
+	 that measures where #showText: leaves the current point."
+
+	^ 88.62
+]
+
+{ #category : 'fixture constants' }
+VGCairoTextTest class >> fixtureRun [
+	"The string the measured text constants of this class were taken from."
+
+	^ 'Cairo A'
+]
+
+{ #category : 'fixture constants' }
+VGCairoTextTest class >> liveCairoMetricTolerance [
+	"Our metrics are exact rationals read from the font tables and Cairo's are doubles, so a
+	 comparison of the two has nothing between it but the width of a double."
+
+	^ 1.0e-12
+]
+
+{ #category : 'fixture constants' }
+VGCairoTextTest class >> oneStepOfTheFixedPointGrid [
+	"One step of the 24.8 fixed point grid Cairo keeps path coordinates on, which is the largest
+	 distance a coordinate can move by being stored in a path."
+
+	^ 1 / 256
+]
+
+{ #category : 'private' }
+VGCairoTextTest >> anInstalledOpenTypeFontFile [
+	"The first .otf file this machine's font directory holds, or nil when it holds none. A
+	 gate built on a real font says nothing on a machine that has no such font. The directory
+	 is the one VGScaledFontExamples reads, because allowedDependencies forbids this package
+	 from naming the catalogue that knows all five of them."
+
+	| directory |
+	directory := VGScaledFontExamples fontDirectory.
+	directory exists ifFalse: [ ^ nil ].
+	directory allFiles do: [ :file |
+		(file basename asLowercase endsWith: '.otf') ifTrue: [ ^ file ] ].
+	^ nil
+]
+
+{ #category : 'helpers' }
+VGCairoTextTest >> fixtureFontBytes [
+	"Source Sans Pro regular, embedded in Alexandrie, as raw TrueType bytes. The test package
+	 is allowed to name an Ae class; the engine is not, and never sees anything but the bytes."
+
+	^ AeSourceSansPro_Regular fontContentsData
+]
+
+{ #category : 'helpers' }
+VGCairoTextTest >> fixtureFontBytesWithTheTableTagsRenamed: aTag [
+	"The fixture font with one table tag spelled differently, so the table directory no longer
+	 holds it. It is how a font that carries its outlines in another format looks to me: the
+	 directory is sound and the table I need is absent."
+
+	| copy numberOfTables position |
+	copy := self fixtureFontBytes copy.
+	numberOfTables := copy shortAt: 5 bigEndian: true.
+	position := 13.
+	1 to: numberOfTables do: [ :index |
+		| tag |
+		tag := String new: 4.
+		1 to: 4 do: [ :each | tag at: each put: (Character value: (copy byteAt: position + each - 1)) ].
+		tag = aTag ifTrue: [
+			1 to: 4 do: [ :each | copy byteAt: position + each - 1 put: $x asInteger ] ].
+		position := position + 16 ].
+	^ copy
+]
+
+{ #category : 'helpers' }
+VGCairoTextTest >> fixtureFontFamilyName [
+	"The family name the font manager registers my fixture font under."
+
+	^ 'Source Sans Pro'
+]
+
+{ #category : 'helpers' }
+VGCairoTextTest >> fixtureScaledFontOfSize: aNumber hintMetrics: aSymbol [
+	"The fixture font at one size, with hinting of the metrics on or off. The user to device
+	 matrix is the identity, so user space and device space agree and a measured number is a
+	 pixel count."
+
+	^ VGScaledFont
+		  fontFace: (VGFontFace newForBytes: self fixtureFontBytes)
+		  fontMatrix: (VGCairoMatrix newScalingBy: aNumber asPoint)
+		  userToDeviceMatrix: VGCairoMatrix newIdentity
+		  options: (VGFontOptions new
+				   hintMetrics: aSymbol;
+				   yourself)
+]
+
+{ #category : 'support' }
+VGCairoTextTest >> liveCairoScaledFontOfSize: aNumber [
+	"The same font, size and options as #fixtureScaledFontOfSize:hintMetrics:, through Cairo and
+	 FreeType themselves. The library is the one VGAlexandrieFontLifetime keeps and the face is
+	 kept beside it, because a face freed under a foreign library that still references it takes
+	 the image down. Alexandrie is named here because this is the test package; the packages under
+	 test name none of it."
+
+	| options |
+	options := AeCairoFontOptions new
+		           hintStyle: AeCairoHintStyle none;
+		           hintMetrics: AeCairoHintMetrics off;
+		           yourself.
+	^ AeCairoScaledFont
+		  fontFace: (AeCairoFreetypeFontFace newForFace: (VGAlexandrieFontLifetime
+					    retain: (VGAlexandrieFontLifetime freeTypeLibrary
+							     newFaceFromBytes: self fixtureFontBytes
+							     index: 0)))
+		  fontMatrix: (AeCairoMatrix newScalingBy: aNumber asPoint)
+		  userToDeviceMatrix: AeCairoMatrix newIdentity
+		  options: options
+]
+
+{ #category : 'support' }
+VGCairoTextTest >> methodsOfThisProjectSending: aSelector [
+	"Every method of every package of this project, test and example packages included, that
+	 sends that selector. The organiser is read rather than a list kept, so a package added later
+	 is covered."
+
+	^ (PackageOrganizer default packages
+		   select: [ :each |
+		   each name beginsWith: VGCairoReferenceScanner projectPackagePrefix ])
+		  flatCollect: [ :each |
+		  each methods select: [ :one | one sendsSelector: aSelector ] ]
+]
+
+{ #category : 'running' }
+VGCairoTextTest >> newSurface [
+	^ VGCairoImageSurface extent: 64 @ 32
+]
+
+{ #category : 'running' }
+VGCairoTextTest >> newTextSurface [
+	"Wide enough for the fixture string at size 30, which advances eighty-nine pixels."
+
+	^ VGCairoImageSurface extent: 128 @ 48
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testACffGlyphIsInterpretedOnlyWhenItsOutlineIsAsked [
+	"A CFF glyph is drawn by interpreting its charstring, which a face does glyph by glyph: a
+	 font of three thousand glyphs is read to draw the twenty a page shows. The font here
+	 carries one glyph no reader can walk, so reading the font eagerly would raise where
+	 reading it lazily raises only for that one glyph."
+
+	| face |
+	face := VGFontFace newForBytes:
+		        VGFontBytesFixture cffFontBytesWithAGlyphThatCannotBeRead.
+	self assert: face glyphCount equals: 2.
+	self assert: (face outlineOfGlyphAt: 0) contours isEmpty.
+	self
+		should: [
+			face outlineOfGlyphAt:
+				(face glyphIndexForCodePoint: VGFontBytesFixture firstMappedCodePoint) ]
+		raise: Error
+		description: 'a glyph whose charstring cannot be read must say so'
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAComponentPlacedByMatchingPointsIsRejectedRatherThanGuessed [
+	"A component record whose arguments are point numbers to match, rather than an offset, is
+	 not supported: placing the component would mean guessing, and a guess moves a letter
+	 silently. The record here holds neither the offsets flag nor a transform, and the font is
+	 rejected while it is read."
+
+	| bytes error |
+	bytes := VGFontBytesFixture fontBytesWithGlyphRecords: {
+			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: 0
+						           glyphIndex: 1
+						           arguments: #( 1 2 )
+						           transform: #(  )) }) }.
+	error := [
+	         VGFontFace newForBytes: bytes.
+	         nil ] on: Error do: [ :each | each ].
+	self deny: error isNil.
+	self assert: (error messageText includesSubstring: 'points')
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAComponentThatIsItselfACompositeIsReadThroughItsOwnComponents [
+	"A component may name a composite glyph, and the two placements then compose: the square
+	 moved ten to the right by the glyph in the middle, and that glyph moved twenty up by the
+	 glyph on top."
+
+	| face square nested |
+	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
+			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: TTGlyfGlyphSource argumentsAreOffsetsFlag
+						           glyphIndex: 1
+						           arguments: #( 10 0 )
+						           transform: #(  )) }).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: TTGlyfGlyphSource argumentsAreOffsetsFlag
+						           glyphIndex: 2
+						           arguments: #( 0 20 )
+						           transform: #(  )) }) }).
+	square := face outlineOfGlyphAt: 1.
+	nested := face outlineOfGlyphAt: 3.
+	self
+		assert: nested contours first
+		equals: (square contours first collect: [ :each | each + (10 @ 20) ])
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testACompositeGlyphIsReadThroughItsComponentsAtTheirOffsets [
+	"The letter i of this font is a composite glyph: a stem and a dot, each a glyph of its own and
+	 each placed by an offset the composite carries. VectorGraphics' own TTGlyfTableParser reads
+	 those offsets and throws them away, so the face reads a composite glyph itself. The box the
+	 font stores for the glyph says where its ink really is, so the composed contours must fill
+	 that box and no more."
+
+	| face outline points |
+	face := VGFontFace newForBytes: self fixtureFontBytes.
+	outline := face outlineOfGlyphAt: (face glyphIndexForCodePoint: $i codePoint).
+	self assert: outline contours size equals: 2.
+	self assert: outline boundsRectangle equals: (69 @ 0 corner: 179 @ 694).
+	points := outline contours flatCollect: [ :each | each ].
+	self assert: (points collect: [ :each | each x ]) min equals: 69.
+	self assert: (points collect: [ :each | each x ]) max equals: 179.
+	self assert: (points collect: [ :each | each y ]) min equals: 0.
+	self assert: (points collect: [ :each | each y ]) max equals: 694
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testACompositeGlyphReadsEveryComponentWhileTheMoreComponentsFlagIsSet [
+	"The component records of a composite run on while one of them sets the more components
+	 flag, and the face reads them all. Two copies of the same square, side by side, make a
+	 glyph of two contours covering twice the width of one."
+
+	| face composed points |
+	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords: {
+			         (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100).
+			         (VGFontBytesFixture compositeGlyphRecordWithComponents: {
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: TTGlyfGlyphSource argumentsAreOffsetsFlag
+						           glyphIndex: 1
+						           arguments: #( 0 0 )
+						           transform: #(  )).
+					          (VGFontBytesFixture
+						           componentRecordWithFlags: TTGlyfGlyphSource argumentsAreOffsetsFlag
+						           glyphIndex: 1
+						           arguments: #( 100 0 )
+						           transform: #(  )) }) }).
+	composed := face outlineOfGlyphAt: 2.
+	self assert: composed contours size equals: 2.
+	points := composed contours flatCollect: [ :each | each ].
+	self assert: (points collect: [ :each | each x ]) min equals: 0.
+	self assert: (points collect: [ :each | each x ]) max equals: 200
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFaceAnswersTheScaledFontTheClassSideConstructorBuilds [
+	"A drawing asks the face for a scaled font where this package asks the scaled font class for
+	 one. Both spellings must build the same font, down to the run it measures."
+
+	| face matrix identity options fromTheFace fromTheClass |
+	face := VGFontFace newForBytes: self fixtureFontBytes.
+	matrix := VGCairoMatrix newScalingBy: 30 asPoint.
+	identity := VGCairoMatrix newIdentity.
+	options := VGFontOptions new.
+	fromTheFace := face
+		               newScaledFontWithFontMatrix: matrix
+		               userToDeviceMatrix: identity
+		               options: options.
+	fromTheClass := VGScaledFont
+		                fontFace: face
+		                fontMatrix: matrix
+		                userToDeviceMatrix: identity
+		                options: options.
+	self assert: fromTheFace fontFace identicalTo: face.
+	self assert: fromTheFace fontMatrix equals: matrix.
+	self assert: fromTheFace options equals: options.
+	self
+		assert: (fromTheFace textExtentsOf: 'Cairo in Pharo') advance
+		equals: (fromTheClass textExtentsOf: 'Cairo in Pharo') advance
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFaceNamesTheFamilyAndStyleItsOwnTablesState [
+	"The face reads its own name table, so a consumer naming a font does not need a second
+	 reader beside it. The names the class side states for the bundled face are the same names,
+	 so the fixture constants and the reader cannot drift apart."
+
+	| face |
+	face := VGFontFace newForBytes: VGFontFace defaultBytes.
+	self assert: face familyName equals: 'Source Sans Pro'.
+	self assert: face styleName equals: 'Regular'.
+	self assert: face familyName equals: VGFontFace defaultFamilyName.
+	self assert: face styleName equals: VGFontFace defaultStyleName
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFaceParsesAGlyphOnceAndKeepsIt [
+	"A page of text asks for the same few glyphs again and again, so a glyph is parsed once. The
+	 same outline object comes back, and the face says how many it holds."
+
+	| face first second |
+	face := VGFontFace newForBytes: self fixtureFontBytes.
+	self assert: face cachedGlyphCount equals: 0.
+	first := face outlineOfGlyphAt: 2.
+	second := face outlineOfGlyphAt: 2.
+	self assert: first identicalTo: second.
+	self assert: face cachedGlyphCount equals: 1.
+	face outlineOfGlyphAt: 28.
+	self assert: face cachedGlyphCount equals: 2
+]
+
+{ #category : 'tests - faces' }
+VGCairoTextTest >> testAFaceReadsACharacterMapOfTheWindowsPlatformAlone [
+	"The fonts of the Droid and the Open Sans families carry a Windows subtable of Unicode over
+	 the Basic Multilingual Plane and no subtable of platform 0, so a reader that looks for the
+	 Unicode platform alone rejects them all. The face takes that pair as the Unicode map it
+	 is, and maps the code points of the subtable to the glyphs of the font."
+
+	| tables bytes face |
+	tables := VGFontBytesFixture tablesForGlyphRecords:
+		          { (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100) }.
+	bytes := VGFontBytesFixture fontBytesWithTables: (tables collect: [ :each |
+			         each key = 'cmap'
+				         ifTrue: [
+					         'cmap' -> (VGFontBytesFixture
+						          cmapTableForGlyphCount: 1
+						          platformId: TTCmapTableParser windowsPlatformId
+						          encodingId: TTCmapTableParser bmpEncodingId) ]
+				         ifFalse: [ each ] ]).
+	face := VGFontFace newForBytes: bytes.
+	self
+		assert: (face glyphIndexForCodePoint: VGFontBytesFixture firstMappedCodePoint)
+		equals: 1
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFaceReadsTheNegativeNumbersOfTheHeadAndHheaTablesAsNegative [
+	"The box in head and the descent in hhea are signed 16 bit numbers, and both of them are
+	 negative in a real font: the box reaches left of the origin and below the baseline, and
+	 the descent is stated downwards. Read unsigned, minus 200 comes back as 65336, which is a
+	 line height off by two em squares."
+
+	| tables bytes face |
+	tables := VGFontBytesFixture tablesForGlyphRecords:
+		          { (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100) }.
+	bytes := VGFontBytesFixture fontBytesWithTables: (tables collect: [ :each |
+			         each key = 'head'
+				         ifTrue: [
+					         'head' -> (VGFontBytesFixture headTableWithBounds:
+							           (-300 @ -400 corner: 500 @ 600)) ]
+				         ifFalse: [ each ] ]).
+	face := VGFontFace newForBytes: bytes.
+	self assert: face boundsRectangle equals: (-300 @ -400 corner: 500 @ 600).
+	self assert: face descent equals: -200.
+	self assert: face ascent equals: 800
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFaceReadsTheOutlineOfAGlyphFromACffTable [
+	"An OpenType font carries its outlines as CFF charstrings in one table, where a TrueType
+	 font carries them in glyf and loca. The face reads either: the outline of a glyph is the
+	 same object, in the same font units, with the same box, whichever table it was drawn
+	 from. The square is four straight segments, so every control point is its own end point."
+
+	| face outline |
+	face := VGFontFace newForBytes: VGFontBytesFixture cffFontBytes.
+	self assert: face glyphCount equals: 2.
+	outline := face outlineOfGlyphAt:
+		           (face glyphIndexForCodePoint:
+			            VGFontBytesFixture firstMappedCodePoint).
+	self assert: outline advance equals: VGFontBytesFixture advanceWidth.
+	self assert: outline contours size equals: 1.
+	self
+		assert: outline contours first asArray
+		equals: {
+				(50 @ 100).
+				(450 @ 100).
+				(450 @ 100).
+				(450 @ 400).
+				(450 @ 400).
+				(50 @ 400).
+				(50 @ 400).
+				(50 @ 100).
+				(50 @ 100) }.
+	self assert: outline boundsRectangle equals: (50 @ 100 corner: 450 @ 400)
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFaceWithNoNameTableStillReadsAndNamesNothing [
+	"What I need to draw and what the metadata reader needs to name are not the same tables:
+	 the name table is in neither requiredTableTags nor what any glyph is read from. So a font
+	 stripped of it is still a face, draws as before, and answers nil for both its names."
+
+	| face |
+	face := VGFontFace newForBytes:
+		        (self fixtureFontBytesWithTheTableTagsRenamed: 'name').
+	self assert: face glyphCount equals:
+		(VGFontFace newForBytes: self fixtureFontBytes) glyphCount.
+	self assert: face familyName isNil.
+	self assert: face styleName isNil
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFontFaceAnswersTheGlyphIndexOfACodePoint [
+	"The index comes from the font's own character map, and a code point the font does not map
+	 answers zero, which is the glyph every TrueType font keeps for exactly that."
+
+	| face |
+	face := VGFontFace newForBytes: self fixtureFontBytes.
+	self assert: (face glyphIndexForCodePoint: $A codePoint) equals: 2.
+	self assert: (face glyphIndexForCodePoint: $a codePoint) equals: 28.
+	self assert: (face glyphIndexForCodePoint: Character space codePoint) equals: 1.
+	self assert: (face glyphIndexForCodePoint: 16r2615) equals: 0.
+	self assert: (face glyphIndexForCodePoint: 16r10FFFF) equals: 0
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFontFaceReadsItsOwnMetricsFromTheFontFile [
+	"The face is built from the font's own bytes, so its metrics are the font's, in font units."
+
+	| face |
+	face := VGFontFace newForBytes: self fixtureFontBytes.
+	self assert: face unitsPerEm equals: 1000.
+	self assert: face glyphCount equals: 1972.
+	self assert: face ascent equals: 984.
+	self assert: face descent equals: -273.
+	self assert: face lineGap equals: 0
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFontMissingAnyRequiredTableIsRejectedAndTheErrorNamesThatTable [
+	"Every tag of requiredTableTags is required, and so is every tag of the outline format the
+	 font carries: a font stripped of any one of them is rejected before a single glyph is
+	 read, and the error says which table was not there. One case per tag, so a tag dropped
+	 from either list, or a check that stops at the first tag, fails here."
+
+	| records tables |
+	records := { (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100) }.
+	tables := VGFontBytesFixture tablesForGlyphRecords: records.
+	(VGFontFace requiredTableTags
+	 , (VGFontFace outlineTableTagsIn: (Dictionary newFrom: tables))) do: [ :tag |
+		| bytes error |
+		bytes := VGFontBytesFixture fontBytesWithTables:
+			         (tables reject: [ :each | each key = tag ]).
+		error := [
+		         VGFontFace newForBytes: bytes.
+		         nil ] on: Error do: [ :each | each ].
+		self deny: error isNil description: 'a font with no ' , tag , ' table must be rejected'.
+		self
+			assert: (error messageText includesSubstring: tag)
+			description: 'the error must name the ' , tag , ' table' ]
+]
+
+{ #category : 'tests - faces' }
+VGCairoTextTest >> testAFontWhoseCharacterMapHoldsNoUnicodeSubtableIsRejected [
+	"The cmap table is there, so the check for a missing table says nothing, but its one
+	 subtable is the Windows platform under the encoding of a Chinese code page, which is no
+	 Unicode map. The reader answers nothing for such a table, and a face that cannot turn a
+	 code point into a glyph is of no use to a drawing, so it is rejected with the reason
+	 rather than kept with an empty map."
+
+	| tables bytes error |
+	tables := VGFontBytesFixture tablesForGlyphRecords:
+		          { (VGFontBytesFixture simpleGlyphRecordFrom: 0 @ 0 to: 100 @ 100) }.
+	bytes := VGFontBytesFixture fontBytesWithTables: (tables collect: [ :each |
+			         each key = 'cmap'
+				         ifTrue: [
+					         'cmap' -> (VGFontBytesFixture
+						          cmapTableForGlyphCount: 1
+						          platformId: TTCmapTableParser windowsPlatformId
+						          encodingId: TTCmapTableParser prcEncodingId) ]
+				         ifFalse: [ each ] ]).
+	error := [
+	         VGFontFace newForBytes: bytes.
+	         nil ] on: Error do: [ :each | each ].
+	self deny: error isNil.
+	self assert: (error messageText includesSubstring: 'Unicode')
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAFontWithNoOutlineTableIsRejected [
+	"A CFF OpenType font has no glyf table, and every glyph of it would be empty here, so the
+	 face rejects the font instead of drawing a page of nothing."
+
+	self
+		should: [ VGFontFace newForBytes: (self fixtureFontBytesWithTheTableTagsRenamed: 'glyf') ]
+		raise: Error
+		description: 'a font with no glyf table must be rejected'
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testAFreeTypeLibraryOfAnotherImageRunIsNeverAnsweredAgain [
+	"What a restarted image must not be handed: the FT_Library of a virtual machine run that has
+	 ended. The library is kept for the whole session, and a session ends when the image is saved,
+	 so an image that comes back holds a handle of a process that no longer exists; every font
+	 test of this project then fails with an invalid library handle, which is what the whole Cairo
+	 suite did when the image of 6 November 2026 was restarted. The run is stamped when the
+	 library is opened and read on every ask, so a library of another run is dropped and one is
+	 opened again."
+	"What is kept stays kept, dead faces included. Letting go of the only reference to a face
+	 lets the collector reach it and send FT_Done_Face to a dangling handle, which is the
+	 finalisation crash VGAlexandrieFontLifetime exists to prevent. Faking the run is the only
+	 way to hold a stale library without saving the image."
+	| stale kept |
+	stale := VGAlexandrieFontLifetime freeTypeLibrary.
+	self assert: VGAlexandrieFontLifetime isOfThisImageRun.
+	kept := VGAlexandrieFontLifetime retained size.
+	VGAlexandrieFontLifetime instVarNamed: 'imageRun' put: nil.
+	self deny: VGAlexandrieFontLifetime isOfThisImageRun.
+	self deny: VGAlexandrieFontLifetime freeTypeLibrary identicalTo: stale.
+	self assert: VGAlexandrieFontLifetime isOfThisImageRun.
+	self assert: (VGAlexandrieFontLifetime retained includes: stale).
+	self assert: VGAlexandrieFontLifetime retained size equals: kept + 1
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAGlyphOutlineHoldsAbsoluteFontUnitPointsAndTheGlyphsAdvance [
+	"An outline is the glyph as the font draws it: contours of quadratic segments in font units,
+	 each contour a start point followed by control and end point pairs. A glyph with no contour,
+	 a space, still carries its advance."
+
+	| face outline contour space |
+	face := VGFontFace newForBytes: self fixtureFontBytes.
+	outline := face outlineOfGlyphAt: 2.
+	self assert: outline advance equals: 544.
+	self assert: outline boundsRectangle equals: (3 @ 0 corner: 541 @ 656).
+	self assert: outline contours size equals: 2.
+	contour := outline contours first.
+	self assert: contour first equals: 203 @ 367.
+	self assert: contour size odd.
+	self assert: contour size equals: 17.
+	space := face outlineOfGlyphAt: (face glyphIndexForCodePoint: Character space codePoint).
+	self assert: space contours isEmpty.
+	self assert: space advance equals: 200
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAGlyphThatInksNothingIsLookedAtOnceAndRasterisedNever [
+	"A space has no contour, so it has no mask. The atlas remembers that it has none, and the
+	 count of rasterised glyphs does not move for it."
+
+	| font index glyphs surface |
+	font := self fixtureScaledFontOfSize: 30 hintMetrics: #off.
+	index := font fontFace glyphIndexForCodePoint: Character space codePoint.
+	glyphs := #( 0 20 ) collect: [ :x |
+		          VGGlyph
+			          index: index
+			          x: x
+			          y: 30 ].
+	surface := self newTextSurface.
+	surface newContext
+		scaledFont: font;
+		showGlyphs: glyphs.
+	surface flush.
+	self assert: font atlas renderedGlyphCount equals: 0.
+	self assert: font atlas size equals: 1.
+	self assert: surface data asArray asSet asArray equals: #( 0 )
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testASimpleGlyphDrawnLeftOfTheOriginKeepsItsNegativeCoordinates [
+	"The points of a glyph are stated as steps from the point before, and those steps are
+	 signed: a glyph sitting left of the origin and below the baseline, as a comma or a
+	 parenthesis does, walks backwards from 0 @ 0. Read unsigned, its points land some
+	 65 thousand units away and nothing of the letter is drawn where it belongs."
+
+	| face outline points |
+	face := VGFontFace newForBytes: (VGFontBytesFixture fontBytesWithGlyphRecords:
+			        { (VGFontBytesFixture
+				         simpleGlyphRecordFrom: -200 @ -100
+				         to: -50 @ -25) }).
+	outline := face outlineOfGlyphAt: 1.
+	points := outline contours first.
+	self assert: (points collect: [ :each | each x ]) min equals: -200.
+	self assert: (points collect: [ :each | each y ]) min equals: -100.
+	self assert: (points collect: [ :each | each x ]) max equals: -50.
+	self assert: (points collect: [ :each | each y ]) max equals: -25
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAStringBecomesGlyphsLaidOutAtTheirOwnAdvances [
+	"Unshaped layout: one glyph per code point, each one at the sum of the advances before it.
+	 Measured on live Cairo, which answers the same seven indices and the same seven positions."
+
+	| glyphs |
+	glyphs := (self fixtureScaledFontOfSize: 30 hintMetrics: #off)
+		          glyphArrayForString: 'Cairo A'.
+	self
+		assert: (glyphs collect: [ :each | each index ]) asArray
+		equals: #( 4 28 36 45 42 1 2 ).
+	self assert: (glyphs allSatisfy: [ :each | each y = 0 ]).
+	(glyphs collect: [ :each | each x ]) asArray
+		with: #( 0 17.13 32.25 39.63 50.04 66.3 72.3 )
+		do: [ :measured :expected | self assert: measured closeTo: expected ]
+]
+
+{ #category : 'tests - default face' }
+VGCairoTextTest >> testATextVerbWithNoFontDrawsThroughTheDefaultFace [
+	"A text verb with no font selected draws, and draws exactly what selecting the default face
+	 by hand draws. Ink is asserted too, so that a default face which resolved to nothing could
+	 not pass the comparison by leaving both surfaces blank."
+
+	| withNoFont withTheDefault |
+	withNoFont := self newTextSurface.
+	withNoFont newContext
+		sourceColorR: 0.1 g: 0.1 b: 0.1;
+		moveTo: 2 @ 20;
+		showText: 'Hi'.
+	withNoFont flush.
+	withTheDefault := self newTextSurface.
+	withTheDefault newContext
+		scaledFont: withTheDefault newContext defaultScaledFont;
+		sourceColorR: 0.1 g: 0.1 b: 0.1;
+		moveTo: 2 @ 20;
+		showText: 'Hi'.
+	withTheDefault flush.
+	self deny: (withNoFont data asArray allSatisfy: [ :each | each = 0 ]).
+	self assert: withNoFont data asArray equals: withTheDefault data asArray
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAnInstalledOpenTypeFontDrawsItsGlyphs [
+	"A gate on a real file: a face is built from an OpenType font nobody wrote for this suite,
+	 and the glyph of the letter a holds contours. The fixtures say what the reader does with
+	 a table of our own; this says it holds for the fonts of this machine."
+
+	| file face outline |
+	file := self anInstalledOpenTypeFontFile.
+	file ifNil: [ ^ self skip: 'this machine has no .otf font installed' ].
+	face := VGFontFace newForBytes: file binaryReadStream upToEnd.
+	outline := face outlineOfGlyphAt: (face glyphIndexForCodePoint: $a codePoint).
+	self deny: outline contours isEmpty description: file basename , ' draws no a'.
+	self assert: outline advance > 0
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAnUnhintedFontExtentIsTheFontsOwnNumberScaledByTheFontMatrix [
+	"With the metrics unhinted there is no rounding anywhere: an extent is the font's own value
+	 over the em square, times the font matrix. Measured on live Cairo with the same font at the
+	 same size, which answers 37.71, 29.52, 8.19 and 66.0."
+
+	| extents |
+	extents := (self fixtureScaledFontOfSize: 30 hintMetrics: #off) fontExtents.
+	self assert: extents ascent closeTo: 29.52.
+	self assert: extents descent closeTo: 8.19.
+	self assert: extents height closeTo: 37.71.
+	self assert: extents maxAdvanceX closeTo: 66.0.
+	self assert: extents maxAdvanceY equals: 0
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testAppendingTheGlyphsPathAddsOneClosedSubPathPerContour [
+	"cairo_glyph_path adds closed subpaths for the glyphs to the path being built and draws
+	 nothing. The letter A of this font has two contours, the outside and the counter, and the
+	 path is in device space, so the box it covers is the inked box of the glyph moved to where
+	 the glyph was placed."
+
+	| context font path box |
+	context := self newSurface newContext.
+	font := self fixtureScaledFontOfSize: 30 hintMetrics: #off.
+	context
+		scaledFont: font;
+		translateBy: 10 @ 25;
+		appendGlyphsPath: (font glyphArrayForString: 'A').
+	path := context pathBuilder path.
+	self assert: path subPaths size equals: 2.
+	self assert: (path subPaths allSatisfy: [ :each | each isClosed ]).
+	box := path boundingBox.
+	self assert: box left closeTo: 10.09 precision: 0.01.
+	self assert: box top closeTo: 5.32 precision: 0.01.
+	self assert: box right closeTo: 26.23 precision: 0.01.
+	self assert: box bottom closeTo: 25.0 precision: 0.01.
+	self assert: context surface displayList isEmpty
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testEveryCairoFontEnumerationAnswersTheNamesTheOptionsKnow [
+	"The enumeration classes and VGFontOptions may not drift apart, so each class is asked for a
+	 value under every name its option knows, and is allowed no value beyond them. #names is the
+	 one class-side selector that is not a value, because it is where the names come from."
+
+	{
+		{ VGCairoAntialias. VGFontOptions antialiasNames }.
+		{ VGCairoHintMetrics. VGFontOptions hintMetricsNames }.
+		{ VGCairoHintStyle. VGFontOptions hintStyleNames }.
+		{ VGCairoSubpixelOrder. VGFontOptions subpixelOrderNames } } do: [ :each |
+		| enumeration names |
+		enumeration := each first.
+		names := each second.
+		self assert: (names collect: [ :name | enumeration perform: name ]) equals: names.
+		self
+			assert: (enumeration class selectors reject: [ :selector | selector = #names ]) asSet
+			equals: names asSet ]
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testEveryInspectorViewOfTheFontKeeperBuildsThroughThePresenterBuilder [
+	"Both tabs of the keeper, built the way the inspector builds them: through
+	 StInspectionContext, which hands the method a presenter builder and refuses a view that
+	 does not take one. A table's column blocks run per drawn row only, so each one is run over
+	 each item here; otherwise a broken column would pass. The documentation gate of this
+	 project covers the four rasteriser layers and not this package, which is why the keeper's
+	 views are built here."
+	| builder |
+	VGAlexandrieFontLifetime freeTypeLibrary.
+	builder := SpPresenterBuilder newApplication: SpApplication new.
+	#( #inspectorKept: #inspectorLifetime: ) do: [ :selector |
+		| presenter |
+		presenter := (StInspectionContext new
+			 inspectedObject: VGAlexandrieFontLifetime;
+			 methodSelector: selector;
+			 yourself) basicNewInspectionPresenter: builder.
+		self assert: presenter notNil.
+		presenter columns do: [ :column |
+			presenter items do: [ :item | column evaluation value: item ] ] ]
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testHintedMetricsAreRoundedTheWayFreetypeRoundsThem [
+	"FreeType rounds the ascent and the descent up, and the height and the maximum advance to the
+	 nearest pixel. Measured on live Cairo with the metrics hinted: at size 30 it answers 30, 9, 38
+	 and 66, and at size 16 it answers 16, 5, 20 and 35."
+
+	| atThirty atSixteen |
+	atThirty := (self fixtureScaledFontOfSize: 30 hintMetrics: #on) fontExtents.
+	self assert: atThirty ascent equals: 30.
+	self assert: atThirty descent equals: 9.
+	self assert: atThirty height equals: 38.
+	atSixteen := (self fixtureScaledFontOfSize: 16 hintMetrics: #on) fontExtents.
+	self assert: atSixteen ascent equals: 16.
+	self assert: atSixteen descent equals: 5.
+	self assert: atSixteen height equals: 20
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testNoMethodHandsAFreeTypeFaceToHarfbuzz [
+	"hb_ft_font_create_referenced keeps the FreeType face alive at the C level and frees it with
+	 FT_Done_Face when the harfbuzz font is collected, from the finalisation process, which has
+	 taken the image down minutes after a drawing. AeHbBuffer >> cairoGlyphArrayForFace:size: is
+	 the call that opens that door, so no method of this project sends it: the project shapes from
+	 a harfbuzz blob over the bytes of a face instead, the way
+	 TTFontCatalogueEntry >> newHbFontScaledTo: does. Until unit 5.2 of the font plan the rule
+	 read the other way, that a sender of it keeps the face for the session; that unit took the
+	 last two senders away, the experiments ported from Alexandrie, so the rule is now that there
+	 are none."
+
+	| senders |
+	senders := self methodsOfThisProjectSending: #cairoGlyphArrayForFace:size:.
+	self
+		assert: (senders collect: [ :each |
+				 each methodClass name , ' >> ' , each selector ]) asSortedCollection asArray
+		equals: #(  )
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testNoMethodOfThisProjectMakesAFreeTypeLibraryOfItsOwn [
+	"A library made per call is a library collected per call, which is the crash above. The rule
+	 is read off the code rather than listed here, so a new sender is caught the day it is
+	 written: only the one place that keeps the library may build it."
+
+	| offenders |
+	offenders := self methodsOfThisProjectSending: #newInitialized.
+	self
+		assertCollection: (offenders collect: [ :each | each methodClass name , ' >> ' , each selector ]) asSet
+		hasSameElements: { 'VGAlexandrieFontLifetime class >> freeTypeLibrary' } asSet
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testOptionsBuiltFromCairosEnumerationsEqualOursBuiltFromOurOwnNames [
+	"A drawing names Cairo's enumerations where this package names symbols, so the four
+	 enumeration classes have to be two spellings of one option rather than two options."
+
+	| throughEnumerations throughNames |
+	throughEnumerations := VGFontOptions new
+		                       antialias: VGCairoAntialias fast;
+		                       hintMetrics: VGCairoHintMetrics on;
+		                       hintStyle: VGCairoHintStyle slight;
+		                       subpixelOrder: VGCairoSubpixelOrder default;
+		                       yourself.
+	throughNames := VGFontOptions new
+		                antialias: #fast;
+		                hintMetrics: #on;
+		                hintStyle: #slight;
+		                subpixelOrder: #default;
+		                yourself.
+	self assert: throughEnumerations equals: throughNames
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testShowingTextDrawsFromTheCurrentPointAndLeavesItAfterTheRun [
+	"cairo_show_text lays a string out with no shaping, draws it from the current point, and
+	 leaves the current point where the next glyph would start. It is Cairo's toy API over
+	 cairo_show_glyphs, so it must draw exactly what that verb draws for the same run placed at
+	 the same point. The new current point is a path coordinate, so it is held on the 24.8 grid
+	 and is read back a fraction of a pixel away from the exact advance; the precision allows
+	 that one step of the grid."
+
+	| font throughText context throughGlyphs origin |
+	font := self fixtureScaledFontOfSize: 30 hintMetrics: #off.
+	origin := 2 @ 33.
+	throughText := self newTextSurface.
+	context := throughText newContext.
+	context
+		scaledFont: font;
+		sourceColorR: 0.1 g: 0.1 b: 0.1;
+		moveTo: origin;
+		showText: 'Cairo A'.
+	throughText flush.
+	self
+		assert: context currentPointInUserSpace x
+		closeTo: origin x + self class cairoAdvanceOfTheFixtureRun
+		precision: self class oneStepOfTheFixedPointGrid.
+	self assert: context currentPointInUserSpace y closeTo: origin y.
+	throughGlyphs := self newTextSurface.
+	throughGlyphs newContext
+		scaledFont: font;
+		sourceColorR: 0.1 g: 0.1 b: 0.1;
+		showGlyphs: ((font glyphArrayForString: 'Cairo A') collect: [ :glyph |
+					 VGGlyph
+						 index: glyph index
+						 x: glyph x + origin x
+						 y: glyph y + origin y ]).
+	throughGlyphs flush.
+	self assert: throughText data asArray equals: throughGlyphs data asArray
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testTheAlexandrieFreeTypeLibraryIsOneObjectForTheWholeSession [
+	"FreeType destroys every face a library owns when the library goes, and harfbuzz holds its own
+	 C reference to a face it was handed, with FT_Done_Face as the callback that frees it. Nothing
+	 ties the two lifetimes together, so a library collected before the harfbuzz font that
+	 outlived it means FT_Done_Face reads freed memory and the virtual machine takes a
+	 segmentation fault inside the finalisation process, minutes after the drawing. One library,
+	 held for the session, cannot be collected."
+
+	| library |
+	library := VGAlexandrieFontLifetime freeTypeLibrary.
+	self assert: library identicalTo: VGAlexandrieFontLifetime freeTypeLibrary.
+	self assert: (VGAlexandrieFontLifetime retained includes: library)
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testTheAtlasRasterisesOneGlyphOnceHoweverOftenItIsDrawn [
+	"The second half of the gate: the atlas is built once for a repeated draw. The three glyphs
+	 sit on whole pixels, so all three share one phase and one mask, and drawing the run again,
+	 a whole pixel to the right, rasterises nothing new: the key holds the matrix without its
+	 translation."
+
+	| font index glyphs surface context |
+	font := self fixtureScaledFontOfSize: 30 hintMetrics: #off.
+	index := font fontFace glyphIndexForCodePoint: $a codePoint.
+	glyphs := #( 0 20 40 ) collect: [ :x |
+		          VGGlyph
+			          index: index
+			          x: x
+			          y: 30 ].
+	surface := self newTextSurface.
+	context := surface newContext.
+	context
+		scaledFont: font;
+		showGlyphs: glyphs.
+	self assert: font atlas renderedGlyphCount equals: 1.
+	context
+		translateBy: 1 @ 0;
+		showGlyphs: glyphs.
+	self assert: font atlas renderedGlyphCount equals: 1.
+	self assert: font atlas size equals: 1
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testTheAtlasRouteAndThePathRouteDrawTheSameBytes [
+	"The gate of unit 1.8. A run drawn with #showGlyphs:, which blits one cached mask per glyph,
+	 must lay down the same bytes as the same run filled as a path. Both routes place a glyph on
+	 the same snapped device point and hand the same coverage to the same compositing, so the two
+	 surfaces agree byte for byte and not merely closely."
+
+	| font glyphs throughAtlas throughPath |
+	font := self fixtureScaledFontOfSize: 30 hintMetrics: #off.
+	glyphs := font glyphArrayForString: 'Cairo A'.
+	throughAtlas := self newTextSurface.
+	throughAtlas newContext
+		scaledFont: font;
+		translateBy: 2.5 @ 33.25;
+		sourceColorR: 0.0 g: 0.2 b: 0.9;
+		showGlyphs: glyphs.
+	throughAtlas flush.
+	throughPath := self newTextSurface.
+	throughPath newContext
+		scaledFont: font;
+		translateBy: 2.5 @ 33.25;
+		sourceColorR: 0.0 g: 0.2 b: 0.9;
+		appendGlyphsPath: glyphs;
+		fill.
+	throughPath flush.
+	self deny: throughPath data asArray asSet asArray equals: #( 0 ).
+	self assert: throughAtlas data asArray equals: throughPath data asArray
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testTheContextAnswersTheFontExtentsOfTheScaledFontItWasGiven [
+	"cairo_set_scaled_font replaces the face, the font matrix and the options of the context in
+	 one go, and cairo_font_extents then answers that font's own numbers."
+
+	| context extents |
+	context := self newSurface newContext.
+	context scaledFont: (self fixtureScaledFontOfSize: 30 hintMetrics: #off).
+	extents := context fontExtents.
+	self assert: extents ascent closeTo: 29.52.
+	self assert: extents descent closeTo: 8.19.
+	self assert: extents height closeTo: 37.71
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testTheContextFillsTheTextExtentsRecordItIsGiven [
+	"AeCanvas owns the record and hands it over to be filled, so the context writes into it
+	 through the record's own setters and answers nothing of its own. The record here is
+	 Alexandrie's, which is the one the real caller passes, so this also gates the duck typing
+	 that lets our records stand in for Cairo's."
+
+	| context font glyphs record |
+	context := self newSurface newContext.
+	font := self fixtureScaledFontOfSize: 30 hintMetrics: #off.
+	context scaledFont: font.
+	glyphs := font glyphArrayForString: 'A'.
+	record := AeCairoTextExtents new.
+	context getGlyphExtentsOf: glyphs size: glyphs size into: record.
+	self assert: record width closeTo: 16.14.
+	self assert: record height closeTo: 19.68.
+	self assert: record bearingX closeTo: 0.09.
+	self assert: record bearingY closeTo: -19.68.
+	self assert: record advanceX closeTo: 16.32.
+	self assert: record advanceY closeTo: 0
+]
+
+{ #category : 'tests - default face' }
+VGCairoTextTest >> testTheDefaultFaceIsReadOnceAndKept [
+	"The bundled font is nearly three hundred kilobytes of tables, and a text verb with no font
+	 is the slowest path there is if every send parses them again. The face is therefore read
+	 once and kept, which also means two default scaled fonts share one glyph cache."
+
+	| first second |
+	VGFontFace resetDefault.
+	first := VGFontFace default.
+	second := VGFontFace default.
+	self assert: first identicalTo: second.
+	VGFontFace resetDefault.
+	self deny: VGFontFace default identicalTo: first.
+	self assert: VGFontFace default bytes equals: first bytes
+]
+
+{ #category : 'tests - default face' }
+VGCairoTextTest >> testTheDefaultScaledFontIsPharosOwnBundledFaceAtCairosDefaultSize [
+	"Cairo draws with a toy default face when the caller selected none, and resolves that face
+	 through fontconfig, which this replacement does not have. The face has to come from
+	 somewhere that is always there, so it is the sans family Pharo itself embeds, at Cairo's own
+	 default font size, with the font options a context starts with."
+
+	| context font |
+	context := self newSurface newContext.
+	font := context defaultScaledFont.
+	self assert: font fontFace bytes equals: VGFontFace defaultBytes.
+	self
+		assert: font fontMatrix
+		equals: (VGCairoMatrix newScalingBy: VGCairoContext defaultFontSize asPoint).
+	self assert: font options equals: VGFontOptions new
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testTheExtentsOfARunAreTheInkedBoxOfItsGlyphs [
+	"The extent is the union of the inked boxes, the bearing says where that union sits relative
+	 to the origin of the run, and the advance is where the next run would start. Measured on live
+	 Cairo for the same string at the same size with the metrics unhinted."
+
+	| extents |
+	extents := (self fixtureScaledFontOfSize: 30 hintMetrics: #off)
+		           textExtentsOf: 'Cairo A'.
+	self assert: extents width closeTo: 86.97.
+	self assert: extents height closeTo: 21.18.
+	self assert: extents bearingX closeTo: 1.56.
+	self assert: extents bearingY closeTo: -20.82.
+	self assert: extents advanceX closeTo: self class cairoAdvanceOfTheFixtureRun.
+	self assert: extents advanceY closeTo: 0
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testTheExtentsOfOneGlyphAreThatGlyphsOwnBoxScaled [
+	"One glyph measured on its own: the box the font stores for it, scaled by the font matrix, with
+	 y pointing down. Measured on live Cairo for the letter A at size 30."
+
+	| font extents |
+	font := self fixtureScaledFontOfSize: 30 hintMetrics: #off.
+	extents := font glyphExtentsOf: (font glyphArrayForString: 'A').
+	self assert: extents width closeTo: 16.14.
+	self assert: extents height closeTo: 19.68.
+	self assert: extents bearingX closeTo: 0.09.
+	self assert: extents bearingY closeTo: -19.68.
+	self assert: extents advanceX closeTo: 16.32.
+	self assert: extents advanceY closeTo: 0
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testTheFontSizeReplacesTheFontMatrixAndKeepsTheFace [
+	"cairo_set_font_size replaces the font matrix with a scale, and leaves the face and the
+	 options alone, so the extents are the same face's numbers at the new size: 984 over the em
+	 square of 1000, at 16."
+
+	| context |
+	context := self newSurface newContext.
+	context scaledFont: (self fixtureScaledFontOfSize: 30 hintMetrics: #off).
+	context fontSize: 16.
+	self assert: context fontExtents ascent closeTo: 15.744.
+	self assert: (context scaledFont textExtentsOf: 'A') advanceX closeTo: 8.704
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testTheGlyphsOfAStringMatchLiveCairoAndFreeType [
+	"The other measured half of the metrics gate: the same string, through our own cmap and hmtx
+	 tables and through FreeType, must answer the same glyph indices at the same positions."
+
+	| theirs ours theirGlyphs ourGlyphs |
+	theirs := self liveCairoScaledFontOfSize: 30.
+	ours := self fixtureScaledFontOfSize: 30 hintMetrics: #off.
+	theirGlyphs := (theirs glyphArrayForString: self class fixtureRun) asExternalStructure.
+	ourGlyphs := ours glyphArrayForString: self class fixtureRun.
+	self assert: ourGlyphs size equals: self class fixtureRun size.
+	ourGlyphs doWithIndex: [ :each :position |
+		| theirGlyph |
+		theirGlyph := theirGlyphs at: position.
+		self assert: each index equals: theirGlyph index.
+		self
+			assert: each x
+			closeTo: theirGlyph x
+			precision: self class liveCairoMetricTolerance.
+		self
+			assert: each y
+			closeTo: theirGlyph y
+			precision: self class liveCairoMetricTolerance ]
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testTheLifetimeRowsAskTheClassWhatRunItsLibraryBelongsTo [
+	"The one fact this defect turned on, where a reader can see it: whether the library held was
+	 opened by the run of the virtual machine that is running now. The row asks the class rather
+	 than restating the rule, so it cannot drift from the code, and it reads false for a library
+	 of a run that has ended — the state a restarted image comes back in. The count beside it is
+	 the size of what is kept, which only ever grows."
+	| valueOf |
+	valueOf := [ :label |
+		(VGAlexandrieFontLifetime lifetimeRows detect: [ :each | each first = label ]) second ].
+	VGAlexandrieFontLifetime freeTypeLibrary.
+	self assert: (valueOf value: 'Library of this image run').
+	self
+		assert: (valueOf value: 'Objects kept')
+		equals: VGAlexandrieFontLifetime retained size.
+	VGAlexandrieFontLifetime instVarNamed: 'imageRun' put: nil.
+	self deny: (valueOf value: 'Library of this image run').
+	VGAlexandrieFontLifetime freeTypeLibrary.
+	self assert: (valueOf value: 'Library of this image run')
+]
+
+{ #category : 'tests - font lifetime' }
+VGCairoTextTest >> testTheReferencePictureKeepsTheFontManagerItLeavesBehind [
+	"The reference picture is drawn by Alexandrie's own experiment, which this project may not
+	 edit, and several of those replace the global font manager and hand its face to harfbuzz. The
+	 manager left behind therefore owns a library a foreign font still references, so whoever runs
+	 the reference keeps it: the collector would otherwise free the library first, and
+	 FT_Done_Face inside the finalisation process would read freed memory."
+
+	| case |
+	case := VGAlexandrieCase for: #lineCap.
+	case cairoForm.
+	self assert:
+		(VGAlexandrieFontLifetime retained includes: AeFontManager globalInstance)
+]
+
+{ #category : 'tests' }
+VGCairoTextTest >> testTheUnhintedMetricsMatchLiveCairoAndFreeType [
+	"The metrics half of the gate of unit 1.8, measured rather than frozen: the same font at the
+	 same size, through our own TrueType tables and through FreeType, must answer the same font
+	 extents and the same run extents. Our numbers are exact rationals read from the tables and
+	 Cairo's are doubles, so only the width of a double separates them. Hinted metrics are left
+	 out on purpose: Cairo's hinted advances come from a FreeType face shared with whatever else
+	 in the image last set its size, so they are not reproducible from outside."
+
+	| theirs ours theirExtents ourExtents |
+	theirs := self liveCairoScaledFontOfSize: 30.
+	ours := self fixtureScaledFontOfSize: 30 hintMetrics: #off.
+	theirExtents := theirs fontExtents.
+	ourExtents := ours fontExtents.
+	#( #ascent #descent #height #maxAdvanceX #maxAdvanceY ) do: [ :each |
+		self
+			assert: (ourExtents perform: each)
+			closeTo: (theirExtents perform: each)
+			precision: self class liveCairoMetricTolerance ].
+	theirExtents := theirs textExtentsOf: self class fixtureRun.
+	ourExtents := ours textExtentsOf: self class fixtureRun.
+	#( #width #height #bearingX #bearingY #advanceX #advanceY ) do: [ :each |
+		self
+			assert: (ourExtents perform: each)
+			closeTo: (theirExtents perform: each)
+			precision: self class liveCairoMetricTolerance ]
+]

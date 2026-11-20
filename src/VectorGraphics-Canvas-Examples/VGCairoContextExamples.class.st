@@ -1,0 +1,64 @@
+"
+I hold the one-click examples for the VectorGraphics Cairo-compatible context. My examples rebuild their object on every call and assert nothing: open one from the browser, inspect the result, and read the Skeletons tab to see which selectors the context still owes and which unit of VECTORCANVAS-PLAN.md owes them.
+"
+Class {
+	#name : 'VGCairoContextExamples',
+	#superclass : 'Object',
+	#category : 'VectorGraphics-Canvas-Examples-Examples',
+	#package : 'VectorGraphics-Canvas-Examples',
+	#tag : 'Examples'
+}
+
+{ #category : 'examples' }
+VGCairoContextExamples class >> contextOnAnImageSurface [
+	<sampleInstance>
+	"A context over an image surface, the pair every drawing goes through."
+	^ (VGCairoImageSurface extent: 64 @ 64) newContext
+]
+
+{ #category : 'examples' }
+VGCairoContextExamples class >> contextWithAStarPathPending [
+	<sampleInstance>
+	"A context holding a built but unpainted path, so the Path tab shows the runs and the current
+	 point a fill would consume. The path is already in device space, which is why a later
+	 transformation cannot move it."
+
+	| context |
+	context := (VGCairoImageSurface extent: 64 @ 64) newContext.
+	context useFillRuleEvenOdd.
+	0 to: 4 do: [ :index |
+		| angle point |
+		angle := index * 4 * Float pi / 5 - (Float pi / 2).
+		point := 32 @ 32 + (angle cos * 26 @ (angle sin * 26)).
+		index isZero
+			ifTrue: [ context moveTo: point ]
+			ifFalse: [ context lineTo: point ] ].
+	context closePath.
+	^ context
+]
+
+{ #category : 'examples' }
+VGCairoContextExamples class >> linearGradientPatternClass [
+	<sampleInstance>
+	"The pattern classes are the third of the three Cairo objects AeCanvas drives. Inspecting the
+	 class shows the constructors unit 1.5 owes."
+
+	^ VGCairoLinearGradientPattern
+]
+
+{ #category : 'examples' }
+VGCairoContextExamples class >> transformedContextWithASavedState [
+	<sampleInstance>
+	"A context whose current matrix has been moved, turned and stretched, with one state pushed
+	 underneath it, so the state stack and the current transformation are both visible."
+	| context |
+	context := (VGCairoImageSurface extent: 64 @ 64) newContext.
+	context state fillRule: #evenOdd.
+	context saveState.
+	context
+		translateBy: 32 @ 32;
+		rotateByRadians: Float pi / 6;
+		scaleBy: 1.8 @ 0.6.
+	context state source: Color red.
+	^ context
+]

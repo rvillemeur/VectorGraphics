@@ -1,0 +1,121 @@
+"
+I check the skeletons of the Cairo replacement: every selector the inventory names exists, signals VGNotYetImplemented until its unit arrives, and names a unit that VECTORCANVAS-PLAN.md declares.
+
+The point is that a conformance case which touches unfinished behaviour reports the unit that owes it, rather than a doesNotUnderstand or a silent wrong answer. I also hold the meta test that the unit table covers the inventory exactly, so a selector cannot be added to one without the other.
+"
+Class {
+	#name : 'VGCairoSkeletonTest',
+	#superclass : 'TestCase',
+	#category : 'VectorGraphics-Canvas-Tests-Tests',
+	#package : 'VectorGraphics-Canvas-Tests',
+	#tag : 'Tests'
+}
+
+{ #category : 'accessing' }
+VGCairoSkeletonTest >> packagesUnderTest [
+	"The nine packages of the canvas: the three of code since the split of 2026-11, and the
+	 tests and the examples package beside each of them."
+	^ #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
+	     'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Tests'
+	     'VectorGraphics-Canvas-Examples' 'VectorGraphics-Canvas-Raster-Tests'
+	     'VectorGraphics-Canvas-Raster-Examples' 'VectorGraphics-Canvas-Fonts-Tests'
+	     'VectorGraphics-Canvas-Fonts-Examples' ) collect: [ :each |
+		  Smalltalk packageOrganizer packageNamed: each ]
+]
+
+{ #category : 'accessing' }
+VGCairoSkeletonTest >> skeletonMethods [
+	"Every method of the Cairo replacement that is still a skeleton, found by its send rather than
+	 by its protocol name, so that renaming a protocol cannot hide one. The replacement is three
+	 packages since the split of 2026-11, and a skeleton may be in any of them."
+	^ #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
+	     'VectorGraphics-Canvas-Fonts' ) flatCollect: [ :each |
+		  (Smalltalk packageOrganizer packageNamed: each) methods select: [ :method |
+			  method messages includes: #notYetImplementedIn:selector: ] ]
+]
+
+{ #category : 'tests' }
+VGCairoSkeletonTest >> testEverySkeletonNamesAUnitThePlanDeclares [
+	| unknown |
+	unknown := self skeletonMethods
+		           select: [ :each |
+			           (VGCairoInventory planUnits includes:
+				            (each literals detect: [ :one | one isString and: [ one first isDigit ] ])) not ]
+		           thenCollect: [ :each | each methodClass name , ' >> ' , each selector ].
+	self assert: unknown asArray isEmpty description: unknown asArray printString
+]
+
+{ #category : 'tests' }
+VGCairoSkeletonTest >> testEverySkeletonNamesItsOwnSelector [
+	"A skeleton passes its own selector to the hook. A copy-paste that left the wrong one behind
+	 would make a conformance failure name the wrong selector."
+
+	| wrong |
+	wrong := self skeletonMethods
+		         select: [ :each | (each literals includes: each selector) not ]
+		         thenCollect: [ :each | each methodClass name , ' >> ' , each selector ].
+	self assert: wrong asArray isEmpty description: wrong asArray printString
+]
+
+{ #category : 'tests' }
+VGCairoSkeletonTest >> testEverySkeletonSignalsAndTheErrorNamesItsUnit [
+	"Send every skeleton for real, with nil arguments, and check what comes back. This is the test
+	 that proves the calling surface is complete: a missing selector shows up as a
+	 doesNotUnderstand, not as a passing test."
+
+	| failures |
+	failures := OrderedCollection new.
+	self skeletonMethods do: [ :method |
+		| receiver arguments |
+		receiver := method methodClass isClassSide
+			            ifTrue: [ method methodClass instanceSide ]
+			            ifFalse: [ method methodClass instanceSide basicNew ].
+		arguments := Array new: method numArgs withAll: nil.
+		[ receiver perform: method selector withArguments: arguments.
+		  failures add: method methodClass name , ' >> ' , method selector , ' did not signal' ]
+			on: VGNotYetImplemented
+			do: [ :error |
+				error selectorName = method selector ifFalse: [
+					failures add: method methodClass name , ' >> ' , method selector , ' signalled for '
+						, error selectorName ].
+				(VGCairoInventory unitForSelector: method selector) = error unit ifFalse: [
+					failures add: method methodClass name , ' >> ' , method selector , ' named unit '
+						, error unit printString ] ] ].
+	self assert: failures asArray isEmpty description: failures asArray printString
+]
+
+{ #category : 'tests' }
+VGCairoSkeletonTest >> testNoMethodReferencesAnUndeclaredVariable [
+	"A method left behind by a slot that was removed still compiles: the slot name becomes an
+	 undeclared global, and reading it answers nil instead of failing. Nothing in these packages
+	 may hold such a reference."
+
+	| offenders |
+	offenders := OrderedCollection new.
+	self packagesUnderTest do: [ :package |
+		package methods do: [ :method |
+			(method literals select: [ :each |
+				 each isVariableBinding and: [ each key notNil and: [
+					 (Smalltalk includesKey: each key asSymbol) not ] ] ]) do: [ :each |
+				offenders add:
+					method methodClass name asString , '>>' , method selector , ' -> '
+					, each key asString ] ] ].
+	self
+		assert: offenders isEmpty
+		description: 'these methods read an undeclared variable: '
+			, offenders asArray printString
+]
+
+{ #category : 'tests - meta' }
+VGCairoSkeletonTest >> testTheUnitTableCoversTheInventoryExactly [
+	"The table and the inventory are two lists, and a selector added to one and not the other is a
+	 silent gap: a skeleton with no unit, or a unit owing a selector nobody sends."
+
+	| tabled |
+	tabled := VGCairoInventory selectorUnitTable
+		          inject: Set new
+		          into: [ :all :each | all addAll: each value; yourself ].
+	self
+		assertCollection: tabled asSortedCollection asArray
+		hasSameElements: VGCairoInventory allInventorySelectors
+]

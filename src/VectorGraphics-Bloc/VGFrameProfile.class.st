@@ -191,7 +191,9 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Bloc-FontEngine/Installation' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc-FontEngine-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc-Examples/Text' -> #notInTheFrame).
-			  ('VectorGraphics-Cairo-Examples/Examples' -> #notInTheFrame).
+			  ('VectorGraphics-Canvas-Examples/Examples' -> #notInTheFrame).
+			  ('VectorGraphics-Canvas-Raster-Examples/Examples' -> #notInTheFrame).
+			  ('VectorGraphics-Canvas-Fonts-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics-Vulkan/Budget' -> #notInTheFrame).
 			  ('VectorGraphics-Vulkan-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics-Engine/Kernel' -> #notInTheFrame).

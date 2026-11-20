@@ -47,14 +47,22 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 	 nothing else of this project. The canvas names the renderer and the font layer. The
 	 renderer names the canvas back, four times, which is the one cycle of the trio and the one
 	 edge left out here: VGArchitectureTest class >> edgesTheBaselineCannotDeclare holds it,
-	 since a pair declared both ways has no load order. The other edge the baseline cannot state
-	 is Cairo-Examples on Cairo-Tests, for the same reason.
+	 since a pair declared both ways has no load order. The second such edge is the canvas
+	 examples on the canvas tests, which is the cycle the mirror packages make: the tests build
+	 their subject from an example and an example of the architecture table reads the test class
+	 that holds it.
+	 Each of the three has its own examples and tests package, declared from the references each
+	 one makes. The tests of the canvas require the tests of the renderer, which is an edge
+	 between two test packages this project already allows elsewhere: the canvas tests draw a
+	 frame through the backend fixture.
 	 The Bloc renderer names the font reader as well as the canvas. The Bloc examples and the
 	 Bloc tests name the reader as well since unit 3.7, where a catalogue entry is what a run of
-	 text is shaped from.
+	 text is shaped from. The Bloc tests also require the canvas tests, which the dependency
+	 table cannot state: VGBlocExamplesTest subclasses VGCairoExamplesTest and names it nowhere
+	 in a method.
 	 The Vulkan packages are declared from a scan of their Tonel files, because they are not
-	 loaded in any image this project is developed in: they name the canvas and the renderer, and
-	 no class of the font layer.
+	 loaded in any image this project is developed in: they name the canvas and the renderer, the
+	 Vulkan tests name both test packages of those two, and no class of the font layer.
 	 The corpus and the benchmark harness are declared by declareSupportPackagesOn:."
 
 	spec
@@ -65,18 +73,39 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Raster' ) ];
-		package: 'VectorGraphics-Cairo-Examples'
+		package: 'VectorGraphics-Canvas-Fonts-Examples'
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
-					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance' ) ];
-		package: 'VectorGraphics-Cairo-Tests'
+					   'VectorGraphics-Conformance' ) ];
+		package: 'VectorGraphics-Canvas-Fonts-Tests'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Cairo-Examples' 'VectorGraphics-Canvas'
-					   'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Raster'
-					   'VectorGraphics-Conformance' 'VectorGraphics-TrueType'
-					   'VectorGraphics-TrueType-Tests' ) ];
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
+					   'VectorGraphics-Canvas-Fonts-Examples' 'VectorGraphics-Conformance'
+					   'VectorGraphics-TrueType' 'VectorGraphics-TrueType-Tests' ) ];
+		package: 'VectorGraphics-Canvas-Raster-Tests'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
+					   'VectorGraphics-Conformance' ) ];
+		package: 'VectorGraphics-Canvas-Examples'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
+					   'VectorGraphics-Conformance' ) ];
+		package: 'VectorGraphics-Canvas-Raster-Examples'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Examples'
+					   'VectorGraphics-Canvas-Raster' ) ];
+		package: 'VectorGraphics-Canvas-Tests'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Examples'
+					   'VectorGraphics-Canvas-Fonts-Examples' 'VectorGraphics-Canvas-Raster'
+					   'VectorGraphics-Canvas-Raster-Examples'
+					   'VectorGraphics-Canvas-Raster-Tests' 'VectorGraphics-Conformance' ) ];
 		package: 'VectorGraphics-Bloc'
 		with: [
 			spec requires:
@@ -91,8 +120,8 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples'
-					   'VectorGraphics-Cairo-Tests' 'VectorGraphics-Canvas'
-					   'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Raster'
+					   'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
+					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Canvas-Tests'
 					   'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Vulkan'
 		with: [
@@ -108,9 +137,10 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc'
-					   'VectorGraphics-Cairo-Tests' 'VectorGraphics-Canvas'
-					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance'
-					   'VectorGraphics-Vulkan' 'VectorGraphics-Vulkan-Examples' ) ]
+					   'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
+					   'VectorGraphics-Canvas-Raster-Tests' 'VectorGraphics-Canvas-Tests'
+					   'VectorGraphics-Conformance' 'VectorGraphics-Vulkan'
+					   'VectorGraphics-Vulkan-Examples' ) ]
 ]
 
 { #category : 'baselines' }
@@ -141,7 +171,7 @@ BaselineOfVectorGraphics >> declareFontEnginePackagesOn: spec [
 	 The postLoadDoIt: is what makes that group transparent: Metacello sends it to me once the
 	 engine's package is in, and the route is posed before the load returns. It is attached to
 	 the package rather than to the group, so it runs once however the package arrives.
-	 The tests name the font layer of the canvas, and require the Cairo test package, which the
+	 The tests name the font layer of the canvas, and require the canvas test package, which the
 	 dependency table cannot state: VGFontEngineExamplesTest subclasses VGCairoExamplesTest and
 	 names it nowhere in a method."
 
@@ -159,8 +189,8 @@ BaselineOfVectorGraphics >> declareFontEnginePackagesOn: spec [
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-FontEngine'
-					   'VectorGraphics-Bloc-FontEngine-Examples' 'VectorGraphics-Cairo-Tests'
-					   'VectorGraphics-Canvas-Fonts' 'VectorGraphics-TrueType' ) ]
+					   'VectorGraphics-Bloc-FontEngine-Examples' 'VectorGraphics-Canvas-Fonts'
+					   'VectorGraphics-Canvas-Tests' 'VectorGraphics-TrueType' ) ]
 ]
 
 { #category : 'baselines' }
@@ -188,7 +218,7 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 	 whole rasteriser arrived through the canvas's requires and loading a backend must keep
 	 bringing it: the backend itself names only the font reader.
 	 'dev' is the group to work on this project from: the default stack, the tests of those
-	 same layers, and MuTalk. It names the five test groups one by one rather than the
+	 same layers, and MuTalk. It names the test groups one by one rather than the
 	 project-wide 'tests' group, so that it still loads in a plain Pharo image.
 	 'conformance' is the corpus the backends are compared against and 'benchmarks' the
 	 harness that measures them. Neither holds a TestCase, and each is a group of its own so
@@ -209,10 +239,16 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 		group: 'text-tests' with: #( 'VectorGraphics-Text-Tests' );
 		group: 'core' with: #( 'VectorGraphics' 'paths' 'engine' 'truetype' 'text' );
 		group: 'canvas' with: #( 'VectorGraphics-Canvas' );
+		group: 'canvas-examples' with: #( 'VectorGraphics-Canvas-Examples' );
+		group: 'canvas-tests' with: #( 'VectorGraphics-Canvas-Tests' );
 		group: 'canvas-raster' with: #( 'VectorGraphics-Canvas-Raster' );
+		group: 'canvas-raster-examples'
+			with: #( 'VectorGraphics-Canvas-Raster-Examples' );
+		group: 'canvas-raster-tests' with: #( 'VectorGraphics-Canvas-Raster-Tests' );
 		group: 'canvas-fonts' with: #( 'VectorGraphics-Canvas-Fonts' );
-		group: 'cairo-examples' with: #( 'VectorGraphics-Cairo-Examples' );
-		group: 'cairo-tests' with: #( 'VectorGraphics-Cairo-Tests' );
+		group: 'canvas-fonts-examples'
+			with: #( 'VectorGraphics-Canvas-Fonts-Examples' );
+		group: 'canvas-fonts-tests' with: #( 'VectorGraphics-Canvas-Fonts-Tests' );
 		group: 'bloc' with: #( 'core' 'VectorGraphics-Bloc' );
 		group: 'bloc-examples' with: #( 'VectorGraphics-Bloc-Examples' );
 		group: 'bloc-tests' with: #( 'VectorGraphics-Bloc-Tests' );
@@ -228,14 +264,16 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 		group: 'benchmarks' with: #( 'VectorGraphics-Benchmarks' );
 		group: 'examples'
 		with: #( 'paths-examples' 'engine-examples' 'truetype-examples' 'text-examples'
-			   'cairo-examples' 'bloc-examples' 'fonts-examples' 'vulkan-examples' );
+			   'canvas-examples' 'canvas-raster-examples' 'canvas-fonts-examples'
+			   'bloc-examples' 'fonts-examples' 'vulkan-examples' );
 		group: 'tests'
-		with: #( 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests' 'cairo-tests'
-			   'bloc-tests' 'fonts-tests' 'vulkan-tests' );
+		with: #( 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests' 'canvas-tests'
+			   'canvas-raster-tests' 'canvas-fonts-tests' 'bloc-tests' 'fonts-tests'
+			   'vulkan-tests' );
 		group: 'default' with: #( 'core' 'canvas' 'canvas-raster' 'canvas-fonts' );
 		group: 'dev'
 		with: #( 'default' 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests'
-			   'cairo-tests' 'MuTalk' )
+			   'canvas-tests' 'canvas-raster-tests' 'canvas-fonts-tests' 'MuTalk' )
 ]
 
 { #category : 'baselines' }
