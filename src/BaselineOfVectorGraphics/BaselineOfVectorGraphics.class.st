@@ -93,12 +93,14 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 			spec requires:
 					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 					   'VectorGraphics-Canvas-Fonts-Examples' 'VectorGraphics-Conformance'
-					   'VectorGraphics-TrueType' 'VectorGraphics-TrueType-Tests' ) ];
+					   'VectorGraphics-Reflection' 'VectorGraphics-TrueType'
+					   'VectorGraphics-TrueType-Tests' ) ];
 		package: 'VectorGraphics-Canvas-Raster-Tests'
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths'
-					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance' ) ];
+					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance'
+					   'VectorGraphics-Reflection' ) ];
 		package: 'VectorGraphics-Canvas-Examples'
 		with: [
 			spec requires:
@@ -124,13 +126,15 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 					   'VectorGraphics-Canvas-Fonts-Examples'
 					   'VectorGraphics-Canvas-Paths-Examples' 'VectorGraphics-Canvas-Raster'
 					   'VectorGraphics-Canvas-Raster-Examples'
-					   'VectorGraphics-Canvas-Raster-Tests' 'VectorGraphics-Conformance' ) ];
+					   'VectorGraphics-Canvas-Raster-Tests' 'VectorGraphics-Conformance'
+					   'VectorGraphics-Reflection'
+					   'VectorGraphics-Reflection-Examples' ) ];
 		package: 'VectorGraphics-Bloc'
 		with: [
 			spec requires:
 					#( 'Bloc' 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 					   'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster'
-					   'VectorGraphics-TrueType' ) ];
+					   'VectorGraphics-Reflection' 'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Bloc-Examples'
 		with: [
 			spec requires:
@@ -243,9 +247,12 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 	 'dev' is the group to work on this project from: the default stack, the tests of those
 	 same layers, and MuTalk. It names the test groups one by one rather than the
 	 project-wide 'tests' group, so that it still loads in a plain Pharo image.
-	 'conformance' is the corpus the backends are compared against and 'benchmarks' the
-	 harness that measures them. Neither holds a TestCase, and each is a group of its own so
-	 that it loads with no test package at all."
+	 'conformance' is the corpus the backends are compared against, 'benchmarks' the
+	 harness that measures them, and 'reflection' the scan that answers which classes of
+	 another project a package names. None of the three holds a TestCase, and each is a group
+	 of its own so that it loads with no test package at all. 'reflection' is in no group
+	 above it: the test packages and the Bloc renderer that read the scan require it, so it
+	 arrives with whichever of them is asked for."
 
 	spec
 		group: 'paths' with: #( 'VectorGraphics-Paths' );
@@ -361,11 +368,16 @@ BaselineOfVectorGraphics >> declareRasteriserPackagesOn: spec [
 
 { #category : 'baselines' }
 BaselineOfVectorGraphics >> declareSupportPackagesOn: spec [
-	"The two packages that hold neither a layer nor a suite: the corpus every backend is
-	 compared against, and the harness that measures a frame through each of them. Both lived
-	 in a -Tests package until the review of 2026-11, which made an examples package depend
-	 on a test package; neither holds a TestCase, and each is a group of its own so that it
-	 loads with no suite in the image.
+	"The three packages that hold neither a layer nor a suite: the corpus every backend is
+	 compared against, the harness that measures a frame through each of them, and the
+	 reference scan that answers which classes of another project a package names. The first
+	 two lived in a -Tests package until the review of 2026-11, which made an examples package
+	 depend on a test package; none of the three holds a TestCase, and each is a group of its
+	 own so that it loads with no suite in the image.
+	 The scan is a leaf: it reads compiled methods and the literals they hold, so it names no
+	 package of this project and every layer may ask it. It left VectorGraphics-Canvas in unit
+	 2 of FONTS-LOAD-PLAN, because the cairo route reads it through VGFontCanvas and must not
+	 load the canvas to do so.
 	 The corpus names VectorGraphics-TrueType since unit 5.2 of the font plan: the experiments
 	 ported from Alexandrie read their font out of this project's own catalogue, where they
 	 read it out of the global FreeType font manager before.
@@ -374,6 +386,9 @@ BaselineOfVectorGraphics >> declareSupportPackagesOn: spec [
 	 backend."
 
 	spec
+		package: 'VectorGraphics-Reflection';
+		package: 'VectorGraphics-Reflection-Examples'
+		with: [ spec requires: #( 'VectorGraphics-Reflection' ) ];
 		package: 'VectorGraphics-Conformance'
 		with: [
 			spec requires:

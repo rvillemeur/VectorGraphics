@@ -19,8 +19,8 @@ Class {
 	#instVars : [
 		'packageNames'
 	],
-	#category : 'VectorGraphics-Canvas-Reflection',
-	#package : 'VectorGraphics-Canvas',
+	#category : 'VectorGraphics-Reflection-Reflection',
+	#package : 'VectorGraphics-Reflection',
 	#tag : 'Reflection'
 }
 

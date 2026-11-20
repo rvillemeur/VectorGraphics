@@ -114,13 +114,15 @@ VGArchitectureTest class >> allowedDependencies [
 				    'VectorGraphics-Canvas-Fonts-Examples' 'VectorGraphics-Canvas-Paths-Examples'
 				    'VectorGraphics-Canvas-Raster'
 				    'VectorGraphics-Canvas-Raster-Examples'
-				    'VectorGraphics-Canvas-Raster-Tests' 'VectorGraphics-Conformance' ).
+				    'VectorGraphics-Canvas-Raster-Tests' 'VectorGraphics-Conformance'
+				    'VectorGraphics-Reflection' 'VectorGraphics-Reflection-Examples' ).
 			  'VectorGraphics-Canvas-Raster-Examples'
 			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths'
 				    'VectorGraphics-Canvas-Paths-Examples' 'VectorGraphics-Canvas-Raster' ).
 			  'VectorGraphics-Canvas-Raster-Tests'
 			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths'
-				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance' ).
+				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance'
+				    'VectorGraphics-Reflection' ).
 			  'VectorGraphics-Canvas-Fonts-Examples'
 			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 				    'VectorGraphics-Conformance' ).
@@ -132,7 +134,15 @@ VGArchitectureTest class >> allowedDependencies [
 			  'VectorGraphics-Canvas-Fonts-Tests'
 			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 				    'VectorGraphics-Canvas-Fonts-Examples' 'VectorGraphics-Conformance'
-				    'VectorGraphics-TrueType' 'VectorGraphics-TrueType-Tests' ).
+				    'VectorGraphics-Reflection' 'VectorGraphics-TrueType'
+				    'VectorGraphics-TrueType-Tests' ).
+			  "The reference scan, a leaf of its own since unit 2 of FONTS-LOAD-PLAN. It reads the
+			   compiled methods of a package and answers the classes of another project they
+			   name, so it is a tool every layer may ask and it names nothing itself. It left the
+			   canvas because the cairo route reads it through VGFontCanvas, and the canvas is
+			   not on that route."
+			  'VectorGraphics-Reflection' -> #(  ).
+			  'VectorGraphics-Reflection-Examples' -> #( 'VectorGraphics-Reflection' ).
 			  "The Bloc renderer names the font reader as well as the canvas since unit 3.2 of
 			   the font plan: VGFontManager is an adapter onto TTFontCatalogue, which reads the
 			   fonts the FreeType library used to read. Its examples and its tests name the
@@ -142,7 +152,7 @@ VGArchitectureTest class >> allowedDependencies [
 			  'VectorGraphics-Bloc'
 			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 				    'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster'
-				    'VectorGraphics-TrueType' ).
+				    'VectorGraphics-Reflection' 'VectorGraphics-TrueType' ).
 			  'VectorGraphics-Bloc-Examples'
 			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
 				    'VectorGraphics-Canvas-Fonts' 'VectorGraphics-TrueType' ).
@@ -886,6 +896,18 @@ VGArchitectureTest >> testPathsTestsStayInsideTheirAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Paths-Tests'
 ]
 
+{ #category : 'tests' }
+VGArchitectureTest >> testReflectionExamplesStayInsideTheirAllowedDependencies [
+
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Reflection-Examples'
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testReflectionStaysInsideItsAllowedDependencies [
+
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Reflection'
+]
+
 { #category : 'tests - dependencies' }
 VGArchitectureTest >> testTextExamplesStayInsideTheirAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Text-Examples'
@@ -955,7 +977,8 @@ VGArchitectureTest >> testTheCanvasExampleAndTestGroupsNameNoBlocClass [
 	 VectorGraphics-TrueType-Tests with the glyph source: the face tests that reject a font
 	 missing a table read that fixture. The path tests group brings neither the font reader nor
 	 the corpus: a path, its subpaths and the builder are geometry, and the renderer below them
-	 is all they need.
+	 is all they need. The three test groups bring the reference scan as well, which the
+	 gate and the backend selection read to answer what a package names.
 	 None of it is Bloc. Alexandrie is not asked about here — blocPackageNames says why. A group
 	 that does not exist would pass on an empty scan, so the packages each one must bring in are
 	 named first."
@@ -979,7 +1002,8 @@ VGArchitectureTest >> testTheCanvasExampleAndTestGroupsNameNoBlocClass [
 				               'VectorGraphics-Canvas-Raster-Examples'
 				               'VectorGraphics-Canvas-Raster-Tests'
 				               'VectorGraphics-Canvas-Tests' 'VectorGraphics-Conformance'
-				               'VectorGraphics-Paths' 'VectorGraphics-TrueType' ).
+				               'VectorGraphics-Paths' 'VectorGraphics-Reflection'
+				               'VectorGraphics-Reflection-Examples' 'VectorGraphics-TrueType' ).
 			            'canvas-raster-examples'
 			            -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 				               'VectorGraphics-Canvas-Paths'
@@ -992,7 +1016,7 @@ VGArchitectureTest >> testTheCanvasExampleAndTestGroupsNameNoBlocClass [
 				               'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster'
 				               'VectorGraphics-Canvas-Raster-Tests'
 				               'VectorGraphics-Conformance' 'VectorGraphics-Paths'
-				               'VectorGraphics-TrueType' ).
+				               'VectorGraphics-Reflection' 'VectorGraphics-TrueType' ).
 			            'canvas-fonts-examples'
 			            -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 				               'VectorGraphics-Canvas-Fonts-Examples'
@@ -1005,7 +1029,8 @@ VGArchitectureTest >> testTheCanvasExampleAndTestGroupsNameNoBlocClass [
 				               'VectorGraphics-Canvas-Fonts-Tests'
 				               'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster'
 				               'VectorGraphics-Conformance' 'VectorGraphics-Paths'
-				               'VectorGraphics-Tests' 'VectorGraphics-TrueType'
+				               'VectorGraphics-Reflection' 'VectorGraphics-Tests'
+				               'VectorGraphics-TrueType'
 				               'VectorGraphics-TrueType-Examples'
 				               'VectorGraphics-TrueType-Tests' ).
 			            'canvas-paths-examples'

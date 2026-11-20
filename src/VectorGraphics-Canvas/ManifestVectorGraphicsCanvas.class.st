@@ -26,9 +26,12 @@ Tags:
 - `Matrix` — the affine transformation of the canvas.
 - `Export` — the PDF and SVG surfaces, which record and never rasterise.
 - `Inventory` — the list of selectors the correspondence with Alexandrie requires.
-- `Reflection` — `VGCairoReferenceScanner`, how the architecture tests read what a package names.
 - `Skeleton` — the root object, the status enumeration and the not-yet-implemented signal.
 - `Manifest` — this comment and the Renraku rule configuration.
+
+The reference scan the architecture tests read a package with is `VectorGraphics-Reflection`
+since unit 2 of `FONTS-LOAD-PLAN.md`, where it left this package for the same reason the
+geometry did: the cairo route reads it and must not load the canvas to do so.
 
 The renderer is `VectorGraphics-Canvas-Raster`, the glyph layer is
 `VectorGraphics-Canvas-Fonts` and the path geometry is `VectorGraphics-Canvas-Paths`; this

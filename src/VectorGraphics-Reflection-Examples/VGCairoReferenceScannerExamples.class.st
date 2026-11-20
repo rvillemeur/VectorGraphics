@@ -9,8 +9,8 @@ subclassing the canvas.
 Class {
 	#name : 'VGCairoReferenceScannerExamples',
 	#superclass : 'Object',
-	#category : 'VectorGraphics-Canvas-Examples-Examples',
-	#package : 'VectorGraphics-Canvas-Examples',
+	#category : 'VectorGraphics-Reflection-Examples-Examples',
+	#package : 'VectorGraphics-Reflection-Examples',
 	#tag : 'Examples'
 }
 
