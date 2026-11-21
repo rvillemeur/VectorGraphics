@@ -159,7 +159,8 @@ VGArchitectureTest class >> allowedDependencies [
 			  'VectorGraphics-Bloc-Tests'
 			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples'
 				    'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
-				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-TrueType' ).
+				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-Reflection'
+				    'VectorGraphics-TrueType' ).
 			  "The font engine is the one object the fonts group loads for: it poses the manager
 			   and the renderer that make Bloc draw text with glyphs of this project, so it names
 			   the package holding both and nothing else. Its examples name it alone, and its

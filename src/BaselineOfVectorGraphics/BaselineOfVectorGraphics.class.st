@@ -146,7 +146,7 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 					#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples'
 					   'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Canvas-Tests'
-					   'VectorGraphics-TrueType' ) ];
+					   'VectorGraphics-Reflection' 'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Vulkan'
 		with: [
 			spec requires:
