@@ -137,7 +137,9 @@ VGFrameProfile class >> stageByPackageAndTag [
 	 A tag name travels with its classes, so the split of the canvas into three packages of
 	 2026-11 re-keyed these entries and changed no stage: `Path`, `Paint` and `Display list` are
 	 a tag of the canvas and a tag of its renderer both, and the two halves of each are the
-	 same stage.
+	 same stage. The three units of FONTS-LOAD-PLAN re-keyed them again and changed no stage
+	 either: the geometry left the canvas, the reference scan left it too, and the cairo text
+	 route left the Bloc renderer for `VectorGraphics-Bloc-Text`.
 	 The stages are the frame read as a pipeline. `canvasApi` is the drawing verbs and the state
 	 they keep, `transforms` the matrices they multiply, `pathAndStroke` the flattening and the
 	 stroke outlines, `displayList` the recording and the draining of a frame and the binning of
@@ -156,8 +158,8 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Canvas/Context' -> #canvasApi).
 			  ('VectorGraphics-Canvas/Skeleton' -> #canvasApi).
 			  ('VectorGraphics-Bloc/Backend' -> #canvasApi).
-			  ('VectorGraphics-Canvas/Matrix' -> #transforms).
-			  ('VectorGraphics-Canvas/Path' -> #pathAndStroke).
+			  ('VectorGraphics-Canvas-Geometry/Matrix' -> #transforms).
+			  ('VectorGraphics-Canvas-Geometry/Path' -> #pathAndStroke).
 			  ('VectorGraphics-Canvas-Raster/Path' -> #pathAndStroke).
 			  ('VectorGraphics-Canvas-Raster/Backend' -> #displayList).
 			  ('VectorGraphics-Canvas/Display list' -> #displayList).
@@ -172,8 +174,9 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Canvas/Compositing' -> #compositing).
 			  ('VectorGraphics-Canvas/Surface' -> #pixelAccess).
 			  ('VectorGraphics-Canvas-Fonts/Text' -> #text).
-			  ('VectorGraphics-Bloc/Fonts' -> #text).
-			  ('VectorGraphics-Bloc/Text' -> #text).
+			  ('VectorGraphics-Bloc-Text/Fonts' -> #text).
+			  ('VectorGraphics-Bloc-Text/Text' -> #text).
+			  ('VectorGraphics-Bloc-Text/Backend' -> #canvasApi).
 			  ('VectorGraphics-TrueType/Fonts' -> #text).
 			  ('VectorGraphics-TrueType/Glyphs' -> #text).
 			  ('VectorGraphics-TrueType/Reading' -> #text).
@@ -185,12 +188,15 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Bloc/Profiling' -> #harness).
 			  ('VectorGraphics-Canvas/Export' -> #notInTheFrame).
 			  ('VectorGraphics-Canvas/Inventory' -> #notInTheFrame).
-			  ('VectorGraphics-Canvas/Reflection' -> #notInTheFrame).
+			  ('VectorGraphics-Reflection/Reflection' -> #notInTheFrame).
+			  ('VectorGraphics-Reflection/Manifest' -> #notInTheFrame).
+			  ('VectorGraphics-Reflection-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc/Exporters' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc-Examples/Uncategorized' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc-FontEngine/Installation' -> #notInTheFrame).
 			  ('VectorGraphics-Bloc-FontEngine-Examples/Examples' -> #notInTheFrame).
-			  ('VectorGraphics-Bloc-Examples/Text' -> #notInTheFrame).
+			  ('VectorGraphics-Bloc-Text-Examples/Text' -> #notInTheFrame).
+			  ('VectorGraphics-Bloc-Text-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics-Canvas-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics-Canvas-Raster-Examples/Examples' -> #notInTheFrame).
 			  ('VectorGraphics-Canvas-Fonts-Examples/Examples' -> #notInTheFrame).
@@ -210,7 +216,9 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics/Manifest' -> #notInTheFrame).
 			  ('VectorGraphics-Canvas/Manifest' -> #notInTheFrame).
 			  ('VectorGraphics-Canvas-Raster/Manifest' -> #notInTheFrame).
-			  ('VectorGraphics-Canvas-Fonts/Manifest' -> #notInTheFrame) }
+			  ('VectorGraphics-Canvas-Fonts/Manifest' -> #notInTheFrame).
+			  ('VectorGraphics-Canvas-Geometry/Manifest' -> #notInTheFrame).
+			  ('VectorGraphics-Canvas-Geometry-Examples/Examples' -> #notInTheFrame) }
 ]
 
 { #category : 'stages' }

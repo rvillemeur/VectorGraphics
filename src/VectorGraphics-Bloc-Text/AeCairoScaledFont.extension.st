@@ -1,0 +1,52 @@
+Extension { #name : 'AeCairoScaledFont' }
+
+{ #category : '*VectorGraphics-Bloc-Text' }
+AeCairoScaledFont >> aeTextFont [
+	"I am a font Cairo itself can draw, so I need no adapter: I am my own. The pivot in
+	 VGAeTextContext asks every font for its adapter, which is how one of ours reaches
+	 VGAeTextFont without a test of its class."
+
+	^ self
+]
+
+{ #category : '*VectorGraphics-Bloc-Text' }
+AeCairoScaledFont >> appendPathOfGlyphs: aGlyphsArray length: aNumberOfGlyphs onAeContext: aContext [
+	"Straight back to cairo_glyph_path."
+
+	^ aContext
+		  appendGlyphsPathThroughCairo: aGlyphsArray
+		  length: aNumberOfGlyphs
+]
+
+{ #category : '*VectorGraphics-Bloc-Text' }
+AeCairoScaledFont >> fontExtentsInto: aFontExtents onAeContext: aContext [
+	"Straight back to cairo_font_extents."
+
+	^ aContext fontExtentsThroughCairoInto: aFontExtents
+]
+
+{ #category : '*VectorGraphics-Bloc-Text' }
+AeCairoScaledFont >> glyphExtentsOf: aGlyphArray size: aNumberOfGlyphs into: aTextExtents onAeContext: aContext [
+	"Straight back to cairo_glyph_extents."
+
+	^ aContext
+		  glyphExtentsThroughCairoOf: aGlyphArray
+		  size: aNumberOfGlyphs
+		  into: aTextExtents
+]
+
+{ #category : '*VectorGraphics-Bloc-Text' }
+AeCairoScaledFont >> poseOnAeContext: aContext [
+	"Extensions in this project's own package, because Alexandrie's classes are never edited
+	 here: VGAeTextContext asks the scaled font it was given which route to take, and a real
+	 Cairo font sends every text call straight back to the inherited implementation."
+
+	^ aContext poseScaledFontThroughCairo: self
+]
+
+{ #category : '*VectorGraphics-Bloc-Text' }
+AeCairoScaledFont >> showGlyphs: aGlyphsArray size: aNumberOfGlyphs onAeContext: aContext [
+	"Straight back to cairo_show_glyphs: I am a font Cairo can draw by itself."
+
+	^ aContext showGlyphsThroughCairo: aGlyphsArray size: aNumberOfGlyphs
+]

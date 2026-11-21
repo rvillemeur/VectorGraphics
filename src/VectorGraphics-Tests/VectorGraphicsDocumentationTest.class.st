@@ -126,11 +126,13 @@ VectorGraphicsDocumentationTest >> behaviourNamedBy: aString [
 	| isClassSide name class |
 	isClassSide := aString endsWith: self classSideSuffix.
 	name := isClassSide
-		ifTrue: [ (aString allButLast: self classSideSuffix size) trimmed ]
-		ifFalse: [ aString trimmed ].
+		        ifTrue: [ (aString allButLast: self classSideSuffix size) trimBoth ]
+		        ifFalse: [ aString trimBoth ].
 	class := Smalltalk at: name asSymbol ifAbsent: [ ^ nil ].
-	(class isBehavior) ifFalse: [ ^ nil ].
-	^ isClassSide ifTrue: [ class class ] ifFalse: [ class ]
+	class isBehavior ifFalse: [ ^ nil ].
+	^ isClassSide
+		  ifTrue: [ class class ]
+		  ifFalse: [ class ]
 ]
 
 { #category : 'running' }
@@ -226,7 +228,7 @@ VectorGraphicsDocumentationTest >> isImplementedMethodToken: aToken [
 	index = 0 ifTrue: [ ^ false ].
 	behaviour := self behaviourNamedBy: (aToken first: index - 1).
 	behaviour ifNil: [ ^ false ].
-	selector := (aToken allButFirst: index - 1 + separator size) trimmed.
+	selector := (aToken allButFirst: index - 1 + separator size) trimBoth.
 	^ behaviour canUnderstand: selector asSymbol
 ]
 
@@ -324,12 +326,12 @@ VectorGraphicsDocumentationTest >> tagNamesNamedBy: aComment [
 	start = 0 ifTrue: [ ^ Set new ].
 	names := Set new.
 	(lines allButFirst: start) do: [ :each |
-		(each beginsWith: '- `')
-			ifTrue: [
-				| rest |
-				rest := each allButFirst: 3.
-				names add: (rest first: (rest indexOf: $`) - 1) ]
-			ifFalse: [ (each trimmed isEmpty and: [ names isEmpty ]) ifFalse: [ ^ names ] ] ].
+			(each beginsWith: '- `')
+				ifTrue: [
+						| rest |
+						rest := each allButFirst: 3.
+						names add: (rest first: (rest indexOf: $`) - 1) ]
+				ifFalse: [ (each trimBoth isEmpty and: [ names isEmpty ]) ifFalse: [ ^ names ] ] ].
 	^ names
 ]
 

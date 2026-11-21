@@ -38,13 +38,13 @@ BaselineOfVectorGraphics >> baseline: spec [
 
 { #category : 'baselines' }
 BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
-	"The backends above the rasteriser: the canvas, which is four packages of its own since the
-	 split of 2026-11, the Bloc renderer that replaces Alexandrie's canvas, and the Vulkan device
+	"The backends above the rasteriser: the canvas, which is three packages since the split of
+	 2026-11 and four since unit 1 of FONTS-LOAD-PLAN, the Bloc renderer that replaces Alexandrie's canvas, and the Vulkan device
 	 path. Each names every package it really depends on, and not only the nearest one that would
 	 drag the rest in: VGArchitectureTest holds this declaration against the references the code
 	 makes.
 	 The canvas is a chain. The font layer is a leaf, so it names the font reader and nothing
-	 else of this project. The path geometry is a leaf too, and names nothing at all: the two
+	 else of this project. The geometry is a leaf too, and names nothing at all: the two
 	 methods of a path that read the renderer''s segments are extensions the renderer owns,
 	 so the cairo route of the fonts group loads a path with no canvas behind it. The
 	 renderer requires the geometry all the same, because those two extension methods cannot
@@ -62,9 +62,12 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 	 one makes. The tests of the canvas require the tests of the renderer, which is an edge
 	 between two test packages this project already allows elsewhere: the canvas tests draw a
 	 frame through the backend fixture.
-	 The Bloc renderer names the font reader as well as the canvas. The Bloc examples and the
-	 Bloc tests name the reader as well since unit 3.7, where a catalogue entry is what a run of
-	 text is shaped from. The Bloc tests also require the canvas tests, which the dependency
+	 The Bloc renderer names the canvas, the rasteriser and the reference scan. Since unit 3 of
+	 FONTS-LOAD-PLAN it names nothing of the cairo route, and requires the package holding that
+	 route for the superclass of VGCanvas alone, an edge the dependency table cannot state. The
+	 Bloc examples and the Bloc tests name the font reader since unit 3.7, where a catalogue
+	 entry is what a run of text is shaped from; the Bloc tests name the cairo route and both of
+	 its mirror packages as well. The Bloc tests also require the canvas tests, which the dependency
 	 table cannot state: VGBlocExamplesTest subclasses VGCairoExamplesTest and names it nowhere
 	 in a method.
 	 The Vulkan packages are declared from a scan of their Tonel files, because they are not
@@ -74,78 +77,91 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 
 	spec
 		package: 'VectorGraphics-Canvas-Fonts'
-		with: [ spec requires: #( 'VectorGraphics-TrueType' ) ];
-		package: 'VectorGraphics-Canvas-Paths';
+		with: [ spec requires: #( 'VectorGraphics-Canvas-Geometry' 'VectorGraphics-TrueType' ) ];
+		package: 'VectorGraphics-Canvas-Geometry';
 		package: 'VectorGraphics-Canvas-Raster'
-		with: [ spec requires: #( 'VectorGraphics-Canvas-Paths' ) ];
+		with: [ spec requires: #( 'VectorGraphics-Canvas-Geometry' ) ];
 		package: 'VectorGraphics-Canvas'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Paths'
+					#( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Geometry'
 					   'VectorGraphics-Canvas-Raster' ) ];
 		package: 'VectorGraphics-Canvas-Fonts-Examples'
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
+					   'VectorGraphics-Canvas-Geometry'
 					   'VectorGraphics-Conformance' ) ];
 		package: 'VectorGraphics-Canvas-Fonts-Tests'
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
-					   'VectorGraphics-Canvas-Fonts-Examples' 'VectorGraphics-Conformance'
-					   'VectorGraphics-Reflection' 'VectorGraphics-TrueType'
+					   'VectorGraphics-Canvas-Fonts-Examples'
+					   'VectorGraphics-Canvas-Geometry'
+					   'VectorGraphics-Conformance' 'VectorGraphics-Reflection'
+					   'VectorGraphics-TrueType'
 					   'VectorGraphics-TrueType-Tests' ) ];
 		package: 'VectorGraphics-Canvas-Raster-Tests'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths'
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Geometry'
 					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance'
 					   'VectorGraphics-Reflection' ) ];
 		package: 'VectorGraphics-Canvas-Examples'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths-Examples'
-					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance' ) ];
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Geometry'
+					   'VectorGraphics-Canvas-Geometry-Examples'
+					   'VectorGraphics-Canvas-Raster'
+					   'VectorGraphics-Conformance' ) ];
 		package: 'VectorGraphics-Canvas-Raster-Examples'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths'
-					   'VectorGraphics-Canvas-Paths-Examples' 'VectorGraphics-Canvas-Raster' ) ];
-		package: 'VectorGraphics-Canvas-Paths-Examples'
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Geometry'
+					   'VectorGraphics-Canvas-Geometry-Examples' 'VectorGraphics-Canvas-Raster' ) ];
+		package: 'VectorGraphics-Canvas-Geometry-Examples'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Paths' ) ];
-		package: 'VectorGraphics-Canvas-Paths-Tests'
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Geometry' ) ];
+		package: 'VectorGraphics-Canvas-Geometry-Tests'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster' ) ];
+					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Geometry'
+					   'VectorGraphics-Canvas-Raster' ) ];
 		package: 'VectorGraphics-Canvas-Tests'
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Examples'
 					   'VectorGraphics-Canvas-Fonts-Examples'
-					   'VectorGraphics-Canvas-Paths-Examples' 'VectorGraphics-Canvas-Raster'
+					   'VectorGraphics-Canvas-Geometry'
+					   'VectorGraphics-Canvas-Geometry-Examples'
+					   'VectorGraphics-Canvas-Raster'
 					   'VectorGraphics-Canvas-Raster-Examples'
-					   'VectorGraphics-Canvas-Raster-Tests' 'VectorGraphics-Conformance'
-					   'VectorGraphics-Reflection'
+					   'VectorGraphics-Canvas-Raster-Tests'
+					   'VectorGraphics-Conformance' 'VectorGraphics-Reflection'
 					   'VectorGraphics-Reflection-Examples' ) ];
 		package: 'VectorGraphics-Bloc'
 		with: [
 			spec requires:
-					#( 'Bloc' 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
-					   'VectorGraphics-Canvas-Paths' 'VectorGraphics-Canvas-Raster'
-					   'VectorGraphics-Reflection' 'VectorGraphics-TrueType' ) ];
+					#( 'Bloc' 'VectorGraphics-Bloc-Text' 'VectorGraphics-Canvas'
+					   'VectorGraphics-Canvas-Raster'
+					   'VectorGraphics-Reflection' ) ];
 		package: 'VectorGraphics-Bloc-Examples'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
+					#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Text'
 					   'VectorGraphics-Canvas-Fonts' 'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Bloc-Tests'
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Examples'
-					   'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
-					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Canvas-Tests'
+					   'VectorGraphics-Bloc-Text'
+					   'VectorGraphics-Bloc-Text-Examples'
+					   'VectorGraphics-Bloc-Text-Tests' 'VectorGraphics-Canvas'
+					   'VectorGraphics-Canvas-Fonts'
+					   'VectorGraphics-Canvas-Geometry'
+					   'VectorGraphics-Canvas-Raster'
+					   'VectorGraphics-Canvas-Tests'
 					   'VectorGraphics-Reflection' 'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Vulkan'
 		with: [
@@ -187,23 +203,52 @@ BaselineOfVectorGraphics >> declareExternalProjectsOn: spec [
 
 { #category : 'baselines' }
 BaselineOfVectorGraphics >> declareFontEnginePackagesOn: spec [
-	"The font engine, in three packages of its own above the Bloc renderer. It is apart from
-	 VectorGraphics-Bloc because it does one thing that package must not do on its own: write
-	 Bloc's renderer slot and upstream's font manager slot, which changes what every space of
-	 the image draws with. A reader who wants the renderer and no such change loads 'bloc'; one
-	 who wants the change loads 'fonts'.
-	 The postLoadDoIt: is what makes that group transparent: Metacello sends it to me once the
-	 engine's package is in, and the route is posed before the load returns. It is attached to
-	 the package rather than to the group, so it runs once however the package arrives.
-	 The tests name the font layer of the canvas, and require the canvas test package, which the
-	 dependency table cannot state: VGFontEngineExamplesTest subclasses VGCairoExamplesTest and
-	 names it nowhere in a method."
+	"The cairo text route and the engine that poses it, in six packages above the Bloc
+	 renderer. The route is VectorGraphics-Bloc-Text: the canvas that answers a scaled
+	 font of ours, the font manager, and the cairo canvas, offscreen, renderer, context
+	 and font that draw text with them. VectorGraphics-Bloc requires it, because VGCanvas
+	 has its superclass there, so the software canvas and the cairo route share one
+	 reading of the fonts.
+	 The engine is VectorGraphics-Bloc-FontEngine, one class and the hook that installs
+	 it. It is apart from the route because it does the one thing loading a renderer must
+	 not do: write the renderer slot of Bloc and the font manager slot of upstream, which
+	 changes what every space of the image draws with. A reader who wants the renderer
+	 and no such change loads the bloc group, which brings the route and poses nothing;
+	 one who wants the change loads the fonts group. Unit 3 of FONTS-LOAD-PLAN split the
+	 two: while the hook sat on the package holding the route, every image that loaded
+	 the software canvas posed the cairo renderer as well.
+	 The postLoadDoIt: is what makes the fonts group transparent: Metacello sends it to me
+	 once the package of the engine is in, and the route is posed before the load returns.
+	 It is attached to the package rather than to the group, so it runs once however the
+	 package arrives.
+	 The route names the external Bloc project, because its canvases subclass the canvas
+	 of Alexandrie. The tests of both name the font layer of the canvas, and the tests of
+	 the engine require the canvas test package, which the dependency table cannot state:
+	 VGFontEngineExamplesTest subclasses VGCairoExamplesTest and names it nowhere in a
+	 method."
 
 	spec
+		package: 'VectorGraphics-Bloc-Text'
+		with: [
+			spec requires:
+					#( 'Bloc' 'VectorGraphics-Canvas-Fonts'
+					   'VectorGraphics-Canvas-Geometry' 'VectorGraphics-Reflection'
+					   'VectorGraphics-TrueType' ) ];
+		package: 'VectorGraphics-Bloc-Text-Examples'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Text'
+					   'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Geometry' ) ];
+		package: 'VectorGraphics-Bloc-Text-Tests'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-Text'
+					   'VectorGraphics-Bloc-Text-Examples' 'VectorGraphics-Canvas-Fonts'
+					   'VectorGraphics-Canvas-Geometry' 'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Bloc-FontEngine'
 		with: [
 			spec
-				requires: #( 'VectorGraphics-Bloc' );
+				requires: #( 'VectorGraphics-Bloc-Text' );
 				postLoadDoIt: #installTheFontEngine ];
 		package: 'VectorGraphics-Bloc-FontEngine-Examples'
 		with: [
@@ -212,8 +257,9 @@ BaselineOfVectorGraphics >> declareFontEnginePackagesOn: spec [
 		package: 'VectorGraphics-Bloc-FontEngine-Tests'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Bloc' 'VectorGraphics-Bloc-FontEngine'
-					   'VectorGraphics-Bloc-FontEngine-Examples' 'VectorGraphics-Canvas-Fonts'
+					#( 'VectorGraphics-Bloc-FontEngine'
+					   'VectorGraphics-Bloc-FontEngine-Examples'
+					   'VectorGraphics-Bloc-Text' 'VectorGraphics-Canvas-Fonts'
 					   'VectorGraphics-Canvas-Tests' 'VectorGraphics-TrueType' ) ]
 ]
 
@@ -231,7 +277,7 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 	 'canvas' is the canvas API and, through its requires, the renderer and the font layer below
 	 it; 'canvas-raster' is the scan-line renderer of a display list, which needs no device, no
 	 library and no window; 'canvas-fonts' is the font and glyph layer, a leaf above the font
-	 reader; 'canvas-paths' is a path, its subpaths and the builder that records one, which the
+	 reader; 'canvas-geometry' is a path, its subpaths and the builder that records one, which the
 	 cairo route of 'fonts' loads with no canvas behind it. 'default' names the four one by one
 	 rather than 'canvas' alone, so what it loads
 	 is read from the group list and not from a chain of requires.
@@ -279,13 +325,17 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 		group: 'canvas-fonts-examples'
 			with: #( 'VectorGraphics-Canvas-Fonts-Examples' );
 		group: 'canvas-fonts-tests' with: #( 'VectorGraphics-Canvas-Fonts-Tests' );
-		group: 'canvas-paths' with: #( 'VectorGraphics-Canvas-Paths' );
-		group: 'canvas-paths-examples'
-			with: #( 'VectorGraphics-Canvas-Paths-Examples' );
-		group: 'canvas-paths-tests' with: #( 'VectorGraphics-Canvas-Paths-Tests' );
+		group: 'canvas-geometry' with: #( 'VectorGraphics-Canvas-Geometry' );
+		group: 'canvas-geometry-examples'
+			with: #( 'VectorGraphics-Canvas-Geometry-Examples' );
+		group: 'canvas-geometry-tests' with: #( 'VectorGraphics-Canvas-Geometry-Tests' );
 		group: 'bloc' with: #( 'core' 'VectorGraphics-Bloc' );
 		group: 'bloc-examples' with: #( 'VectorGraphics-Bloc-Examples' );
 		group: 'bloc-tests' with: #( 'VectorGraphics-Bloc-Tests' );
+		group: 'bloc-text' with: #( 'VectorGraphics-Bloc-Text' );
+		group: 'bloc-text-examples'
+			with: #( 'VectorGraphics-Bloc-Text-Examples' );
+		group: 'bloc-text-tests' with: #( 'VectorGraphics-Bloc-Text-Tests' );
 		group: 'fonts'
 			with: #( 'truetype' 'canvas' 'VectorGraphics-Bloc'
 			   'VectorGraphics-Bloc-FontEngine' );
@@ -299,18 +349,18 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 		group: 'examples'
 		with: #( 'paths-examples' 'engine-examples' 'truetype-examples' 'text-examples'
 			   'canvas-examples' 'canvas-raster-examples' 'canvas-fonts-examples'
-			   'canvas-paths-examples'
-			   'bloc-examples' 'fonts-examples' 'vulkan-examples' );
+			   'canvas-geometry-examples'
+			   'bloc-examples' 'bloc-text-examples' 'fonts-examples' 'vulkan-examples' );
 		group: 'tests'
 		with: #( 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests' 'canvas-tests'
-			   'canvas-raster-tests' 'canvas-fonts-tests' 'canvas-paths-tests'
-			   'bloc-tests' 'fonts-tests'
+			   'canvas-raster-tests' 'canvas-fonts-tests' 'canvas-geometry-tests'
+			   'bloc-tests' 'bloc-text-tests' 'fonts-tests'
 			   'vulkan-tests' );
 		group: 'default'
-			with: #( 'core' 'canvas' 'canvas-raster' 'canvas-fonts' 'canvas-paths' );
+			with: #( 'core' 'canvas' 'canvas-raster' 'canvas-fonts' 'canvas-geometry' );
 		group: 'dev'
 		with: #( 'default' 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests'
-			   'canvas-tests' 'canvas-raster-tests' 'canvas-fonts-tests' 'canvas-paths-tests'
+			   'canvas-tests' 'canvas-raster-tests' 'canvas-fonts-tests' 'canvas-geometry-tests'
 			   'MuTalk' )
 ]
 
@@ -393,6 +443,7 @@ BaselineOfVectorGraphics >> declareSupportPackagesOn: spec [
 		with: [
 			spec requires:
 					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
+					   'VectorGraphics-Canvas-Geometry'
 					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Benchmarks'
 		with: [
