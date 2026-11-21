@@ -1192,7 +1192,7 @@ VGArchitectureTest >> testTheExamplesAndTestsGroupsAreTheUnionOfTheirLayerGroups
 			 'truetype-examples' 'text-examples' 'canvas-examples'
 			 'canvas-raster-examples' 'canvas-fonts-examples' 'canvas-geometry-examples'
 			 'bloc-examples' 'bloc-text-examples' 'fonts-examples'
-			 'vulkan-examples' ).
+			 'reflection-examples' 'vulkan-examples' ).
 	self assert: (groups at: 'tests') equals: #( 'paths-tests' 'engine-tests' 'truetype-tests'
 			 'text-tests' 'canvas-tests' 'canvas-raster-tests' 'canvas-fonts-tests'
 			 'canvas-geometry-tests' 'bloc-tests' 'bloc-text-tests' 'fonts-tests'
@@ -1221,25 +1221,21 @@ VGArchitectureTest >> testTheFontEngineTestsStayInsideTheirAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Bloc-FontEngine-Tests'
 ]
 
-{ #category : 'tests - groups' }
-VGArchitectureTest >> testTheFontsGroupLoadsTheRouteItInstallsAndNothingElse [
-	"The group a reader asks for to have Bloc drawing with this project's fonts after the load
-	 and nothing left to evaluate. It brings the engine, the renderer package that engine
-	 poses, the canvas that renderer rasterises through, the canvas's own font layer and the
-	 font reader the glyphs come from — and none of the scan-line engine of the rasteriser,
-	 which the canvas does not need, nor a Vulkan package, which would ask a device of a
-	 machine that may hold none."
+{ #category : 'tests' }
+VGArchitectureTest >> testTheFontsGroupLoadsTheCairoRouteAndNoCanvas [
+	"The point of FONTS-LOAD-PLAN, held here: someone who wants the TrueType engine on cairo
+	 loads `fonts` and gets the reader, the font layer, the geometry, the reference scan, the
+	 cairo route and the engine that poses it. No canvas, no rasteriser, no software renderer
+	 and no Vulkan package, none of which is on that route. The set is named one by one rather
+	 than asserted package by package, so the group cannot grow a layer back unnoticed; this
+	 replaces the looser test of unit 3.7, which named the canvas as part of the route."
 
-	| loaded |
-	loaded := self class packagesLoadedByGroupNamed: 'fonts'.
-	self assert: (loaded includes: 'VectorGraphics-Bloc-FontEngine').
-	self assert: (loaded includes: 'VectorGraphics-Bloc').
-	self assert: (loaded includes: 'VectorGraphics-Canvas').
-	self assert: (loaded includes: 'VectorGraphics-Canvas-Fonts').
-	self assert: (loaded includes: 'VectorGraphics-Canvas-Raster').
-	self assert: (loaded includes: 'VectorGraphics-TrueType').
-	self assert: (loaded noneSatisfy: [ :each | each includesSubstring: 'Vulkan' ]).
-	self deny: (loaded includes: 'VectorGraphics-Engine')
+	self
+		assert: (self class packagesLoadedByGroupNamed: 'fonts') asSortedCollection asArray
+		equals: #( 'VectorGraphics-Bloc-FontEngine' 'VectorGraphics-Bloc-Text'
+			   'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Geometry'
+			   'VectorGraphics-Paths' 'VectorGraphics-Reflection'
+			   'VectorGraphics-TrueType' )
 ]
 
 { #category : 'tests - groups' }

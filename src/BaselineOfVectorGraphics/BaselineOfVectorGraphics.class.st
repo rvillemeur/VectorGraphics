@@ -277,8 +277,12 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 	 'canvas' is the canvas API and, through its requires, the renderer and the font layer below
 	 it; 'canvas-raster' is the scan-line renderer of a display list, which needs no device, no
 	 library and no window; 'canvas-fonts' is the font and glyph layer, a leaf above the font
-	 reader; 'canvas-geometry' is a path, its subpaths and the builder that records one, which the
-	 cairo route of 'fonts' loads with no canvas behind it. 'default' names the four one by one
+	 reader; 'canvas-geometry' is a path, its subpaths, the builder that records one and the matrix a
+	 point is mapped by, which the cairo route of 'fonts' loads with no canvas behind it.
+	 'fonts' is that route: the reader, the font layer, the geometry, the reference scan and the
+	 package whose postLoadDoIt poses the route in Bloc. It names no canvas group since unit 4
+	 of FONTS-LOAD-PLAN, because no part of the canvas is on the route; it loads 'bloc-text' all
+	 the same, through the requires of the engine package. 'default' names the four one by one
 	 rather than 'canvas' alone, so what it loads
 	 is read from the group list and not from a chain of requires.
 	 The examples and the tests of each layer are a group of their own, because the
@@ -337,7 +341,8 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 			with: #( 'VectorGraphics-Bloc-Text-Examples' );
 		group: 'bloc-text-tests' with: #( 'VectorGraphics-Bloc-Text-Tests' );
 		group: 'fonts'
-			with: #( 'truetype' 'canvas' 'VectorGraphics-Bloc'
+			with: #( 'truetype' 'VectorGraphics-Canvas-Fonts'
+			   'VectorGraphics-Canvas-Geometry' 'VectorGraphics-Reflection'
 			   'VectorGraphics-Bloc-FontEngine' );
 		group: 'fonts-examples' with: #( 'VectorGraphics-Bloc-FontEngine-Examples' );
 		group: 'fonts-tests' with: #( 'VectorGraphics-Bloc-FontEngine-Tests' );
@@ -346,11 +351,15 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 		group: 'vulkan-tests' with: #( 'VectorGraphics-Vulkan-Tests' );
 		group: 'conformance' with: #( 'VectorGraphics-Conformance' );
 		group: 'benchmarks' with: #( 'VectorGraphics-Benchmarks' );
+		group: 'reflection' with: #( 'VectorGraphics-Reflection' );
+		group: 'reflection-examples'
+			with: #( 'VectorGraphics-Reflection-Examples' );
 		group: 'examples'
 		with: #( 'paths-examples' 'engine-examples' 'truetype-examples' 'text-examples'
 			   'canvas-examples' 'canvas-raster-examples' 'canvas-fonts-examples'
 			   'canvas-geometry-examples'
-			   'bloc-examples' 'bloc-text-examples' 'fonts-examples' 'vulkan-examples' );
+			   'bloc-examples' 'bloc-text-examples' 'fonts-examples'
+			   'reflection-examples' 'vulkan-examples' );
 		group: 'tests'
 		with: #( 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests' 'canvas-tests'
 			   'canvas-raster-tests' 'canvas-fonts-tests' 'canvas-geometry-tests'
