@@ -24,22 +24,25 @@ neither is present. Every layer above them is a group of its own.
 | `VectorGraphics-Canvas` | The canvas that replaces the Cairo layer, same calling API as `Alexandrie-Cairo`: the surface, the context and the display list every call is recorded in |
 | `VectorGraphics-Canvas-Raster` | The software renderer of that canvas: the backend, the rasteriser, the spans, the clip, the stroker and the blur |
 | `VectorGraphics-Canvas-Fonts` | The scaled fonts of that canvas: a face at a size, its glyph atlas and the extents text is measured by |
+| `VectorGraphics-Canvas-Geometry` | The geometry both routes measure and map with: a path, its subpaths, the builder that records one, and the matrix a point is mapped by. It names nothing else of this project |
+| `VectorGraphics-Reflection` | `VGCairoReferenceScanner`: which classes of another project a package of this one names, read from the compiled methods |
 | `VectorGraphics-Bloc` | `VGCanvas` and `VGRenderer`, the Bloc backend, plus the pixel buffer host |
-| `VectorGraphics-Bloc-FontEngine` | `VGFontEngine`: one send that makes Bloc draw text with the fonts of this project, and one that gives the image back |
+| `VectorGraphics-Bloc-Text` | The cairo text route, which both canvases of this project share: `VGFontCanvas`, the `AeCanvas` and renderer of our own that draw through Cairo, our font manager, and the extension methods on Alexandrie's classes they need |
+| `VectorGraphics-Bloc-FontEngine` | `VGFontEngine` alone: one send that makes Bloc draw text with the fonts of this project, and one that gives the image back. The route itself is the package above, so loading that route poses nothing |
 | `VectorGraphics-Vulkan` | The GPU backend: device session, tiled fill, the present host and its SDL2 host |
 | `VectorGraphics-Conformance` | The corpus every backend is compared against: the cases, the ported Alexandrie corpus, the `Form` comparison |
 | `VectorGraphics-Benchmarks` | The frame harness: the drawing kit, the stage benchmark and the device benchmark |
 | `VectorGraphics-Engine-Examples`, `VectorGraphics-Paths-Examples`, `VectorGraphics-TrueType-Examples`, `VectorGraphics-Text-Examples` | One `<sampleInstance>` example per subject of the rasteriser |
-| `VectorGraphics-Canvas-Examples`, `VectorGraphics-Canvas-Raster-Examples`, `VectorGraphics-Canvas-Fonts-Examples`, `VectorGraphics-Bloc-Examples`, `VectorGraphics-Bloc-FontEngine-Examples`, `VectorGraphics-Vulkan-Examples` | One `<sampleInstance>` example per subject of the layers above it |
+| `VectorGraphics-Canvas-Examples`, `VectorGraphics-Canvas-Raster-Examples`, `VectorGraphics-Canvas-Fonts-Examples`, `VectorGraphics-Canvas-Geometry-Examples`, `VectorGraphics-Reflection-Examples`, `VectorGraphics-Bloc-Examples`, `VectorGraphics-Bloc-Text-Examples`, `VectorGraphics-Bloc-FontEngine-Examples`, `VectorGraphics-Vulkan-Examples` | One `<sampleInstance>` example per subject of the layers above it |
 | `VectorGraphics-Tests` | `VectorGraphicsDocumentationTest`, the abstract documentation gate the four suites below subclass |
 | `VectorGraphics-Engine-Tests`, `VectorGraphics-Paths-Tests`, `VectorGraphics-TrueType-Tests`, `VectorGraphics-Text-Tests` | The suites of the rasteriser, each with the documentation gate of its own package |
-| `VectorGraphics-Canvas-Tests`, `VectorGraphics-Canvas-Raster-Tests`, `VectorGraphics-Canvas-Fonts-Tests`, `VectorGraphics-Bloc-Tests`, `VectorGraphics-Bloc-FontEngine-Tests`, `VectorGraphics-Vulkan-Tests` | The suites of the layers above, including the conformance gate against Alexandrie |
+| `VectorGraphics-Canvas-Tests`, `VectorGraphics-Canvas-Raster-Tests`, `VectorGraphics-Canvas-Fonts-Tests`, `VectorGraphics-Canvas-Geometry-Tests`, `VectorGraphics-Bloc-Tests`, `VectorGraphics-Bloc-Text-Tests`, `VectorGraphics-Bloc-FontEngine-Tests`, `VectorGraphics-Vulkan-Tests` | The suites of the layers above, including the conformance gate against Alexandrie |
 
 ## Groups
 
 | Group | Loads |
 |---|---|
-| `default` | `core`, `canvas`, `canvas-raster` and `canvas-fonts` — the whole rasteriser and the whole canvas, no Bloc |
+| `default` | `core`, `canvas`, `canvas-raster`, `canvas-fonts` and `canvas-geometry` — the whole rasteriser and the whole canvas, no Bloc |
 | `core` | the front page and the four packages of the rasteriser: `paths`, `engine`, `truetype`, `text` |
 | `paths` | the SVG path commands and their parser, alone |
 | `engine` | the scan-line rasteriser, with no font code |
@@ -50,18 +53,23 @@ neither is present. Every layer above them is a group of its own.
 | `canvas` | the canvas API and the display list. It names the renderer and the font layer, so this brings all three, and the font layer brings `truetype` and `paths` below it, not the whole of `core` |
 | `canvas-raster` | the software renderer alone: no font code, and nothing of the canvas API below it |
 | `canvas-fonts` | the scaled fonts alone, with no renderer. It names the `.ttf` reader, so it brings `truetype` and `paths` |
-| `canvas-examples`, `canvas-raster-examples`, `canvas-fonts-examples` | the examples of one package of the canvas |
-| `canvas-tests`, `canvas-raster-tests`, `canvas-fonts-tests` | the suite of one package of the canvas, still without Bloc |
+| `canvas-geometry` | a path, its subpaths, the builder that records one and the matrix a point is mapped by, alone. It names nothing of this project, so nothing else comes with it |
+| `canvas-examples`, `canvas-raster-examples`, `canvas-fonts-examples`, `canvas-geometry-examples` | the examples of one package of the canvas |
+| `canvas-tests`, `canvas-raster-tests`, `canvas-fonts-tests`, `canvas-geometry-tests` | the suite of one package of the canvas, still without Bloc |
 | `bloc` | `core`, `VectorGraphics-Bloc`, and Bloc itself from `github://pharo-graphics/Bloc:master` |
 | `bloc-examples`, `bloc-tests` | the examples and the suites of the Bloc backend |
-| `fonts` | the font engine, and the route it poses: the `.ttf` reader, the canvas, the Bloc backend and `VGFontEngine`. The package carries a `postLoadDoIt:`, so the load poses the route itself and leaves nothing to evaluate |
+| `bloc-text` | the cairo text route alone, six packages: `VectorGraphics-Bloc-Text`, the font layer, the geometry, the reference scan and the `.ttf` reader and the path commands below them, with Bloc itself. `VectorGraphics-Canvas` and its rasteriser stay out |
+| `bloc-text-examples`, `bloc-text-tests` | the examples and the suite of that route |
+| `fonts` | `bloc-text` and the engine that poses it, seven packages: the six of that route and `VectorGraphics-Bloc-FontEngine`, which carries a `postLoadDoIt:`, so the load poses the route itself and leaves nothing to evaluate. `VectorGraphics-Canvas` and its rasteriser stay out of this group too |
 | `fonts-examples`, `fonts-tests` | the example and the suite of the font engine |
 | `vulkan` | `core` and `VectorGraphics-Vulkan`. PharoVulkan is not published, so load it before asking for this group |
 | `vulkan-examples`, `vulkan-tests` | the examples and the suites of the GPU backend |
 | `conformance` | the corpus alone. It names the canvas and no test package, so a comparison can be drawn with no suite loaded |
 | `benchmarks` | the frame harness, which names the corpus it draws and the three backends it measures |
-| `examples`, `tests` | the union of the ten layer groups, so they reach Bloc and PharoVulkan |
-| `dev` | the group to work on this project from: `default`, the suites of its seven layers, and MuTalk from `github://pharo-contributions/mutalk:v3.0.8/src`. It names the seven test groups one by one, so it still loads in a plain Pharo image |
+| `reflection` | the reference scan alone. It is in no group above it: every package that reads it requires it, so it arrives with whichever of them is asked for |
+| `reflection-examples` | the examples of that scan |
+| `examples`, `tests` | the union of the layer groups: thirteen for the examples, the twelve layers and the reference scan, twelve for the suites. Both reach Bloc and PharoVulkan |
+| `dev` | the group to work on this project from: `default`, the suites of its eight layers, and MuTalk from `github://pharo-contributions/mutalk:v3.0.8/src`. It names the eight test groups one by one, so it still loads in a plain Pharo image |
 
 The canvas examples and suites load without Bloc:
 
@@ -72,9 +80,10 @@ Metacello new
 	load: 'canvas-tests'.
 ```
 
-`canvas-tests` brings eleven packages in: the three of the canvas, the three of their examples, the
+`canvas-tests` brings fifteen packages in: the four of the canvas, the four of their examples, the
 suite of the renderer beside the suite asked for, `VectorGraphics-Conformance`, the corpus the gate
-reads, and the `.ttf` reader and the path commands below the font layer. Neither the scan-line
+reads, the reference scan and its examples, and the `.ttf` reader and the path commands below the
+font layer. Neither the scan-line
 engine nor the text glue arrives, because no package of the canvas names either. The suites do name
 Alexandrie's Cairo bindings, on purpose: the conformance gate proves this rasteriser matches live
 Cairo byte for byte, and a comparison needs that positive control.
@@ -129,6 +138,13 @@ That is the whole of it. When the load returns, every space of the image draws i
 fonts this project reads, and no FreeType face is built anywhere in the route. There is no step
 left to the reader: `VectorGraphics-Bloc-FontEngine` carries a `postLoadDoIt:` that sends
 `VGFontEngine install` once the package is in.
+
+The group loads that route and nothing else, seven packages: the `.ttf` reader and the path
+commands below it, the font layer of the canvas, the geometry both routes map with, the reference
+scan, `VectorGraphics-Bloc-Text` — the cairo text route itself — and the engine package.
+`VectorGraphics-Canvas` stays out, and so do its renderer and its display list: Cairo rasterises
+every figure on this route, so none of them is on it. Bloc arrives too, because the route extends
+Alexandrie's classes.
 
 Two slots of the image decide where a glyph comes from, and `install` writes both:
 
