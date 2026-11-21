@@ -17,14 +17,21 @@ VGVulkanDriverSdl2HostTest class >> withDriverClass: aDriverClass during: aBlock
 	 driver class it cannot install: the stock one. The swap runs non-interactively because
 	 OSWindowDriver class >> driverClass: ends with a dialog telling the user to restart the
 	 image, advice that does not apply when the same method nils the cached driver instance.
+	 The manager is posed by hand rather than through UIManager class >> nonInteractiveDuring:,
+	 which raises a MessageNotUnderstood on Pharo 14: the base UIManager >> nonInteractiveManager
+	 it reaches sends beDefault to the NonInteractiveUIManager class, and that class-side method
+	 is gone from this image.
 	 I am on the class side because VGVulkanPresentHostTest needs the same swap, and one copy of
 	 it is better than two that can drift apart."
-
-	| previous |
+	| previous previousManager |
 	previous := OSWindowDriver driverClass.
-	UIManager nonInteractiveDuring: [ OSWindowDriver driverClass: aDriverClass ].
+	previousManager := UIManager default.
+	NonInteractiveUIManager new beDefault.
+	[ OSWindowDriver driverClass: aDriverClass ] ensure: [ previousManager beDefault ].
 	^ aBlock ensure: [
-		  UIManager nonInteractiveDuring: [ OSWindowDriver driverClass: previous ] ]
+		  previousManager := UIManager default.
+		  NonInteractiveUIManager new beDefault.
+		  [ OSWindowDriver driverClass: previous ] ensure: [ previousManager beDefault ] ]
 ]
 
 { #category : 'running' }
