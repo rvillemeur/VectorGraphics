@@ -62,7 +62,7 @@ neither is present. Every layer above them is a group of its own.
 | `bloc-text-examples`, `bloc-text-tests` | the examples and the suite of that route |
 | `fonts` | `bloc-text` and the engine that poses it, seven packages: the six of that route and `VectorGraphics-Bloc-FontEngine`, which carries a `postLoadDoIt:`, so the load poses the route itself and leaves nothing to evaluate. `VectorGraphics-Canvas` and its rasteriser stay out of this group too |
 | `fonts-examples`, `fonts-tests` | the example and the suite of the font engine |
-| `vulkan` | `core` and `VectorGraphics-Vulkan`. PharoVulkan is not published, so load it before asking for this group |
+| `vulkan` | `core`, `VectorGraphics-Vulkan` and PharoVulkan from `github://rvillemeur/PharoVulkan:main/src`, whose `default` group the three Vulkan packages require. The machine needs `libvulkan.so.1` and a driver; nothing else of this project does |
 | `vulkan-examples`, `vulkan-tests` | the examples and the suites of the GPU backend |
 | `conformance` | the corpus alone. It names the canvas and no test package, so a comparison can be drawn with no suite loaded |
 | `benchmarks` | the frame harness, which names the corpus it draws and the three backends it measures |
