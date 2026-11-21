@@ -179,6 +179,7 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 			spec requires:
 					#( 'PharoVulkan' 'VectorGraphics-Benchmarks'
 					   'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
+					   'VectorGraphics-Canvas-Geometry'
 					   'VectorGraphics-Canvas-Raster'
 					   'VectorGraphics-Canvas-Raster-Tests' 'VectorGraphics-Canvas-Tests'
 					   'VectorGraphics-Conformance' 'VectorGraphics-Vulkan'

@@ -224,14 +224,17 @@ VGArchitectureTest class >> allowedDependencies [
 			  'VectorGraphics-Vulkan-Examples'
 			  -> #( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
 				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-Vulkan' ).
-			  "The two edges to the canvas test packages are the edges this project allows
-			   between test packages: VGVulkanExamplesTest subclasses VGCairoExamplesTest, which
-			   is the canvas's, and the backend tests draw the frame fixture of the renderer's
-			   tests, rather than keeping a second copy of either."
+			  "One edge to a canvas test package: the backend tests draw the frame fixture of the
+			   renderer's tests rather than keeping a second copy of it. VGVulkanExamplesTest
+			   subclasses VGCairoExamplesTest, which is the canvas's, but a superclass is not a
+			   reference a method makes, so that edge is the baseline's to declare and not this
+			   table's. The geometry leaf is named because VGGradientFrameFixture maps a pattern
+			   through VGCairoMatrix, which moved there with unit 3 of FONTS-LOAD-PLAN."
 			  'VectorGraphics-Vulkan-Tests'
 			  -> #( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc'
-				    'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
-				    'VectorGraphics-Canvas-Raster-Tests' 'VectorGraphics-Canvas-Tests'
+				    'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Geometry'
+				    'VectorGraphics-Canvas-Raster'
+				    'VectorGraphics-Canvas-Raster-Tests'
 				    'VectorGraphics-Conformance' 'VectorGraphics-Vulkan'
 				    'VectorGraphics-Vulkan-Examples' ).
 			  "Neither of these two holds a TestCase, and both were filed in a -Tests package until
