@@ -36,7 +36,7 @@ BaselineOfVectorGraphics >> baseline: spec [
 		self declareGroupsOn: spec ]
 ]
 
-{ #category : 'baselines' }
+{ #category : 'baseline' }
 BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 	"The backends above the rasteriser: the canvas, which is three packages since the split of
 	 2026-11 and four since unit 1 of FONTS-LOAD-PLAN, the Bloc renderer that replaces Alexandrie's canvas, and the Vulkan device
@@ -166,39 +166,49 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 		package: 'VectorGraphics-Vulkan'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
-					   'VectorGraphics-Canvas-Raster' ) ];
+					#( 'PharoVulkan' 'VectorGraphics-Bloc'
+					   'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster' ) ];
 		package: 'VectorGraphics-Vulkan-Examples'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
+					#( 'PharoVulkan' 'VectorGraphics-Benchmarks'
+					   'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
 					   'VectorGraphics-Canvas-Raster' 'VectorGraphics-Vulkan' ) ];
 		package: 'VectorGraphics-Vulkan-Tests'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Benchmarks' 'VectorGraphics-Bloc'
-					   'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Raster'
+					#( 'PharoVulkan' 'VectorGraphics-Benchmarks'
+					   'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
+					   'VectorGraphics-Canvas-Raster'
 					   'VectorGraphics-Canvas-Raster-Tests' 'VectorGraphics-Canvas-Tests'
 					   'VectorGraphics-Conformance' 'VectorGraphics-Vulkan'
 					   'VectorGraphics-Vulkan-Examples' ) ]
 ]
 
-{ #category : 'baselines' }
+{ #category : 'baseline' }
 BaselineOfVectorGraphics >> declareExternalProjectsOn: spec [
 	"The projects outside this repository that a layer or a group of it needs. Bloc: the
 	 renderer of the bloc group subclasses BARenderer, so that group fetches Bloc rather than
 	 assume an image that already holds it. MuTalk: the mutation tester the dev group brings,
 	 pinned to a tag because it rewrites production methods in the image and the version doing
 	 the rewriting is part of this project's setup — Bloc is pinned to master only because it
-	 publishes no release tags. The vulkan group names no project, because PharoVulkan is not
-	 published; load it by hand before asking for that group."
+	 publishes no release tags. PharoVulkan: the Vulkan packages name its bindings, its
+	 compiler and its driver, so they fetch it rather than assume it loaded by hand. They ask
+	 for its default group, which brings its SPIR-V and compiler packages through that
+	 project's own requires. It is pinned to a branch like Bloc, and for one reason more: it is
+	 written alongside this project, so a tag cut today is stale a week later."
 
 	spec
 		baseline: 'Bloc'
 		with: [ spec repository: 'github://pharo-graphics/Bloc:master' ];
 		baseline: 'MuTalk'
 		with: [
-		spec repository: 'github://pharo-contributions/mutalk:v3.0.8/src' ]
+		spec repository: 'github://pharo-contributions/mutalk:v3.0.8/src' ];
+		baseline: 'PharoVulkan'
+		with: [
+			spec
+				repository: 'github://rvillemeur/PharoVulkan:main/src';
+				loads: #( 'default' ) ]
 ]
 
 { #category : 'baselines' }

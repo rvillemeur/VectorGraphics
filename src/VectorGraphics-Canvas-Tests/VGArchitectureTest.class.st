@@ -732,6 +732,29 @@ VGArchitectureTest >> testEveryEdgeTheBaselineCannotDeclareIsOneHalfOfACycle [
 ]
 
 { #category : 'tests' }
+VGArchitectureTest >> testEveryExternalProjectIsPinnedWhereThisProjectMeansIt [
+	"Every project outside this repository, with the repository this project pins it to and the
+	 reason that pin is a tag or a branch. MuTalk is a tag: it rewrites production methods in the
+	 image, so the version doing the rewriting is part of this project's own setup. Bloc is a
+	 branch because it publishes no release tag. PharoVulkan is a branch because it is this
+	 project's own Vulkan binding, written alongside it, so a tag cut today is stale a week later.
+	 The pins are read through `repositorySpecs`: the MuTalk-only test this one replaces sent
+	 `map`, which MetacelloRepositoriesSpec no longer understands."
+
+	| pins |
+	pins := Dictionary new.
+	BaselineOfVectorGraphics project version projects do: [ :each |
+		pins
+			at: each name
+			put: (each repositories repositorySpecs collect: [ :one | one description ])
+					asArray ].
+	self assert: pins equals: (Dictionary newFrom: {
+			 ('Bloc' -> #( 'github://pharo-graphics/Bloc:master' )).
+			 ('MuTalk' -> #( 'github://pharo-contributions/mutalk:v3.0.8/src' )).
+			 ('PharoVulkan' -> #( 'github://rvillemeur/PharoVulkan:main/src' )) })
+]
+
+{ #category : 'tests' }
 VGArchitectureTest >> testEveryPackageOfThisProjectHasADeclaredAllowedSet [
 	"A package added tomorrow goes unscanned until it appears in the table, so the table is
 	 checked against the organiser rather than against a list written out by hand."
@@ -978,16 +1001,16 @@ VGArchitectureTest >> testTextTestsStayInsideTheirAllowedDependencies [
 ]
 
 { #category : 'tests' }
-VGArchitectureTest >> testTheBaselineNamesOnlyBlocAndMuTalkAsExternalProjects [
+VGArchitectureTest >> testTheBaselineNamesOnlyBlocMuTalkAndPharoVulkanAsExternalProjects [
 	"Every project outside this repository that a load can reach, named here so one cannot be
 	 added without saying which group needs it: Bloc for the renderer group, MuTalk for the dev
-	 group. PharoVulkan is deliberately not among them — it is unpublished, and the vulkan
-	 group expects it loaded by hand."
+	 group, PharoVulkan for the vulkan group, whose three packages name its bindings, its
+	 compiler and its driver. What each one is pinned to, and why, is the test above."
 
 	self
 		assert: (BaselineOfVectorGraphics project version projects collect: [ :each |
 				 each name ]) asSortedCollection asArray
-		equals: #( 'Bloc' 'MuTalk' )
+		equals: #( 'Bloc' 'MuTalk' 'PharoVulkan' )
 ]
 
 { #category : 'tests' }
@@ -1256,21 +1279,6 @@ VGArchitectureTest >> testTheFrontPagePackageStaysInsideItsAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics'
 ]
 
-{ #category : 'tests - groups' }
-VGArchitectureTest >> testTheMuTalkProjectIsPinnedToATagAndNotToMaster [
-	"MuTalk is a development tool that rewrites production methods in the image, so the version
-	 it rewrites with is part of this project's own setup: a tag, never the moving `master`.
-	 Bloc is pinned to master on purpose and is the exception — it has no release tags."
-
-	| repositories |
-	repositories := Dictionary new.
-	BaselineOfVectorGraphics project version projects do: [ :each |
-		repositories at: each name put: each repositories map keys asSortedCollection asArray ].
-	self
-		assert: (repositories at: 'MuTalk')
-		equals: #( 'github://pharo-contributions/mutalk:v3.0.8/src' )
-]
-
 { #category : 'tests' }
 VGArchitectureTest >> testTheScanReadsAReferencePlantedInsideANestedBlock [
 	"The scan must read the literals of every block inside a method, at any depth. Most of this
@@ -1283,6 +1291,24 @@ VGArchitectureTest >> testTheScanReadsAReferencePlantedInsideANestedBlock [
 		assert: (self class packagesNamedBy:
 				 VGNestedBlockReferenceFixture >> #reachThroughThreeBlocks)
 		equals: (Set with: VGCairoMatrix package name asString)
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testTheVulkanLayerRequiresTheExternalPharoVulkanProject [
+	"The three Vulkan packages name PharoVulkan's bindings, its compiler and its driver, so the
+	 group that loads them must fetch that project rather than assume an image that already
+	 holds it. No package of the default stack requires it, which is the other half of the same
+	 fact: the canvas and the rasteriser draw with no GPU and no Vulkan driver present."
+
+	| requires |
+	requires := Dictionary new.
+	BaselineOfVectorGraphics project version packages do: [ :each |
+		requires at: each name put: each requires asSet ].
+	#( 'VectorGraphics-Vulkan' 'VectorGraphics-Vulkan-Examples'
+	   'VectorGraphics-Vulkan-Tests' ) do: [ :each |
+		self assert: ((requires at: each) includes: 'PharoVulkan') ].
+	(self class packagesLoadedByGroupNamed: 'default') do: [ :each |
+		self deny: ((requires at: each) includes: 'PharoVulkan') ]
 ]
 
 { #category : 'tests - dependencies' }
