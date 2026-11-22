@@ -138,6 +138,26 @@ VGVulkanDeviceSessionTest >> testASessionOfAnotherImageRunOpensItsDeviceAgainAnd
 ]
 
 { #category : 'tests' }
+VGVulkanDeviceSessionTest >> testASessionThatCanPresentHoldsThePresentableContextItProbedWith [
+	"Unit 7.3a: host selection asks canPresent before any window exists, and the answer is the
+	 real one — the context is built there and then and kept, so the window that follows opens on
+	 the device the probe proved rather than on a second one. A machine that cannot present
+	 answers false and holds no context."
+
+	| session |
+	session := VGVulkanDeviceSession new.
+	[
+	session canPresent
+		ifTrue: [
+			self assert: session contextKind equals: #presenting.
+			self
+				assert: session context surfaceExtensionNames
+				equals: session surfaceInstanceExtensionNames ]
+		ifFalse: [ self assert: session presentableContextOrNil isNil ] ] ensure: [
+		session releaseDevice ]
+]
+
+{ #category : 'tests' }
 VGVulkanDeviceSessionTest >> testAnImageStartForgetsTheDefaultSessionAndDoesNotReleaseIt [
 	"What an image start must do with the session it came back holding: forget it, and send it
 	 nothing at all. Releasing it would send vkDestroy to the handles of the virtual machine run
@@ -189,6 +209,27 @@ VGVulkanDeviceSessionTest >> testTheLifetimeRowsAskTheSessionItselfWhatRunItsDev
 	self assert: (valueOf value: 'Device of this image run').
 	session forgetDeviceOfAnotherImageRun.
 	self deny: (valueOf value: 'Device of this image run')
+]
+
+{ #category : 'tests' }
+VGVulkanDeviceSessionTest >> testThePresentableContextIsTheSessionsOwnContext [
+	"Unit 7.3a: one device does compute and presentation both. A session that has opened a
+	 compute-only context answers the presentable one from #context afterwards as well, because
+	 the ask releases the compute context and rebuilds in place instead of opening a second
+	 device beside it. A machine with no device has nothing to open and nothing to compare."
+
+	| session compute presentable |
+	session := VGVulkanDeviceSession new.
+	[
+	compute := session contextOrNil.
+	compute ifNil: [ ^ self ].
+	self assert: session contextKind equals: #compute.
+	presentable := session presentableContextOrNil.
+	presentable ifNil: [ ^ self ].
+	self assert: session contextKind equals: #presenting.
+	self assert: session context identicalTo: presentable.
+	self deny: compute identicalTo: presentable.
+	self assert: compute device isNil ] ensure: [ session releaseDevice ]
 ]
 
 { #category : 'tests' }

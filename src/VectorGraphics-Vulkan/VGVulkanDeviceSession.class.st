@@ -9,7 +9,8 @@ Class {
 		'dispatches',
 		'unavailableReason',
 		'blur',
-		'imageRun'
+		'imageRun',
+		'contextKind'
 	],
 	#classVars : [
 		'Default'
@@ -32,6 +33,13 @@ VGVulkanDeviceSession class >> default [
 	 saving of the unit is that a second frame finds it already open."
 
 	^ Default ifNil: [ Default := self new ]
+]
+
+{ #category : 'constants' }
+VGVulkanDeviceSession class >> extensionCountByteCount [
+	"SDL_Vulkan_GetInstanceExtensions writes the count as a Uint32."
+
+	^ 4
 ]
 
 { #category : 'class initialization' }
@@ -85,6 +93,18 @@ VGVulkanDeviceSession >> blurDispatch [
 	^ blur ifNil: [ blur := VGBlurDispatch on: context ]
 ]
 
+{ #category : 'testing' }
+VGVulkanDeviceSession >> canPresent [
+	"Whether a window on this machine can be presented to by the device. The question is
+	 answered by building the context rather than by a proxy for it, because the failures that
+	 matter — no device whose one queue does graphics and compute both, no swapchain extension,
+	 no surface extension from the window system — show up at creation and nowhere earlier.
+	 It is asked by host selection, before any window exists; the context it leaves behind is
+	 the one that window then presents from."
+
+	^ self presentableContextOrNil notNil
+]
+
 { #category : 'accessing' }
 VGVulkanDeviceSession >> context [
 	"The context of this session, raising where no device on this machine computes. A caller that
@@ -93,6 +113,15 @@ VGVulkanDeviceSession >> context [
 
 	^ self contextOrNil ifNil: [
 		  VkError signal: self class noDeviceErrorMessage , unavailableReason ]
+]
+
+{ #category : 'accessing' }
+VGVulkanDeviceSession >> contextKind [
+	"Which kind of device this session holds: #compute for the context a frame opens, which
+	 carries no surface extension and cannot present, #presenting for the one a window needs,
+	 and nil while nothing is open. A frame works on either, so only presentation asks."
+
+	^ contextKind
 ]
 
 { #category : 'accessing' }
@@ -108,14 +137,7 @@ VGVulkanDeviceSession >> contextOrNil [
 	context ifNotNil: [
 		self isOfThisImageRun ifTrue: [ ^ context ].
 		self forgetDeviceOfAnotherImageRun ].
-	unavailableReason ifNotNil: [ ^ nil ].
-	imageRun := Smalltalk session.
-	^ context := [ VkContext computeContext ]
-		  on: Error
-		  do: [ :failure |
-			  unavailableReason := failure description.
-			  imageRun := nil.
-			  nil ]
+	^ self openContextOfKind: #compute with: [ VkContext computeContext ]
 ]
 
 { #category : 'accessing' }
@@ -256,6 +278,43 @@ VGVulkanDeviceSession >> lifetimeRows [
 		  { 'Reason there is no device'. unavailableReason ifNil: [ 'none given' ] } }
 ]
 
+{ #category : 'private' }
+VGVulkanDeviceSession >> openContextOfKind: aSymbol with: aBlock [
+	"The one place a device is opened, for either kind. A machine that has refused once is not
+	 asked again, and a fault of the driver arrives here as any class of error, so it is caught
+	 whole and remembered as the reason there is no device."
+
+	unavailableReason ifNotNil: [ ^ nil ].
+	imageRun := Smalltalk session.
+	contextKind := aSymbol.
+	^ context := aBlock
+		             on: Error
+		             do: [ :failure |
+			             unavailableReason := failure description.
+			             imageRun := nil.
+			             contextKind := nil.
+			             nil ]
+]
+
+{ #category : 'accessing' }
+VGVulkanDeviceSession >> presentableContextOrNil [
+	"The context a window presents from, or nil where this machine cannot present. It is the
+	 session's one context: a compute-only one opened earlier by a frame is released here and
+	 rebuilt with the surface extensions, because two devices on one machine would hold two
+	 copies of every kernel and every buffer, and a surface cannot be made on an instance that
+	 was created without the extension the window system names.
+	 What the rebuild drops — the dispatches and the blur — is rebuilt lazily by the next frame."
+
+	| names |
+	contextKind = #presenting ifTrue: [ ^ self contextOrNil ].
+	names := self surfaceInstanceExtensionNames.
+	names ifNil: [ ^ nil ].
+	context ifNotNil: [ self releaseDevice ].
+	^ self
+		  openContextOfKind: #presenting
+		  with: [ VkContext presentingContextForExtensions: names ]
+]
+
 { #category : 'printing' }
 VGVulkanDeviceSession >> printOn: aStream [
 	"The state a reader of a stack or an inspector title needs first: whether I hold a device,
@@ -274,16 +333,18 @@ VGVulkanDeviceSession >> printOn: aStream [
 		ifNotNil: [ aStream nextPutAll: ' (no device: ' , unavailableReason , ')' ]
 ]
 
-{ #category : 'lifetime' }
+{ #category : 'accessing' }
 VGVulkanDeviceSession >> releaseDevice [
 	"Everything I hold destroyed, children before the device, and the reason for a machine with no
 	 device forgotten so that the next ask probes again rather than answering a stale no."
+
 	dispatches valuesDo: [ :each | each releaseDevice ].
 	dispatches removeAll.
 	blur ifNotNil: [ blur releaseDevice ].
 	blur := nil.
 	context ifNotNil: [ context destroy ].
 	context := nil.
+	contextKind := nil.
 	unavailableReason := nil
 ]
 
@@ -313,6 +374,39 @@ VGVulkanDeviceSession >> residencyRows [
 					name.
 					(blur deviceBuffers at: name) size } ] ].
 	^ rows asArray
+]
+
+{ #category : 'private' }
+VGVulkanDeviceSession >> surfaceInstanceExtensionNames [
+	"The instance extensions the window system needs before a surface can be made, read from
+	 SDL with no window at all: SDL_Vulkan_GetInstanceExtensions takes a null window, which is
+	 what lets host selection learn them before any window exists. Answers nil where SDL cannot
+	 say, so the caller takes the software path instead of opening a device it cannot present
+	 from.
+	 It is read here and not in PharoVulkan because PharoVulkan reads the names from a window
+	 handle, which is the only form a window needs."
+
+	| pCount count names pointerSize |
+	pointerSize := VkContext pointerSize.
+	^ [
+	  pCount := ExternalAddress allocate: self class extensionCountByteCount.
+	  [
+	  (SDL2Vulkan
+		   getInstanceExtensions: ExternalAddress null
+		   count: pCount
+		   names: ExternalAddress null) ifFalse: [ ^ nil ].
+	  count := pCount unsignedLongAt: 1.
+	  names := ExternalAddress allocate: count * pointerSize.
+	  [
+	  (SDL2Vulkan
+		   getInstanceExtensions: ExternalAddress null
+		   count: pCount
+		   names: names) ifFalse: [ ^ nil ].
+	  (1 to: count) collect: [ :index |
+		  (names pointerAt: index - 1 * pointerSize + 1) readString asString ] ]
+		  ensure: [ names free ] ] ensure: [ pCount free ] ]
+		  on: Error
+		  do: [ :failure | nil ]
 ]
 
 { #category : 'accessing' }
