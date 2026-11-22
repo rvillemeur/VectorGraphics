@@ -253,6 +253,15 @@ VGVulkanDeviceSession >> isOfThisImageRun [
 ]
 
 { #category : 'testing' }
+VGVulkanDeviceSession >> isPresenting [
+	"Whether the context this session holds is the one built for presentation. The kind is a
+	 symbol and this is the one place that reads its value, so a caller asks the question
+	 instead of restating the answer."
+
+	^ contextKind = #presenting
+]
+
+{ #category : 'testing' }
 VGVulkanDeviceSession >> isReleased [
 	"Whether I hold nothing at all. A session that has never been asked for a device is released
 	 in exactly the same sense: there is nothing of a device to let go of."
@@ -260,17 +269,20 @@ VGVulkanDeviceSession >> isReleased [
 	^ context isNil
 ]
 
-{ #category : 'inspecting' }
+{ #category : 'private' }
 VGVulkanDeviceSession >> lifetimeRows [
 	"One row a fact about the device I hold and how long it is mine: whether I hold one at all,
-	 whether the run that opened it is the run that is going now, how many dispatches hang off
-	 it, whether my class will be told when an image starts, and the reason a machine without a
-	 driver gave. Every value is asked of the object that owns it — the predicate, the dictionary
-	 and the session manager — so that a row cannot say one thing while the code does another.
-	 Reading them opens no device, which is what lets an inspector show them."
+	 what it was built for, whether the run that opened it is the run that is going now, how
+	 many dispatches hang off it, whether my class will be told when an image starts, and the
+	 reason a machine without a driver gave. Every value is asked of the object that owns it —
+	 the predicate, the dictionary and the session manager — so that a row cannot say one thing
+	 while the code does another. Reading them opens no device, which is what lets an inspector
+	 show them, and it is why canPresent is not a row here: answering it would build the
+	 presenting device rather than report one."
 
 	^ {
 		  { 'Holds a device'. context isNotNil }.
+		  { 'Context built for'. contextKind ifNil: [ 'nothing open' ] }.
 		  { 'Device of this image run'. self isOfThisImageRun }.
 		  { 'Dispatches kept'. dispatches size }.
 		  { 'Registered for an image start'.
@@ -298,20 +310,18 @@ VGVulkanDeviceSession >> openContextOfKind: aSymbol with: aBlock [
 
 { #category : 'accessing' }
 VGVulkanDeviceSession >> presentableContextOrNil [
-	"The context a window presents from, or nil where this machine cannot present. It is the
-	 session's one context: a compute-only one opened earlier by a frame is released here and
-	 rebuilt with the surface extensions, because two devices on one machine would hold two
-	 copies of every kernel and every buffer, and a surface cannot be made on an instance that
-	 was created without the extension the window system names.
-	 What the rebuild drops — the dispatches and the blur — is rebuilt lazily by the next frame."
+	"The context this session presents through, built on demand. A session already presenting
+	 answers the context it holds. One built for compute only is released first: its instance
+	 carries none of the surface extensions a window needs, and nothing of it can be kept.
+	 Answers nil where the window system names no surface extension, which is the machine that
+	 cannot present at all."
 
 	| names |
-	contextKind = #presenting ifTrue: [ ^ self contextOrNil ].
+	self isPresenting ifTrue: [ ^ self contextOrNil ].
 	names := self surfaceInstanceExtensionNames.
 	names ifNil: [ ^ nil ].
 	context ifNotNil: [ self releaseDevice ].
-	^ self
-		  openContextOfKind: #presenting
+	^ self openContextOfKind: #presenting
 		  with: [ VkContext presentingContextForExtensions: names ]
 ]
 
@@ -333,7 +343,7 @@ VGVulkanDeviceSession >> printOn: aStream [
 		ifNotNil: [ aStream nextPutAll: ' (no device: ' , unavailableReason , ')' ]
 ]
 
-{ #category : 'accessing' }
+{ #category : 'initialize-release' }
 VGVulkanDeviceSession >> releaseDevice [
 	"Everything I hold destroyed, children before the device, and the reason for a machine with no
 	 device forgotten so that the next ask probes again rather than answering a stale no."

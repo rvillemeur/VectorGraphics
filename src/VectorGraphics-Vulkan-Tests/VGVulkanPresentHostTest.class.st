@@ -62,12 +62,14 @@ VGVulkanPresentHostTest >> testAFrameOfMySpaceReachesMyRendererAndNotTheSurfaceL
 		self assert: hostSpace renderer frameCount equals: 1 ]
 ]
 
-{ #category : 'tests - presenting' }
-VGVulkanPresentHostTest >> testClosingMyHostSpaceDestroysItsChainAndItsContext [
-	"The window, the chain over it and the Vulkan context the chain was built on all end when
-	 the space does, in that reverse order, and nothing is left on the device. The context is
-	 the host space's own for now: the session's context is built for compute and carries none
-	 of the instance extensions a surface needs, and unit 7.3 is where the two become one."
+{ #category : 'tests' }
+VGVulkanPresentHostTest >> testClosingMyHostSpaceDestroysItsChainAndKeepsTheSessionsDevice [
+	"What ends when the space does, and what does not. The chain over the window ends with it,
+	 because its surface names a window that is gone. The device does not: since unit 7.3 it is
+	 the session's one context, which compute frames draw on whether a window exists or not, so
+	 a host space that destroyed it would take the next frame of any kind down with it. This
+	 test replaced the one that asserted the opposite, which was true only while the host space
+	 held a context of its own."
 
 	self withPresentingHostSpaceDo: [ :hostSpace |
 		| chain context |
@@ -76,8 +78,8 @@ VGVulkanPresentHostTest >> testClosingMyHostSpaceDestroysItsChainAndItsContext [
 		self deny: chain isDestroyed.
 		hostSpace close.
 		self assert: chain isDestroyed.
-		self assert: hostSpace presentContextOrNil isNil.
-		self assert: context device isNil ]
+		self deny: context device isNil.
+		self assert: hostSpace presentContextOrNil identicalTo: context ]
 ]
 
 { #category : 'tests' }
@@ -232,6 +234,23 @@ VGVulkanPresentHostTest >> testThePresentContextOfMyHostSpaceIsTheOneDeviceOfThe
 			assert: hostSpace presentContext
 			identicalTo: VGVulkanDeviceSession default context.
 		self assert: VGVulkanDeviceSession default contextKind equals: #presenting ]
+]
+
+{ #category : 'tests' }
+VGVulkanPresentHostTest >> testThePresentHostIsNotSupportedWhereTheSessionCannotPresent [
+	"§7d of the present plan: the failover is decided before the window opens, at host selection.
+	 A machine whose window system names no surface extension cannot present at all, and the
+	 host must not be offered there, because a swapchain image already acquired cannot turn
+	 back into a ByteArray halfway through a frame. The session answers the question, so the
+	 predicate takes the session it is asked about."
+
+	self withPresentHostDuring: [
+		self
+			assert: (VGVulkanPresentHost isSupportedWithSession: VGVulkanDeviceSession default)
+			equals: VGVulkanDeviceSession default canPresent.
+		self deny:
+			(VGVulkanPresentHost isSupportedWithSession:
+				 VGNoSurfaceExtensionSessionStub new) ]
 ]
 
 { #category : 'tests' }

@@ -42,12 +42,24 @@ VGVulkanPresentHost class >> isEnabled [
 
 { #category : 'testing' }
 VGVulkanPresentHost class >> isSupported [
-	"Two things at once: the driver that makes a Vulkan window possible, and a caller that has
-	 asked for one. §8 of the present plan is the second half — Bloc's default stays on the
-	 software path, so an image never starts presenting by itself, and every window opened inside
-	 a plain PVVulkanDriver installDuring: keeps the host my superclass answers with."
+	"Three things at once: the driver that makes a Vulkan window possible, a caller that has
+	 asked for one, and a machine that can really present. §8 of the present plan is the second
+	 of the three — Bloc''s default stays on the software path, so an image never starts
+	 presenting by itself, and every window opened inside a plain PVVulkanDriver installDuring:
+	 keeps the host my superclass answers with."
 
-	^ self respondsToVulkanDriver and: [ self isEnabled ]
+	^ self isSupportedWithSession: VGVulkanDeviceSession default
+]
+
+{ #category : 'testing' }
+VGVulkanPresentHost class >> isSupportedWithSession: aSession [
+	"Whether I am the host to use, given the session that would present through me. Asked of a
+	 session rather than reading the image''s own, so a test holds the refusal on a machine that
+	 can in fact present. A session that cannot present is the whole of the failover: it is
+	 decided here, before a window exists, because a swapchain image already acquired cannot
+	 turn back into a ByteArray halfway through a frame."
+
+	^ self respondsToVulkanDriver and: [ self isEnabled and: [ aSession canPresent ] ]
 ]
 
 { #category : 'inspector' }

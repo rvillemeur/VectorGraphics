@@ -9,7 +9,6 @@ Class {
 	#name : 'VGVulkanPresentHostSpace',
 	#superclass : 'BlOSWindowSDL2HostSpace',
 	#instVars : [
-		'presentContext',
 		'presentChain'
 	],
 	#category : 'VectorGraphics-Vulkan-Present',
@@ -27,17 +26,15 @@ VGVulkanPresentHostSpace >> backendWindow [
 
 { #category : 'host space - displaying' }
 VGVulkanPresentHostSpace >> close [
-	"The chain, then the context, then the window my superclass closes: the reverse of the
-	 order they were acquired in, because the surface inside the chain belongs to the instance
-	 the context holds. Tolerates a second close, as my superclass's does, since a test may
-	 close a space its fixture closes again."
+	"The chain, then the window my superclass closes. The context is not destroyed here since
+	 unit 7.3: it is the session's one device, which outlives this window and which the next
+	 frame of any kind still draws on. The surface inside the chain belongs to the instance that
+	 context holds, so the chain goes first. Tolerates a second close, as my superclass's does,
+	 since a test may close a space its fixture closes again."
 
 	presentChain ifNotNil: [
 		presentChain destroy.
 		presentChain := nil ].
-	presentContext ifNotNil: [
-		presentContext destroy.
-		presentContext := nil ].
 	super close
 ]
 
@@ -104,25 +101,29 @@ VGVulkanPresentHostSpace >> presentChain [
 		                  backendWindow: self backendWindow
 ]
 
-{ #category : 'presenting' }
+{ #category : 'accessing' }
 VGVulkanPresentHostSpace >> presentContext [
-	"The Vulkan context this host space presents through, built on first use from the instance
-	 extensions SDL asks for on this platform. It is the host space's own, and not
-	 VGVulkanDeviceSession's: the session's context is created for compute and carries none of
-	 the surface extensions a window needs. Unit 7.3 is where the two become one context, and
-	 this method is the one place that has to change for it."
+	"The Vulkan context this host space presents through: the session's one device, which does
+	 compute and presentation both since unit 7.3. Asking for it is what rebuilds a compute-only
+	 context into a presenting one, so a frame that opened a device before this window existed
+	 leaves no second device behind.
+	 Nothing is cached here. The session holds the context and may release and rebuild it, and a
+	 copy kept here would outlive the handles it names. A machine that cannot present never
+	 reaches this method: VGVulkanPresentHost class >> isSupported asks the session first, and
+	 the host is not offered at all."
 
-	^ presentContext ifNil: [
-		  presentContext := VkContext graphicsContextForExtensions:
-			                    self backendWindow requiredInstanceExtensions ]
+	^ VGVulkanDeviceSession default presentableContextOrNil
 ]
 
-{ #category : 'presenting' }
+{ #category : 'accessing' }
 VGVulkanPresentHostSpace >> presentContextOrNil [
-	"The context if one was built, and nil before the first frame and after close. Tests read
-	 this rather than presentContext, which would build one to answer the question."
+	"The context this host space would present through if the session holds a presenting one
+	 now, and nil otherwise. Tests read this rather than presentContext, which would open a
+	 device to answer the question."
 
-	^ presentContext
+	| session |
+	session := VGVulkanDeviceSession default.
+	^ session isPresenting ifTrue: [ session context ]
 ]
 
 { #category : 'rendering' }

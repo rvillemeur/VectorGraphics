@@ -73,3 +73,31 @@ VGVulkanDeviceSessionExamples class >> sessionThatDroppedADeviceOfAnotherImageRu
 	session contextOrNil.
 	^ session
 ]
+
+{ #category : 'examples' }
+VGVulkanDeviceSessionExamples class >> sessionThatPresentsAndComputesOnOneDevice [
+	<sampleInstance>
+	"One click: a session asked for presentation first and for compute after, which is the whole
+	 of unit 7.3a — one device does both. The Lifetime tab names what the context was built for
+	 and the Residency tab names the buffers the frames kept on that very device, so the two
+	 tabs together are the fact: no second device was opened for the drawing.
+	 A fresh session and not the default, so a click neither releases the device the frames of
+	 this image draw on nor shows what an earlier click left behind. It is answered live,
+	 because a released session is a device the next frame opens again.
+	 Where nothing can present — no driver, or a window system that names no surface extension —
+	 the session is answered as it stands and nothing is drawn: an example may not raise on a
+	 machine with no device."
+
+	| session encoding target dispatch |
+	session := VGVulkanDeviceSession new.
+	session presentableContextOrNil ifNil: [ ^ session ].
+	encoding := VGTiledFillExamples encodingOfThreeShapes.
+	target := ByteArray new:
+		          VGTiledFillExamples frameExtent x
+		          * VGTiledFillExamples frameExtent y
+		          * VGTiledFillEncoding targetFormat bytesPerPixel.
+	dispatch := session dispatchForEncoding: encoding.
+	dispatch ifNil: [ ^ session ].
+	2 timesRepeat: [ dispatch draw: encoding into: target ].
+	^ session
+]
