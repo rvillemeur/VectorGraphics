@@ -69,7 +69,7 @@ VGVulkanPresentRendererExamples class >> spaceOfTheElement: anElement [
 	 unopened root clips everything to the nothing it measures."
 
 	| space |
-	anElement size: VGFrameDeviceBenchmark extentOfItsFrames.
+	anElement extent: VGFrameDeviceBenchmark extentOfItsFrames.
 	space := BlSpace new.
 	space
 		extent: VGFrameDeviceBenchmark extentOfItsFrames;
@@ -83,4 +83,60 @@ VGVulkanPresentRendererExamples class >> spaceOfTheElement: anElement [
 { #category : 'constants' }
 VGVulkanPresentRendererExamples class >> windowTitle [
 	^ 'VectorGraphics frames presented from the device'
+]
+
+{ #category : 'examples' }
+VGVulkanPresentRendererExamples >> openWindowAndPresentTheBenchmarkFrames [
+	<sampleInstance>
+	"One click: a real, visible Vulkan window, the three frames VGFrameDeviceBenchmark measures
+	 drawn on the device and presented through its swapchain two seconds apart, and the renderer
+	 of that window answered once the window is closed. Answers nil on a machine with no Vulkan
+	 device."
+	"The host space is built by hand, the way every device test of this unit builds it, and not
+	 by showing the space: BlSpace >> show hands the space to BlHostRegistry default
+	 preferredHost, which is set at image start and kept there, so a shown space opens on the
+	 Morphic host and never reaches this one. The window, the surface, the swapchain and the
+	 renderer are the real ones either way — only the frame loop is driven here rather than by
+	 the universe, which is also why each frame is rendered directly and waited on instead of
+	 settled."
+	"Named open… so that the example gates do not run it: see the class comment."
+
+	| element space hostSpace |
+	VGVulkanDeviceSession default contextOrNil ifNil: [ ^ nil ].
+	element := VGDrawnFrameElement new.
+	^ PVVulkanDriver installDuring: [
+		  VGVulkanPresentHost enableDuring: [
+			  space := self spaceOfTheElement: element.
+			  hostSpace := VGVulkanPresentHost default newHostSpaceFor: space.
+			  hostSpace initializeRenderer.
+			  [
+			  hostSpace show.
+			  VGFrameDeviceBenchmark frameNames do: [ :each |
+				  element drawBlock: (VGFrameDeviceBenchmark drawBlockNamed: each).
+				  space invalidateAll.
+				  hostSpace render: space.
+				  (Delay forSeconds: self secondsPerFrame) wait ].
+			  hostSpace renderer ] ensure: [ hostSpace close ] ] ]
+]
+
+{ #category : 'examples' }
+VGVulkanPresentRendererExamples >> spaceOfTheElement: anElement [
+	"A space holding that one element, laid out and ready to be drawn, at the extent of the
+	 frames the benchmark measures. The element is laid out while it is still detached and the
+	 root is told not to clip, for the reason VGVulkanPresentRendererTest >> spaceOfShapes
+	 gives: settling a space needs the pulse loop of a space the universe has opened, this space
+	 is driven by hand instead, and an unsettled root stays at the extent it starts with, which
+	 is none."
+
+	| space |
+	anElement extent: VGFrameDeviceBenchmark extentOfItsFrames.
+	anElement forceLayout.
+	space := BlSpace new.
+	space
+		extent: VGFrameDeviceBenchmark extentOfItsFrames;
+		title: self windowTitle.
+	space root
+		clipChildren: false;
+		addChild: anElement.
+	^ space
 ]
