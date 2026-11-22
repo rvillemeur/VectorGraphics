@@ -218,6 +218,35 @@ VGTiledFillExamples class >> encodingOfThreeShapes [
 	^ VGTiledFillEncoding of: surface displayList extent: self frameExtent
 ]
 
+{ #category : 'examples' }
+VGTiledFillExamples class >> frameEndedInAnImageOnThisMachine [
+	"One click: a frame of three shapes drawn on this machine and left in a Vulkan image,
+	 which is the frame of unit 7.3b. Nothing of it crosses to the host: the dispatch copies
+	 its target buffer into the image, and the Image tab shows the image in the layout a copy
+	 writes into, over a live handle. The device, the kernel and the buffers are the session''s
+	 and are left alone; the image is mine and is the object handed back. Where no device
+	 computes it answers an image that was never created, which is what the inspector should
+	 show on such a machine."
+
+	<sampleInstance>
+	| context backend image surface |
+	context := VGVulkanDeviceSession default contextOrNil.
+	context ifNil: [ ^ VkImage new ].
+	image := VkImage
+		         on: context device
+		         format: VkFormat b8g8r8a8Unorm
+		         extent: self frameExtent
+		         usage: (VkImageUsage transferDstBit bitOr: VkImageUsage transferSrcBit).
+	backend := VGVulkanBackend new.
+	surface := VGCairoImageSurface extent: self frameExtent.
+	surface newContext
+		sourceColorR: 0.2 g: 0.3 b: 0.8 a: 1.0;
+		circleCenterX: 32 y: 32 radius: 24;
+		fill.
+	surface displayList replayOn: backend.
+	^ backend drawFrameInto: image
+]
+
 { #category : 'constants' }
 VGTiledFillExamples class >> frameExtent [
 	"The extent of the conformance cases, so that an example and a case can be read against each

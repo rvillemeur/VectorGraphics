@@ -17,7 +17,8 @@ Class {
 		'buffers',
 		'tileExtent',
 		'prepared',
-		'blocks'
+		'blocks',
+		'copyPool'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -31,6 +32,17 @@ VGTiledFillDispatch class >> bindingsNotOfAnEncoding [
 	 is the one thing an encoding does not carry into a buffer."
 
 	^ #( #target #frame )
+]
+
+{ #category : 'constants' }
+VGTiledFillDispatch class >> bufferUsage [
+	"What every buffer of a frame is created for. The storage bit is what the kernel reads and
+	 writes them through; the transfer source bit is what lets the target buffer be the source
+	 of a copy into an image, which is how a frame that ends on the device ends. One usage for
+	 every binding rather than one for the target and another for the rest: a buffer that is
+	 never copied pays nothing for being allowed to be."
+
+	^ VkBufferUsage storageBufferBit bitOr: VkBufferUsage transferSrcBit
 ]
 
 { #category : 'constants' }
@@ -83,11 +95,12 @@ VGTiledFillDispatch class >> stageNames [
 	 figures of every unit can be read against each other. It is not the building of the
 	 encoding, which a frame pays before a dispatch is asked for anything.
 	 There is no release among them, because unit 3.1 keeps the device objects of a frame for the
-	 session and a frame pays nothing to let go of them. The last of them is paid only by a frame
-	 that asks for its pixels: a frame that ends on the device reaches no readback and is
-	 reported with no row for one."
+	 session and a frame pays nothing to let go of them. The last two are paid by one kind of
+	 frame each and never by both: a frame that ends on the device pays the copy of its target
+	 buffer into an image and reaches no readback, and a frame that asks for its pixels pays the
+	 readback and copies into no image. A report shows a row for the one its frame paid."
 
-	^ #( #writeBuffers #module #allocate #prepare #upload #dispatch #readback )
+	^ #( #writeBuffers #module #allocate #prepare #upload #dispatch #copy #readback )
 ]
 
 { #category : 'accessing' }
@@ -160,6 +173,42 @@ VGTiledFillDispatch >> context [
 	^ context
 ]
 
+{ #category : 'device' }
+VGTiledFillDispatch >> copyCommandPool [
+	"The pool the copy into an image cuts its command buffers from, made on the first such
+	 frame and kept until the device is released. A frame that only ever reads back never makes
+	 one: the kernel has a pool of its own and this one is of no use to it."
+
+	^ copyPool ifNil: [
+		  copyPool := context device createCommandPool:
+			              context computeQueueFamily ]
+]
+
+{ #category : 'drawing' }
+VGTiledFillDispatch >> copyTargetInto: anImage [
+	"The target buffer into that image, in one submission: the image moved to the layout a copy
+	 writes into, the whole extent copied, and nothing read back. The command pool is kept for
+	 the session like everything else of the device here, so a frame pays one allocation of a
+	 command buffer and not one of a pool."
+
+	self timeStage: #copy during: [
+		| command region |
+		command := self copyCommandPool allocateBuffer.
+		region := VkCommandBuffer regionForExtent: anImage extent.
+		[
+		command do: [ :recorder |
+			anImage
+				transitionTo: VkImageLayout transferDstOptimal
+				in: recorder.
+			recorder
+				recordCopyOfBuffer: (buffers at: #target)
+				toImage: anImage
+				layout: VkImageLayout transferDstOptimal
+				region: region ].
+		context computeQueue submit: command andWait: true ]
+			ensure: [ region getHandle free ] ]
+]
+
 { #category : 'accessing' }
 VGTiledFillDispatch >> deviceBuffers [
 	"The device buffer of every binding, keyed by the name of the binding. Empty where no frame
@@ -186,6 +235,21 @@ VGTiledFillDispatch >> draw: anEncoding into: aByteArray [
 	 ends on the device says otherwise."
 
 	^ self draw: anEncoding into: aByteArray readBack: true
+]
+
+{ #category : 'drawing' }
+VGTiledFillDispatch >> draw: anEncoding into: aByteArray endingIn: anImage [
+	"One frame that ends on the device: drawn with no readback, then the target buffer copied
+	 into that image. Nothing of the frame reaches the host, which is the whole point of the
+	 unit; the caller owns the image and the layout it wants it in afterwards, because the
+	 chain that presents it has its own semaphores to fit around the transition.
+	 A frame that touches no tile dispatches nothing and copies nothing: the image holds
+	 whatever it held, which is what the target buffer holds too."
+
+	self draw: anEncoding into: aByteArray readBack: false.
+	anEncoding touchedTileCount = 0 ifTrue: [ ^ anImage ].
+	self copyTargetInto: anImage.
+	^ anImage
 ]
 
 { #category : 'drawing' }
@@ -250,7 +314,7 @@ VGTiledFillDispatch >> growBuffers [
 				grown := VkBuffer
 					         on: context device
 					         size: needed
-					         usage: VkBuffer storageBufferUsage.
+					         usage: self class bufferUsage.
 				buffers at: name put: grown.
 				prepared ifTrue: [
 					kernel rebindBuffer: grown atBinding: index - 1 ].
@@ -298,6 +362,28 @@ VGTiledFillDispatch >> inspectorBuffers: aBuilder [
 { #category : 'inspecting' }
 VGTiledFillDispatch >> inspectorBuffersContext: aContext [
 	aContext active: blocks isNotNil
+]
+
+{ #category : 'inspector' }
+VGTiledFillDispatch >> inspectorStages: aBuilder [
+	<inspectorPresentationOrder: 20 title: 'Stages'>
+	"What the frames I drew cost, stage by stage. A stage shows as unreached rather than as
+	 nought, which is how a frame that ended on the device is told from one read back into the
+	 host: the first pays the copy and never the readback, the second the other way about. A
+	 dispatch that was never asked to record its stages shows every row unreached, because
+	 reading the clock twice a stage is a cost a running tool does not pay."
+
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn
+				   title: 'Stage'
+				   evaluated: [ :each | (each at: 1) asString ]);
+		  addColumn: (SpStringTableColumn title: 'Microseconds' evaluated: [
+					   :each |
+					   (each at: 2)
+						   ifNil: [ 'not reached' ]
+						   ifNotNil: [ :microseconds | microseconds printString ] ]);
+		  items: self stageRows;
+		  yourself
 ]
 
 { #category : 'measuring' }
@@ -383,6 +469,9 @@ VGTiledFillDispatch >> releaseDevice [
 		kernel destroy.
 		kernel := nil ].
 	buffers valuesDo: [ :each | each destroy ].
+	copyPool ifNotNil: [
+		copyPool destroy.
+		copyPool := nil ].
 	buffers removeAll.
 	prepared := false.
 	tileExtent := nil
@@ -419,6 +508,19 @@ VGTiledFillDispatch >> stageMicroseconds [
 	 early can be told from one whose stage was too fast to measure."
 
 	^ stages ifNil: [ Dictionary new ]
+]
+
+{ #category : 'accessing' }
+VGTiledFillDispatch >> stageRows [
+	"Every stage a frame can pay, in the order the table names them, each with what the frames
+	 I drew paid for it or nil where it was never reached. The names are read off the table
+	 itself, so a stage cannot be shown here under a name no report shows, and the two last
+	 rows are where the kind of frame I drew can be read: one of them is always unreached."
+
+	^ self class stageNames collect: [ :each |
+		  {
+			  each.
+			  (self microsecondsOfStage: each) } ]
 ]
 
 { #category : 'measuring' }

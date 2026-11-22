@@ -1,0 +1,249 @@
+"
+I hold the gate of unit 7.3b: a frame that ends on the device rather than in host memory.
+
+The dispatch copies its target buffer into a VkImage by vkCmdCopyBufferToImage, with the layout
+transitions around it, and VGVulkanBackend asks for that instead of draining into a surface. What
+I prove is that the pixels are the same ones: the image read back holds what the software backend
+draws for the same frame, within the tolerance of VGTiledFrameTestCase, and the frame pays no
+readback stage and copies no pixels through the host on the way.
+"
+Class {
+	#name : 'VGTiledImageCopyTest',
+	#superclass : 'VGTiledFrameTestCase',
+	#category : 'VectorGraphics-Vulkan-Tests-Tests',
+	#package : 'VectorGraphics-Vulkan-Tests',
+	#tag : 'Tests'
+}
+
+{ #category : 'fixtures' }
+VGTiledImageCopyTest >> formOfImage: anImage [
+	"The picture that image holds, read back through a surface of the format a frame is encoded
+	 for so that it can be held against the software backend's own Form."
+
+	| surface pixels rowBytes |
+	surface := VGCairoImageSurface extent: anImage extent.
+	pixels := self pixelsOfImage: anImage.
+	rowBytes := anImage extent x
+	            * VGTiledFillEncoding targetFormat bytesPerPixel.
+	0 to: anImage extent y - 1 do: [ :row |
+		surface data
+			replaceFrom: row * surface stride + 1
+			to: row * surface stride + rowBytes
+			with: pixels
+			startingAt: row * rowBytes + 1 ].
+	^ surface asForm
+]
+
+{ #category : 'fixtures' }
+VGTiledImageCopyTest >> imageOfExtent: anExtent [
+	"An image on the session's own device, of the format a frame is encoded for and usable as
+	 both ends of a copy: the frame writes into it and I read it back out of it."
+
+	^ VkImage
+		  on: VGVulkanDeviceSession default context device
+		  format: VkFormat b8g8r8a8Unorm
+		  extent: anExtent
+		  usage:
+		  (VkImageUsage transferDstBit bitOr: VkImageUsage transferSrcBit)
+]
+
+{ #category : 'fixtures' }
+VGTiledImageCopyTest >> pixelsOfImage: anImage [
+	"The pixels of that image in host memory, packed row after row with no padding, which is
+	 how the kernel wrote them into the target buffer and how the oracle reads them. The image
+	 is moved to the layout a copy reads from and left there: nothing of mine looks at it
+	 again, and the frame that wrote it transitions it for itself."
+
+	| context pool answer buffer |
+	context := VGVulkanDeviceSession default context.
+	answer := ByteArray new:
+		          anImage extent x * anImage extent y
+		          * VGTiledFillEncoding targetFormat bytesPerPixel.
+	buffer := VkBuffer
+		          on: context device
+		          size: answer size
+		          usage: VkBufferUsage transferDstBit.
+	pool := context device createCommandPool: context computeQueueFamily.
+	[
+	| command |
+	command := pool allocateBuffer.
+	command do: [ :recorder |
+		anImage transitionTo: VkImageLayout transferSrcOptimal in: recorder.
+		recorder
+			copyImage: anImage
+			layout: VkImageLayout transferSrcOptimal
+			toBuffer: buffer
+			extent: anImage extent.
+		recorder barrierForHostRead ].
+	context computeQueue submit: command andWait: true.
+	answer := buffer copyToByteArray ] ensure: [
+		buffer destroy.
+		pool destroy ].
+	^ answer
+]
+
+{ #category : 'fixtures' }
+VGTiledImageCopyTest >> recordFrame: aBlock on: aBackend [
+	"That frame recorded on the backend and not drained, which is what a surface does to the
+	 backend it holds: it replays its display list and drains afterwards."
+
+	| surface |
+	surface := VGCairoImageSurface extent: self caseExtent.
+	aBlock value: surface newContext.
+	surface displayList replayOn: aBackend.
+	surface displayList reset
+]
+
+{ #category : 'tests' }
+VGTiledImageCopyTest >> testAFrameThatEndsInAnImagePaysTheCopyAndNoReadback [
+	"The two last stages belong to one kind of frame each. A frame that ends in an image is
+	 timed for its copy and reaches no readback at all, so a report of it shows a copy row and
+	 no readback row. The dispatch is my own and not the session's, because a dispatch asked to
+	 record its stages records them for every frame after, and the session's draws the frames
+	 of every other test."
+
+	| encoding dispatch image pixelCount |
+	self hasDevice ifFalse: [ ^ self ].
+	encoding := self
+		            encodingOfExtent: self caseExtent
+		            drawnWith: self mixedFillFrame.
+	pixelCount := self caseExtent x * self caseExtent y
+	              * VGTiledFillEncoding targetFormat bytesPerPixel.
+	dispatch := VGTiledFillDispatch on:
+		            VGVulkanDeviceSession default context.
+	image := self imageOfExtent: self caseExtent.
+	[
+	dispatch recordStages.
+	dispatch draw: encoding into: (ByteArray new: pixelCount) endingIn: image.
+	self assert: (dispatch stageMicroseconds includesKey: #copy).
+	self deny: (dispatch stageMicroseconds includesKey: #readback).
+	self assert: (dispatch microsecondsOfStage: #copy) isNil not ]
+		ensure: [
+			dispatch releaseDevice.
+			image destroy ]
+]
+
+{ #category : 'tests' }
+VGTiledImageCopyTest >> testAFrameThatEndsOnTheDeviceCopiesNoPixelThroughTheHost [
+	"What the unit removes: the two host copies a drained frame pays, one reading the surface
+	 into packed bytes and one writing them back. A backend whose pixelsOf: and write:into:
+	 raise draws the same frame into an image without reaching either, and still lays down the
+	 pixels the software backend draws."
+
+	| backend image |
+	self hasDevice ifFalse: [ ^ self ].
+	backend := VGHostPixelRefusingBackendStub new.
+	image := self imageOfExtent: self caseExtent.
+	[
+	self recordFrame: self mixedFillFrame on: backend.
+	backend drawFrameInto: image.
+	self
+		deny: ((self pixelsOfImage: image) allSatisfy: [ :each | each = 0 ])
+		description: 'the frame laid down no pixel at all' ] ensure: [
+		image destroy ]
+]
+
+{ #category : 'tests' }
+VGTiledImageCopyTest >> testAFrameWithNothingRecordedLeavesTheImageAsItWas [
+	"The degenerate frame: a backend drained into an image with nothing recorded asks nothing
+	 of a device and writes nothing, so the image still holds the picture the frame before it
+	 left there."
+
+	| backend image drawn |
+	self hasDevice ifFalse: [ ^ self ].
+	backend := VGVulkanBackend new.
+	image := self imageOfExtent: self caseExtent.
+	[
+	self recordFrame: self mixedFillFrame on: backend.
+	backend drawFrameInto: image.
+	drawn := self pixelsOfImage: image.
+	backend drawFrameInto: image.
+	self assert: (self pixelsOfImage: image) equals: drawn ] ensure: [
+		image destroy ]
+]
+
+{ #category : 'tests' }
+VGTiledImageCopyTest >> testEveryCaseOfTheSubsetDrawsIntoAnImageWhatTheSoftwareBackendDraws [
+	"The gate of unit 7.3b. Every case of the conformance corpus the subset draws is drawn once
+	 through the copy into an image and once by the software backend, and the two pictures are
+	 the same within the tolerance the device is held to everywhere else. One image is made for
+	 the whole walk, because every case is of one extent and a frame overwrites all of it."
+
+	| image |
+	self hasDevice ifFalse: [ ^ self ].
+	image := self imageOfExtent: self caseExtent.
+	[
+	self supportedCasesDo: [ :case :draw :entries |
+		| comparison backend |
+		backend := VGVulkanBackend new.
+		self recordFrame: draw on: backend.
+		backend drawFrameInto: image.
+		comparison := VGFormComparison
+			              between: (self formOfImage: image)
+			              and: (self
+					               softwareFormOfExtent: case extent
+					               drawnWith: draw).
+		self
+			assert:
+			(comparison pixelsFartherThan: self class deviceChannelTolerance) = 0
+			description: case name.
+		self
+			assert: comparison differingPixelCount
+				    <= self class devicePixelsAllowedToDifferPerCase
+			description: case name ] ] ensure: [ image destroy ]
+]
+
+{ #category : 'tests' }
+VGTiledImageCopyTest >> testTheBackendDrawsItsRecordedFrameStraightIntoAnImage [
+	"The path a presenting window takes: the backend is given a frame the way a surface gives
+	 it one, by replaying a display list, and then drains it into an image rather than into the
+	 pixels of a surface. What the image holds afterwards is what the software backend draws
+	 for the same frame."
+
+	| backend image comparison |
+	self hasDevice ifFalse: [ ^ self ].
+	backend := VGVulkanBackend new.
+	image := self imageOfExtent: self caseExtent.
+	[
+	self recordFrame: self mixedFillFrame on: backend.
+	backend drawFrameInto: image.
+	comparison := VGFormComparison
+		              between: (self formOfImage: image)
+		              and: (self
+				               softwareFormOfExtent: self caseExtent
+				               drawnWith: self mixedFillFrame).
+	self assert:
+		(comparison pixelsFartherThan: self class deviceChannelTolerance) = 0.
+	self assert: comparison differingPixelCount
+		<= self class devicePixelsAllowedToDifferPerCase ] ensure: [
+		image destroy ]
+]
+
+{ #category : 'tests' }
+VGTiledImageCopyTest >> testTheImageAFrameEndsInHoldsThePixelsTheSameFrameReadBackHolds [
+	"A frame that ends on the device writes into the image what a frame read back writes into
+	 the host. The same encoding is drawn twice from a zeroed target, once ending in an image
+	 and once read back, and the bytes of the image are the bytes of the readback."
+
+	| encoding pixelCount dispatch readBack image |
+	self hasDevice ifFalse: [ ^ self ].
+	encoding := self
+		            encodingOfExtent: self caseExtent
+		            drawnWith: self mixedFillFrame.
+	pixelCount := self caseExtent x * self caseExtent y
+	              * VGTiledFillEncoding targetFormat bytesPerPixel.
+	dispatch := VGVulkanDeviceSession default dispatchForEncoding: encoding.
+	readBack := ByteArray new: pixelCount.
+	dispatch draw: encoding into: readBack.
+	image := self imageOfExtent: self caseExtent.
+	[
+	dispatch
+		draw: encoding
+		into: (ByteArray new: pixelCount)
+		endingIn: image.
+	self
+		deny: (readBack allSatisfy: [ :each | each = 0 ])
+		description: 'the frame laid down no pixel at all'.
+	self assert: (self pixelsOfImage: image) equals: readBack ]
+		ensure: [ image destroy ]
+]

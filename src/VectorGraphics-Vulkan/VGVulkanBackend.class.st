@@ -141,21 +141,42 @@ VGVulkanBackend >> blitSurface: aSurface at: aPoint paint: aPaint clip: aClip op
 
 { #category : 'drawing' }
 VGVulkanBackend >> dispatch: anEncoding into: aByteArray [
-	"The device trip, with every fault of a driver answered as a refusal: a missing library, a
-	 device that refuses a queue and a dispatch that raises are one answer here, which is that
-	 this frame belongs to the software backend.
-	 The device comes from VGVulkanDeviceSession and is not opened here: it is held for the whole
-	 image session, as are the kernel, the pipeline and the buffers of the dispatch. A frame that
-	 fails releases the session, because a driver that has failed once may hold nothing worth
-	 keeping and the next frame is to probe again rather than inherit it."
+	"The frame drawn on the device and read back into those pixels, which is every frame that
+	 ends in a surface."
+
+	^ self dispatchOf: anEncoding during: [ :dispatch |
+		  dispatch draw: anEncoding into: aByteArray ]
+]
+
+{ #category : 'drawing' }
+VGVulkanBackend >> dispatch: anEncoding into: aByteArray endingIn: anImage [
+	"The frame drawn on the device and copied into that image, which is every frame of a
+	 window that presents."
+
+	^ self dispatchOf: anEncoding during: [ :dispatch |
+		  dispatch draw: anEncoding into: aByteArray endingIn: anImage ]
+]
+
+{ #category : 'drawing' }
+VGVulkanBackend >> dispatchOf: anEncoding during: aBlock [
+	"The device trip of one frame, with every fault of a driver answered as a refusal: a
+	 missing library, a device that refuses a queue and a dispatch that raises are one answer
+	 here, which is that this frame belongs to the software backend. The block is evaluated
+	 with the dispatch of the frame and says where the frame ends, which is the only thing the
+	 two ways of drawing one differ by.
+	 The device comes from VGVulkanDeviceSession and is not opened here: it is held for the
+	 whole image session, as are the kernel, the pipeline and the buffers of the dispatch. A
+	 frame that fails releases the session, because a driver that has failed once may hold
+	 nothing worth keeping and the next frame is to probe again rather than inherit it."
 
 	| session |
 	session := VGVulkanDeviceSession default.
-	^ [ (session dispatchForEncoding: anEncoding)
+	^ [
+	  (session dispatchForEncoding: anEncoding)
 		  ifNil: [
 			  self refuseBecause:
 				  'no device computes here: ' , session unavailableReason ]
-		  ifNotNil: [ :dispatch | dispatch draw: anEncoding into: aByteArray ] ]
+		  ifNotNil: aBlock ]
 		  on: Error
 		  do: [ :failure |
 			  session releaseDevice.
@@ -171,6 +192,27 @@ VGVulkanBackend >> drainInto: aTarget [
 	 and not mine."
 
 	[ self drawRecordedFrameInto: aTarget ] ensure: [ recordedFrame reset ]
+]
+
+{ #category : 'drawing' }
+VGVulkanBackend >> drawFrameInto: anImage [
+	"The frame that ends on the device: encoded for the extent of that image and dispatched
+	 with the target buffer copied into it, so that no pixel of it crosses to the host and
+	 back. The recorded frame is dropped either way, as it is on a drain, because the surface
+	 replays its own list and not mine.
+	 The destination pixels start empty rather than being read off a surface: a window that
+	 presents has no host copy of the last frame to blend over, and unit 7.5 is where the
+	 target buffer the device already holds takes that place."
+
+	[
+	recordedFrame isEmpty ifFalse: [
+		self
+			dispatch: (VGTiledFillEncoding of: recordedFrame extent: anImage extent)
+			into: (ByteArray new:
+					 anImage extent x * anImage extent y
+					 * VGTiledFillEncoding targetFormat bytesPerPixel)
+			endingIn: anImage ] ] ensure: [ recordedFrame reset ].
+	^ anImage
 ]
 
 { #category : 'draining' }

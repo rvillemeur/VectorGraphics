@@ -142,6 +142,29 @@ VGTiledFrameTestCase >> hasDevice [
 ]
 
 { #category : 'fixtures' }
+VGTiledFrameTestCase >> mixedFillFrame [
+	"Four fills of the subset in one frame: an opaque rectangle, a fractional rectangular clip
+	 and a translucent circle under the source operator, a paint through a constant alpha, which
+	 that operator refuses to fold into the colour so that the alpha rides in the segments
+	 instead, and a circle that clears part of what the others laid down."
+	^ [ :context |
+	  context
+		  sourceColorR: 0.1 g: 0.7 b: 0.2 a: 1.0;
+		  rectangleX: 5 y: 7 width: 44 height: 30;
+		  fill;
+		  rectangleX: 8.5 y: 12.25 width: 42 height: 36.75;
+		  clip;
+		  setOperatorSource;
+		  sourceColorR: 0.9 g: 0.4 b: 0.0 a: 0.6;
+		  circleCenterX: 26.5 y: 26.25 radius: 16.5;
+		  fill;
+		  paintWithAlpha: 0.35;
+		  setOperatorClear;
+		  circleCenterX: 42 y: 42 radius: 10.25;
+		  fill ]
+]
+
+{ #category : 'fixtures' }
 VGTiledFrameTestCase >> roundedToSingleFloat: aNumber [
 	"The number as a buffer of single floats keeps it, widened again so that the oracle of this
 	 step computes in the values the buffers hold. Read through the bit pattern rather than
