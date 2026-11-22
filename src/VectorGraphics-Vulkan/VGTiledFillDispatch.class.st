@@ -186,27 +186,15 @@ VGTiledFillDispatch >> copyCommandPool [
 
 { #category : 'drawing' }
 VGTiledFillDispatch >> copyTargetInto: anImage [
-	"The target buffer into that image, in one submission: the image moved to the layout a copy
-	 writes into, the whole extent copied, and nothing read back. The command pool is kept for
-	 the session like everything else of the device here, so a frame pays one allocation of a
-	 command buffer and not one of a pool."
+	"The target buffer into that image, in one submission of my own, for a frame that nobody
+	 else is recording around. The command pool is kept for the session like everything else of
+	 the device here, so a frame pays one allocation of a command buffer and not one of a pool."
 
 	self timeStage: #copy during: [
-		| command region |
+		| command |
 		command := self copyCommandPool allocateBuffer.
-		region := VkCommandBuffer regionForExtent: anImage extent.
-		[
-		command do: [ :recorder |
-			anImage
-				transitionTo: VkImageLayout transferDstOptimal
-				in: recorder.
-			recorder
-				recordCopyOfBuffer: (buffers at: #target)
-				toImage: anImage
-				layout: VkImageLayout transferDstOptimal
-				region: region ].
+		command do: [ :recorder | self recordCopyInto: anImage in: recorder ].
 		context computeQueue submit: command andWait: true ]
-			ensure: [ region getHandle free ] ]
 ]
 
 { #category : 'accessing' }
@@ -454,6 +442,24 @@ VGTiledFillDispatch >> readbackInto: aByteArray [
 
 	self timeStage: #readback during: [
 		(buffers at: #target) readbackInto: aByteArray ]
+]
+
+{ #category : 'drawing' }
+VGTiledFillDispatch >> recordCopyInto: anImage in: aRecorder [
+	"The target buffer into that image, recorded and not submitted: the image moved to the
+	 layout a copy writes into and the whole extent copied. The caller owns the submission, so
+	 a presented frame can fit the copy between the semaphores its chain waits on and signals.
+	 The region is freed here because the driver has read it by the time recording returns."
+
+	| region |
+	region := VkCommandBuffer regionForExtent: anImage extent.
+	[
+	anImage transitionTo: VkImageLayout transferDstOptimal in: aRecorder.
+	aRecorder
+		recordCopyOfBuffer: (buffers at: #target)
+		toImage: anImage
+		layout: VkImageLayout transferDstOptimal
+		region: region ] ensure: [ region getHandle free ]
 ]
 
 { #category : 'measuring' }

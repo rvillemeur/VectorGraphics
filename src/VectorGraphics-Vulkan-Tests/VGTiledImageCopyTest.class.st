@@ -95,6 +95,19 @@ VGTiledImageCopyTest >> recordFrame: aBlock on: aBackend [
 ]
 
 { #category : 'tests' }
+VGTiledImageCopyTest >> testABackendWithNothingRecordedAnswersNoDispatch [
+	"A frame that recorded nothing asks the device for nothing: the backend answers nil rather
+	 than a dispatch over an empty encoding, and the caller takes that as the frame it has to
+	 fill the image with by itself."
+
+	| backend |
+	self hasDevice ifFalse: [ ^ self ].
+	backend := VGVulkanBackend new.
+	self assert:
+		(backend dispatchOfRecordedFrameForExtent: self caseExtent) isNil
+]
+
+{ #category : 'tests' }
 VGTiledImageCopyTest >> testAFrameThatEndsInAnImagePaysTheCopyAndNoReadback [
 	"The two last stages belong to one kind of frame each. A frame that ends in an image is
 	 timed for its copy and reaches no readback at all, so a report of it shows a copy row and
@@ -194,6 +207,37 @@ VGTiledImageCopyTest >> testEveryCaseOfTheSubsetDrawsIntoAnImageWhatTheSoftwareB
 ]
 
 { #category : 'tests' }
+VGTiledImageCopyTest >> testTheBackendAnswersTheDispatchThatHoldsTheRecordedFrame [
+	"The seam the presenting path draws through: the backend encodes and dispatches the frame
+	 recorded on it for the extent asked for, and answers the dispatch that holds the result in
+	 its target buffer, with no copy and no readback. The caller records the copy where its own
+	 submission needs it. The pixels are the ones a drain into a surface of the same extent
+	 writes, because the same frame is encoded for the same extent either way."
+
+	| backend dispatch image pool command drained |
+	self hasDevice ifFalse: [ ^ self ].
+	backend := VGVulkanBackend new.
+	image := self imageOfExtent: self caseExtent.
+	pool := VGVulkanDeviceSession default context device createCommandPool:
+		        VGVulkanDeviceSession default context computeQueueFamily.
+	[
+	self recordFrame: self mixedFillFrame on: backend.
+	backend drawFrameInto: image.
+	drained := self pixelsOfImage: image.
+	self recordFrame: self mixedFillFrame on: backend.
+	dispatch := backend dispatchOfRecordedFrameForExtent: self caseExtent.
+	self deny: dispatch isNil.
+	command := pool allocateBuffer.
+	command do: [ :recorder | dispatch recordCopyInto: image in: recorder ].
+	VGVulkanDeviceSession default context computeQueue
+		submit: command
+		andWait: true.
+	self assert: (self pixelsOfImage: image) equals: drained ] ensure: [
+		pool destroy.
+		image destroy ]
+]
+
+{ #category : 'tests' }
 VGTiledImageCopyTest >> testTheBackendDrawsItsRecordedFrameStraightIntoAnImage [
 	"The path a presenting window takes: the backend is given a frame the way a surface gives
 	 it one, by replaying a display list, and then drains it into an image rather than into the
@@ -216,6 +260,47 @@ VGTiledImageCopyTest >> testTheBackendDrawsItsRecordedFrameStraightIntoAnImage [
 		(comparison pixelsFartherThan: self class deviceChannelTolerance) = 0.
 	self assert: comparison differingPixelCount
 		<= self class devicePixelsAllowedToDifferPerCase ] ensure: [
+		image destroy ]
+]
+
+{ #category : 'tests' }
+VGTiledImageCopyTest >> testTheCopyIntoAnImageIsRecordedInTheCallersOwnSubmission [
+	"A presented frame cannot pay for a submission of its own: the copy into the acquired image
+	 has to sit in the submission that waits on the image being available and signals the one
+	 the presentation engine waits on. So the copy is recordable on a command buffer the caller
+	 owns, and the dispatch neither submits nor times it — a copy stage is recorded only by the
+	 path that owns the submission. The dispatch is my own, because one asked to record its
+	 stages records them for every frame after, and the session's draws the frames of the other
+	 tests."
+
+	| encoding pixelCount dispatch readBack image pool command context |
+	self hasDevice ifFalse: [ ^ self ].
+	context := VGVulkanDeviceSession default context.
+	encoding := self
+		            encodingOfExtent: self caseExtent
+		            drawnWith: self mixedFillFrame.
+	pixelCount := self caseExtent x * self caseExtent y
+	              * VGTiledFillEncoding targetFormat bytesPerPixel.
+	dispatch := VGTiledFillDispatch on: context.
+	readBack := ByteArray new: pixelCount.
+	image := self imageOfExtent: self caseExtent.
+	pool := context device createCommandPool: context computeQueueFamily.
+	[
+	dispatch recordStages.
+	dispatch draw: encoding into: readBack.
+	dispatch draw: encoding into: (ByteArray new: pixelCount) readBack: false.
+	command := pool allocateBuffer.
+	command do: [ :recorder | dispatch recordCopyInto: image in: recorder ].
+	self
+		deny: (dispatch stageMicroseconds includesKey: #copy)
+		description: 'recording the copy timed a stage, so it submitted on its own'.
+	context computeQueue submit: command andWait: true.
+	self
+		deny: (readBack allSatisfy: [ :each | each = 0 ])
+		description: 'the frame laid down no pixel at all'.
+	self assert: (self pixelsOfImage: image) equals: readBack ] ensure: [
+		dispatch releaseDevice.
+		pool destroy.
 		image destroy ]
 ]
 
