@@ -67,25 +67,36 @@ VGVulkanPresentRendererExamples class >> secondsPerFrame [
 ]
 
 { #category : 'examples' }
-VGVulkanPresentRendererExamples class >> spaceOfTheElement: anElement [
-	"A space holding that one element, laid out and ready to be drawn, at the extent of the
-	 frames the benchmark measures. The element is laid out while it is still detached and the
-	 root is told not to clip, for the reason VGVulkanPresentRendererTest >> spaceOfShapes
-	 gives: settling a space needs the pulse loop of a space the universe has opened, this
-	 space is driven by hand instead, and an unsettled root stays at the extent it starts with,
-	 which is none."
+VGVulkanPresentRendererExamples class >> spaceOfElement: anElement extent: anExtent [
+	"A space of that one element at that extent, laid out and ready to be drawn by hand.
+	 The element is laid out while it is still detached, because settling a space needs the
+	 pulse loop of a space the universe has opened and none of the spaces built here is ever
+	 opened; and the root is told not to clip, because an unsettled root stays at the extent it
+	 starts with, which is none, and would clip everything away.
+	 This is the fixture the tests of the renderer build their spaces from as well: the recipe
+	 was written out in three places before, with the same reason each time."
 
 	| space |
-	anElement extent: VGFrameDeviceBenchmark extentOfItsFrames.
+	anElement extent: anExtent.
 	anElement forceLayout.
 	space := BlSpace new.
-	space
-		extent: VGFrameDeviceBenchmark extentOfItsFrames;
-		title: self windowTitle.
+	space extent: anExtent.
 	space root
 		clipChildren: false;
 		addChild: anElement.
 	^ space
+]
+
+{ #category : 'examples' }
+VGVulkanPresentRendererExamples class >> spaceOfTheElement: anElement [
+	"The space the window example presents: that one element at the extent of the frames the
+	 benchmark measures, titled for the window it opens."
+
+	^ (self
+		   spaceOfElement: anElement
+		   extent: VGFrameDeviceBenchmark extentOfItsFrames)
+		  title: self windowTitle;
+		  yourself
 ]
 
 { #category : 'constants' }

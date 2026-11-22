@@ -31,35 +31,25 @@ VGVulkanPresentRendererTest >> softwareFormOfSpace: aSpace extent: anExtent [
 	^ surface asForm
 ]
 
-{ #category : 'running' }
+{ #category : 'fixture' }
 VGVulkanPresentRendererTest >> spaceDrawing: aBlock extent: anExtent [
 	"A Bloc space whose one element draws that frame of this project's drawing context, laid out
-	 and ready to be drawn. The element is laid out while it is still detached and the root is
-	 told not to clip, for the reasons spaceOfShapes gives."
+	 and ready to be drawn, the way spaceOfShapes builds its own."
 
-	| space content |
-	content := VGDrawnFrameElement drawing: aBlock.
-	content extent: anExtent.
-	content forceLayout.
-	space := BlSpace new.
-	space extent: anExtent.
-	space root
-		clipChildren: false;
-		addChild: content.
-	^ space
+	^ VGVulkanPresentRendererExamples
+		  spaceOfElement: (VGDrawnFrameElement drawing: aBlock)
+		  extent: anExtent
 ]
 
-{ #category : 'running' }
+{ #category : 'fixture' }
 VGVulkanPresentRendererTest >> spaceOfShapes [
 	"A Bloc space of three overlapping elements, laid out and ready to be drawn: a frame of it
 	 is a frame of fills and nothing the subset refuses, which is what a presented window draws
-	 too. The content is laid out while it is still detached, because settling a space needs the
-	 pulse loop of an opened window and this space is never opened, and the root is told not to
-	 clip because it stays at the extent an unsettled root has, which is none."
+	 too. VGVulkanPresentRendererExamples class >> spaceOfElement:extent: lays the content out
+	 and says why it is laid out detached."
 
-	| space content |
+	| content |
 	content := BlElement new
-		           extent: self caseExtent;
 		           background: (Color r: 0.1 g: 0.7 b: 0.2);
 		           yourself.
 	content
@@ -77,13 +67,9 @@ VGVulkanPresentRendererTest >> spaceOfShapes [
 				 extent: 18 @ 18;
 				 position: 24 @ 26;
 				 yourself).
-	content forceLayout.
-	space := BlSpace new.
-	space extent: self caseExtent.
-	space root
-		clipChildren: false;
-		addChild: content.
-	^ space
+	^ VGVulkanPresentRendererExamples
+		  spaceOfElement: content
+		  extent: self caseExtent
 ]
 
 { #category : 'tests' }
