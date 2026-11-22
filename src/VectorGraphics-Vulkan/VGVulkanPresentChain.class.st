@@ -336,7 +336,7 @@ VGVulkanPresentChain >> partsInDestructionOrder [
 	^ self partsInCreationOrder reversed
 ]
 
-{ #category : 'presenting' }
+{ #category : 'frames' }
 VGVulkanPresentChain >> presentFrameDuring: aBlock [
 	"One frame: wait for the previous one, acquire an image, hand that image to the block,
 	 record what the block's answer says, submit and present. Answers the index of the image
@@ -347,12 +347,7 @@ VGVulkanPresentChain >> presentFrameDuring: aBlock [
 	 guarantees nothing of what the last frame left there, so a transition from undefined is
 	 both honest and the cheapest one.
 	 The block answers the dispatch holding the frame it computed, or nil for a frame it has
-	 nothing to draw. A dispatch is copied into the image and the image transitioned to the
-	 layout the presentation engine takes; nil is cleared through the render pass this chain
-	 builds, which is the pass that leaves the image in that layout by itself. The pass is
-	 closed here: a command buffer's end does not close it. Either way one submission waits on
-	 imageAvailable and signals renderFinished, because the presentation engine waits on that
-	 one semaphore and a second submission would race it."
+	 nothing to draw; recordFrameOf:into:atIndex: says what each of the two records."
 
 	| imageIndex image dispatch |
 	fence waitTimeout: self class frameTimeoutNanoseconds.
@@ -364,29 +359,8 @@ VGVulkanPresentChain >> presentFrameDuring: aBlock [
 	image := swapchain images at: imageIndex + 1.
 	image declareLayoutUndefined.
 	dispatch := aBlock value: image.
-	commandPool reset.
-	commandBuffer do: [ :recorder |
-		dispatch
-			ifNil: [
-				recorder
-					beginRenderPass: renderPass
-					framebuffer: (framebuffers at: imageIndex + 1)
-					extent: self extent
-					clearColor: VkRenderConfig clearColorBlackOpaque.
-				recorder endRenderPass.
-				image declareLayout: self class presentedLayout ]
-			ifNotNil: [
-				dispatch recordCopyInto: image in: recorder.
-				image transitionTo: self class presentedLayout in: recorder ] ].
-	context computeQueue
-		submitGraphics: commandBuffer
-		waitSemaphore: imageAvailable
-		signalSemaphore: renderFinished
-		fence: fence.
-	swapchain
-		present: imageIndex
-		queue: context computeQueue
-		waitSemaphore: renderFinished handle.
+	self recordFrameOf: dispatch into: image atIndex: imageIndex.
+	self submitAndPresentImageAt: imageIndex.
 	presentedIndexes add: imageIndex.
 	^ imageIndex
 ]
@@ -400,9 +374,50 @@ VGVulkanPresentChain >> presentedIndexes [
 	^ presentedIndexes
 ]
 
+{ #category : 'frames' }
+VGVulkanPresentChain >> recordFrameOf: aDispatchOrNil into: anImage atIndex: anIndex [
+	"The one command buffer of this chain, recorded for that frame.
+	 A dispatch is copied into the image and the image transitioned to the layout the
+	 presentation engine takes; nil is cleared through the render pass this chain builds, which
+	 is the pass that leaves the image in that layout by itself. The pass is closed here: a
+	 command buffer's end does not close it."
+
+	commandPool reset.
+	commandBuffer do: [ :recorder |
+		aDispatchOrNil
+			ifNil: [
+				recorder
+					beginRenderPass: renderPass
+					framebuffer: (framebuffers at: anIndex + 1)
+					extent: self extent
+					clearColor: VkRenderConfig clearColorBlackOpaque.
+				recorder endRenderPass.
+				anImage declareLayout: self class presentedLayout ]
+			ifNotNil: [
+				aDispatchOrNil recordCopyInto: anImage in: recorder.
+				anImage transitionTo: self class presentedLayout in: recorder ] ]
+]
+
 { #category : 'accessing' }
 VGVulkanPresentChain >> renderPass [
 	^ renderPass
+]
+
+{ #category : 'frames' }
+VGVulkanPresentChain >> submitAndPresentImageAt: anIndex [
+	"The recorded frame submitted and the image presented. One submission waits on
+	 imageAvailable and signals renderFinished, because the presentation engine waits on that
+	 one semaphore and a second submission would race it."
+
+	context computeQueue
+		submitGraphics: commandBuffer
+		waitSemaphore: imageAvailable
+		signalSemaphore: renderFinished
+		fence: fence.
+	swapchain
+		present: anIndex
+		queue: context computeQueue
+		waitSemaphore: renderFinished handle
 ]
 
 { #category : 'accessing' }

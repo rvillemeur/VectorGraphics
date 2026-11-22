@@ -44,30 +44,31 @@ VGVulkanPresentRenderer >> backend: aBackend [
 	backend := aBackend
 ]
 
-{ #category : 'drawing' }
-VGVulkanPresentRenderer >> dispatchOfSpace: aSpace forExtent: anExtent [
-	"The frame of that space computed on the device, answered as the dispatch that holds it.
-	 The whole space is drawn and the damaged rectangle ignored: an acquired image is not the
-	 frame before it, so a partial frame would leave the rest of it undefined.
+{ #category : 'frames' }
+VGVulkanPresentRenderer >> dispatchOfRecording: aSurface forExtent: anExtent [
+	"The recording of a frame replayed on the device, answered as the dispatch that holds it.
 	 A device that fails takes the frame with it — the backend class is rejected, as a surface
 	 rejects it on a failover, and nil is answered, which the host space presents as the frame
 	 with nothing drawn. Nothing is drawn on the processor instead: a window of this host has no
 	 surface to lock, and the frame after this one probes the device again."
 
-	| surface |
-	surface := self recordingSurfaceForExtent: anExtent.
-	aeCanvas prepareForSurface: surface.
-	aeCanvas clippingRectangle: (0 @ 0 extent: anExtent / scaleFactor).
-	scaleFactor > 1.0 ifTrue: [ aeCanvas setLowQualityOptions ].
-	aSpace aeFullDrawOn: aeCanvas.
-	aeCanvas removeSurface.
 	^ [
-	  surface displayList replayOn: backend.
+	  aSurface displayList replayOn: backend.
 	  backend dispatchOfRecordedFrameForExtent: anExtent ]
 		  on: VGBackendFailure
 		  do: [ :failure |
 			  VGBackend reject: failure backend class.
 			  nil ]
+]
+
+{ #category : 'frames' }
+VGVulkanPresentRenderer >> dispatchOfSpace: aSpace forExtent: anExtent [
+	"The frame of that space computed on the device, answered as the dispatch that holds it:
+	 recorded on the surface this renderer keeps, then replayed on the backend."
+
+	^ self
+		  dispatchOfRecording: (self recordSpace: aSpace onSurfaceForExtent: anExtent)
+		  forExtent: anExtent
 ]
 
 { #category : 'accessing' }
@@ -137,6 +138,24 @@ VGVulkanPresentRenderer >> presentReport [
 			    ifNotNil: [ :each | each deviceScale printString ])).
 		  ('scale factor' -> scaleFactor printString).
 		  ('valid' -> self isValid printString) }
+]
+
+{ #category : 'frames' }
+VGVulkanPresentRenderer >> recordSpace: aSpace onSurfaceForExtent: anExtent [
+	"The frame of that space recorded on the surface this renderer keeps, which is answered.
+	 The whole space is drawn and the damaged rectangle ignored: an acquired image is not the
+	 frame before it, so a partial frame would leave the rest of it undefined.
+	 The clip is in space coordinates, which is why it divides by the scale factor, and a
+	 scaled frame is recorded with the quality options a scaled frame is drawn with."
+
+	| surface |
+	surface := self recordingSurfaceForExtent: anExtent.
+	aeCanvas prepareForSurface: surface.
+	aeCanvas clippingRectangle: (0 @ 0 extent: anExtent / scaleFactor).
+	scaleFactor > 1.0 ifTrue: [ aeCanvas setLowQualityOptions ].
+	aSpace aeFullDrawOn: aeCanvas.
+	aeCanvas removeSurface.
+	^ surface
 ]
 
 { #category : 'private' }
