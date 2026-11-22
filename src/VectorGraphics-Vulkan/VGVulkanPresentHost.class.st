@@ -8,8 +8,6 @@ What I do differently: newAttributesFor: builds a PVWindowAttributes carrying vu
 Class {
 	#name : 'VGVulkanPresentHost',
 	#superclass : 'VGVulkanDriverSdl2Host',
-	#traits : 'TBlSingletonHost',
-	#classTraits : 'TBlSingletonHost classTrait',
 	#classInstVars : [
 		'enabled'
 	],

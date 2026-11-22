@@ -190,7 +190,7 @@ VGVulkanPresentRenderer >> releaseRecordingSurface [
 	recordingSurface := nil
 ]
 
-{ #category : 'frames' }
+{ #category : 'rendering' }
 VGVulkanPresentRenderer >> render: aHostSpace [
 	"A frame of a presenting window: the space drawn on the device and the result presented
 	 through the host space, where BARenderer locks a surface and draws on the processor. A host
