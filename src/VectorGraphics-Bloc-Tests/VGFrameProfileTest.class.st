@@ -92,6 +92,25 @@ VGFrameProfileTest >> testBuildingTheSceneLeavesThePreferableRendererAsItWas [
 ]
 
 { #category : 'tests' }
+VGFrameProfileTest >> testEachKitIsMeasuredWithTheFontManagerItsFacesComeFrom [
+	"Bloc measures text through BlHostRenderer preferableClass, and the two kits read a face by
+	 different means: a renderer of this project lays a string out in VGScaledFont, which reads the
+	 character map of a VGFontFace, while the Cairo kit goes through AeCairoContext >> scaledFont:,
+	 a uFFI call that wants the FreeType handle of an AeFTFace. So the manager has to move with the
+	 renderer class. Swapping the class alone leaves one kit measuring with faces it cannot draw,
+	 and the message it sends that face is not understood inside Bloc's measuring process, where no
+	 test sees it. The ambient manager is global state of Alexandrie and is put back either way."
+
+	| ambient ours cairo |
+	ambient := VGFontManager managerUpstreamHolds.
+	ours := profile withRendererClass: VGRenderer during: [ AeFontManager globalInstance class ].
+	cairo := profile withRendererClass: BARenderer during: [ AeFontManager globalInstance class ].
+	self assert: ours equals: VGFontManager.
+	self assert: cairo equals: AeFontManager.
+	self assert: VGFontManager managerUpstreamHolds identicalTo: ambient
+]
+
+{ #category : 'tests' }
 VGFrameProfileTest >> testEveryPackageAndTagOfThisProjectHasAStageAndNoOthers [
 	"A sample is credited to the stage of the deepest class of this project on the stack, so every
 	 package and tag of the project needs a stage, and a key naming a tag that is gone would

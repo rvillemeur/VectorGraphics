@@ -27,6 +27,14 @@ VGAeRenderer class >> label [
 	^ 'VectorGraphics fonts'
 ]
 
+{ #category : 'testing' }
+VGAeRenderer class >> measuresTextWithFacesOfThisProject [
+	"I draw through the canvas of this project and read a VGFontFace for every glyph, as
+	 VGRenderer does, so my text is measured with the faces this project builds."
+
+	^ true
+]
+
 { #category : 'host - api' }
 VGAeRenderer class >> offscreenMeasureTextParagraph: aBlTextParagraph [
 	"Text is measured during layout, before any window exists, so the measurement goes through a

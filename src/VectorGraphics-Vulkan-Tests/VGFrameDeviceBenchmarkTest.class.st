@@ -10,6 +10,18 @@ Class {
 	#tag : 'Tests'
 }
 
+{ #category : 'accessing' }
+VGFrameDeviceBenchmarkTest >> defaultTimeLimit [
+	"testEveryFrameOfTheBenchmarkDrawsOnTheDeviceWhatTheSoftwareBackendDraws runs every frame
+	 of the benchmark on the device and then draws each one again in software to compare the
+	 pixels, which is 14.1 s on this machine against the ten seconds SUnit allows a test. The
+	 rest of the class stays under 5 s, but it is the class that owns the budget, so the budget
+	 is declared once here. Without this a run reports TestTookTooMuchTime, with no message and
+	 no stack, where it should report which frame differs."
+
+	^ 2 minutes
+]
+
 { #category : 'tests' }
 VGFrameDeviceBenchmarkTest >> testABenchmarkThatHasNotRunCarriesNoTimeAtAll [
 	"The degenerate state. A benchmark names its frame as soon as it is built, so the report has
@@ -81,7 +93,12 @@ VGFrameDeviceBenchmarkTest >> testEveryFrameOfTheBenchmarkDrawsOnTheDeviceWhatTh
 	 workgroup, so an error in the tile table shows here and in nothing unit 2.3 gated.
 	 The software side of each frame costs a second or two, which is the measurement itself and
 	 not an overhead of the test. A machine with no device has nothing to compare and holds
-	 nothing."
+	 nothing.
+	 The dispatch is not held against the SPIR-V build: measureEncoding builds that module
+	 outside the cache on purpose, to report what a session pays once, so the two numbers
+	 compare a warm resident frame with a cold build and state the ratio of this machine's
+	 device to its own compiler rather than a fact about the frame. On this machine the cheap
+	 frames dispatch in less time than their module takes to build."
 
 	VGFrameDeviceBenchmark frameNames do: [ :name |
 		| benchmark |
@@ -90,10 +107,7 @@ VGFrameDeviceBenchmarkTest >> testEveryFrameOfTheBenchmarkDrawsOnTheDeviceWhatTh
 			benchmark measureSoftwareFrame.
 			self assert: benchmark hasRun description: name.
 			self assert: benchmark pixelsEqual description: name.
-			self assert: benchmark deviceMilliseconds > 0 description: name.
-			self
-				assert: benchmark deviceMilliseconds >= benchmark spirvMilliseconds
-				description: name ] ]
+			self assert: benchmark deviceMilliseconds > 0 description: name ] ]
 ]
 
 { #category : 'tests' }

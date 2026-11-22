@@ -608,18 +608,14 @@ VGFrameProfile >> sampleOneFrameOf: aScene [
 	stageSamples := self attribute: profiler tallyRoot
 ]
 
-{ #category : 'scene' }
+{ #category : 'running' }
 VGFrameProfile >> sceneForRendererClass: aRendererClass [
-	"The reference scene, laid out, with every text span measured through the renderer class given.
-	 Bloc measures text during layout through `BlHostRenderer preferableClass`, and a span measured
-	 on one backend keeps that backend's scaled font, which the other backend cannot draw. The
-	 class is put back whatever happens, because it decides how the whole image draws."
+	"The reference scene, laid out, with every text span measured through the renderer class
+	 given and through the font manager that renderer needs. Bloc measures text during layout
+	 through BlHostRenderer preferableClass, and a span measured on one backend keeps that
+	 backend scaled font, which the other backend cannot draw."
 
-	| previous |
-	previous := BlHostRenderer preferableClass.
-	^ [
-	  BlHostRenderer preferableClass: aRendererClass.
-	  self newScene ] ensure: [ BlHostRenderer preferableClass: previous ]
+	^ self withRendererClass: aRendererClass during: [ self newScene ]
 ]
 
 { #category : 'reading' }
@@ -727,4 +723,22 @@ VGFrameProfile >> timeOurFramesOf: aScene [
 			                     (#drain -> (drain / frames)) }.
 	ourMilliseconds := (phaseMilliseconds at: #build)
 	                   + (phaseMilliseconds at: #drain)
+]
+
+{ #category : 'running' }
+VGFrameProfile >> withRendererClass: aRendererClass during: aBlock [
+	"Evaluate the block with that renderer class posed as the one Bloc measures text through,
+	 and with the font manager that renderer needs posed too. The two move together or one kit
+	 measures with faces it cannot draw: our renderers read the character map of a VGFontFace,
+	 the Cairo kit reads the FreeType handle of an AeFTFace, and the message sent to the wrong
+	 face is not understood inside the measuring process of Bloc, where no test sees it. The
+	 renderer class decides, in measureTextDuring:. Both are put back whatever happens, because
+	 both decide how the whole image draws."
+
+	| previous |
+	previous := BlHostRenderer preferableClass.
+	^ [ 
+	  BlHostRenderer preferableClass: aRendererClass.
+	  aRendererClass measureTextDuring: aBlock ]
+		ensure: [ BlHostRenderer preferableClass: previous ]
 ]

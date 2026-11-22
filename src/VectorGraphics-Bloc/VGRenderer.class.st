@@ -32,6 +32,15 @@ VGRenderer class >> label [
 	^ 'VectorGraphics'
 ]
 
+{ #category : 'testing' }
+VGRenderer class >> measuresTextWithFacesOfThisProject [
+	"I lay a string out in VGScaledFont, which reads the character map of a VGFontFace, so the
+	 manager posed while my text is measured has to be one that builds those faces. What to do
+	 about it is the font engine's, which is the only package that knows both kits."
+
+	^ true
+]
+
 { #category : 'host - api' }
 VGRenderer class >> newFormFrom: aBlElement [
 	"The inherited method sends `aeAsForm`, which names `AeCanvas` in its own source and cannot be
