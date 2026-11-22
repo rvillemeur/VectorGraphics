@@ -171,11 +171,11 @@ VGVulkanPresentRenderer >> releaseRecordingSurface [
 	recordingSurface := nil
 ]
 
-{ #category : 'rendering' }
+{ #category : 'frames' }
 VGVulkanPresentRenderer >> render: aHostSpace [
 	"A frame of a presenting window: the space drawn on the device and the result presented
-	 through the host space, where BARenderer locks a surface and draws on the processor. Any
-	 other host space is drawn by the inherited CPU frame, because
+	 through the host space, where BARenderer locks a surface and draws on the processor. A host
+	 space whose frames do not come from the device is drawn by the inherited CPU frame, because
 	 BlHostRenderer class >> availableClasses is self allSubclasses: I appear in Bloc's renderer
 	 setting and preferableClass can pick me for an ordinary window, which has to be drawn
 	 rather than refused.
@@ -185,8 +185,7 @@ VGVulkanPresentRenderer >> render: aHostSpace [
 	 counted too: the count is of frames this renderer took, not of frames the device drew."
 
 	| space |
-	(aHostSpace isKindOf: VGVulkanPresentHostSpace) ifFalse: [
-		^ super render: aHostSpace ].
+	aHostSpace presentsFramesOnDevice ifFalse: [ ^ super render: aHostSpace ].
 	self isValid ifFalse: [ ^ self ].
 	space := aHostSpace space.
 	space ifNil: [ ^ self ].

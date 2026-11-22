@@ -137,3 +137,11 @@ VGVulkanPresentHostSpace >> presentFrameFor: logicalDamagedRectangle scaleFactor
 
 	^ self presentChain presentFrameDuring: aBlock
 ]
+
+{ #category : 'frames' }
+VGVulkanPresentHostSpace >> presentsFramesOnDevice [
+	"True: my frames are computed on the device and copied into an image of my swapchain, and
+	 lockSurfaceFor:scaleFactor:during: refuses, so nothing of mine is drawn on the processor."
+
+	^ true
+]

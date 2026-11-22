@@ -190,3 +190,22 @@ VGVulkanPresentRendererTest >> testTheFrameOfASpaceReachesTheImageWithThePixelsT
 		description: 'too many pixels of the presented frame differ' ] ensure: [
 		hostSpace destroy ]
 ]
+
+{ #category : 'tests' }
+VGVulkanPresentRendererTest >> testThePresentHostSpaceIsTheOnlyOneThatSaysItsFramesComeFromTheDevice [
+	"The renderer asks the host space it is handed whether the frame is a device frame, rather
+	 than testing its class: BlHostRenderer class >> availableClasses is self allSubclasses, so
+	 this renderer appears in Bloc's renderer setting and can be picked for an ordinary window,
+	 which has to be drawn on the processor rather than refused. Every host space of the image
+	 answers the question, and the ones that answer yes are this host space and the stubs that
+	 stand in for it."
+
+	| onDevice |
+	onDevice := (BlHostSpace withAllSubclasses select: [ :each |
+		             each basicNew presentsFramesOnDevice ]) asArray.
+	self deny: onDevice isEmpty.
+	onDevice do: [ :each |
+		self assert: (each inheritsFrom: VGVulkanPresentHostSpace) | (each
+				 == VGVulkanPresentHostSpace) ].
+	self deny: BlHostSpace basicNew presentsFramesOnDevice
+]
