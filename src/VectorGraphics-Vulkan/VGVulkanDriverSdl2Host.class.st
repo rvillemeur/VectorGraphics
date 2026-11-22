@@ -44,7 +44,9 @@ VGVulkanDriverSdl2Host >> inspectorHost: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Host'>
 	"The rule I exist for, and what holds in the image at the moment the tab is drawn. Every row
 	 asks the live predicate rather than restating it, so the table cannot drift from the rule.
-	 Nothing here installs or registers anything: the driver and the registry are only read."
+	 Nothing here installs or registers anything: the driver and the registry are only read.
+	 The registry answers `preferredHost`; it has no `defaultHost`, which this row sent until
+	 the view test caught it."
 
 	^ aBuilder newTable
 		  items: {
@@ -53,7 +55,7 @@ VGVulkanDriverSdl2Host >> inspectorHost: aBuilder [
 				  ('I am supported now' -> self class isSupported).
 				  ('Bloc''s own SDL2 host supported now' -> BlOSWindowSDL2Host isSupported).
 				  ('Host a space would find now'
-				   -> (BlHostRegistry default defaultHost ifNotNil: [ :each | each class ])).
+				   -> (BlHostRegistry default preferredHost ifNotNil: [ :each | each class ])).
 				  ('Spaces open on me' -> self spaces size) };
 		  addColumn: (SpStringTableColumn
 				   title: 'Property'

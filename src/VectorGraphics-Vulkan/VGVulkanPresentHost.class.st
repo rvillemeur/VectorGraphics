@@ -58,7 +58,9 @@ VGVulkanPresentHost >> inspectorPresentHost: aBuilder [
 	 `VGVulkanDriverSdl2Host` answers, and under that driver with me enabled I answer. The
 	 registry sorts by `order` alone and all three answer 10, so exactly one of the three rows
 	 may be true at a time. Nothing here installs, enables or registers anything; the renderer
-	 row builds a renderer and drops it."
+	 row builds a renderer and drops it.
+	 The registry answers `preferredHost`; it has no `defaultHost`, which this row sent until
+	 the view test caught it."
 
 	^ aBuilder newTable
 		  items: {
@@ -69,7 +71,7 @@ VGVulkanPresentHost >> inspectorPresentHost: aBuilder [
 				   -> VGVulkanDriverSdl2Host isSupported).
 				  ('Bloc''s own SDL2 host supported now' -> BlOSWindowSDL2Host isSupported).
 				  ('Host a space would find now'
-				   -> (BlHostRegistry default defaultHost ifNotNil: [ :each | each class ])).
+				   -> (BlHostRegistry default preferredHost ifNotNil: [ :each | each class ])).
 				  ('Renderer I build' -> self newHostRenderer class).
 				  ('Spaces open on me' -> self spaces size) };
 		  addColumn: (SpStringTableColumn
