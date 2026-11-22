@@ -790,6 +790,24 @@ VGArchitectureTest >> testEveryPackageOfThisProjectIsScannedByOneOfMyTests [
 		equals: self class projectPackageNames asSortedCollection asArray
 ]
 
+{ #category : 'tests - hierarchy' }
+VGArchitectureTest >> testNoBackendOutsideAProductionPackageIsACandidateForSelection [
+	"VGBackend class >> candidateClasses finds candidates by reflection over the subclasses, so
+	 a fixture that subclasses a real backend and forgets to refuse is ranked with the real
+	 ones and chosen for every surface of the image — which happened during unit 7.4 of
+	 VECTORCANVAS-PRESENT-PLAN.md, where a cleared rejection set left VGFailingDispatchBackendStub
+	 preferred, a stub that fails every frame. Every backend a test or an example package
+	 defines answers false to isCandidate, and this holds the next one to it."
+
+	| offenders |
+	offenders := OrderedCollection new.
+	VGBackend allSubclasses do: [ :each |
+		((self class isProductionPackageNamed: each package name) not and: [
+			 each isCandidate ]) ifTrue: [
+			offenders add: each package name , ': ' , each name ] ].
+	self assert: offenders asSortedCollection asArray equals: #(  )
+]
+
 { #category : 'tests - groups' }
 VGArchitectureTest >> testNoClassOfTheCanvasExampleAndTestGroupsInheritsFromBloc [
 	"The six canvas example and test groups install in an image with no Bloc, which the literal
