@@ -39,19 +39,24 @@ VGFontManagerTest >> testADirectoryScanReadsEveryFileAndJudgesItByItsContent [
 VGFontManagerTest >> testAFaceIsBuiltOnceForAnEntryAndNoFreeTypeFaceIsBuiltAtAll [
 	"The face a consumer draws with is ours, read from the entry's own bytes, and kept for the
 	 session: asking twice answers the same object rather than parsing the font again. No
-	 FreeType face is built on the way, which is the whole point of this plan."
+	 FreeType face is built on the way, which is the whole point of this plan.
+	 The faces standing before are held by identity rather than counted. A count says the same
+	 thing only while nothing else runs: garbage collection reaps an AeFTFace nobody holds
+	 between the two reads, and the test then reports fewer faces than it started with, which
+	 looks like a failure of what it states and is not one."
 
-	| manager entry first second faceCount |
+	| manager entry first second faces |
 	manager := VGFontManager new.
 	entry := manager registerFacesOnMemory:
 		         AeSourceSansPro_Regular fontContentsData.
-	faceCount := AeFTFace allInstances size.
+	faces := AeFTFace allInstances asIdentitySet.
 	first := manager faceAt: entry.
 	second := manager faceAt: entry.
 	self assert: first class equals: VGFontFace.
 	self assert: first identicalTo: second.
 	self assert: first familyName equals: 'Source Sans Pro'.
-	self assert: AeFTFace allInstances size equals: faceCount
+	self assert:
+		(AeFTFace allInstances allSatisfy: [ :each | faces includes: each ])
 ]
 
 { #category : 'tests' }
