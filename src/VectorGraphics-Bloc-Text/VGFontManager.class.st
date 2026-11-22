@@ -417,13 +417,18 @@ VGFontManager >> inspectorState: aBuilder [
 	 slot upstream keeps its index in, which stays empty for ever. The three file rows
 	 reconcile: every file met is either an entry registered or a file rejected.
 	 Every row asks through an accessor, so a manager left over from a dead session shows what
-	 it would answer now, rebuilt, rather than what it held then."
+	 it would answer now, rebuilt, rather than what it held then. The row beside the session
+	 says which rebuilding that is: a manager built from the machine's fonts meets them again,
+	 one filled by hand comes back empty, and a reader looking at an empty table wants to know
+	 which of the two he has."
 
 	| cache |
 	cache := self faceByEntryCache.
 	^ aBuilder newTable
 		  items: {
 				  ('Session' -> session).
+				  ('Rebuilds from default directories'
+				   -> self rebuildsFromDefaultDirectories).
 				  ('FreeType library' -> self freetypeLibrary).
 				  ('Face cache' -> cache class).
 				  ('Faces kept' -> cache size).
