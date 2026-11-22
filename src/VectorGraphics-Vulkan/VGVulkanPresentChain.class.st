@@ -80,6 +80,22 @@ VGVulkanPresentChain class >> verifySurface: aSurface presentsOnQueueFamily: aQu
 		, ' cannot present on this surface'
 ]
 
+{ #category : 'format' }
+VGVulkanPresentChain class >> verifySurfaceAcceptsACopy: aSurface [
+	"Refuse a surface whose images cannot be copied into. The frame of a presenting window is
+	 computed in a buffer on the device and copied into the image that was acquired, so a
+	 swapchain of this project asks for the transfer destination usage; a surface that does not
+	 allow it fails creation inside the driver, and this says so first and names what it allows."
+
+	| allowed |
+	allowed := aSurface capabilities supportedUsageFlags.
+	(allowed bitAnd: VkSwapchain imageUsage) = VkSwapchain imageUsage ifTrue: [
+		^ self ].
+	self error: 'A presenting surface must allow the image usage '
+		, VkSwapchain imageUsage printString , ', and this surface allows '
+		, allowed printString
+]
+
 { #category : 'accessing' }
 VGVulkanPresentChain >> backendWindow [
 	^ backendWindow
@@ -181,10 +197,11 @@ VGVulkanPresentChain >> initialize [
 VGVulkanPresentChain >> initializeContext: aVkContext backendWindow: aVulkanBackendWindow [
 	"In the order partsInCreationOrder states, which destruction reads backwards. The extent
 	 is the drawable SDL answers for a Vulkan window and never the window's logical size: on a
-	 scaled display the two differ, and the swapchain's images are the drawable's pixels. Both
-	 refusals happen as soon as the driver has answered: a surface that offers another format
-	 would present swapped channels, and a queue family that cannot present would swallow
-	 every frame."
+	 scaled display the two differ, and the swapchain's images are the drawable's pixels. The
+	 three refusals happen as soon as the driver has answered: a surface that offers another
+	 format would present swapped channels, a queue family that cannot present would swallow
+	 every frame, and images that take no copy would leave the frame in the buffer the device
+	 computed it in."
 
 	context := aVkContext.
 	backendWindow := aVulkanBackendWindow.
@@ -195,6 +212,7 @@ VGVulkanPresentChain >> initializeContext: aVkContext backendWindow: aVulkanBack
 	self class
 		verifySurface: surface
 		presentsOnQueueFamily: context computeQueueFamily.
+	self class verifySurfaceAcceptsACopy: surface.
 	swapchain := VkSwapchain
 		             on: context device
 		             surface: surface

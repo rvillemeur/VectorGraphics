@@ -82,6 +82,26 @@ VGVulkanPresentChainTest >> testAQueueFamilyThatCannotPresentOnTheSurfaceIsRefus
 	self assert: (message includesSubstring: '7')
 ]
 
+{ #category : 'tests - format' }
+VGVulkanPresentChainTest >> testASurfaceThatCannotTakeACopyIntoItsImagesIsRefused [
+	"The frame of a presenting window is computed in a buffer and copied into the image that was
+	 acquired, so a surface whose images refuse the transfer destination usage cannot show one.
+	 Refused where the format and the queue family are refused, with both bitmasks in the message:
+	 what this project needs, and what the surface does allow."
+
+	| message |
+	message := [
+	           VGVulkanPresentChain verifySurfaceAcceptsACopy:
+		           VGCopylessSurfaceStub new.
+	           nil ]
+		           on: Error
+		           do: [ :error | error messageText ].
+	self assert: message isNotNil.
+	self assert: (message includesSubstring: VkSwapchain imageUsage printString).
+	self assert:
+		(message includesSubstring: VkImageUsage colorAttachmentBit printString)
+]
+
 { #category : 'tests - waiting' }
 VGVulkanPresentChainTest >> testEveryWaitOfAPresentedFrameIsBounded [
 	"On 4 November a present loop with two unbounded waits in it froze this image for minutes:
