@@ -60,11 +60,12 @@ VGTiledFillKernelTest >> classesNamedBy: aMethod [
 { #category : 'private' }
 VGTiledFillKernelTest >> kernelDecorationLiterals: aDecoration [
 	"Every literal that decoration carries in the kernel's module, read from the module's own
-	 decoration instructions and not from the bytes."
+	 decoration instructions and not from the bytes. A decoration is an SpvDecorate, which
+	 answers its target, its decoration and its literals; this read used to index it as an
+	 array and broke the day the module stopped holding them that way."
 
 	^ ((VGTiledFillKernel default module decorations select: [ :each |
-		    (each first = #decorate and: [ each third = aDecoration ]) ]) collect: [
-		   :each | each fourth ]) flattened
+		    each decoration = aDecoration ]) collect: [ :each | each literals ]) flattened
 ]
 
 { #category : 'private' }
@@ -234,9 +235,9 @@ VGTiledFillKernelTest >> testTheBlocksOfAWorkgroupFitTheSharedMemoryEveryDeviceG
 
 { #category : 'tests' }
 VGTiledFillKernelTest >> testTheKernelBindsOneBufferForEveryBufferItReads [
-	"The seven buffers of the binding contract: the five VGTiledFillEncoding writes, the target
-	 pixels and the size of the frame. They stand at one descriptor set, numbered from zero in
-	 the order bindingNames holds them."
+	"The fourteen buffers of the binding contract: the twelve VGTiledFillEncoding writes, the
+	 target pixels and the size of the frame. They stand at one descriptor set, numbered from
+	 zero in the order bindingNames holds them."
 
 	self
 		assert: (self kernelValidator variableIdsInStorageClass:

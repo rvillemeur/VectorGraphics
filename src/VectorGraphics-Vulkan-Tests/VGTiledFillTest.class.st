@@ -43,6 +43,19 @@ VGTiledFillTest class >> gradientFrameCount [
 	^ 15
 ]
 
+{ #category : 'accessing' }
+VGTiledFillTest >> defaultTimeLimit [
+	"Six tests here run the corpus or the gradient fixture on the device and draw each case
+	 again in software to compare the bytes. On this machine the slowest costs 7.5 s against the
+	 ten seconds SUnit allows a test, which is headroom an image that has been working for hours
+	 does not have: a full run reported TestTookTooMuchTime on
+	 testEveryFillCaseOfTheCorpusDrawsTheSameBytesFromTheBuffersAsFromItsOwnEntries while the
+	 same test passes alone in 6.7 s. The timeout carries no message and no stack, and only the
+	 managed runner raises it, so without this the red reads as transient."
+
+	^ 2 minutes
+]
+
 { #category : 'fixtures' }
 VGTiledFillTest >> fillCasesDo: aBlock [
 	"Every case the subset draws that records no blit, with the block that draws it. The count is
