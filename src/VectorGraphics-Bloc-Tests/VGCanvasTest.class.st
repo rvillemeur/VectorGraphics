@@ -58,6 +58,22 @@ VGCanvasTest >> scaledFontOfTheFixture [
 		  options: VGFontOptions new
 ]
 
+{ #category : 'tests' }
+VGCanvasTest >> testAFrameElementRefusesACanvasThatBuildsNoneOfOurDrawingContexts [
+	"A frame block is written against the drawing context of this project, and a canvas of
+	 Alexandrie's own builds one of Alexandrie's instead: a few selectors overlap and the rest
+	 fail inside Cairo marshalling, far from the cause. The element has to say so itself."
+
+	| element |
+	element := VGDrawnFrameElement drawing: [ :context | context fill ].
+	self
+		should: [ element aeDrawGeometryOn: (AeCanvas extent: 8 @ 8) ]
+		raise: Error
+		withExceptionDo: [ :error |
+			self deny: (error isKindOf: MessageNotUnderstood).
+			self assert: (error messageText includesSubstring: 'VGCanvas') ]
+]
+
 { #category : 'tests - overrides' }
 VGCanvasTest >> testALinearGradientSourceIsOurOwnPattern [
 	"Bloc asks the canvas for a linear gradient by handing it offset to colour associations. The

@@ -51,11 +51,17 @@ VGDrawnFrameElement >> aeDrawGeometryOn: aeCanvas [
 	 same display list as everything else of the space, in the order the elements are drawn.
 	 Nothing of mine reaches the canvas's own state either, which is why no save is needed.
 	 A frame larger than my extent is not clipped to me, because a context of its own carries
-	 none of the clip the canvas prepared."
+	 none of the clip the canvas prepared.
+	 A surface that builds none of this project's contexts is refused here. My frame would
+	 otherwise meet Alexandrie's own context, where a few selectors overlap by coincidence and
+	 the rest fail deep inside Cairo marshalling, saying nothing about the cause."
 
 	super aeDrawGeometryOn: aeCanvas.
 	drawBlock ifNil: [ ^ self ].
-	drawBlock value: aeCanvas privateAeCairoSurface newContext
+	drawBlock value: (aeCanvas privateAeCairoSurface newVectorGraphicsContextOrNil
+			 ifNil: [
+				 self error:
+					 'A frame of mine draws through a drawing context of this project, which only the surface of a VGCanvas builds.' ])
 ]
 
 { #category : 'accessing' }

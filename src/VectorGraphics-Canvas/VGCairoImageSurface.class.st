@@ -348,6 +348,15 @@ VGCairoImageSurface >> newSimilarImageFormat: aFormat width: aWidth height: aHei
 	^ self class newFormat: aFormat extent: aWidth @ aHeight
 ]
 
+{ #category : 'instance creation' }
+VGCairoImageSurface >> newVectorGraphicsContextOrNil [
+	"A drawing context of this project, which is what my own newContext answers. The selector
+	 exists so that a drawing written against that context can ask a surface for one instead of
+	 testing its class: a surface of Alexandrie's own answers nil to the same question."
+
+	^ self newContext
+]
+
 { #category : 'pixels' }
 VGCairoImageSurface >> offsetOfX: x y: y [
 	^ y * stride + (x * format bytesPerPixel)
