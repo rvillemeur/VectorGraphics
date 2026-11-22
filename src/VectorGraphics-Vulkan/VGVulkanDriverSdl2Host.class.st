@@ -10,6 +10,8 @@ I add nothing else. The attributes, the host space and the renderer are the ones
 Class {
 	#name : 'VGVulkanDriverSdl2Host',
 	#superclass : 'BlOSWindowSDL2Host',
+	#traits : 'TBlSingletonHost',
+	#classTraits : 'TBlSingletonHost classTrait',
 	#category : 'VectorGraphics-Vulkan-Backend',
 	#package : 'VectorGraphics-Vulkan',
 	#tag : 'Backend'
