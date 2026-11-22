@@ -62,11 +62,18 @@ VGFontEngine class >> install [
 	 What was in place is remembered first, so uninstall can give the image back rather than
 	 name a route of its own; a second send leaves that memory alone, the state it would
 	 remember being the one this class posed.
+	 A renderer of mine already posed is remembered as nothing rather than as itself. The
+	 question isInstalled asks is an and of both halves, so an image holding my renderer with
+	 no manager of mine — what upstream's resetGlobalInstance leaves — reaches this line, and
+	 remembering VGAeRenderer there would make uninstall pose the route it is taking away.
+	 Nil is the honest memory: upstream picks a renderer from availableClasses when its slot
+	 is nil, which is the state an image that never met this project is in.
 	 Both offscreens are reset because each caches an AeCanvas whose faces were resolved
 	 through whichever manager was posed when it was built."
 
 	self isInstalled ifFalse: [
 		previousRenderer := BlHostRenderer preferableClass.
+		previousRenderer == VGAeRenderer ifTrue: [ previousRenderer := nil ].
 		previousManager := VGFontManager managerUpstreamHolds ].
 	VGFontManager installGlobally.
 	BlHostRenderer preferableClass: VGAeRenderer.

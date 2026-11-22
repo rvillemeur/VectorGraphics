@@ -15,7 +15,8 @@ Class {
 	#name : 'VGFontManager',
 	#superclass : 'AeFontManager',
 	#instVars : [
-		'catalogue'
+		'catalogue',
+		'rebuildsFromDefaultDirectories'
 	],
 	#classInstVars : [
 		'installedInstance'
@@ -143,15 +144,13 @@ VGFontManager class >> newWithDefaultFaces [
 	 with Alexandrie's FreeType packages out of the image.
 	 Each default is the first family of a preference list that the machine holds, and a
 	 machine that holds none of them is an error rather than a nil default: a nil comes back
-	 from BAFontConverter >> faceFor: and breaks in the drawing instead of here."
-	| manager |
-	manager := self new.
-	manager scanDefaultDirectories.
-	manager defaultFace: (manager defaultFaceOfFirstFamilyNamedIn:
-			 self preferredTextFamilyNames).
-	manager defaultCodeFace: (manager defaultFaceOfFirstFamilyNamedIn:
-			 self preferredCodeFamilyNames).
-	^ manager
+	 from BAFontConverter >> faceFor: and breaks in the drawing instead of here.
+	 The scan and the pair are one send of the manager's own, because it must do them again
+	 whenever a new session resets it."
+
+	^ self new
+		  scanDefaultDirectoriesAndChooseDefaultFaces;
+		  yourself
 ]
 
 { #category : 'defaults' }
@@ -323,6 +322,18 @@ VGFontManager >> includesFamilyName: aString [
 	^ self catalogue includesFamilyNamed: aString
 ]
 
+{ #category : 'initialization' }
+VGFontManager >> initialize [
+	"A manager filled by hand until somebody says otherwise: a new session then resets me to
+	 nothing, which is what a registered face deserves, nobody here knowing how to register it
+	 again. The slot is written after super initialize because that is what runs reset, and
+	 reset reads this policy before this line could have set it — which is why the reader
+	 answers false for nil."
+
+	super initialize.
+	rebuildsFromDefaultDirectories := false
+]
+
 { #category : 'inspecting' }
 VGFontManager >> inspectionFaces: aBuilder [
 	<inspectorPresentationOrder: 1 title: 'Faces'>
@@ -438,6 +449,15 @@ VGFontManager >> inspectorStateContext: aContext [
 	aContext active: true
 ]
 
+{ #category : 'accessing' }
+VGFontManager >> rebuildsFromDefaultDirectories [
+	"Whether I was built from the fonts this machine has installed, and so must meet them
+	 again when a new session resets me. Read through here rather than from the slot because
+	 reset runs from initialize, before any writer of mine could have set it."
+
+	^ rebuildsFromDefaultDirectories ifNil: [ false ]
+]
+
 { #category : 'registering' }
 VGFontManager >> registerFacesOnFile: aFileReference [
 	"Meet the face of one file. The catalogue reads its metadata off the stream, a few hundred
@@ -471,22 +491,24 @@ VGFontManager >> rejectedFiles [
 { #category : 'initialization' }
 VGFontManager >> reset [
 	"The state a session owns, built without a foreign library. Three slots differ from upstream.
-
 	 freetypeLibrary stays nil: there is no FreeType to initialise, and nothing here owns a
 	 handle that would have to be released. A catalogue reads the fonts instead, and it is mine
 	 for the session, as 1.4 of the font plan decided: no singleton and no global catalogue.
-
 	 faceByEntryCache is a plain Dictionary where upstream keeps an LRUCache capped at twenty
 	 faces. Upstream has to cap, because what it caches is an AeFTFace, a handle; what is cached
 	 here is a VGFontFace, parsed tables and a glyph memo in object memory, which costs to read
 	 again and nothing to let go of. So a face is kept for the session rather than evicted.
-
 	 entriesByFamilyName stays empty: the catalogue holds the only index, and the four inherited
 	 readers of this slot are overridden to read it. The slot cannot be removed, since it is
 	 upstream's.
-
 	 session is set because checkSession resets whenever it differs, and would reset forever if
-	 this method left it alone."
+	 this method left it alone. It is set first, before the scan below reads an accessor that
+	 checks it again.
+	 A manager built from the machine's fonts meets them again here. The catalogue a reset
+	 builds is empty and both defaults are nil, and nothing else ever scans: without this an
+	 image restart hands back a manager that answers no family at all, and the drawing breaks
+	 on a nil default in BAFontConverter >> faceFor: rather than here. The scan is roughly half
+	 a second, paid once a session by the first reader."
 
 	session := Smalltalk session.
 	entriesByFamilyName := Dictionary new.
@@ -494,7 +516,9 @@ VGFontManager >> reset [
 	defaultCodeFace := nil.
 	freetypeLibrary := nil.
 	faceByEntryCache := Dictionary new.
-	catalogue := TTFontCatalogue new
+	catalogue := TTFontCatalogue new.
+	self rebuildsFromDefaultDirectories ifTrue: [
+		self scanDefaultDirectoriesAndChooseDefaultFaces ]
 ]
 
 { #category : 'scanning' }
@@ -503,6 +527,24 @@ VGFontManager >> scanDefaultDirectories [
 	 a platform keeps them. A directory that does not exist is passed over."
 
 	^ self catalogue scanDefaultDirectories
+]
+
+{ #category : 'scanning' }
+VGFontManager >> scanDefaultDirectoriesAndChooseDefaultFaces [
+	"Meet every font this machine has installed and pick the two faces Bloc falls back on when
+	 a text names a family nobody holds, one for text and one for code. The pair is what makes
+	 a manager ready to draw, which is why one send does both.
+	 Remembered as the way I was built, so a new session can do it again: reset drops the
+	 catalogue and both defaults, and a manager that answered for the machine before an image
+	 restart must answer for it after. A manager somebody filled by hand is not rebuilt, since
+	 nothing here knows what was registered into it."
+
+	rebuildsFromDefaultDirectories := true.
+	self scanDefaultDirectories.
+	self defaultFace:
+		(self defaultFaceOfFirstFamilyNamedIn: self class preferredTextFamilyNames).
+	self defaultCodeFace:
+		(self defaultFaceOfFirstFamilyNamedIn: self class preferredCodeFamilyNames)
 ]
 
 { #category : 'scanning' }

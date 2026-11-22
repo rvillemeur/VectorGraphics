@@ -68,6 +68,22 @@ VGFontManagerTest >> testAFreshManagerOwnsNoFreeTypeLibraryAndHoldsAPermanentFac
 ]
 
 { #category : 'tests' }
+VGFontManagerTest >> testAManagerBuiltWithDefaultFacesScansAgainWhenTheSessionChanges [
+	"Reproduces a defect. reset builds an empty catalogue and nils both defaults, and nothing
+	 ever scans again, so the manager an image restart hands back has met no font at all. The
+	 drawing then breaks in BAFontConverter >> faceFor: on a nil default rather than here.
+	 A manager built by hand keeps answering empty, which the test above this one states: what
+	 is rebuilt is the scan the manager was built with, not faces somebody registered."
+
+	| manager |
+	manager := VGFontManager newWithDefaultFaces.
+	manager instVarNamed: 'session' put: Object new.
+	self deny: manager familyNames isEmpty.
+	self assert: manager defaultFace notNil.
+	self assert: manager defaultCodeFace notNil
+]
+
+{ #category : 'tests' }
 VGFontManagerTest >> testAManagerBuiltWithTheDefaultFacesDrawsTheMachineFamiliesWithoutFreeType [
 	"The manager a consumer can draw with straight away: every family this machine has
 	 installed, and a face for text and a face for code chosen among them. Upstream builds the

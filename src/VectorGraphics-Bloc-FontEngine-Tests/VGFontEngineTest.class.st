@@ -124,6 +124,26 @@ VGFontEngineTest >> testInstallingPosesTheCairoRouteWithOurFonts [
 ]
 
 { #category : 'tests' }
+VGFontEngineTest >> testInstallingWhileOnlyMyRendererIsPosedLetsUninstallTakeTheRouteAway [
+	"Reproduces a defect. install remembers what came before whenever isInstalled answers
+	 false, and that question is an and of two slots: the renderer and the manager. An image
+	 with my renderer posed but no manager of mine — what upstream's own resetGlobalInstance
+	 leaves behind — answers false, so install remembers VGAeRenderer as the renderer that
+	 came before and uninstall poses it again. The route can then never be taken away.
+	 A renderer of mine is not a route to give back, so nothing is what must be remembered:
+	 upstream picks a renderer lazily from availableClasses when its slot is nil, which is the
+	 state an image that never met this project is in."
+
+	BlHostRenderer preferableClass: VGAeRenderer.
+	VGFontManager uninstallGlobally.
+	self deny: VGFontEngine isInstalled.
+	VGFontEngine install.
+	VGFontEngine uninstall.
+	self deny: BlHostRenderer preferableClass identicalTo: VGAeRenderer.
+	self deny: VGFontEngine isInstalled
+]
+
+{ #category : 'tests' }
 VGFontEngineTest >> testNoFaceOfFreeTypeIsResolvedOnceTheRouteIsPosed [
 	"The point of the engine: with the route posed, nothing a drawing asks for answers a face of
 	 FreeType, neither a family the catalogue holds nor one it does not — an unknown family is
