@@ -237,19 +237,21 @@ VGVulkanPresentChainTest >> testTheQueueTheChainPresentsOnCanPresentOnItsSurface
 			(chain surface supportsPresentation: chain context computeQueueFamily) ]
 ]
 
-{ #category : 'tests - frames' }
+{ #category : 'tests' }
 VGVulkanPresentChainTest >> testThirtyFramesPresentInSequenceAndTheImageIndexCyclesThroughTheImageCount [
 	"The whole of this unit, measured on the one thing a presented frame answers: the index of
 	 the image it went into. Thirty frames of a swapchain of two or three images must visit
 	 every index and nothing beyond, and the block the chain evaluates is handed the image of
-	 that index, which is what unit 7.4 draws into."
+	 that index and answers nil, which is the frame with nothing to draw that the chain clears."
+
 	self withChainDo: [ :chain |
 		| indexes imagesSeen |
 		indexes := OrderedCollection new.
 		imagesSeen := OrderedCollection new.
 		self class presentedFrameCount timesRepeat: [
 			indexes add: (chain presentFrameDuring: [ :image |
-					 imagesSeen add: image ]) ].
+					 imagesSeen add: image.
+					 nil ]) ].
 		self assert: indexes size equals: self class presentedFrameCount.
 		self assert: imagesSeen size equals: self class presentedFrameCount.
 		self

@@ -132,6 +132,25 @@ VGTiledFrameTestCase >> encodingOfExtent: anExtent drawnWith: aBlock [
 	^ encoding
 ]
 
+{ #category : 'fixtures' }
+VGTiledFrameTestCase >> formOfImage: anImage [
+	"The picture that image holds, read back through a surface of the format a frame is encoded
+	 for so that it can be held against the software backend's own Form."
+
+	| surface pixels rowBytes |
+	surface := VGCairoImageSurface extent: anImage extent.
+	pixels := self pixelsOfImage: anImage.
+	rowBytes := anImage extent x
+	            * VGTiledFillEncoding targetFormat bytesPerPixel.
+	0 to: anImage extent y - 1 do: [ :row |
+		surface data
+			replaceFrom: row * surface stride + 1
+			to: row * surface stride + rowBytes
+			with: pixels
+			startingAt: row * rowBytes + 1 ].
+	^ surface asForm
+]
+
 { #category : 'private' }
 VGTiledFrameTestCase >> hasDevice [
 	"Whether a device on this machine computes, asked of the session that holds it. A test of mine
@@ -139,6 +158,19 @@ VGTiledFrameTestCase >> hasDevice [
 	 compare and that is not a failure."
 
 	^ VGVulkanDeviceSession default contextOrNil isNotNil
+]
+
+{ #category : 'fixtures' }
+VGTiledFrameTestCase >> imageOfExtent: anExtent [
+	"An image on the session's own device, of the format a frame is encoded for and usable as
+	 both ends of a copy: the frame writes into it and I read it back out of it."
+
+	^ VkImage
+		  on: VGVulkanDeviceSession default context device
+		  format: VkFormat b8g8r8a8Unorm
+		  extent: anExtent
+		  usage:
+		  (VkImageUsage transferDstBit bitOr: VkImageUsage transferSrcBit)
 ]
 
 { #category : 'fixtures' }
@@ -162,6 +194,41 @@ VGTiledFrameTestCase >> mixedFillFrame [
 		  setOperatorClear;
 		  circleCenterX: 42 y: 42 radius: 10.25;
 		  fill ]
+]
+
+{ #category : 'fixtures' }
+VGTiledFrameTestCase >> pixelsOfImage: anImage [
+	"The pixels of that image in host memory, packed row after row with no padding, which is
+	 how the kernel wrote them into the target buffer and how the oracle reads them. The image
+	 is moved to the layout a copy reads from and left there: nothing of mine looks at it
+	 again, and the frame that wrote it transitions it for itself."
+
+	| context pool answer buffer |
+	context := VGVulkanDeviceSession default context.
+	answer := ByteArray new:
+		          anImage extent x * anImage extent y
+		          * VGTiledFillEncoding targetFormat bytesPerPixel.
+	buffer := VkBuffer
+		          on: context device
+		          size: answer size
+		          usage: VkBufferUsage transferDstBit.
+	pool := context device createCommandPool: context computeQueueFamily.
+	[
+	| command |
+	command := pool allocateBuffer.
+	command do: [ :recorder |
+		anImage transitionTo: VkImageLayout transferSrcOptimal in: recorder.
+		recorder
+			copyImage: anImage
+			layout: VkImageLayout transferSrcOptimal
+			toBuffer: buffer
+			extent: anImage extent.
+		recorder barrierForHostRead ].
+	context computeQueue submit: command andWait: true.
+	answer := buffer copyToByteArray ] ensure: [
+		buffer destroy.
+		pool destroy ].
+	^ answer
 ]
 
 { #category : 'fixtures' }

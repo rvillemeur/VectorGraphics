@@ -118,7 +118,9 @@ VGVulkanPresentHostTest >> testMyHostSpacePresentsFramesThatCycleThroughItsSwapc
 			indexes add: (hostSpace
 					 presentFrameFor: (0 @ 0 extent: chain extent)
 					 scaleFactor: 1
-					 during: [ :image | imagesSeen add: image ]) ].
+					 during: [ :image |
+						 imagesSeen add: image.
+						 nil ]) ].
 		self assert: imagesSeen size equals: indexes size.
 		self
 			assert: indexes asSet asSortedCollection asArray

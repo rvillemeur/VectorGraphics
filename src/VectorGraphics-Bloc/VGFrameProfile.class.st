@@ -158,6 +158,7 @@ VGFrameProfile class >> stageByPackageAndTag [
 			  ('VectorGraphics-Canvas/Context' -> #canvasApi).
 			  ('VectorGraphics-Canvas/Skeleton' -> #canvasApi).
 			  ('VectorGraphics-Bloc/Backend' -> #canvasApi).
+			  ('VectorGraphics-Bloc/Elements' -> #canvasApi).
 			  ('VectorGraphics-Canvas-Geometry/Matrix' -> #transforms).
 			  ('VectorGraphics-Canvas-Geometry/Path' -> #pathAndStroke).
 			  ('VectorGraphics-Canvas-Raster/Path' -> #pathAndStroke).

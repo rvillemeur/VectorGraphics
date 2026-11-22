@@ -57,6 +57,15 @@ VGVulkanPresentChain class >> onContext: aVkContext backendWindow: aVulkanBacken
 	^ chain
 ]
 
+{ #category : 'constants' }
+VGVulkanPresentChain class >> presentedLayout [
+	"The layout the presentation engine takes an image in, which is the layout every frame of
+	 this chain leaves it in: the render pass of an empty frame ends there by itself, and a
+	 frame copied into the image is transitioned there after the copy."
+
+	^ VkImageLayout presentSrcKHR
+]
+
 { #category : 'format' }
 VGVulkanPresentChain class >> verifyFormat: aFormat [
 	"The format a swapchain really came back with, against the one this project renders in.
@@ -330,29 +339,45 @@ VGVulkanPresentChain >> partsInDestructionOrder [
 { #category : 'presenting' }
 VGVulkanPresentChain >> presentFrameDuring: aBlock [
 	"One frame: wait for the previous one, acquire an image, hand that image to the block,
-	 clear it, submit and present. Answers the index of the image presented, which is what
-	 says the cycle is a cycle, and keeps it in presentedIndexes. Both waits are bounded by
-	 frameTimeoutNanoseconds; neither may be unbounded, since both run inside a plain uFFI
-	 call that stops the whole virtual machine while it waits. The clear is a render pass
-	 because the pass this chain builds is the one that leaves the image in presentSrcKHR, and
-	 the pass is closed here: a command buffer's end does not close it."
+	 record what the block's answer says, submit and present. Answers the index of the image
+	 presented, which is what says the cycle is a cycle, and keeps it in presentedIndexes.
+	 Both waits are bounded by frameTimeoutNanoseconds; neither may be unbounded, since both
+	 run inside a plain uFFI call that stops the whole virtual machine while it waits.
+	 The acquired image is declared undefined before the block sees it: the presentation engine
+	 guarantees nothing of what the last frame left there, so a transition from undefined is
+	 both honest and the cheapest one.
+	 The block answers the dispatch holding the frame it computed, or nil for a frame it has
+	 nothing to draw. A dispatch is copied into the image and the image transitioned to the
+	 layout the presentation engine takes; nil is cleared through the render pass this chain
+	 builds, which is the pass that leaves the image in that layout by itself. The pass is
+	 closed here: a command buffer's end does not close it. Either way one submission waits on
+	 imageAvailable and signals renderFinished, because the presentation engine waits on that
+	 one semaphore and a second submission would race it."
 
-	| imageIndex |
+	| imageIndex image dispatch |
 	fence waitTimeout: self class frameTimeoutNanoseconds.
 	fence reset.
 	imageIndex := swapchain
 		              acquireNextImage: imageAvailable handle
 		              fence: ExternalAddress null
 		              timeout: self class frameTimeoutNanoseconds.
-	aBlock value: (swapchain images at: imageIndex + 1).
+	image := swapchain images at: imageIndex + 1.
+	image declareLayoutUndefined.
+	dispatch := aBlock value: image.
 	commandPool reset.
 	commandBuffer do: [ :recorder |
-		recorder
-			beginRenderPass: renderPass
-			framebuffer: (framebuffers at: imageIndex + 1)
-			extent: self extent
-			clearColor: VkRenderConfig clearColorBlackOpaque.
-		recorder endRenderPass ].
+		dispatch
+			ifNil: [
+				recorder
+					beginRenderPass: renderPass
+					framebuffer: (framebuffers at: imageIndex + 1)
+					extent: self extent
+					clearColor: VkRenderConfig clearColorBlackOpaque.
+				recorder endRenderPass.
+				image declareLayout: self class presentedLayout ]
+			ifNotNil: [
+				dispatch recordCopyInto: image in: recorder.
+				image transitionTo: self class presentedLayout in: recorder ] ].
 	context computeQueue
 		submitGraphics: commandBuffer
 		waitSemaphore: imageAvailable

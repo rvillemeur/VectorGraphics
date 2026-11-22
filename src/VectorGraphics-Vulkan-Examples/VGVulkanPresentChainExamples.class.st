@@ -48,7 +48,7 @@ VGVulkanPresentChainExamples class >> openWindowAndPresentFrames [
 			           backendWindow: backendWindow.
 		  [
 		  self presentedFrameCount timesRepeat: [
-			  chain presentFrameDuring: [ :image | image ] ].
+			  chain presentFrameDuring: [ :image | nil ] ].
 		  chain ] ensure: [ chain destroy ] ] ensure: [ context destroy ] ]
 			  ensure: [ window destroy ] ]
 ]
