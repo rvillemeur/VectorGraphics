@@ -18,6 +18,14 @@ Class {
 	#tag : 'Fixtures'
 }
 
+{ #category : 'selection' }
+VGFailingDispatchBackendStub class >> isCandidate [
+	"No. I fail every frame handed to me, and selection reads VGBackend withAllSubclasses, so a
+	 candidate of mine would be probed for real windows of this image."
+
+	^ false
+]
+
 { #category : 'accessing' }
 VGFailingDispatchBackendStub >> dispatchAttempts [
 	"How many times a frame recorded on me was asked for its dispatch. One is all a presenting

@@ -31,6 +31,15 @@ VGDrawnFrameElement class >> drawing: aBlock [
 		  yourself
 ]
 
+{ #category : 'constants' }
+VGDrawnFrameElement class >> recordingExtent [
+	"The extent of the throwaway surface frameReport records on. One pixel: the display list it
+	 reads holds commands, so nothing of what is reported depends on this extent, and a larger
+	 one would allocate a drawable for nothing."
+
+	^ 1 @ 1
+]
+
 { #category : 'drawing' }
 VGDrawnFrameElement >> aeDrawGeometryOn: aeCanvas [
 	"My geometry, my background and my border as any element draws them, and then my frame on a
@@ -60,4 +69,54 @@ VGDrawnFrameElement >> drawBlock [
 { #category : 'accessing' }
 VGDrawnFrameElement >> drawBlock: aBlock [
 	drawBlock := aBlock
+]
+
+{ #category : 'reporting' }
+VGDrawnFrameElement >> frameReport [
+	"What my frame is made of, found by recording it rather than by describing it. The surface
+	 recorded on is a throwaway one of one pixel: a display list holds the commands and not the
+	 pixels, so the extent of the surface recorded on bounds nothing that is read here, and a
+	 surface of my own extent would cost a drawable of memory and would answer nothing for an
+	 element no space has laid out yet. The kinds are counted because what a frame is made of is
+	 what decides which backend can draw it."
+
+	| surface entries kinds |
+	drawBlock ifNil: [ ^ { ('frame' -> 'none: I draw my background and my border only') } ].
+	surface := VGCairoImageSurface extent: self class recordingExtent.
+	drawBlock value: surface newContext.
+	entries := surface displayList entries.
+	kinds := (entries collect: [ :each | each class name asString ]) asBag.
+	^ {
+		  ('laid out at' -> self extent printString).
+		  ('entries recorded' -> entries size printString).
+		  ('kinds' -> ((kinds sortedCounts collect: [ :each |
+				      each key printString , ' × ' , each value ]) inject: ''
+			    into: [ :all :each |
+			    all isEmpty
+				    ifTrue: [ each ]
+				    ifFalse: [ all , ', ' , each ] ])) }
+]
+
+{ #category : 'inspector' }
+VGDrawnFrameElement >> inspectorFrame: aBuilder [
+	"What the frame I hold records, read by recording it on a surface of my own extent. Reads
+	 frameReport, so it cannot drift from what the block really draws, and touches neither me
+	 nor the space I am in."
+
+	<inspectorPresentationOrder: 10 title: 'Frame'>
+	^ aBuilder newTable
+		  addColumn:
+			  (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
+		  addColumn:
+			  (SpStringTableColumn title: 'Value' evaluated: [ :each | each value ]);
+		  items: self frameReport;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGDrawnFrameElement >> inspectorFrameContext: aContext [
+	"Always: an element with no frame says so in its one row, which is the answer a reader of
+	 this tab wants."
+
+	aContext active: true
 ]

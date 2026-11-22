@@ -23,6 +23,7 @@ VGBlocExamplesTest >> exampleHolders [
 		  VGAeTextContextExamples.
 		  VGAeTextFontExamples.
 		  VGCanvasExamples.
+		  VGDrawnFrameElementExamples.
 		  VGFontManagerExamples.
 		  VGFrameProfileExamples.
 		  VGHarfbuzzShapingExamples.

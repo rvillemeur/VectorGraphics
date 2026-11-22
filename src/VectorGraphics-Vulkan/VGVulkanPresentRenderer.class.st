@@ -80,19 +80,66 @@ VGVulkanPresentRenderer >> frameCount [
 
 { #category : 'initialization' }
 VGVulkanPresentRenderer >> initialize [
-	"A renderer can be initialised more than once, once per window resize, so the surface of
-	 the frame before is finished here rather than left to the garbage collector: it holds
-	 Cairo memory of the size of a drawable."
+	"A renderer is initialised again on every window resize, so the surface of the frame before
+	 is released here and not left behind."
 
 	super initialize.
 	frameCount := 0.
-	recordingSurface ifNotNil: [
-		recordingSurface finish.
-		recordingSurface := nil ].
+	self releaseRecordingSurface.
 	backend := VGVulkanBackend new
 ]
 
-{ #category : 'drawing' }
+{ #category : 'inspector' }
+VGVulkanPresentRenderer >> inspectorPresent: aBuilder [
+	"What this renderer has drawn and what it would draw the next frame with: the frames it
+	 took, the backend of those frames and whether selection still holds it, and the surface the
+	 frame is recorded on with the device scale it carries. Reads presentReport, so it cannot
+	 drift from what the renderer answers, and writes nothing."
+
+	<inspectorPresentationOrder: 10 title: 'Present'>
+	^ aBuilder newTable
+		  addColumn:
+			  (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
+		  addColumn:
+			  (SpStringTableColumn title: 'Value' evaluated: [ :each | each value ]);
+		  items: self presentReport;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGVulkanPresentRenderer >> inspectorPresentContext: aContext [
+	"Always: a renderer that has drawn no frame yet is exactly what the tab is read for, and a
+	 renderer whose device has gone answers every row as well."
+
+	aContext active: true
+]
+
+{ #category : 'reporting' }
+VGVulkanPresentRenderer >> presentReport [
+	"What this renderer is and what it has drawn, each row asking the live object. The backend
+	 is asked whether it can draw at all, because a renderer whose device has gone answers
+	 frames of nothing and the count alone would not say so."
+
+	| surface |
+	surface := recordingSurface.
+	^ {
+		  ('frames taken' -> frameCount printString).
+		  ('backend' -> backend class name asString).
+		  ('backend is candidate' -> backend class isCandidate printString).
+		  ('backend in selection'
+		   -> (VGBackend rejectedClasses includes: backend class) not
+				   printString).
+		  ('recording surface' -> (surface
+			    ifNil: [ 'none yet' ]
+			    ifNotNil: [ :each | each extent printString ])).
+		  ('device scale' -> (surface
+			    ifNil: [ 'none yet' ]
+			    ifNotNil: [ :each | each deviceScale printString ])).
+		  ('scale factor' -> scaleFactor printString).
+		  ('valid' -> self isValid printString) }
+]
+
+{ #category : 'private' }
 VGVulkanPresentRenderer >> recordingSurfaceForExtent: anExtent [
 	"The surface the frame is recorded on, one per drawable and kept between frames: a frame
 	 of a window is recorded on it and replayed on the device, so its own pixels are never
@@ -107,10 +154,21 @@ VGVulkanPresentRenderer >> recordingSurfaceForExtent: anExtent [
 		 recordingSurface extent = anExtent and: [
 			 recordingSurface deviceScale = scale ] ]) ifTrue: [
 		^ recordingSurface ].
-	recordingSurface ifNotNil: [ recordingSurface finish ].
+	self releaseRecordingSurface.
 	recordingSurface := VGCairoImageSurface extent: anExtent.
 	recordingSurface deviceScale: scale.
 	^ recordingSurface
+]
+
+{ #category : 'private' }
+VGVulkanPresentRenderer >> releaseRecordingSurface [
+	"The surface of the frame before holds Cairo memory of the size of a drawable, so it is
+	 finished here rather than left to the garbage collector. The slot is cleared as well: a
+	 finished surface answers its extent as it did, so a surface left in the slot would be
+	 handed back to the next frame of that extent and drawn on after it was finished."
+
+	recordingSurface ifNotNil: [ :surface | surface finish ].
+	recordingSurface := nil
 ]
 
 { #category : 'rendering' }

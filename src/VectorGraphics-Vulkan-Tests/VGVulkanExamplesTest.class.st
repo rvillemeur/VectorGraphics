@@ -25,6 +25,7 @@ VGVulkanExamplesTest >> exampleHolders [
 		  VGVulkanDriverSdl2HostExamples.
 		  VGVulkanPresentHostExamples.
 		  VGVulkanPresentChainExamples.
+		  VGVulkanPresentRendererExamples.
 		  VGFrameDeviceBenchmarkExamples.
 		  VGFrameDrawingKitExamples.
 		  VGFrameStageBenchmarkExamples.
