@@ -383,10 +383,13 @@ VGVulkanDeviceSession >> surfaceInstanceExtensionNames [
 	 what lets host selection learn them before any window exists. Answers nil where SDL cannot
 	 say, so the caller takes the software path instead of opening a device it cannot present
 	 from.
+	 The loader is asked for first, because SDL loads it when the first SDL_WINDOW_VULKAN window
+	 is created and answers false to every Vulkan question until it is loaded.
 	 It is read here and not in PharoVulkan because PharoVulkan reads the names from a window
 	 handle, which is the only form a window needs."
 
 	| pCount count names pointerSize |
+	VGSdl2VulkanLoader ensureDefaultLibraryLoaded ifFalse: [ ^ nil ].
 	pointerSize := VkContext pointerSize.
 	^ [
 	  pCount := ExternalAddress allocate: self class extensionCountByteCount.

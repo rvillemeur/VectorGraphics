@@ -327,3 +327,19 @@ VGVulkanDeviceSessionTest >> testTheSessionIsTheOnlyPlaceAFrameOrAFilterOpensADe
 				 each methodClass name , ' >> ' , each selector ]) asSortedCollection asArray
 		equals: #( )
 ]
+
+{ #category : 'tests' }
+VGVulkanDeviceSessionTest >> testTheSurfaceExtensionNamesAreReadBeforeAnyWindowHasBeenOpened [
+	"Unit 7.3a: host selection asks for the names before a window exists, so the read must not
+	 depend on one having been opened already. SDL loads the Vulkan loader when the first
+	 SDL_WINDOW_VULKAN window is created, and until it is loaded
+	 SDL_Vulkan_GetInstanceExtensions answers false — which is why this read answered in the
+	 image that had shown a window and answered nil in a fresh one. The session loads the
+	 loader itself. A machine with no Vulkan device at all is not asked."
+
+	| names |
+	self hasDevice ifFalse: [ ^ self ].
+	names := VGVulkanDeviceSession new surfaceInstanceExtensionNames.
+	self deny: names isNil.
+	self assert: (names includes: 'VK_KHR_surface')
+]

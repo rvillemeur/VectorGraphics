@@ -220,6 +220,21 @@ VGVulkanPresentHostTest >> testThePhysicalSizeOfMyHostSpaceComesFromTheVulkanDra
 ]
 
 { #category : 'tests' }
+VGVulkanPresentHostTest >> testThePresentContextOfMyHostSpaceIsTheOneDeviceOfTheSession [
+	"Unit 7.3a: one device does compute and presentation both, so the context a host space
+	 presents through is the session's own and not a second one opened beside it. The fixture
+	 opens the session's context first, which is the compute-only one; asking the host space for
+	 its context is what releases that and rebuilds the presenting one, and both then answer the
+	 same object."
+
+	self withPresentingHostSpaceDo: [ :hostSpace |
+		self
+			assert: hostSpace presentContext
+			identicalTo: VGVulkanDeviceSession default context.
+		self assert: VGVulkanDeviceSession default contextKind equals: #presenting ]
+]
+
+{ #category : 'tests' }
 VGVulkanPresentHostTest >> testThePresentHostIsSupportedOnlyWhileEnabledUnderTheVulkanDriver [
 	"Four states, because two things have to be true at once. The driver is the half §6b already
 	 holds. The opt-in is the half §8 of the present plan asks for: Bloc's default stays Cairo,
