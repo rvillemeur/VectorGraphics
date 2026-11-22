@@ -386,6 +386,14 @@ VGTiledFillDispatch >> inspectorStages: aBuilder [
 		  yourself
 ]
 
+{ #category : 'inspector' }
+VGTiledFillDispatch >> inspectorStagesContext: aContext [
+	"The table of stages stands as soon as the class names them, which is always: a dispatch
+	 that drew nothing shows every row unreached, and that is a fact worth showing."
+
+	aContext active: true
+]
+
 { #category : 'measuring' }
 VGTiledFillDispatch >> isRecordingStages [
 	^ stages notNil
