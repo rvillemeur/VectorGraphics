@@ -166,10 +166,16 @@ VGTiledFillDispatch >> blocksOf: anEncoding target: aByteArray [
 	 that ends in the host. Nothing is copied: a WordArray and a Float32Array already hold
 	 their elements in the order and the width a storage buffer reads them, so the upload
 	 writes out of these very objects."
-
 	^ (self blocksOf: anEncoding)
-		  at: #target put: aByteArray;
+		  at: VGTiledFillKernel targetBinding put: aByteArray;
 		  yourself
+]
+
+{ #category : 'accessing' }
+VGTiledFillDispatch >> bufferOfBinding: aName [
+	"The device buffer kept for that binding, or nil where no frame has needed one yet. The
+	 companion of blockOfBinding:, which answers what the host filled it with."
+	^ buffers at: aName ifAbsent: [ nil ]
 ]
 
 { #category : 'inspecting' }
@@ -253,9 +259,10 @@ VGTiledFillDispatch >> clearAndDispatchOver: anEncoding [
 		| command |
 		command := self frameCommandPool allocateBuffer.
 		command do: [ :recorder |
-			(self hostFilled: #target) ifFalse: [
+			(self hostFilled: VGTiledFillKernel targetBinding) ifFalse: [
 				recorder
-					recordFillOfBuffer: (buffers at: #target)
+					recordFillOfBuffer:
+					(self bufferOfBinding: VGTiledFillKernel targetBinding)
 					with: self class clearedTargetWord.
 				recorder recordFillToComputeBarrier ].
 			kernel
@@ -546,16 +553,15 @@ VGTiledFillDispatch >> packBlocksOf: anEncoding target: aByteArray [
 	^ blocks := self blocksOf: anEncoding target: aByteArray
 ]
 
-{ #category : 'dispatching' }
+{ #category : 'drawing' }
 VGTiledFillDispatch >> prepareOnce [
 	"The descriptor set, the pipeline and the command pool of my kernel, built on the first frame
 	 of my tile extent and kept afterwards. A buffer grown later is pointed at by the set itself,
 	 so a frame never prepares twice."
-
 	prepared ifTrue: [ ^ self ].
 	self timeStage: #prepare during: [
 		VGTiledFillKernel bindingNames do: [ :name |
-			kernel bindBuffer: (buffers at: name) ].
+			kernel bindBuffer: (self bufferOfBinding: name) ].
 		kernel prepare.
 		prepared := true ]
 ]
@@ -566,16 +572,17 @@ VGTiledFillDispatch >> printOn: aStream [
 	blocks ifNil: [ ^ self ].
 	aStream
 		nextPutAll: ' of ';
-		print: (blocks at: #target) size / VGTiledFillEncoding targetFormat bytesPerPixel;
+		print: (blocks at: VGTiledFillKernel targetBinding) size
+			/ VGTiledFillEncoding targetFormat bytesPerPixel;
 		nextPutAll: ' pixels'
 ]
 
-{ #category : 'dispatching' }
+{ #category : 'drawing' }
 VGTiledFillDispatch >> readbackInto: aByteArray [
 	"The target buffer read back into the bytes it was written from."
-
 	self timeStage: #readback during: [
-		(buffers at: #target) readbackInto: aByteArray ]
+		(self bufferOfBinding: VGTiledFillKernel targetBinding) readbackInto:
+			aByteArray ]
 ]
 
 { #category : 'drawing' }
@@ -584,13 +591,13 @@ VGTiledFillDispatch >> recordCopyInto: anImage in: aRecorder [
 	 layout a copy writes into and the whole extent copied. The caller owns the submission, so
 	 a presented frame can fit the copy between the semaphores its chain waits on and signals.
 	 The region is freed here because the driver has read it by the time recording returns."
-
 	| region |
 	region := VkCommandBuffer regionForExtent: anImage extent.
 	[
 	anImage transitionTo: VkImageLayout transferDstOptimal in: aRecorder.
 	aRecorder
-		recordCopyOfBuffer: (buffers at: #target)
+		recordCopyOfBuffer:
+		(self bufferOfBinding: VGTiledFillKernel targetBinding)
 		toImage: anImage
 		layout: VkImageLayout transferDstOptimal
 		region: region ] ensure: [ region getHandle free ]
@@ -688,7 +695,7 @@ VGTiledFillDispatch >> timeStage: aSymbol during: aBlock [
 	^ answer
 ]
 
-{ #category : 'dispatching' }
+{ #category : 'drawing' }
 VGTiledFillDispatch >> upload [
 	"The words of each block into the buffer kept for it, the two held together by the name of
 	 the binding. The copy reads the block's own memory, so a frame pays one copy a binding and
@@ -698,7 +705,7 @@ VGTiledFillDispatch >> upload [
 	self timeStage: #upload during: [
 		VGTiledFillKernel bindingNames do: [ :name |
 			(self blockOfBinding: name) ifNotNil: [ :block |
-				(buffers at: name)
+				(self bufferOfBinding: name)
 					uploadBits: block
 					byteCount: (self byteCountOfBlock: block) ] ] ]
 ]

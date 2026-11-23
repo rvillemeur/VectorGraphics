@@ -251,6 +251,15 @@ VGTiledFillKernel class >> subRowCount [
 ]
 
 { #category : 'constants' }
+VGTiledFillKernel class >> targetBinding [
+	"The binding the frame is composed into: the destination pixels, read and written by the
+	 kernel, and the one binding a frame may bring from the host or leave on the device. It is
+	 named here because bindingNames states the contract, and the methods that treat that one
+	 binding differently from the other thirteen ask for it by this name."
+	^ #target
+]
+
+{ #category : 'constants' }
 VGTiledFillKernel class >> tileComponent [
 	"The component of the workgroup id that carries the row of the tile table this workgroup
 	 owns. The dispatch is one dimensional, so the other two are zero."
@@ -1024,17 +1033,18 @@ VGTiledFillKernel >> emitPixelXOfOrdinal: anOrdinal [
 		  and: (self constantWord: anOrdinal - 1)
 ]
 
-{ #category : 'emitting - pixel' }
+{ #category : 'emitting' }
 VGTiledFillKernel >> emitReadOfPixelWordsWhere: insides at: indexes [
 	"Reads the destination word of each pixel this invocation owns, once, before the loop over
 	 the references of the tile. The read is guarded per pixel and not per word, because the
 	 width of the frame can fall inside a word: a pixel past the edge of the frame never touches
 	 its own word, and its neighbours in the same word still draw."
-
 	insides doWithIndex: [ :inside :ordinal |
 		builder emitIf: inside then: [
 			self
-				store: (self elementOf: #target at: (indexes at: ordinal))
+				store: (self
+						 elementOf: self class targetBinding
+						 at: (indexes at: ordinal))
 				into: (self class destVariableNameOfPixel: ordinal) ] ]
 ]
 
@@ -1568,17 +1578,16 @@ VGTiledFillKernel >> emitWordRun: aRun from: aBindingName base: aBaseId lengthId
 								  and: index)) ] ]
 ]
 
-{ #category : 'emitting - pixel' }
+{ #category : 'emitting' }
 VGTiledFillKernel >> emitWriteBackOfPixelWordsWhere: insides at: indexes [
 	"Writes the destination word of each pixel this invocation owns, once, after the last entry
 	 of the tile. One invocation owns these pixels alone, so nothing else can have written them
 	 in between, which is what lets the write stand outside the loop over the references."
-
 	insides doWithIndex: [ :inside :ordinal |
 		builder emitIf: inside then: [
 			self
 				storeWord: (self load: (self class destVariableNameOfPixel: ordinal))
-				into: #target
+				into: self class targetBinding
 				at: (indexes at: ordinal) ] ]
 ]
 
