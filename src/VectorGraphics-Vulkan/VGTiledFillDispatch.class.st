@@ -18,7 +18,7 @@ Class {
 		'tileExtent',
 		'prepared',
 		'blocks',
-		'copyPool'
+		'commandPool'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -386,8 +386,8 @@ VGTiledFillDispatch >> frameCommandPool [
 	 in and the one a copy into an image is recorded in — made on the first frame and kept until
 	 the device is released. The kernel has a pool of its own, which is where the blur's passes
 	 are recorded."
-	^ copyPool ifNil: [
-		  copyPool := context device createCommandPool:
+	^ commandPool ifNil: [
+		  commandPool := context device createCommandPool:
 			              context computeQueueFamily ]
 ]
 
@@ -624,9 +624,9 @@ VGTiledFillDispatch >> releaseDevice [
 		kernel destroy.
 		kernel := nil ].
 	buffers valuesDo: [ :each | each destroy ].
-	copyPool ifNotNil: [
-		copyPool destroy.
-		copyPool := nil ].
+	commandPool ifNotNil: [
+		commandPool destroy.
+		commandPool := nil ].
 	buffers removeAll.
 	prepared := false.
 	tileExtent := nil
