@@ -142,6 +142,13 @@ VGPresentPathBenchmark >> drawsOf: anEncoding through: aDispatch endingIn: anIma
 		  yourself
 ]
 
+{ #category : 'accessing' }
+VGPresentPathBenchmark >> drawsOfARound [
+	"Every draw of one round of one path, the discarded ones among them: they pay stages too,
+	 and the stages of a round are summed over all of them."
+	^ self class discardedDrawCount + timedDrawCount
+]
+
 { #category : 'running' }
 VGPresentPathBenchmark >> encodingOf: aSurface at: anExtent [
 	"The frame of that surface written out as buffers, once for both paths: what they differ by
@@ -272,9 +279,9 @@ VGPresentPathBenchmark >> measureFrameNamed: aName at: anExtent on: aSession [
 	 what is compared is the device trip and the host copies around it, not the binning of a
 	 display list, which units 3.0 and 3.8 already measure. Both paths draw through the one
 	 dispatch of that tile extent and alternate round by round, so neither is measured on a
-	 device the other warmed. The dispatch is told to record again at the head of every round,
-	 because it keeps one table of stages: a round that did not reset it would show the stages
-	 the other path paid last beside its own."
+	 device the other warmed. Both tables of stages are emptied at the head of every round,
+	 because each of them sums the draws it was given: a round that did not empty them would
+	 show the draws the other path made beside its own."
 	| surface encoding dispatch image comparisons draws |
 	surface := self surfaceOfFrameNamed: aName at: anExtent.
 	encoding := self encodingOf: surface at: anExtent.
@@ -290,6 +297,7 @@ VGPresentPathBenchmark >> measureFrameNamed: aName at: anExtent on: aSession [
 	1 to: roundCount do: [ :round |
 		self class pathNames do: [ :pathName |
 			dispatch recordStages.
+			hostCopies := Dictionary new.
 			(comparisons at: pathName)
 				addRound: (self timedDrawsOf: (draws at: pathName))
 				stages: (self stagesOf: dispatch on: pathName) ] ] ] ensure: [
@@ -346,7 +354,6 @@ VGPresentPathBenchmark >> readBack: anEncoding through: aDispatch into: aSurface
 	 back into the rows of the target. The two host copies are timed here and nowhere else,
 	 because they are the part of this path the device never sees."
 	| pixels |
-	hostCopies := Dictionary new.
 	pixels := self timed: self class pixelsOfStageName during: [
 		          backend pixelsOf: aSurface ].
 	aDispatch draw: anEncoding into: pixels.
@@ -405,13 +412,19 @@ VGPresentPathBenchmark >> setRounds: aRoundCount timedDraws: aDrawCount [
 
 { #category : 'running' }
 VGPresentPathBenchmark >> stagesOf: aDispatch on: aPathName [
-	"The stages of the last draw of a round. The host's own copies are stages of the readback
-	 path and of no other, so they join its table alone."
-	| answer |
-	answer := aDispatch stageMicroseconds copy.
+	"What one draw of that round was made of, stage by stage. A dispatch sums each stage over
+	 every frame it drew since it was told to record, and the host copies are summed the same
+	 way, so both sides are divided by the draws of the round and the table reads as the mean
+	 draw of it. The host copies are stages of the readback path and of no other, so they join
+	 its table alone."
+	| answer drawsOfRound |
+	drawsOfRound := self drawsOfARound.
+	answer := Dictionary new.
+	aDispatch stageMicroseconds keysAndValuesDo: [ :stage :total |
+		answer at: stage put: (total / drawsOfRound) rounded ].
 	aPathName = self class readBackPathName ifTrue: [
-		hostCopies keysAndValuesDo: [ :stage :microseconds |
-			answer at: stage put: microseconds ] ].
+		hostCopies keysAndValuesDo: [ :stage :total |
+			answer at: stage put: (total / drawsOfRound) rounded ] ].
 	^ answer
 ]
 
@@ -428,12 +441,17 @@ VGPresentPathBenchmark >> surfaceOfFrameNamed: aName at: anExtent [
 
 { #category : 'running' }
 VGPresentPathBenchmark >> timed: aStageName during: aBlock [
-	"The block evaluated, its wall clock kept as a stage of the host's own, and its value
-	 answered, so that a copy is timed where it is used rather than around it."
+	"The block evaluated, its wall clock added to that stage of the host's own, and its value
+	 answered, so that a copy is timed where it is used rather than around it. The clock is
+	 added and not stored, as a dispatch adds its own stages: a round sums every draw it made
+	 and divides once, at the end."
 	| started answer |
 	started := Time microsecondClockValue.
 	answer := aBlock value.
-	hostCopies at: aStageName put: Time microsecondClockValue - started.
+	hostCopies
+		at: aStageName
+		put: (hostCopies at: aStageName ifAbsent: [ 0 ])
+			+ (Time microsecondClockValue - started).
 	^ answer
 ]
 

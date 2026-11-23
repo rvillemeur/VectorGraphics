@@ -1,5 +1,5 @@
 "
-I am one frame measured at one extent on one of the two paths unit 7.6 compares: the presented path, which ends on the device, and the readBack path, which ends in the host's own pixels. I hold the microseconds of every timed draw of every round, and the stage table the dispatch recorded for the last draw of each round, the host's own copies among them. minimumMicroseconds is the figure the verdict is read from, because it is the closest this machine comes to the cost of the work itself; medianMicroseconds and firstDrawMicroseconds are kept beside it, since the stages of a long-lived dispatch grow frame over frame and a verdict that hid that would be read as something it is not.
+I am one frame, at one extent, on one of the two paths of unit 7.6, measured over several rounds of timed draws. minimumMicroseconds is the verdict figure: the fastest draw I ever paid, which is the closest this machine comes to the cost of the work with nothing else of the system in it. medianMicroseconds and firstDrawMicroseconds stand beside it, because a first draw against a minimum says how much of a figure is the work and how much is the state the image was in. stagesOfRound: holds what the mean draw of a round was made of, stage by stage, the host's own copies among them where the path pays any. My Stages view reads those tables, one column a round. VGPresentPathBenchmark builds me and holds the pair I belong to.
 "
 Class {
 	#name : 'VGPresentPathComparison',
@@ -22,9 +22,9 @@ VGPresentPathComparison class >> frameName: aName extent: anExtent path: aPathNa
 
 { #category : 'measuring' }
 VGPresentPathComparison >> addRound: aCollectionOfMicroseconds stages: aDictionary [
-	"One round of timed draws and the stage table the dispatch recorded for the last of them.
-	 The table is copied, because a dispatch overwrites its own stage times on the next draw and
-	 a round that handed out a live dictionary would read as the round after it."
+	"One round of timed draws, and what the mean draw of that round was made of stage by stage.
+	 The table is copied, because the dispatch that built it writes its own stage times again on
+	 the next round and a round that held a live dictionary would read as the round after it."
 	roundDraws add: aCollectionOfMicroseconds asArray.
 	roundStages add: aDictionary copy
 ]
@@ -36,6 +36,12 @@ VGPresentPathComparison >> allDraws [
 		  all
 			  addAll: each;
 			  yourself ]
+]
+
+{ #category : 'accessing' }
+VGPresentPathComparison >> drawsOfRound: anIndex [
+	"The timed draws of that round, in the order they were drawn."
+	^ roundDraws at: anIndex
 ]
 
 { #category : 'accessing' }
@@ -62,8 +68,9 @@ VGPresentPathComparison >> frameName [
 VGPresentPathComparison >> inspectorStages: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Stages'>
 	"What one draw of this path is made of, one column a round, so that a stage which grows from
-	 round to round is visible as such. The rows are the stages this comparison really recorded
-	 and not a list written here, so a path that stops paying a stage stops showing it."
+	 round to round is visible as such. Every figure is the mean draw of its round. The rows are
+	 the stages this comparison really recorded and not a list written here, so a path that
+	 stops paying a stage stops showing it."
 	| table |
 	table := aBuilder newTable
 		         items: self stageNames;
@@ -73,7 +80,7 @@ VGPresentPathComparison >> inspectorStages: aBuilder [
 		         yourself.
 	1 to: self roundCount do: [ :round |
 		table addColumn: (SpStringTableColumn
-				 title: 'Round ' , round printString , ' us'
+				 title: 'Round ' , round printString , ' us a draw'
 				 evaluated: [ :each |
 					 ((self stagesOfRound: round) at: each ifAbsent: [ nil ])
 						 ifNil: [ '-' ]
@@ -151,7 +158,7 @@ VGPresentPathComparison >> stageNames [
 
 { #category : 'accessing' }
 VGPresentPathComparison >> stagesOfRound: anIndex [
-	"The stage table the dispatch recorded for the last draw of that round, the host's own
-	 copies among them."
+	"What the mean draw of that round was made of, stage by stage, in microseconds, the host's
+	 own copies among them."
 	^ roundStages at: anIndex
 ]

@@ -58,6 +58,26 @@ VGPresentPathBenchmarkTest >> testARunReportsEveryFrameOnBothPathsAtBothExtents 
 ]
 
 { #category : 'tests' }
+VGPresentPathBenchmarkTest >> testAStageOfARoundIsAPartOfADrawOfIt [
+	"The unit of a stage table. A dispatch sums each stage over every frame it drew since it was
+	 told to record, so a table handed on as it stands holds the whole round and reads as a draw
+	 forty times too slow. What a comparison holds is the mean draw of its round, and no part of
+	 a draw is slower than the slowest draw it is a part of."
+	| benchmark |
+	self hasDevice ifFalse: [ ^ self ].
+	benchmark := VGPresentPathBenchmark rounds: 1 timedDraws: 4.
+	benchmark run.
+	benchmark comparisonRows do: [ :row |
+		1 to: row roundCount do: [ :round |
+			| slowest |
+			slowest := (row drawsOfRound: round) max.
+			(row stagesOfRound: round) keysAndValuesDo: [ :stage :microseconds |
+				self
+					assert: microseconds <= slowest
+					description: stage , ' of ' , row printString ] ] ]
+]
+
+{ #category : 'tests' }
 VGPresentPathBenchmarkTest >> testEachPathIsMeasuredOnTheStagesThatPathPays [
 	"What the two paths are, read off the stages they were measured on rather than off their
 	 names. The presented path clears its target on the device and copies it into an image; it
