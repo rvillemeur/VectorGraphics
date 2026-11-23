@@ -12,6 +12,26 @@ Class {
 }
 
 { #category : 'examples' }
+VGStageTimingsExamples class >> timingsOfTheDrawingOfTheReferenceFrame [
+	<sampleInstance>
+	"The host half of the reference frame with the drawing of it taken apart as well: the Stages
+	 tab shows the phases of the encode under the encode, and under displayList the four phases
+	 of the drawing — the surface, the canvas, the scene and the recording of the entries.
+	 The frame measured is the one unit 1.11 profiles, which is the only frame of the budget
+	 that builds a scene; the other two draw on the context the surface answers and have two
+	 phases rather than four."
+
+	| benchmark |
+	benchmark := VGFrameDeviceBenchmark
+		             frameName: #reference
+		             repeats: 5
+		             extent: 800 @ 600.
+	benchmark measureEncoding.
+	benchmark measureDisplayList.
+	^ benchmark timings
+]
+
+{ #category : 'examples' }
 VGStageTimingsExamples class >> timingsOfTheHostHalfOfABudgetFrame [
 	<sampleInstance>
 	"The timings of the cheapest frame of the budget, measured on the host alone: the encode

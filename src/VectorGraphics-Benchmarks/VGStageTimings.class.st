@@ -170,3 +170,17 @@ VGStageTimings >> stageRows [
 						row third } ] ] ].
 	^ rows asArray
 ]
+
+{ #category : 'measuring' }
+VGStageTimings >> time: aStage during: aBlock [
+	"Evaluate the block and keep the microseconds it took as one reading of that stage. The
+	 clock is read in microseconds because a phase of a frame can finish inside a millisecond.
+	 Answers what the block answered, so a phase can be timed around the expression that
+	 produces the thing the next phase needs."
+
+	| start value |
+	start := Time microsecondClockValue.
+	value := aBlock value.
+	self add: Time microsecondClockValue - start of: aStage.
+	^ value
+]

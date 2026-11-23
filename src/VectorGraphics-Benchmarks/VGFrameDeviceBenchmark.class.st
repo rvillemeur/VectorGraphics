@@ -69,16 +69,34 @@ VGFrameDeviceBenchmark class >> drawBlockNamed: aSymbol [
 
 { #category : 'frames' }
 VGFrameDeviceBenchmark class >> drawBlockNamed: aSymbol using: aKit [
-	"A one argument block that draws the named frame on a context, with the classes of that kit.
-	 A name no frame answers is an error and not an empty frame: an empty frame touches no tile,
-	 dispatches nothing, and would be reported as the fastest measurement of the set."
+	"The named frame drawn with the classes of that kit, with none of its phases timed."
+
+	^ self drawBlockNamed: aSymbol using: aKit recordingInto: nil
+]
+
+{ #category : 'frames' }
+VGFrameDeviceBenchmark class >> drawBlockNamed: aSymbol using: aKit recordingInto: aTimingsOrNil [
+	"A one argument block that draws the named frame on a context, with the classes of that kit,
+	 timing the phases of that drawing into the timings given. A name no frame answers is an
+	 error and not an empty frame: an empty frame touches no tile, dispatches nothing, and would
+	 be reported as the fastest measurement of the set.
+	 The two cheap frames are one phase, #record: they draw on the context the surface answers
+	 and build neither a canvas nor a scene, so there is nothing else of them to name."
 
 	aSymbol = #background ifTrue: [
-		^ [ :context | self drawBackgroundOn: context using: aKit ] ].
+		^ [ :context |
+		  self timeDrawing: #record into: aTimingsOrNil during: [
+			  self drawBackgroundOn: context using: aKit ] ] ].
 	aSymbol = #cards ifTrue: [
-		^ [ :context | self drawCardsOn: context using: aKit ] ].
+		^ [ :context |
+		  self timeDrawing: #record into: aTimingsOrNil during: [
+			  self drawCardsOn: context using: aKit ] ] ].
 	aSymbol = #reference ifTrue: [
-		^ [ :context | self drawReferenceOn: context using: aKit ] ].
+		^ [ :context |
+		  self
+			  drawReferenceOn: context
+			  using: aKit
+			  recordingInto: aTimingsOrNil ] ].
 	^ self error: 'no frame of that name'
 ]
 
@@ -115,19 +133,46 @@ VGFrameDeviceBenchmark class >> drawCardsOn: aContext using: aKit [
 
 { #category : 'frames' }
 VGFrameDeviceBenchmark class >> drawReferenceOn: aContext using: aKit [
+	"The reference frame drawn through that kit, with none of its phases timed."
+
+	^ self drawReferenceOn: aContext using: aKit recordingInto: nil
+]
+
+{ #category : 'frames' }
+VGFrameDeviceBenchmark class >> drawReferenceOn: aContext using: aKit recordingInto: aTimingsOrNil [
 	"The frame unit 1.11 profiles, drawn through the kit's renderer onto the surface that context
 	 records on: eight hundred by six hundred, with gradients, strokes, glyphs and blits in it,
 	 which is the frame a backend is really asked to draw. A scene draws on a canvas and not on a
 	 context, so the canvas is built over the surface the context was made for and the entries
 	 reach the one display list either way.
 	 The scene is laid out through the kit's renderer class, because a text span measured on one
-	 backend keeps that backend's scaled font and the other backend cannot draw it."
+	 backend keeps that backend's scaled font and the other backend cannot draw it.
+	 Three phases of unit 3.11: the canvas, the scene — the layout, where text is measured and
+	 where the font manager is posed — and the recording of the entries."
 
-	| canvas |
-	canvas := aKit canvasOn: aContext surface.
-	canvas clippingRectangle: (0 @ 0 extent: self extentOfItsFrames).
-	(VGFrameProfile new sceneForRendererClass: aKit rendererClass)
-		aeFullDrawOn: canvas
+	| canvas scene |
+	canvas := self timeDrawing: #canvas into: aTimingsOrNil during: [
+		          | built |
+		          built := aKit canvasOn: aContext surface.
+		          built clippingRectangle: (0 @ 0 extent: self extentOfItsFrames).
+		          built ].
+	scene := self timeDrawing: #scene into: aTimingsOrNil during: [
+		         VGFrameProfile new sceneForRendererClass: aKit rendererClass ].
+	^ self timeDrawing: #record into: aTimingsOrNil during: [
+		  scene aeFullDrawOn: canvas ]
+]
+
+{ #category : 'frames' }
+VGFrameDeviceBenchmark class >> drawingStageNames [
+	"The phases of the drawing of a frame, in the order a frame pays them: the surface it draws
+	 on and the context over that surface, the canvas built for a scene, the scene laid out
+	 through the renderer class, and the entries recorded into the display list. The two cheap
+	 frames reach the first and the last of them only, having no scene and drawing on the
+	 context the surface answers.
+	 The only place a phase of the drawing is named, as VGTiledFillEncoding class >> stageNames
+	 is for the phases of the encode."
+
+	^ #( surface canvas scene record )
 ]
 
 { #category : 'constants' }
@@ -229,6 +274,16 @@ VGFrameDeviceBenchmark class >> phaseLabels [
 		  (#buildSpirv -> 'build SPIR-V, once a session').
 		  (#dispatch -> 'dispatch').
 		  (#software -> 'software frame') }
+]
+
+{ #category : 'frames' }
+VGFrameDeviceBenchmark class >> timeDrawing: aStage into: aTimingsOrNil during: aBlock [
+	"One phase of the drawing of a frame, timed if a reader asked for the phases and evaluated
+	 plainly if it did not. A drawing nobody is measuring pays no clock read at all, which is
+	 what VGTiledFillEncoding does with its own phases."
+
+	aTimingsOrNil ifNil: [ ^ aBlock value ].
+	^ aTimingsOrNil time: aStage during: aBlock
 ]
 
 { #category : 'accessing' }
@@ -419,16 +474,24 @@ VGFrameDeviceBenchmark >> measure: aPhase perRepeatOf: aBlock [
 
 { #category : 'measuring' }
 VGFrameDeviceBenchmark >> measureDisplayList [
-	"Drawing the frame, which is the first phase of its host half. It is measured apart from the
-	 encodes and not between them: it allocates a surface a pass, and an encode measured
-	 directly after such an allocation pays for it — with the drawing inside that loop the plain
-	 encode read a quarter more than the phases it is the sum of."
+	"Drawing the frame, which is the first phase of its host half, with the phases of the
+	 drawing itself under it. It is measured apart from the encodes and not between them: it
+	 allocates a surface a pass, and an encode measured directly after such an allocation pays
+	 for it — with the drawing inside that loop the plain encode read a quarter more than the
+	 phases it is the sum of.
+	 One drawing before the loop, as the encode loop has: the first drawing of an image poses
+	 the font manager, which scans this machine's fonts once a session, and that scan is not a
+	 phase of a frame."
 
-	| phases |
+	| phases drawing |
 	phases := timings insideOf: #encode.
+	drawing := phases insideOf: #displayList.
 	self newSurface.
 	repeats timesRepeat: [
-		phases add: (self microsecondsDuring: [ self newSurface ]) of: #displayList ]
+		phases
+			add: (self microsecondsDuring: [
+					 self newSurfaceOnBackend: nil recordingInto: drawing ])
+			of: #displayList ]
 ]
 
 { #category : 'measuring' }
@@ -607,16 +670,29 @@ VGFrameDeviceBenchmark >> newSurface [
 
 { #category : 'measuring' }
 VGFrameDeviceBenchmark >> newSurfaceOnBackend: aBackendOrNil [
-	"A surface of the frame extent with the frame recorded on it, to be drained by the given
-	 backend or by whichever one selection chose. The backend is named before the frame is drawn,
-	 because the setter flushes what is already recorded: naming it afterwards drains the frame
-	 on the backend being replaced and leaves an empty list behind, which measures as a frame
-	 drawn in two microseconds."
+	"My frame drawn on a surface of my extent, with none of the phases of that drawing timed."
 
-	| surface |
-	surface := VGCairoImageSurface extent: self extent.
-	aBackendOrNil ifNotNil: [ surface backend: aBackendOrNil ].
-	(self class drawBlockNamed: frameName) value: surface newContext.
+	^ self newSurfaceOnBackend: aBackendOrNil recordingInto: nil
+]
+
+{ #category : 'measuring' }
+VGFrameDeviceBenchmark >> newSurfaceOnBackend: aBackendOrNil recordingInto: aTimingsOrNil [
+	"My frame drawn on a surface of my extent, with the phases of that drawing timed into the
+	 timings given. The backend is set before the drawing, because a context records on the
+	 surface it was made for.
+	 The context the drawing records on is built inside the #surface phase and not between the
+	 phases: on the background frame, whose whole drawing is 0.14 ms, the context was a sixth
+	 of the drawing and no phase was measuring it."
+
+	| surface context |
+	context := self class timeDrawing: #surface into: aTimingsOrNil during: [
+		           surface := VGCairoImageSurface extent: self extent.
+		           aBackendOrNil ifNotNil: [ surface backend: aBackendOrNil ].
+		           surface newContext ].
+	(self class
+		 drawBlockNamed: frameName
+		 using: VGFrameDrawingKit ours
+		 recordingInto: aTimingsOrNil) value: context.
 	^ surface
 ]
 

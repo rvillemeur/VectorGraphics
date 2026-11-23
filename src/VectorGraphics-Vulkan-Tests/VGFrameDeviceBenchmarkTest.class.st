@@ -150,6 +150,27 @@ VGFrameDeviceBenchmarkTest >> testEveryGlyphOfTheReferenceFrameIsNowInTheSubset 
 ]
 
 { #category : 'tests' }
+VGFrameDeviceBenchmarkTest >> testEveryPhaseTheDrawingTimesIsOnePhaseItNames [
+	"The drawing table is the only place a phase of the drawing is named, so the names in it and
+	 the names the drawing times have to be the same set. A phase timed under a name no table
+	 holds would be measured and never reported; a name in the table that nothing times would be
+	 reported as missing on every frame.
+	 The source is read rather than a measured frame, because a phase a frame never reaches —
+	 the canvas and the scene of a frame that draws on a context — is absent from that frame's
+	 table and present in the code all the same."
+
+	| timed |
+	timed := Set new.
+	(VGFrameDeviceBenchmark methods , VGFrameDeviceBenchmark class methods) do: [
+		:method |
+		method ast sendNodes do: [ :send |
+			send selector = #timeDrawing:into:during: ifTrue: [
+				self assert: send arguments first isLiteralNode.
+				timed add: send arguments first value ] ] ].
+	self assert: VGFrameDeviceBenchmark drawingStageNames asSet equals: timed
+]
+
+{ #category : 'tests' }
 VGFrameDeviceBenchmarkTest >> testTheCensusAgreesWithTheRasteriserAboutEveryEntryOfTheFrame [
 	"The census names a reason by walking the clauses of the rasteriser predicate in its own
 	 order, so the one thing that may never differ is the verdict: an entry carries the supported
@@ -177,6 +198,31 @@ VGFrameDeviceBenchmarkTest >> testTheCensusCountsThePixelsBehindEveryReasonItNam
 		assert: census pixelsByReason keys asSet
 		equals: census countByReason keys asSet.
 	census pixelsByReason valuesDo: [ :pixels | self assert: pixels > 0 ]
+]
+
+{ #category : 'tests' }
+VGFrameDeviceBenchmarkTest >> testTheDrawingOfEveryFrameIsMeasuredPhaseByPhase [
+	"Unit 3.11 asks where the drawing of a frame goes, the pose of the font manager having left
+	 4.1 ms of it on the reference frame. Every phase a frame times is one the table names, and
+	 a phase the frame does not reach is absent rather than zero: only the reference frame
+	 builds a canvas and a scene, the other two drawing on the context the surface answers."
+
+	| names |
+	names := VGFrameDeviceBenchmark drawingStageNames asSet.
+	VGFrameDeviceBenchmark frameNames do: [ :each |
+		| benchmark measured |
+		benchmark := VGFrameDeviceBenchmark
+			             frameName: each
+			             repeats: 2
+			             extent: 400 @ 300.
+		benchmark measureDisplayList.
+		measured := ((benchmark timings insideOf: #encode) insideOf: #displayList) means
+			            keys asSet.
+		self assert: (measured includesAll: #( surface record )).
+		self assert: (names includesAll: measured).
+		self
+			assert: (measured includesAll: #( canvas scene ))
+			equals: each = #reference ]
 ]
 
 { #category : 'tests' }
@@ -238,6 +284,37 @@ VGFrameDeviceBenchmarkTest >> testThePhasesInsideAPhaseAreTimingsOfTheirOwn [
 	self assert: inside floors equals: (Dictionary newFrom: { #bin -> 2 }).
 	self assert: (timings meanOf: #encode) equals: 5.
 	self assert: timings means equals: (Dictionary newFrom: { #encode -> 5 })
+]
+
+{ #category : 'tests' }
+VGFrameDeviceBenchmarkTest >> testThePhasesOfEveryDrawnFrameAccountForItsDrawing [
+	"What the phases of a drawing are read for is where its milliseconds go, so they have to be
+	 most of it. Nine tenths, which leaves room for the sends between the phases and for the
+	 clock itself.
+	 Measured inside one pass — the phases of a drawing against the clock around that same
+	 drawing — and asserted on the best of five, because the fastest pass of a phase is not the
+	 fastest pass of the whole and a pass that met the garbage collector carries work no phase
+	 is measuring. That is the fault unit 3.10's own accounting gate was rewritten for."
+
+	VGFrameDeviceBenchmark frameNames do: [ :each |
+		| benchmark best |
+		benchmark := VGFrameDeviceBenchmark
+			             frameName: each
+			             repeats: 1
+			             extent: 400 @ 300.
+		benchmark newSurface.
+		best := 0.
+		5 timesRepeat: [
+			| phases taken sum |
+			phases := VGStageTimings new.
+			taken := benchmark microsecondsDuring: [
+				         benchmark newSurfaceOnBackend: nil recordingInto: phases ].
+			sum := phases means values inject: 0 into: [ :total :one | total + one ].
+			best := best max: sum / (phases millisecondsOfMicroseconds: taken) ].
+		self
+			assert: best > (9 / 10)
+			description: each asString , ': ' , best printString
+				, ' of the drawing is accounted for' ]
 ]
 
 { #category : 'tests' }
