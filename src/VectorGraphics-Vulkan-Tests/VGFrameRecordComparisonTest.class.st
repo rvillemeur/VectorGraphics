@@ -32,6 +32,24 @@ VGFrameRecordComparisonTest >> testARowPrintsItsVariantItsExtentAndBothFloors [
 ]
 
 { #category : 'tests' }
+VGFrameRecordComparisonTest >> testASurfaceOfOursDrawnOnTwiceHoldsTheEntriesOfBothPasses [
+	"Why a pass of ours draws on a fresh surface where a pass of Cairo's does not: our
+	 recording appends to the display list of the surface it is given, so a surface kept would
+	 make every pass record against a longer list than the pass before it."
+	| kit surface row once |
+	kit := VGFrameDrawingKit ours.
+	surface := kit surfaceOfExtent: VGFrameDeviceBenchmark extentOfItsFrames.
+	row := VGFrameRecordComparisonRow
+		       variant: #cards
+		       extent: VGFrameDeviceBenchmark extentOfItsFrames.
+	row recordWith: kit into: VGStageTimings new on: surface.
+	once := surface displayList entries size.
+	row recordWith: kit into: VGStageTimings new on: surface.
+	self assert: once > 0.
+	self assert: surface displayList entries size equals: once * 2
+]
+
+{ #category : 'tests' }
 VGFrameRecordComparisonTest >> testEveryRowIsSubtractedFromTheWholeRowOfItsOwnExtent [
 	"A variant measured on a screen must not be priced against a whole frame measured on a
 	 smaller surface, which is the one way this subtraction can be wrong by a factor."
@@ -66,6 +84,24 @@ VGFrameRecordComparisonTest >> testEveryVariantIsMeasuredOnBothKitsAtEveryExtent
 	comparison rows do: [ :each |
 		self assert: each ourRecordFloor > 0.
 		self assert: each cairoRecordFloor > 0 ]
+]
+
+{ #category : 'tests' }
+VGFrameRecordComparisonTest >> testTheCairoSurfaceOfARowIsTheSameAcrossItsPasses [
+	"A fresh Cairo surface is paged in by the drawing that first touches it, and that first
+	 touch was most of the first measurement of this budget: a second run of the same twenty
+	 passes read the background frame at 0.150 ms where the first read 0.582. A window has one
+	 surface for every frame it draws, so a row keeps one too and every pass but the first
+	 draws on warm pages."
+	| row first |
+	row := VGFrameRecordComparisonRow
+		       variant: #cards
+		       extent: VGFrameDeviceBenchmark extentOfItsFrames.
+	row measurePass: 1.
+	first := row cairoSurface.
+	self assert: first isNotNil.
+	row measurePass: 2.
+	self assert: row cairoSurface identicalTo: first
 ]
 
 { #category : 'tests' }

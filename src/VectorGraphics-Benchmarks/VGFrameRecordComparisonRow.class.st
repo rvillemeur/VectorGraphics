@@ -11,7 +11,8 @@ Class {
 		'extent',
 		'ourTimings',
 		'cairoTimings',
-		'wholeRow'
+		'wholeRow',
+		'cairoSurface'
 	],
 	#category : 'VectorGraphics-Benchmarks-Frames',
 	#package : 'VectorGraphics-Benchmarks',
@@ -56,6 +57,12 @@ VGFrameRecordComparisonRow >> cairoFloorOf: aStageName [
 ]
 
 { #category : 'accessing' }
+VGFrameRecordComparisonRow >> cairoKit [
+	"The kit that draws as it is asked, which is the counterpart of mine."
+	^ VGFrameDrawingKit ours counterpart
+]
+
+{ #category : 'accessing' }
 VGFrameRecordComparisonRow >> cairoPartCost [
 	"What the same part costs Cairo, in milliseconds. nil for the whole frame."
 	wholeRow ifNil: [ ^ nil ].
@@ -79,23 +86,56 @@ VGFrameRecordComparisonRow >> cairoRecordFloorString [
 ]
 
 { #category : 'accessing' }
+VGFrameRecordComparisonRow >> cairoSurface [
+	"The one Cairo surface every pass of this row draws on, built the first time a pass asks
+	 for it. A window has one surface for every frame it draws, and a fresh Cairo surface is
+	 paged in by the drawing that first touches it: on this machine that first touch was
+	 0.58 ms of a 1.47 ms frame at 800 by 600, which a second run of the same budget did not
+	 pay. Measuring it once a pass would measure the operating system."
+	^ cairoSurface ifNil: [
+		  cairoSurface := self cairoKit surfaceOfExtent: extent ]
+]
+
+{ #category : 'accessing' }
 VGFrameRecordComparisonRow >> extent [
 	^ extent
+]
+
+{ #category : 'measuring' }
+VGFrameRecordComparisonRow >> measureCairoPass [
+	"One pass of Cairo's, on the one surface of this row."
+	self
+		recordWith: self cairoKit
+		into: cairoTimings
+		on: self cairoSurface
+]
+
+{ #category : 'measuring' }
+VGFrameRecordComparisonRow >> measureOurPass [
+	"One pass of mine, on a surface of its own: our recording appends to the display list of
+	 the surface it draws on, so a surface kept would make every pass record against a longer
+	 list than the pass before it. Building the surface is outside the timing, and our
+	 recording touches no pixel of it, so the fresh pages a Cairo pass would pay for cost this
+	 one nothing."
+	| kit |
+	kit := VGFrameDrawingKit ours.
+	self
+		recordWith: kit
+		into: ourTimings
+		on: (kit surfaceOfExtent: extent)
 ]
 
 { #category : 'measuring' }
 VGFrameRecordComparisonRow >> measurePass: anIndex [
 	"Both kits, once each. Which of them goes first alternates by pass, so neither kit is
 	 always the one measured on the heap the other had just grown."
-	| ours |
-	ours := VGFrameDrawingKit ours.
 	anIndex odd
 		ifTrue: [
-			self recordWith: ours into: ourTimings.
-			self recordWith: ours counterpart into: cairoTimings ]
+			self measureOurPass.
+			self measureCairoPass ]
 		ifFalse: [
-			self recordWith: ours counterpart into: cairoTimings.
-			self recordWith: ours into: ourTimings ]
+			self measureCairoPass.
+			self measureOurPass ]
 ]
 
 { #category : 'printing' }
@@ -177,14 +217,10 @@ VGFrameRecordComparisonRow >> ratioString [
 ]
 
 { #category : 'measuring' }
-VGFrameRecordComparisonRow >> recordWith: aKit into: aTimings [
-	"One pass of this variant on that kit. The surface is built fresh and outside the timing:
-	 ours records a display list, so a surface drawn on twice would already hold the entries of
-	 the pass before it."
-	| surface |
-	surface := aKit surfaceOfExtent: extent.
+VGFrameRecordComparisonRow >> recordWith: aKit into: aTimings on: aSurface [
+	"One pass of this variant on that kit, drawn on that surface."
 	VGFrameDeviceBenchmark
-		drawReferenceOn: surface newContext
+		drawReferenceOn: aSurface newContext
 		using: aKit
 		recordingInto: aTimings
 		without: self partLeftOut
