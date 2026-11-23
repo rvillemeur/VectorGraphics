@@ -49,26 +49,47 @@ VGVulkanPresentRendererExamples class >> intervalsOfFrameNamed: aName presentedI
 { #category : 'examples' }
 VGVulkanPresentRendererExamples class >> openWindowAndPresentTheBenchmarkFrames [
 	<sampleInstance>
-	"One click: a real, visible Vulkan window, the three frames VGFrameDeviceBenchmark measures
-	 drawn on the device and presented through its swapchain, and the interval each frame
-	 achieved answered as one VGPresentPathComparison a frame once the window is closed.
-	 Answers nil on a machine with no Vulkan device.
+	"One click: the three frames VGFrameDeviceBenchmark measures, each drawn on the device and
+	 presented in a window of its own, one window at a time, and the interval each frame
+	 achieved answered as one VGPresentPathComparison a frame. Answers nil on a machine with no
+	 Vulkan device.
+	 Every frame here is openWindowAndPresentTheFrameNamed:, which is where the window, the
+	 swapchain and the measurement are, and which is also what a caller sends when it wants one
+	 frame rather than three."
+
+	"Named open… so that the example gates do not run it: see the class comment."
+
+	VGVulkanDeviceSession default contextOrNil ifNil: [ ^ nil ].
+	^ VGFrameDeviceBenchmark frameNames collect: [ :each |
+		  self openWindowAndPresentTheFrameNamed: each ]
+]
+
+{ #category : 'examples' }
+VGVulkanPresentRendererExamples class >> openWindowAndPresentTheFrameNamed: aName [
+	"One window, one of the frames VGFrameDeviceBenchmark measures, presentsPerFrame presents
+	 of it, and the intervals they achieved as one VGPresentPathComparison. Answers nil on a
+	 machine with no Vulkan device.
+	 A window a frame is the unit here. A caller that drives several frames inside one call
+	 cannot stop between them, and a present that stalls leaves every window of that call open
+	 and every interval unreported — which is what one such call cost on 23 November 2026.
 	 This is the windowed half of unit 7.6. The offscreen half, VGPresentPathBenchmark, is what
 	 the two paths are compared on, because every present here waits for the vertical blank: a
-	 FIFO swapchain is what VkRenderConfig asks for, so the intervals below are the refresh
-	 period of the screen wherever the frame is faster than it, and they say that the path keeps
-	 up and nothing about how fast it is."
+	 FIFO swapchain is what VkRenderConfig asks for, so the intervals answered below are the
+	 refresh period of the screen wherever the frame is faster than it, and they say that the
+	 path keeps up and nothing about how fast it is."
+
 	"The host space is built by hand, the way every device test of this unit builds it, and not
 	 by showing the space: BlSpace >> show hands the space to BlHostRegistry default
 	 preferredHost, which is set at image start and kept there, so a shown space opens on the
 	 Morphic host and never reaches this one. The window, the surface, the swapchain and the
 	 renderer are the real ones either way — only the frame loop is driven here rather than by
-	 the universe, which is also why each frame is rendered directly and waited on instead of
+	 the universe, which is also why the frame is rendered directly and waited on instead of
 	 settled."
-	"Named open… so that the example gates do not run it: see the class comment."
+
 	| element space hostSpace |
 	VGVulkanDeviceSession default contextOrNil ifNil: [ ^ nil ].
 	element := VGDrawnFrameElement new.
+	element drawBlock: (VGFrameDeviceBenchmark drawBlockNamed: aName).
 	^ PVVulkanDriver installDuring: [
 		  VGVulkanPresentHost enableDuring: [
 			  space := self spaceOfTheElement: element.
@@ -76,13 +97,10 @@ VGVulkanPresentRendererExamples class >> openWindowAndPresentTheBenchmarkFrames 
 			  hostSpace initializeRenderer.
 			  [
 			  hostSpace show.
-			  VGFrameDeviceBenchmark frameNames collect: [ :each |
-				  element drawBlock:
-					  (VGFrameDeviceBenchmark drawBlockNamed: each).
-				  self
-					  intervalsOfFrameNamed: each
-					  presentedIn: hostSpace
-					  of: space ] ] ensure: [ hostSpace close ] ] ]
+			  self
+				  intervalsOfFrameNamed: aName
+				  presentedIn: hostSpace
+				  of: space ] ensure: [ hostSpace close ] ] ]
 ]
 
 { #category : 'constants' }

@@ -209,3 +209,38 @@ VGVulkanPresentRendererTest >> testThePresentHostSpaceIsTheOnlyOneThatSaysItsFra
 				 == VGVulkanPresentHostSpace) ].
 	self deny: BlHostSpace basicNew presentsFramesOnDevice
 ]
+
+{ #category : 'tests' }
+VGVulkanPresentRendererTest >> testTheWindowExamplePresentsOneFrameAWindow [
+	"Unit 7.6's windowed half was one call that opened one window and presented all three
+	 benchmark frames in it, 363 presents deep. Driven from an MCP evaluation on 23 November
+	 2026 that call never returned, and the image had to be left to recover on its own: the
+	 whole run sits in one process, so whatever stalls in it stalls with no frame finished and
+	 no window closed. The example is a window a frame now, which is the rule the device tests
+	 of this unit already follow. The counts below are that shape: the method that opens a
+	 window names one frame and presents it once, and the method that names the three frames
+	 opens no window of its own."
+
+	| sendsOf |
+	sendsOf := [ :aMethod :aSelector |
+	           (aMethod ast allChildren select: [ :each |
+		            each isMessage and: [ each selector = aSelector ] ]) size ].
+	self
+		assert: (sendsOf
+				 value: VGVulkanPresentRendererExamples class
+					 >> #openWindowAndPresentTheFrameNamed:
+				 value: #intervalsOfFrameNamed:presentedIn:of:)
+		equals: 1.
+	self
+		assert: (sendsOf
+				 value: VGVulkanPresentRendererExamples class
+					 >> #openWindowAndPresentTheBenchmarkFrames
+				 value: #openWindowAndPresentTheFrameNamed:)
+		equals: 1.
+	self
+		assert: (sendsOf
+				 value: VGVulkanPresentRendererExamples class
+					 >> #openWindowAndPresentTheBenchmarkFrames
+				 value: #newHostSpaceFor:)
+		equals: 0
+]
