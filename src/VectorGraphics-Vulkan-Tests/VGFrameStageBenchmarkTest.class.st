@@ -380,32 +380,31 @@ VGFrameStageBenchmarkTest >> testThePhasesOfEveryMeasuredFrameAccountForItsEncod
 	 to add up to that figure and not to some other frame. Within a tenth of it: the clock is
 	 read twice a phase, eleven phases deep, and those readings are inside the carrier encode
 	 and outside every row.
-	 The floors are compared and not the means. A mean over a handful of passes carries whichever
+	 Two sums of one pass are compared, and the floor of each: the fastest clocked pass against
+	 the fastest plain encode. The sum of the fastest pass of each phase is not the fastest sum
+	 of them — it is below it whenever no single pass was fastest in every phase, which read as
+	 0.80 of the whole once — so the phases are summed per pass and the floor taken of that.
+	 The floors and not the means, because a mean over a handful of passes carries whichever
 	 pass met the garbage collector, and such a pass has been ten times the others on a frame of
-	 a full screen; the fastest pass of a phase and the fastest encode are both the work itself.
-	 Five passes and not the three a report takes: the floor is itself an estimate, and at three
-	 passes eighteen measurements of this ratio ran from 0.84 to 1.03, where at five passes they
-	 ran from 0.95 to 1.01.
-	 The display list is left out of the sum, because the encode figure is measured over a list
-	 already drawn and drawing it is a phase of the frame and not of the encoding.
+	 a full screen.
+	 The display list is left out of both sides, because the encode figure is measured over a
+	 list already drawn and drawing it is a phase of the frame and not of the encoding.
 	 No device is asked for anything here: a display list, a binning and a buffer are all built
 	 on the host."
 
 	VGFrameStageBenchmark frameNames do: [ :name |
 		VGFrameStageBenchmark extentsOfItsCensus do: [ :extent |
-			| benchmark whole sum floors |
+			| benchmark whole sum |
 			benchmark := (VGFrameStageBenchmark
 				              frameName: name
 				              repeats: 5
 				              extent: extent) measureEncoding.
 			whole := benchmark minimumMillisecondsOf: #encode.
-			floors := benchmark minimumEncodePhaseMilliseconds.
-			sum := (floors keys reject: [ :each | each = #displayList ]) inject: 0
-				       into: [ :total :each | total + (floors at: each) ].
+			sum := benchmark timings floorOf: #clockedEncode.
 			self
 				assert: (sum - whole) abs < (whole / 10)
 				description: name asString , ' at ' , extent printString , ': '
-					, sum printString , ' of phases against ' , whole printString
+					, sum printString , ' of clocked phases against ' , whole printString
 					, ' of encode' ] ]
 ]
 

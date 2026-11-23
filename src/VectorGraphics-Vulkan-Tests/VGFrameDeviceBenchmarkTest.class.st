@@ -180,6 +180,26 @@ VGFrameDeviceBenchmarkTest >> testTheCensusCountsThePixelsBehindEveryReasonItNam
 ]
 
 { #category : 'tests' }
+VGFrameDeviceBenchmarkTest >> testThePhasesInsideAPhaseAreTimingsOfTheirOwn [
+	"A stage of a frame can be taken apart, and what it is made of is timings of the same kind:
+	 that is how the encode of a frame carries the eleven phases of the host half under it. The
+	 inside of a phase is the same object every time it is asked for, so a loop that reads a
+	 phase table into it does not throw the readings of the pass before away."
+
+	| timings inside |
+	timings := VGStageTimings new.
+	timings add: 5000 of: #encode.
+	inside := timings insideOf: #encode.
+	inside add: 2000 of: #bin.
+	(timings insideOf: #encode) add: 4000 of: #bin.
+	self assert: (timings insideOf: #encode) == inside.
+	self assert: inside means equals: (Dictionary newFrom: { #bin -> 3 }).
+	self assert: inside floors equals: (Dictionary newFrom: { #bin -> 2 }).
+	self assert: (timings meanOf: #encode) equals: 5.
+	self assert: timings means equals: (Dictionary newFrom: { #encode -> 5 })
+]
+
+{ #category : 'tests' }
 VGFrameDeviceBenchmarkTest >> testTheReferenceFrameIsDrawnEntirelyByTheDeviceSubset [
 	"What unit 2.7 bought, and the one fact of this unit that is about a real picture rather
 	 than a corpus case: every one of the eighty eight entries of the profiled frame is in the
@@ -192,6 +212,27 @@ VGFrameDeviceBenchmarkTest >> testTheReferenceFrameIsDrawnEntirelyByTheDeviceSub
 	self assert: census isFrameSupported.
 	self assert: census refusedCount equals: 0.
 	self assert: census supportedCount equals: census entries size
+]
+
+{ #category : 'tests' }
+VGFrameDeviceBenchmarkTest >> testTimingsKeepTheMeanAndTheFloorOfEveryReadingOfAPhase [
+	"The four parallel tables a benchmark kept — a total and a fastest pass, for the stages of a
+	 frame and for the phases inside its encode — are one object, which is the only thing that
+	 knows a reading is in microseconds and a report is in milliseconds. A stage nothing was
+	 read for answers nil rather than zero, since nought milliseconds is a measurement and no
+	 measurement is not, and a stage read once has no floor for the same reason."
+
+	| timings |
+	timings := VGStageTimings new.
+	timings add: 1000 of: #bin.
+	timings add: 3000 of: #bin.
+	timings add: 4000 of: #software.
+	self assert: (timings meanOf: #bin) equals: 2.
+	self assert: (timings floorOf: #bin) equals: 1.
+	self assert: (timings meanOf: #software) equals: 4.
+	self assert: (timings floorOf: #software) equals: nil.
+	self assert: (timings meanOf: #writeTiles) equals: nil.
+	self assert: (timings floorOf: #writeTiles) equals: nil
 ]
 
 { #category : 'tests' }

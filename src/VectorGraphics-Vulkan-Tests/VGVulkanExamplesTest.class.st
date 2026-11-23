@@ -14,6 +14,27 @@ Class {
 }
 
 { #category : 'accessing' }
+VGVulkanExamplesTest class >> exampleHolders [
+	^ {
+		  VGVulkanBackendExamples.
+		  VGVulkanRoundTripExamples.
+		  VGTileBinningExamples.
+		  VGTiledFillExamples.
+		  VGVulkanBlurExamples.
+		  VGVulkanDeviceSessionExamples.
+		  VGVulkanDriverSdl2HostExamples.
+		  VGVulkanPresentHostExamples.
+		  VGVulkanPresentChainExamples.
+		  VGVulkanPresentRendererExamples.
+		  VGFrameDeviceBenchmarkExamples.
+		  VGFrameDrawingKitExamples.
+		  VGFrameStageBenchmarkExamples.
+		  VGStageTimingsExamples.
+		  VGKernelVisitCensusExamples.
+		  VGPresentPathBenchmarkExamples }
+]
+
+{ #category : 'accessing' }
 VGVulkanExamplesTest >> exampleHolders [
 	^ {
 		  VGVulkanBackendExamples.

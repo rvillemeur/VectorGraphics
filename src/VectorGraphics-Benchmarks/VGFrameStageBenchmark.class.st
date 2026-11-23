@@ -145,7 +145,7 @@ VGFrameStageBenchmark >> measureCairoFrame [
 	^ self
 ]
 
-{ #category : 'running' }
+{ #category : 'measuring' }
 VGFrameStageBenchmark >> measureStagesOn: aSession [
 	"Where the milliseconds of one frame go, measured in a pass of its own: the clock is read
 	 twice a stage and those readings would otherwise land inside the dispatch figure my
@@ -156,7 +156,9 @@ VGFrameStageBenchmark >> measureStagesOn: aSession [
 	 cost would be attributed to whichever stage happened to be first.
 	 The pass is timed as a whole as well, because one dispatch of this frame is not the next to
 	 a decimal place: the stages are to be read against the frame they were measured in, and
-	 the difference between that frame and the clean one above is what the readings cost."
+	 the difference between that frame and the clean one above is what the readings cost. The
+	 whole is divided by the repeats and added as one reading, since it is the clocked frame's
+	 own mean and has no floor of its own."
 
 	| target |
 	target := ByteArray new:
@@ -165,9 +167,11 @@ VGFrameStageBenchmark >> measureStagesOn: aSession [
 	dispatch := (aSession dispatchForEncoding: encoding) recordStages.
 	dispatch draw: encoding into: target.
 	dispatch recordStages.
-	milliseconds at: #stagedFrame put: (self millisecondsDuring: [
-			 repeats timesRepeat: [ dispatch draw: encoding into: target ] ])
-		/ repeats.
+	self timings
+		add: (self microsecondsDuring: [
+				 repeats timesRepeat: [ dispatch draw: encoding into: target ] ])
+			 / repeats
+		of: #stagedFrame.
 	^ self
 ]
 
@@ -196,11 +200,11 @@ VGFrameStageBenchmark >> run [
 	| session |
 	self measureEncoding.
 	session := nil.
-	milliseconds
-		at: #context
-		put: (self millisecondsDuring: [ session := self newSession ]).
+	self timings
+		add: (self microsecondsDuring: [ session := self newSession ])
+		of: #context.
 	session
-		ifNil: [ milliseconds removeKey: #context ]
+		ifNil: [ self timings remove: #context ]
 		ifNotNil: [
 			[
 			[

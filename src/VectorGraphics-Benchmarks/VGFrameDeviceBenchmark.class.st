@@ -12,15 +12,12 @@ Class {
 		'repeats',
 		'encoding',
 		'uploadedByteCount',
-		'milliseconds',
 		'deviceForm',
 		'pixelsEqual',
 		'deviceName',
 		'unavailableReason',
 		'extent',
-		'minimums',
-		'encodePhases',
-		'encodePhaseMinimums'
+		'timings'
 	],
 	#category : 'VectorGraphics-Benchmarks-Frames',
 	#package : 'VectorGraphics-Benchmarks',
@@ -237,20 +234,6 @@ VGFrameDeviceBenchmark class >> phaseLabels [
 		  (#software -> 'software frame') }
 ]
 
-{ #category : 'measuring' }
-VGFrameDeviceBenchmark >> addMicroseconds: aNumber of: aPhase toTotals: aTotalTable minimums: aMinimumTable [
-	"One reading of a phase, added to what its passes have cost and compared with the fastest of
-	 them. A phase is kept as both, because the mean is the figure every unit before this one
-	 quotes and the fastest pass is the work without whatever the machine was doing beside it."
-
-	aTotalTable
-		at: aPhase
-		put: (aTotalTable at: aPhase ifAbsent: [ 0 ]) + aNumber.
-	aMinimumTable
-		at: aPhase
-		put: ((aMinimumTable at: aPhase ifAbsent: [ aNumber ]) min: aNumber)
-]
-
 { #category : 'accessing' }
 VGFrameDeviceBenchmark >> binnedEntryCount [
 	^ encoding ifNotNil: [ encoding binnedEntryCount ]
@@ -313,12 +296,12 @@ VGFrameDeviceBenchmark >> encodeMilliseconds [
 	^ self millisecondsOf: #encode
 ]
 
-{ #category : 'accessing' }
+{ #category : 'reading' }
 VGFrameDeviceBenchmark >> encodePhaseMilliseconds [
 	"What each phase of the host half of my frame cost, in milliseconds, keyed by the names
 	 VGTiledFillEncoding gives them. Empty until the frame has been encoded."
 
-	^ encodePhases ifNil: [ Dictionary new ]
+	^ (timings insideOf: #encode) means
 ]
 
 { #category : 'reporting' }
@@ -441,90 +424,72 @@ VGFrameDeviceBenchmark >> isAvailable [
 
 { #category : 'measuring' }
 VGFrameDeviceBenchmark >> measure: aPhase perRepeatOf: aBlock [
-	"The named phase, measured over the repeats, kept as the mean of them and as the fastest of
-	 them. The mean is what every figure already in the plan is, so it stays the number a report
-	 quotes first; the minimum is the work without the collector and the scheduler of whichever
-	 pass met them, which is what a decision between two levers is read off.
+	"The named phase, measured over the repeats. The timings keep the mean of them, which is
+	 the figure every unit already in the plan quotes, and the fastest of them beside it.
 	 One pass is run and thrown away before the clock starts, because the first one pays for the
 	 first touch of the pages and the warm-up of whatever cache is behind the block."
 
-	| total best |
 	aBlock value.
-	total := 0.
-	best := nil.
 	repeats timesRepeat: [
-		| taken |
-		taken := self microsecondsDuring: aBlock.
-		total := total + taken.
-		best := best ifNil: [ taken ] ifNotNil: [ best min: taken ] ].
-	milliseconds at: aPhase put: (self millisecondsOfMicroseconds: total / repeats).
-	minimums at: aPhase put: (self millisecondsOfMicroseconds: best).
+		timings add: (self microsecondsDuring: aBlock) of: aPhase ].
 	^ self
 ]
 
 { #category : 'measuring' }
-VGFrameDeviceBenchmark >> measureDisplayListIntoTotals: aTotalTable minimums: aMinimumTable [
+VGFrameDeviceBenchmark >> measureDisplayList [
 	"Drawing the frame, which is the first phase of its host half. It is measured apart from the
 	 encodes and not between them: it allocates a surface a pass, and an encode measured
 	 directly after such an allocation pays for it — with the drawing inside that loop the plain
 	 encode read a quarter more than the phases it is the sum of."
 
+	| phases |
+	phases := timings insideOf: #encode.
 	self newSurface.
 	repeats timesRepeat: [
-		self
-			addMicroseconds: (self microsecondsDuring: [ self newSurface ])
-			of: #displayList
-			toTotals: aTotalTable
-			minimums: aMinimumTable ]
+		phases add: (self microsecondsDuring: [ self newSurface ]) of: #displayList ]
 ]
 
 { #category : 'measuring' }
 VGFrameDeviceBenchmark >> measureEncodeOf: aDisplayList [
-	"The encode figure, the phases inside it and the drawing of the list, measured into one pair
-	 of tables and then published as milliseconds. The clocked encode that carries the phases is
-	 reported nowhere: the readings inside it are what the plain encode beside it is free of."
+	"The encode figure, the phases inside it and the drawing of the list. The phases are read
+	 into the timings of the encode itself, because they are that figure taken apart. The
+	 clocked encode that carries them is reported nowhere: the readings inside it are what the
+	 plain encode beside it is free of."
 
-	| totals best |
-	totals := Dictionary new.
-	best := Dictionary new.
-	self measureEncodesOf: aDisplayList intoTotals: totals minimums: best.
-	self measureDisplayListIntoTotals: totals minimums: best.
-	milliseconds at: #encode put:
-		(self millisecondsOfMicroseconds: (totals removeKey: #encode) / repeats).
-	minimums at: #encode put:
-		(self millisecondsOfMicroseconds: (best removeKey: #encode)).
-	encodePhases := totals collect: [ :each |
-		                self millisecondsOfMicroseconds: each / repeats ].
-	encodePhaseMinimums := best collect: [ :each |
-		                       self millisecondsOfMicroseconds: each ].
+	self measureEncodesOf: aDisplayList.
+	self measureDisplayList.
 	^ self
 ]
 
 { #category : 'measuring' }
-VGFrameDeviceBenchmark >> measureEncodesOf: aDisplayList intoTotals: aTotalTable minimums: aMinimumTable [
+VGFrameDeviceBenchmark >> measureEncodesOf: aDisplayList [
 	"Pass by pass: the list encoded once with no clock inside it, which is the figure the plan
 	 quotes, then the same list encoded again with every phase timed. The two are interleaved
 	 because a machine is not the same machine a second later — a frame of a full screen has met
 	 the garbage collector in one window and not the next — and phases measured in a window of
 	 their own cannot be read against a whole measured in another.
+	 The phases of a clocked pass are summed and kept as a stage of their own, because the sum
+	 of the fastest pass of each phase is not the fastest sum of them: the accounting of the
+	 phases against the whole is read on this stage, which is a sum of one pass as the encode
+	 figure is a whole of one pass.
 	 One pass of each is thrown away first, for the first touch of the pages."
 
+	| phases |
+	phases := timings insideOf: #encode.
 	VGTiledFillEncoding of: aDisplayList extent: self extent.
 	self encodeWithStagesRecorded: aDisplayList.
 	repeats timesRepeat: [
-		self
-			addMicroseconds: (self microsecondsDuring: [
+		| clocked sum |
+		timings
+			add: (self microsecondsDuring: [
 					 VGTiledFillEncoding of: aDisplayList extent: self extent ])
-			of: #encode
-			toTotals: aTotalTable
-			minimums: aMinimumTable.
-		(self encodeWithStagesRecorded: aDisplayList) stageMicroseconds
-			keysAndValuesDo: [ :phase :taken |
-				self
-					addMicroseconds: taken
-					of: phase
-					toTotals: aTotalTable
-					minimums: aMinimumTable ] ]
+			of: #encode.
+		clocked := self encodeWithStagesRecorded: aDisplayList.
+		sum := 0.
+		clocked stageMicroseconds keysAndValuesDo: [ :phase :taken |
+			phases add: taken of: phase.
+			sum := sum + taken ].
+		timings add: sum of: #clockedEncode ]
 ]
 
 { #category : 'measuring' }
@@ -584,7 +549,7 @@ VGFrameDeviceBenchmark >> measureSoftwareFrame [
 
 	| surface |
 	surface := self newSurfaceOnBackend: VGBackend failover.
-	milliseconds at: #software put: (self millisecondsDuring: [ surface flush ]).
+	timings add: (self microsecondsDuring: [ surface flush ]) of: #software.
 	deviceForm ifNotNil: [ pixelsEqual := deviceForm bits = surface asForm bits ].
 	^ self
 ]
@@ -619,57 +584,30 @@ VGFrameDeviceBenchmark >> millisecondStringFor: aNumber minimum: aMinimumOrNil [
 					   VGVulkanRoundTrip millisecondDecimalPlaces) , ')' ]
 ]
 
-{ #category : 'accessing' }
-VGFrameDeviceBenchmark >> milliseconds [
-	^ milliseconds
-]
-
-{ #category : 'measuring' }
-VGFrameDeviceBenchmark >> millisecondsDuring: aBlock [
-	"The time one pass of the block took. A software frame of this size costs a second or two, so
-	 it is measured once: a second pass would buy three decimal places of a number read for its
-	 order of magnitude."
-
-	| start |
-	start := Time microsecondClockValue.
-	aBlock value.
-	^ (Time microsecondClockValue - start
-	   / VGVulkanRoundTrip microsecondsPerMillisecond) asFloat
-]
-
-{ #category : 'accessing' }
+{ #category : 'reading' }
 VGFrameDeviceBenchmark >> millisecondsOf: aPhase [
 	"What one pass of the named phase cost, or nil where the phase was not measured. The phases
 	 are kept in one table rather than in a variable each, so that the report walks them and
 	 neither the rows nor the view name a phase the measurement does not have."
 
-	^ milliseconds at: aPhase ifAbsent: [ nil ]
+	^ timings meanOf: aPhase
 ]
 
-{ #category : 'measuring' }
-VGFrameDeviceBenchmark >> millisecondsOfMicroseconds: aNumber [
-	"Microseconds as the milliseconds every row of a report is in. One place does the division,
-	 so a row and a phase and a stage all answer the same unit."
-
-	^ (aNumber / VGVulkanRoundTrip microsecondsPerMillisecond) asFloat
-]
-
-{ #category : 'accessing' }
+{ #category : 'reading' }
 VGFrameDeviceBenchmark >> minimumEncodePhaseMilliseconds [
 	"The fastest pass of each phase of the host half of my frame, in milliseconds. A phase is
 	 read against its own mean: the two differ by the collector and the scheduler, and a lever
 	 is chosen on the floor."
 
-	^ encodePhaseMinimums ifNil: [ Dictionary new ]
+	^ (timings insideOf: #encode) floors
 ]
 
-{ #category : 'accessing' }
+{ #category : 'reading' }
 VGFrameDeviceBenchmark >> minimumMillisecondsOf: aPhase [
 	"The fastest pass of the named phase, or nil where the phase was measured once or not at
-	 all. A phase timed by one pass has no floor to report: there is nothing for it to be the
-	 floor of."
+	 all."
 
-	^ minimums at: aPhase ifAbsent: [ nil ]
+	^ timings floorOf: aPhase
 ]
 
 { #category : 'running' }
@@ -789,8 +727,7 @@ VGFrameDeviceBenchmark >> setFrameName: aSymbol repeats: anInteger extent: anExt
 	frameName := aSymbol.
 	repeats := anInteger.
 	extent := anExtent.
-	milliseconds := Dictionary new.
-	minimums := Dictionary new
+	timings := VGStageTimings new
 ]
 
 { #category : 'accessing' }
@@ -832,6 +769,14 @@ VGFrameDeviceBenchmark >> timeRows [
 		rows add: 'faster by'
 			-> ((factor asFloat printShowingDecimalPlaces: 1) , ' times') ].
 	^ rows asArray
+]
+
+{ #category : 'reading' }
+VGFrameDeviceBenchmark >> timings [
+	"What the passes read for every stage of my frame: the mean of each and the fastest of
+	 each, with the phases of the host half under the encode they are inside of."
+
+	^ timings
 ]
 
 { #category : 'accessing' }
