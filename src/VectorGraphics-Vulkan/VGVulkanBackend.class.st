@@ -139,6 +139,15 @@ VGVulkanBackend >> blitSurface: aSurface at: aPoint paint: aPaint clip: aClip op
 	recordedFrame add: entry
 ]
 
+{ #category : 'dispatching' }
+VGVulkanBackend >> dispatch: anEncoding endingIn: anImage [
+	"The frame drawn on the device and copied into that image, which is every frame of a
+	 window that presents."
+
+	^ self dispatchOf: anEncoding during: [ :dispatch |
+		  dispatch draw: anEncoding endingIn: anImage ]
+]
+
 { #category : 'drawing' }
 VGVulkanBackend >> dispatch: anEncoding into: aByteArray [
 	"The frame drawn on the device and read back into those pixels, which is every frame that
@@ -146,15 +155,6 @@ VGVulkanBackend >> dispatch: anEncoding into: aByteArray [
 
 	^ self dispatchOf: anEncoding during: [ :dispatch |
 		  dispatch draw: anEncoding into: aByteArray ]
-]
-
-{ #category : 'drawing' }
-VGVulkanBackend >> dispatch: anEncoding into: aByteArray endingIn: anImage [
-	"The frame drawn on the device and copied into that image, which is every frame of a
-	 window that presents."
-
-	^ self dispatchOf: anEncoding during: [ :dispatch |
-		  dispatch draw: anEncoding into: aByteArray endingIn: anImage ]
 ]
 
 { #category : 'drawing' }
@@ -234,9 +234,6 @@ VGVulkanBackend >> drawFrameInto: anImage [
 	recordedFrame isEmpty ifFalse: [
 		self
 			dispatch: (VGTiledFillEncoding of: recordedFrame extent: anImage extent)
-			into: (ByteArray new:
-					 anImage extent x * anImage extent y
-					 * VGTiledFillEncoding targetFormat bytesPerPixel)
 			endingIn: anImage ] ] ensure: [ recordedFrame reset ].
 	^ anImage
 ]

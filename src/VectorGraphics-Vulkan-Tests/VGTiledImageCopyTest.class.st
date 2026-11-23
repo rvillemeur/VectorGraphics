@@ -48,19 +48,17 @@ VGTiledImageCopyTest >> testAFrameThatEndsInAnImagePaysTheCopyAndNoReadback [
 	 record its stages records them for every frame after, and the session's draws the frames
 	 of every other test."
 
-	| encoding dispatch image pixelCount |
+	| encoding dispatch image |
 	self hasDevice ifFalse: [ ^ self ].
 	encoding := self
 		            encodingOfExtent: self caseExtent
 		            drawnWith: self mixedFillFrame.
-	pixelCount := self caseExtent x * self caseExtent y
-	              * VGTiledFillEncoding targetFormat bytesPerPixel.
 	dispatch := VGTiledFillDispatch on:
 		            VGVulkanDeviceSession default context.
 	image := self imageOfExtent: self caseExtent.
 	[
 	dispatch recordStages.
-	dispatch draw: encoding into: (ByteArray new: pixelCount) endingIn: image.
+	dispatch draw: encoding endingIn: image.
 	self assert: (dispatch stageMicroseconds includesKey: #copy).
 	self deny: (dispatch stageMicroseconds includesKey: #readback).
 	self assert: (dispatch microsecondsOfStage: #copy) isNil not ]
@@ -243,22 +241,17 @@ VGTiledImageCopyTest >> testTheImageAFrameEndsInHoldsThePixelsTheSameFrameReadBa
 	 the host. The same encoding is drawn twice from a zeroed target, once ending in an image
 	 and once read back, and the bytes of the image are the bytes of the readback."
 
-	| encoding pixelCount dispatch readBack image |
+	| encoding dispatch readBack image |
 	self hasDevice ifFalse: [ ^ self ].
 	encoding := self
 		            encodingOfExtent: self caseExtent
 		            drawnWith: self mixedFillFrame.
-	pixelCount := self caseExtent x * self caseExtent y
-	              * VGTiledFillEncoding targetFormat bytesPerPixel.
 	dispatch := VGVulkanDeviceSession default dispatchForEncoding: encoding.
-	readBack := ByteArray new: pixelCount.
+	readBack := ByteArray new: encoding targetByteCount.
 	dispatch draw: encoding into: readBack.
 	image := self imageOfExtent: self caseExtent.
 	[
-	dispatch
-		draw: encoding
-		into: (ByteArray new: pixelCount)
-		endingIn: image.
+	dispatch draw: encoding endingIn: image.
 	self
 		deny: (readBack allSatisfy: [ :each | each = 0 ])
 		description: 'the frame laid down no pixel at all'.

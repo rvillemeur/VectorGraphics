@@ -634,6 +634,15 @@ VGTiledFillEncoding >> stops [
 ]
 
 { #category : 'accessing' }
+VGTiledFillEncoding >> targetByteCount [
+	"The bytes the destination pixels of this frame hold: my extent in the format my kernel
+	 writes. A caller that allocates them asks me rather than multiplying it out itself, which
+	 is how the format stays one decision."
+
+	^ grid extent x * grid extent y * self class targetFormat bytesPerPixel
+]
+
+{ #category : 'accessing' }
 VGTiledFillEncoding >> tileTable [
 	^ buffers tileTable
 ]

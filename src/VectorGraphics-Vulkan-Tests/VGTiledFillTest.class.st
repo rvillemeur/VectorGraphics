@@ -521,6 +521,18 @@ VGTiledFillTest >> testAnEncodedEntryCarriesThePixelItsPaintAnswersAndItsOwnAlph
 ]
 
 { #category : 'tests' }
+VGTiledFillTest >> testAnEncodingKnowsHowManyBytesItsTargetHolds [
+	"The size of the destination pixels is a rule of the encoding, not of whoever asks for a
+	 frame: the extent it was built for and the format its kernel writes."
+
+	| encoding |
+	encoding := self encodingOfExtent: 24 @ 16 drawnWith: self mixedFillFrame.
+	self
+		assert: encoding targetByteCount
+		equals: 24 * 16 * VGTiledFillEncoding targetFormat bytesPerPixel
+]
+
+{ #category : 'tests' }
 VGTiledFillTest >> testAnEvenOddStarDrawsTheSameBytesAsTheSoftwareBackend [
 	"A self-intersecting path, where the even-odd rule leaves the middle empty: the walk counts
 	 crossings rather than directions, and two edges can cross one point."

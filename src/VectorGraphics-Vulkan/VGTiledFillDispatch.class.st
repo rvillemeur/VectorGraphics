@@ -217,27 +217,32 @@ VGTiledFillDispatch >> dispatchOver: anEncoding [
 ]
 
 { #category : 'drawing' }
+VGTiledFillDispatch >> draw: anEncoding endingIn: anImage [
+	"One frame that ends on the device: drawn with no readback, then the target buffer copied
+	 into that image. Nothing of the frame reaches the host, which is the whole point of the
+	 unit; the caller owns the image and the layout it wants it in afterwards, because the
+	 chain that presents it has its own semaphores to fit around the transition.
+	 The destination bytes are mine and no caller sees them: they are what the kernel binds as
+	 its target and what the copy reads, and their size is the encoding's own rule.
+	 A frame that touches no tile dispatches nothing and copies nothing: the image holds
+	 whatever it held, which is what the target buffer holds too."
+
+	self
+		draw: anEncoding
+		into: (ByteArray new: anEncoding targetByteCount)
+		readBack: false.
+	anEncoding touchedTileCount = 0 ifTrue: [ ^ anImage ].
+	self copyTargetInto: anImage.
+	^ anImage
+]
+
+{ #category : 'drawing' }
 VGTiledFillDispatch >> draw: anEncoding into: aByteArray [
 	"One frame on the device whose pixels the host then reads, which is every frame that ends in
 	 a surface. The readback is what makes it so, and draw:into:readBack: is where a frame that
 	 ends on the device says otherwise."
 
 	^ self draw: anEncoding into: aByteArray readBack: true
-]
-
-{ #category : 'drawing' }
-VGTiledFillDispatch >> draw: anEncoding into: aByteArray endingIn: anImage [
-	"One frame that ends on the device: drawn with no readback, then the target buffer copied
-	 into that image. Nothing of the frame reaches the host, which is the whole point of the
-	 unit; the caller owns the image and the layout it wants it in afterwards, because the
-	 chain that presents it has its own semaphores to fit around the transition.
-	 A frame that touches no tile dispatches nothing and copies nothing: the image holds
-	 whatever it held, which is what the target buffer holds too."
-
-	self draw: anEncoding into: aByteArray readBack: false.
-	anEncoding touchedTileCount = 0 ifTrue: [ ^ anImage ].
-	self copyTargetInto: anImage.
-	^ anImage
 ]
 
 { #category : 'drawing' }
