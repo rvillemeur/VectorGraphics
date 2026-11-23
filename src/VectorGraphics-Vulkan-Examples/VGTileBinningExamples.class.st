@@ -19,6 +19,27 @@ Class {
 }
 
 { #category : 'examples' }
+VGTileBinningExamples class >> binningOfTheReferenceFrameWithItsPhasesTimed [
+	<sampleInstance>
+	"The reference frame of unit 1.11 binned with the clock on, which is what the Phases tab
+	 reads: the bounding box of each entry, the tiles and super tiles it reaches, the questions
+	 about what it covers whole, and the writing of the references. The interior phase is the one
+	 worth looking at. It is seven tenths of the measured microseconds, and that is already with
+	 a super tile of sixteen tiles asked before the tiles are, which is what makes the phase the
+	 lever the next unit goes after.
+	 The clock is read four times an entry here, so the whole costs about twice what a binning a
+	 running tool builds costs; the shares are what the tab is read for, not the total."
+	| profile canvas surface |
+	profile := VGFrameProfile new.
+	canvas := profile newCanvas.
+	(profile sceneForRendererClass: VGRenderer) aeFullDrawOn: canvas.
+	surface := canvas privateAeCairoSurface.
+	^ VGTileBinning new recordStages
+		  setDisplayList: surface displayList
+		  grid: (VGTileGrid extent: profile extent)
+]
+
+{ #category : 'examples' }
 VGTileBinningExamples class >> binningOfTwoDistantShapes [
 	<sampleInstance>
 	"Two small fills far apart in one frame, binned. The Binning tab counts the tiles they touch

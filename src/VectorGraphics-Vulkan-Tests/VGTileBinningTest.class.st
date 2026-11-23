@@ -35,6 +35,25 @@ VGTileBinningTest >> frameOfExtent: anExtent drawnWith: aBlock [
 	^ surface displayList
 ]
 
+{ #category : 'tests' }
+VGTileBinningTest >> testABinningAskedForItsPhasesTimesEveryPhaseItPays [
+	"A census of where the binning of a frame goes. The clock is read twice a phase and four
+	 times an entry, so a binning only reads it where a caller asked, which the first assertion
+	 holds: a binning nobody asked reports no phase at all."
+	| grid list binning |
+	grid := VGTileGrid extent: 64 @ 64 tileExtent: 16 @ 16.
+	list := VGDisplayList new.
+	list add: (VGCountingCoverageEntryStub coveringEverythingOf: (0 @ 0 corner: 64 @ 64)).
+	self assert: (VGTileBinning of: list grid: grid) stageMicroseconds isEmpty.
+	binning := VGTileBinning new recordStages
+		           setDisplayList: list
+		           grid: (VGTileGrid extent: 64 @ 64 tileExtent: 16 @ 16).
+	self
+		assert: binning stageMicroseconds keys asSortedCollection asArray
+		equals: VGTileBinning stageNames asSortedCollection asArray.
+	self assert: binning touchedTileCount equals: 16
+]
+
 { #category : 'tests - grid' }
 VGTileBinningTest >> testADegenerateRectangleTouchesNoTileAtAll [
 	"The degenerate states: nothing to draw, nothing off the grid, and nothing from a rectangle of
