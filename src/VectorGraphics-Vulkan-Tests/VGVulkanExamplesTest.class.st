@@ -29,5 +29,6 @@ VGVulkanExamplesTest >> exampleHolders [
 		  VGFrameDeviceBenchmarkExamples.
 		  VGFrameDrawingKitExamples.
 		  VGFrameStageBenchmarkExamples.
-		  VGKernelVisitCensusExamples }
+		  VGKernelVisitCensusExamples.
+		  VGPresentPathBenchmarkExamples }
 ]
