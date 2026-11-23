@@ -30,6 +30,7 @@ VGVulkanExamplesTest class >> exampleHolders [
 		  VGFrameDrawingKitExamples.
 		  VGFrameStageBenchmarkExamples.
 		  VGStageTimingsExamples.
+		  VGDeviceOutcomeExamples.
 		  VGKernelVisitCensusExamples.
 		  VGPresentPathBenchmarkExamples }
 ]

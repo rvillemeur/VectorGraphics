@@ -211,7 +211,8 @@ VGFrameStageBenchmark >> run [
 			self measureOn: session.
 			self measureStagesOn: session ]
 				on: Error
-				do: [ :each | unavailableReason := self reasonFrom: each ] ] ensure: [
+				do: [ :each |
+				self outcome unavailableReason: (self reasonFrom: each) ] ] ensure: [
 				session releaseDevice ] ].
 	self measureCairoFrame.
 	self measureSoftwareFrame.

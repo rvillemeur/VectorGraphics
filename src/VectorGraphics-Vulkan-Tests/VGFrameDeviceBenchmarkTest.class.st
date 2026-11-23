@@ -180,6 +180,47 @@ VGFrameDeviceBenchmarkTest >> testTheCensusCountsThePixelsBehindEveryReasonItNam
 ]
 
 { #category : 'tests' }
+VGFrameDeviceBenchmarkTest >> testTheOutcomeOfADrawnFrameNamesTheDeviceAndWhetherThePixelsMatch [
+	"The other outcome: a device drew, so the rows name it and say whether what came back is
+	 the picture the software path draws. The comparison is the outcome's own, because the two
+	 pictures are what it holds and nothing else needs the software one."
+
+	| outcome drawn |
+	drawn := Form extent: 2 @ 2 depth: 32.
+	drawn fillColor: Color red.
+	outcome := VGDeviceOutcome new
+		           deviceName: 'llvmpipe';
+		           form: drawn;
+		           yourself.
+	self assert: outcome isAvailable.
+	self assert: (outcome rows includes: 'device' -> 'llvmpipe').
+	self assert: outcome pixelsEqual isNil.
+	outcome compareWith: drawn deepCopy.
+	self assert: outcome pixelsEqual.
+	self assert: (outcome rows includes: 'same pixels' -> 'true').
+	outcome compareWith: (Form extent: 2 @ 2 depth: 32).
+	self deny: outcome pixelsEqual
+]
+
+{ #category : 'tests' }
+VGFrameDeviceBenchmarkTest >> testTheOutcomeOfAMachineWithNoDeviceIsTheReasonItGave [
+	"What a benchmark answers about the device half when no device drew: the outcome is not
+	 available, it has no picture, and its rows say none and why instead of naming a device."
+
+	| outcome |
+	outcome := VGDeviceOutcome new.
+	self assert: outcome isAvailable.
+	outcome unavailableReason: 'no libvulkan.so.1 on this machine'.
+	self deny: outcome isAvailable.
+	self assert: outcome form isNil.
+	self
+		assert: outcome rows
+		equals: {
+				'device' -> 'none'.
+				'reason' -> 'no libvulkan.so.1 on this machine' }
+]
+
+{ #category : 'tests' }
 VGFrameDeviceBenchmarkTest >> testThePhasesInsideAPhaseAreTimingsOfTheirOwn [
 	"A stage of a frame can be taken apart, and what it is made of is timings of the same kind:
 	 that is how the encode of a frame carries the eleven phases of the host half under it. The

@@ -12,12 +12,9 @@ Class {
 		'repeats',
 		'encoding',
 		'uploadedByteCount',
-		'deviceForm',
-		'pixelsEqual',
-		'deviceName',
-		'unavailableReason',
 		'extent',
-		'timings'
+		'timings',
+		'outcome'
 	],
 	#category : 'VectorGraphics-Benchmarks-Frames',
 	#package : 'VectorGraphics-Benchmarks',
@@ -261,7 +258,7 @@ VGFrameDeviceBenchmark >> countRows [
 
 { #category : 'accessing' }
 VGFrameDeviceBenchmark >> deviceForm [
-	^ deviceForm
+	^ outcome form
 ]
 
 { #category : 'accessing' }
@@ -271,24 +268,12 @@ VGFrameDeviceBenchmark >> deviceMilliseconds [
 
 { #category : 'accessing' }
 VGFrameDeviceBenchmark >> deviceName [
-	^ deviceName
+	^ outcome deviceName
 ]
 
 { #category : 'reporting' }
 VGFrameDeviceBenchmark >> deviceRows [
-	"Which device drew the frame, or why none did, and whether what came back is the picture the
-	 software path draws."
-
-	| rows |
-	rows := OrderedCollection new.
-	self isAvailable
-		ifTrue: [ deviceName ifNotNil: [ rows add: 'device' -> deviceName ] ]
-		ifFalse: [
-			rows add: 'device' -> 'none'.
-			rows add: 'reason' -> unavailableReason ].
-	pixelsEqual ifNotNil: [
-		rows add: 'same pixels' -> pixelsEqual printString ].
-	^ rows asArray
+	^ outcome rows
 ]
 
 { #category : 'accessing' }
@@ -404,22 +389,19 @@ VGFrameDeviceBenchmark >> inspectorDeviceFrame: aBuilder [
 	"The picture the device drew, so that a frame measured fast and drawn wrong is visible as
 	 such and not only reported as a false in the rows above."
 
-	^ aBuilder newImage image: deviceForm
+	^ aBuilder newImage image: self deviceForm
 ]
 
 { #category : 'inspector' }
 VGFrameDeviceBenchmark >> inspectorDeviceFrameContext: aContext [
 	"A benchmark that has not been dispatched has no picture of its own."
 
-	aContext active: deviceForm isNotNil
+	aContext active: self deviceForm isNotNil
 ]
 
-{ #category : 'accessing' }
+{ #category : 'testing' }
 VGFrameDeviceBenchmark >> isAvailable [
-	"Whether this machine could be measured on a device at all. A device that is missing, or a
-	 driver that faults, records why instead."
-
-	^ unavailableReason isNil
+	^ outcome isAvailable
 ]
 
 { #category : 'measuring' }
@@ -468,10 +450,6 @@ VGFrameDeviceBenchmark >> measureEncodesOf: aDisplayList [
 	 because a machine is not the same machine a second later — a frame of a full screen has met
 	 the garbage collector in one window and not the next — and phases measured in a window of
 	 their own cannot be read against a whole measured in another.
-	 The phases of a clocked pass are summed and kept as a stage of their own, because the sum
-	 of the fastest pass of each phase is not the fastest sum of them: the accounting of the
-	 phases against the whole is read on this stage, which is a sum of one pass as the encode
-	 figure is a whole of one pass.
 	 One pass of each is thrown away first, for the first touch of the pages."
 
 	| phases |
@@ -479,17 +457,12 @@ VGFrameDeviceBenchmark >> measureEncodesOf: aDisplayList [
 	VGTiledFillEncoding of: aDisplayList extent: self extent.
 	self encodeWithStagesRecorded: aDisplayList.
 	repeats timesRepeat: [
-		| clocked sum |
 		timings
 			add: (self microsecondsDuring: [
 					 VGTiledFillEncoding of: aDisplayList extent: self extent ])
 			of: #encode.
-		clocked := self encodeWithStagesRecorded: aDisplayList.
-		sum := 0.
-		clocked stageMicroseconds keysAndValuesDo: [ :phase :taken |
-			phases add: taken of: phase.
-			sum := sum + taken ].
-		timings add: sum of: #clockedEncode ]
+		(self encodeWithStagesRecorded: aDisplayList) stageMicroseconds
+			keysAndValuesDo: [ :phase :taken | phases add: taken of: phase ] ]
 ]
 
 { #category : 'measuring' }
@@ -523,7 +496,7 @@ VGFrameDeviceBenchmark >> measureOn: aSession [
 	 one, and the form is kept so that the software measurement has something to compare."
 
 	| surface pixels backend dispatch |
-	deviceName := aSession contextOrNil chosenDeviceName.
+	outcome deviceName: aSession contextOrNil chosenDeviceName.
 	surface := self newSurface.
 	encoding := VGTiledFillEncoding of: surface displayList extent: self extent.
 	surface displayList reset.
@@ -534,7 +507,7 @@ VGFrameDeviceBenchmark >> measureOn: aSession [
 	uploadedByteCount := dispatch blocks values inject: 0 into: [ :sum :each |
 		                     sum + (dispatch byteCountOfBlock: each) ].
 	backend write: pixels into: surface.
-	deviceForm := surface asForm.
+	outcome form: surface asForm.
 	^ self
 ]
 
@@ -543,14 +516,12 @@ VGFrameDeviceBenchmark >> measureSoftwareFrame [
 	"The other side of the comparison, measured on this machine and in this session rather than
 	 quoted from unit 1.11, and drained by the failover backend by name: a preference set
 	 elsewhere in the session would otherwise send this frame to the device and the comparison
-	 would be of the device with itself.
-	 The two pictures are compared here and the software one is not kept, because what the
-	 comparison is read for is whether the device drew the frame and not what software drew."
+	 would be of the device with itself."
 
 	| surface |
 	surface := self newSurfaceOnBackend: VGBackend failover.
 	timings add: (self microsecondsDuring: [ surface flush ]) of: #software.
-	deviceForm ifNotNil: [ pixelsEqual := deviceForm bits = surface asForm bits ].
+	outcome compareWith: surface asForm.
 	^ self
 ]
 
@@ -622,7 +593,7 @@ VGFrameDeviceBenchmark >> newSession [
 	| session |
 	session := VGVulkanDeviceSession new.
 	session contextOrNil ifNotNil: [ ^ session ].
-	unavailableReason := session unavailableReason.
+	outcome unavailableReason: session unavailableReason.
 	^ nil
 ]
 
@@ -650,8 +621,16 @@ VGFrameDeviceBenchmark >> newSurfaceOnBackend: aBackendOrNil [
 ]
 
 { #category : 'accessing' }
+VGFrameDeviceBenchmark >> outcome [
+	"What the device half answered: the device, the picture, the verdict on the pixels, or the
+	 reason no device drew."
+
+	^ outcome
+]
+
+{ #category : 'accessing' }
 VGFrameDeviceBenchmark >> pixelsEqual [
-	^ pixelsEqual
+	^ outcome pixelsEqual
 ]
 
 { #category : 'printing' }
@@ -663,7 +642,7 @@ VGFrameDeviceBenchmark >> printOn: aStream [
 	self isAvailable ifFalse: [
 		^ aStream
 			  nextPutAll: ', ';
-			  nextPutAll: unavailableReason;
+			  nextPutAll: self unavailableReason;
 			  nextPut: $) ].
 	self hasRun ifFalse: [ ^ aStream nextPutAll: ', not dispatched)' ].
 	aStream
@@ -706,7 +685,7 @@ VGFrameDeviceBenchmark >> run [
 	[
 	[ self measureOn: session ]
 		on: Error
-		do: [ :each | unavailableReason := self reasonFrom: each ] ] ensure: [
+		do: [ :each | outcome unavailableReason: (self reasonFrom: each) ] ] ensure: [
 		session releaseDevice ].
 	^ self
 ]
@@ -727,7 +706,8 @@ VGFrameDeviceBenchmark >> setFrameName: aSymbol repeats: anInteger extent: anExt
 	frameName := aSymbol.
 	repeats := anInteger.
 	extent := anExtent.
-	timings := VGStageTimings new
+	timings := VGStageTimings new.
+	outcome := VGDeviceOutcome new
 ]
 
 { #category : 'accessing' }
@@ -786,7 +766,7 @@ VGFrameDeviceBenchmark >> touchedTileCount [
 
 { #category : 'accessing' }
 VGFrameDeviceBenchmark >> unavailableReason [
-	^ unavailableReason
+	^ outcome unavailableReason
 ]
 
 { #category : 'accessing' }
