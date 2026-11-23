@@ -46,6 +46,22 @@ VGTiledFillDispatch class >> bufferUsage [
 ]
 
 { #category : 'constants' }
+VGTiledFillDispatch class >> clearedOnTheDeviceLabel [
+	"What the buffer table says of a binding no block of the frame names: the destination of a
+	 frame that ends on the device, which the device clears and the kernel then writes."
+
+	^ 'cleared on the device'
+]
+
+{ #category : 'constants' }
+VGTiledFillDispatch class >> clearedTargetWord [
+	"The word a cleared destination pixel holds: transparent black, four zero bytes, which is
+	 what the host destination of a frame that reads back starts as."
+
+	^ 0
+]
+
+{ #category : 'constants' }
 VGTiledFillDispatch class >> emptyBufferWordCount [
 	"Vulkan refuses a buffer of no bytes, so a binding with nothing behind it is one word wide.
 	 The kernel never reads that word: a frame with no entry of its own touches no tile, and a
@@ -86,21 +102,32 @@ VGTiledFillDispatch class >> shownWordCount [
 { #category : 'constants' }
 VGTiledFillDispatch class >> stageNames [
 	"The stages one frame on the device is paid in, in the order it pays them, which is the
-	 order draw:into:readBack: wraps them in and the order a report shows them in. This table is
+	 order the drawing methods wrap them in and the order a report shows them in. This table is
 	 the only place that names a stage: a report reads it, and a test reads the source of the
 	 frame against it so that a stage cannot be timed under a name no report shows.
+
 	 The first of them is named writeBuffers for the frames of units 3.0 to 3.3, where it packed
 	 the words of the already built encoding into runs of bytes; since unit 3.4 it writes the
 	 frame record alone and names the blocks the upload reads, and the name is kept so that the
 	 figures of every unit can be read against each other. It is not the building of the
 	 encoding, which a frame pays before a dispatch is asked for anything.
-	 There is no release among them, because unit 3.1 keeps the device objects of a frame for the
-	 session and a frame pays nothing to let go of them. The last two are paid by one kind of
-	 frame each and never by both: a frame that ends on the device pays the copy of its target
-	 buffer into an image and reaches no readback, and a frame that asks for its pixels pays the
-	 readback and copies into no image. A report shows a row for the one its frame paid."
 
-	^ #( #writeBuffers #module #allocate #prepare #upload #dispatch #copy #readback )
+	 There is no release among them, because unit 3.1 keeps the device objects of a frame for the
+	 session and a frame pays nothing to let go of them. Three of them are paid by one kind of
+	 frame each: a frame that ends on the device clears its destination on the device and copies
+	 its target buffer into an image, and a frame that asks for its pixels brings its own
+	 destination with it, so it clears nothing and pays the readback instead. A report shows a
+	 row for the ones its frame paid."
+
+	^ #( #writeBuffers #module #allocate #prepare #clear #upload #dispatch #copy
+	     #readback )
+]
+
+{ #category : 'constants' }
+VGTiledFillDispatch class >> uploadedFromTheHostLabel [
+	"What the buffer table says of a binding the frame uploaded."
+
+	^ 'uploaded from the host'
 ]
 
 { #category : 'accessing' }
@@ -112,51 +139,79 @@ VGTiledFillDispatch >> blocks [
 ]
 
 { #category : 'encoding' }
-VGTiledFillDispatch >> blocksOf: anEncoding target: aByteArray [
-	"The block of words of every binding the kernel reads, by name: the buffers of the encoding
-	 as they lie in object memory, the pixels of the target as they are, and the frame record
-	 written here. Nothing is copied: a WordArray and a Float32Array already hold their elements
-	 in the order and the width a storage buffer reads them, so the upload writes out of these
-	 very objects. The names are the contract of the kernel with the two that are not an encoding
-	 buffer taken off it, so a binding added to that contract is named in one place and reaches
-	 the device without this method being edited."
+VGTiledFillDispatch >> blocksOf: anEncoding [
+	"The block of words of every binding the kernel reads off the encoding itself, by name,
+	 plus the frame record written here. The destination pixels are not among them: a frame
+	 that ends on the device composes over what the target buffer already holds, and a frame
+	 that reads back names its own destination through blocksOf:target:."
 
 	| answer |
 	answer := Dictionary new.
 	(VGTiledFillKernel bindingNames
 		 reject: [ :each | self class bindingsNotOfAnEncoding includes: each ])
 		do: [ :each | answer at: each put: (anEncoding perform: each) ].
-	answer at: #target put: aByteArray.
 	answer at: #frame put: (self frameRecordOf: anEncoding).
 	^ answer
 ]
 
+{ #category : 'encoding' }
+VGTiledFillDispatch >> blocksOf: anEncoding target: aByteArray [
+	"The blocks of the encoding and the destination pixels the caller owns, which is the frame
+	 that ends in the host. Nothing is copied: a WordArray and a Float32Array already hold
+	 their elements in the order and the width a storage buffer reads them, so the upload
+	 writes out of these very objects."
+
+	^ (self blocksOf: anEncoding)
+		  at: #target put: aByteArray;
+		  yourself
+]
+
+{ #category : 'inspecting' }
+VGTiledFillDispatch >> bufferRowOfBinding: aName at: anIndex [
+	"What the kernel reads that binding as, how many words it holds, the first of them, the
+	 host address its buffer is mapped at and where the words came from. The words are read out
+	 of the block the device was given rather than out of the encoding, and the address is
+	 asked of the buffer itself, so a row cannot say the frame sent something it did not or
+	 that a mapping is held where none is."
+
+	| block count |
+	block := blocks at: aName ifAbsent: [ nil ].
+	count := self wordCountOfBinding: aName filledBy: block.
+	^ {
+		  (anIndex - 1).
+		  aName.
+		  ((VGTiledFillKernel floatBindingNames includes: aName)
+			   ifTrue: [ #float32 ]
+			   ifFalse: [ #uint32 ]).
+		  count.
+		  (self firstWordsOfBlock: block upTo: count).
+		  (buffers
+			   at: aName
+			   ifPresent: [ :buffer | buffer mappingOrNil ]
+			   ifAbsent: [ nil ]).
+		  (block
+			   ifNil: [ self class clearedOnTheDeviceLabel ]
+			   ifNotNil: [ self class uploadedFromTheHostLabel ]) }
+]
+
 { #category : 'inspecting' }
 VGTiledFillDispatch >> bufferRows [
-	"One row a binding, in the order the descriptor set holds them: what the kernel reads it as,
-	 how many words went out, the first words of them and the host address the buffer is mapped
-	 at. The words are read out of the block the device was given rather than out of the
-	 encoding, and the address is asked of the buffer itself, so a row cannot say the frame sent
-	 something it did not or that a mapping is held where none is."
+	"One row a binding, in the order the descriptor set holds them."
 
 	^ VGTiledFillKernel bindingNames withIndexCollect: [ :name :index |
-		  | block count |
-		  block := blocks at: name.
-		  count := (self byteCountOfBlock: block)
-		           / VGTiledFillKernel elementStride.
-		  {
-			  (index - 1).
-			  name.
-			  ((VGTiledFillKernel floatBindingNames includes: name)
-				   ifTrue: [ #float32 ]
-				   ifFalse: [ #uint32 ]).
-			  count.
-			  ((1 to: (count min: self class shownWordCount)) collect: [ :word |
-				   self wordOfBlock: block at: word ]).
-			  (buffers
-				   at: name
-				   ifPresent: [ :buffer | buffer mappingOrNil ]
-				   ifAbsent: [ nil ]) } ]
+		  self bufferRowOfBinding: name at: index ]
+]
+
+{ #category : 'encoding' }
+VGTiledFillDispatch >> byteCountOfBinding: aName in: anEncoding [
+	"The bytes the buffer of that binding owes the device. A binding the blocks name is as
+	 large as its block; the one they do not is the destination of a frame that ends on the
+	 device, and its size is the encoding's own rule, since no host block states it."
+
+	^ blocks
+		  at: aName
+		  ifPresent: [ :block | self byteCountOfBlock: block ]
+		  ifAbsent: [ anEncoding targetByteCount ]
 ]
 
 { #category : 'encoding' }
@@ -166,6 +221,51 @@ VGTiledFillDispatch >> byteCountOfBlock: aBlock [
 	 either way."
 
 	^ aBlock byteSize
+]
+
+{ #category : 'dispatching' }
+VGTiledFillDispatch >> clearTarget [
+	"The target buffer cleared on the device, for a frame that brings no destination from the
+	 host. The kernel composes over the destination, so the pixels under a frame are part of its
+	 result: an uncleared buffer shows whatever the device left there, which is undefined memory
+	 on the first frame and the last frame drawn on every frame after it.
+
+	 It is a fill recorded on the device and not an upload, so the frame pays a write of its own
+	 pixels in device memory and nothing across the bus, which is what this unit removed the
+	 upload of the destination for.
+
+	 A frame that brings its own destination clears nothing: the upload overwrites every pixel
+	 the kernel reads."
+
+	(blocks includesKey: #target) ifTrue: [ ^ self ].
+	self timeStage: #clear during: [
+		| command |
+		command := self copyCommandPool allocateBuffer.
+		command do: [ :recorder |
+			recorder
+				recordFillOfBuffer: (buffers at: #target)
+				with: self class clearedTargetWord ].
+		context computeQueue submit: command andWait: true ]
+]
+
+{ #category : 'dispatching' }
+VGTiledFillDispatch >> computeFrameOf: anEncoding [
+	"The steps of one frame on the device: the kernel of this tile extent prepared, a buffer for
+	 every binding large enough to hold what the frame owes it, the destination cleared when the
+	 frame brings none from the host, the blocks uploaded and one workgroup dispatched for every
+	 tile the frame touches. A frame that touches no tile has nothing to dispatch and leaves the
+	 pixels alone.
+
+	 Nothing of the device is destroyed at the end of a frame: the kernel, the pipeline and the
+	 buffers are what unit 3.1 keeps for the session and releaseDevice is what lets go of them."
+
+	anEncoding touchesNoTile ifTrue: [ ^ self ].
+	self residentKernelFor: anEncoding.
+	self growBuffersFor: anEncoding.
+	self prepareOnce.
+	self clearTarget.
+	self upload.
+	self dispatchOver: anEncoding
 ]
 
 { #category : 'accessing' }
@@ -217,20 +317,28 @@ VGTiledFillDispatch >> dispatchOver: anEncoding [
 ]
 
 { #category : 'drawing' }
+VGTiledFillDispatch >> draw: anEncoding [
+	"One frame that ends on the device, drawn into the target buffer I own. No destination
+	 comes from the host and none goes back to it: the pixels this frame composes over are the
+	 ones the buffer already holds, which is what unit 7.5 removed the upload for, and
+	 readbackInto: fetches the result later if anyone asks."
+
+	self timeStage: #writeBuffers during: [ self packBlocksOf: anEncoding ].
+	self computeFrameOf: anEncoding
+]
+
+{ #category : 'drawing' }
 VGTiledFillDispatch >> draw: anEncoding endingIn: anImage [
-	"One frame that ends on the device: drawn with no readback, then the target buffer copied
-	 into that image. Nothing of the frame reaches the host, which is the whole point of the
-	 unit; the caller owns the image and the layout it wants it in afterwards, because the
-	 chain that presents it has its own semaphores to fit around the transition.
-	 The destination bytes are mine and no caller sees them: they are what the kernel binds as
-	 its target and what the copy reads, and their size is the encoding's own rule.
+	"One frame that ends on the device: drawn with no host destination and no readback, then
+	 the target buffer copied into that image. Nothing of the frame reaches the host, which is
+	 the whole point of the unit; the caller owns the image and the layout it wants it in
+	 afterwards, because the chain that presents it has its own semaphores to fit around the
+	 transition.
+
 	 A frame that touches no tile dispatches nothing and copies nothing: the image holds
 	 whatever it held, which is what the target buffer holds too."
 
-	self
-		draw: anEncoding
-		into: (ByteArray new: anEncoding targetByteCount)
-		readBack: false.
+	self draw: anEncoding.
 	anEncoding touchesNoTile ifTrue: [ ^ anImage ].
 	self copyTargetInto: anImage.
 	^ anImage
@@ -247,30 +355,30 @@ VGTiledFillDispatch >> draw: anEncoding into: aByteArray [
 
 { #category : 'drawing' }
 VGTiledFillDispatch >> draw: anEncoding into: aByteArray readBack: aBoolean [
-	"One frame on the device: the blocks of the frame named, a buffer for every binding large
-	 enough to hold them, the kernel of this tile extent prepared, one workgroup for every tile
-	 the frame touches, and, where the caller asks for it, the target read back into the bytes it
-	 came from. A frame that touches no tile has nothing to dispatch and leaves the pixels alone.
-	 The readback is a request because a frame that ends on the device has no use for it: the
-	 pixels stay in the target buffer, which the next frame of the same dispatch reads as its own
-	 destination, and readbackInto: fetches them later if anyone asks.
-	 Nothing of the device is destroyed at the end of a frame: the kernel, the pipeline and the
-	 buffers are what unit 3.1 keeps for the session, the mapping of each buffer is what unit 3.4
-	 keeps, and releaseDevice is what lets go of them.
-	 Each step is one stage of the frame, which a plain dispatch evaluates and does not time: the
-	 stages are what unit 3.0 measures a frame in, and measuring them anywhere but inside the
-	 frame a tool really draws would measure a different frame."
+	"One frame that ends in the host: the destination pixels are the caller's and they are
+	 uploaded with the blocks of the encoding, because only the caller knows what has touched
+	 them since the last frame. The readback is a request because a caller that means to read
+	 them later asks readbackInto: for them then.
+
+	 A frame that touches no tile has nothing to dispatch and leaves the pixels alone."
 
 	self timeStage: #writeBuffers during: [
 		self packBlocksOf: anEncoding target: aByteArray ].
 	anEncoding touchesNoTile ifTrue: [ ^ aByteArray ].
-	self residentKernelFor: anEncoding.
-	self growBuffers.
-	self prepareOnce.
-	self upload.
-	self dispatchOver: anEncoding.
+	self computeFrameOf: anEncoding.
 	aBoolean ifTrue: [ self readbackInto: aByteArray ].
 	^ aByteArray
+]
+
+{ #category : 'inspecting' }
+VGTiledFillDispatch >> firstWordsOfBlock: aBlock upTo: aCount [
+	"The first words of that block, as many of them as a row shows. A binding with no block
+	 shows none: its words are on the device, and reading them back is what the frame that
+	 leaves them there was built to avoid."
+
+	aBlock ifNil: [ ^ #(  ) ].
+	^ (1 to: (aCount min: self class shownWordCount)) collect: [ :word |
+		  self wordOfBlock: aBlock at: word ]
 ]
 
 { #category : 'encoding' }
@@ -288,18 +396,23 @@ VGTiledFillDispatch >> frameRecordOf: anEncoding [
 ]
 
 { #category : 'dispatching' }
-VGTiledFillDispatch >> growBuffers [
-	"Every binding holding a buffer large enough for the block of this frame. A buffer is made
-	 when there is none and when the frame needs one larger than the last did, and it is never
-	 made smaller: a frame that shrinks would otherwise pay an allocation for shrinking and
-	 another for growing back. A grown buffer is pointed at by the descriptor set before the one
-	 it replaces is destroyed, because a descriptor left pointing at freed memory takes the image
-	 with it on the next dispatch."
+VGTiledFillDispatch >> growBuffersFor: anEncoding [
+	"Every binding holding a buffer large enough for this frame. A buffer is made when there is
+	 none and when the frame needs one larger than the last did, and it is never made smaller: a
+	 frame that shrinks would otherwise pay an allocation for shrinking and another for growing
+	 back. A grown buffer is pointed at by the descriptor set before the one it replaces is
+	 destroyed, because a descriptor left pointing at freed memory takes the image with it on
+	 the next dispatch.
+
+	 The size of a binding the blocks do not name is the encoding's own rule: that binding is
+	 the destination of a frame that ends on the device, and no host block states its size."
 
 	self timeStage: #allocate during: [
 		VGTiledFillKernel bindingNames withIndexDo: [ :name :index |
 			| needed held |
-			needed := (self wordCountOfBlock: (blocks at: name))
+			needed := ((self byteCountOfBinding: name in: anEncoding)
+			            / VGTiledFillKernel elementStride
+			            max: self class emptyBufferWordCount)
 			          * VGTiledFillKernel elementStride.
 			held := buffers at: name ifAbsent: [ nil ].
 			(held isNil or: [ held size < needed ]) ifTrue: [
@@ -325,8 +438,10 @@ VGTiledFillDispatch >> initialize [
 VGTiledFillDispatch >> inspectorBuffers: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Buffers'>
 	"What went to the device, binding by binding: the binding number, the name the kernel reads
-	 it by, the element type it is read as, the words that went out, the first of them and the
-	 host address the buffer is mapped at, which is the one mapping the session keeps."
+	 it by, the element type it is read as, the words it holds, the first of them, the host
+	 address the buffer is mapped at, which is the one mapping the session keeps, and where the
+	 words came from. The last column is how the destination of a frame that ends on the device
+	 is told from one the host filled: it shows no words, because nothing read them back."
 
 	^ aBuilder newTable
 		  addColumn: (SpStringTableColumn
@@ -348,6 +463,9 @@ VGTiledFillDispatch >> inspectorBuffers: aBuilder [
 					   (each at: 6)
 						   ifNil: [ 'no buffer yet' ]
 						   ifNotNil: [ :pointer | pointer printString ] ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Filled by'
+				   evaluated: [ :each | (each at: 7) asString ]);
 		  items: self bufferRows;
 		  yourself
 ]
@@ -405,6 +523,15 @@ VGTiledFillDispatch >> microsecondsOfStage: aSymbol [
 	"What that stage cost over every frame I drew, or nil where it was never reached."
 
 	^ self stageMicroseconds at: aSymbol ifAbsent: [ nil ]
+]
+
+{ #category : 'encoding' }
+VGTiledFillDispatch >> packBlocksOf: anEncoding [
+	"The blocks of one frame that ends on the device, named and kept, so that what a dispatch
+	 sent can be read after the device is gone. Nothing is packed: the blocks are the
+	 encoding's own arrays, and only the frame record is written here."
+
+	^ blocks := self blocksOf: anEncoding
 ]
 
 { #category : 'encoding' }
@@ -477,7 +604,7 @@ VGTiledFillDispatch >> recordStages [
 	^ self
 ]
 
-{ #category : 'releasing' }
+{ #category : 'device' }
 VGTiledFillDispatch >> releaseDevice [
 	"Everything of the device I hold destroyed, the kernel before the buffers, because a buffer
 	 freed under a live pipeline takes the image with it. I am drawable again afterwards and build
@@ -563,15 +690,30 @@ VGTiledFillDispatch >> timeStage: aSymbol during: aBlock [
 VGTiledFillDispatch >> upload [
 	"The words of each block into the buffer kept for it, the two held together by the name of
 	 the binding. The copy reads the block's own memory, so a frame pays one copy a binding and
-	 not two."
+	 not two. A binding the blocks do not name sends nothing: the destination of a frame that
+	 ends on the device is already in its buffer, which is what unit 7.5 removed the transfer
+	 for."
 
 	self timeStage: #upload during: [
 		VGTiledFillKernel bindingNames do: [ :name |
-			| block |
-			block := blocks at: name.
-			(buffers at: name)
-				uploadBits: block
-				byteCount: (self byteCountOfBlock: block) ] ]
+			blocks at: name ifPresent: [ :block |
+				(buffers at: name)
+					uploadBits: block
+					byteCount: (self byteCountOfBlock: block) ] ] ]
+]
+
+{ #category : 'inspecting' }
+VGTiledFillDispatch >> wordCountOfBinding: aName filledBy: aBlock [
+	"The words the buffer of that binding holds. A binding no block names is the destination of
+	 a frame that ends on the device: its words are counted off the buffer, which is the only
+	 thing that knows how many there are."
+
+	aBlock ifNotNil: [
+		^ (self byteCountOfBlock: aBlock) / VGTiledFillKernel elementStride ].
+	^ (buffers
+		   at: aName
+		   ifPresent: [ :buffer | buffer size ]
+		   ifAbsent: [ 0 ]) / VGTiledFillKernel elementStride
 ]
 
 { #category : 'encoding' }

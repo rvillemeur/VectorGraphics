@@ -219,7 +219,12 @@ VGTiledFillTest >> testAFramePaysOneQueueSubmissionWhateverItsTileCount [
 	 whole grid goes down in a single dispatch. Unit 3.8 measured that cost at 0.18 to 0.47 ms
 	 against a background frame whose dispatch is 4.1 ms, and the small share it makes holds
 	 only while each of the three counts below is one: a shape that splits the frame into two
-	 dispatches pays the fixed cost twice, and the plan's accounting would have to be redone."
+	 dispatches pays the fixed cost twice, and the plan's accounting would have to be redone.
+
+	 The dispatch is counted in the steps of a frame and no longer in the method a caller
+	 sends, because since unit 7.5 the two drawing methods share those steps. A frame that
+	 ends on the device pays one submission more than the count here, for the clear of its
+	 destination, which unit 7.6 measures against the upload it replaced."
 
 	| sendsOf |
 	sendsOf := [ :aMethod :aSelector |
@@ -227,7 +232,7 @@ VGTiledFillTest >> testAFramePaysOneQueueSubmissionWhateverItsTileCount [
 		            each isMessage and: [ each selector = aSelector ] ]) size ].
 	self
 		assert: (sendsOf
-				 value: VGTiledFillDispatch >> #draw:into:readBack:
+				 value: VGTiledFillDispatch >> #computeFrameOf:
 				 value: #dispatchOver:)
 		equals: 1.
 	self

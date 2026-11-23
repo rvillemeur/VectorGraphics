@@ -189,8 +189,12 @@ VGVulkanBackend >> dispatchOfRecordedFrameForExtent: anExtent [
 	"The frame recorded on me, encoded for that extent and computed on the device, answered as
 	 the dispatch that holds it in its target buffer. Nothing is copied and nothing is read
 	 back: the caller records the copy into the image it owns, inside the submission it owns.
+	 No destination crosses from the host either, which is what unit 7.5 removed: the dispatch
+	 clears the target buffer on the device and composes the frame over it.
+
 	 A frame that recorded nothing answers nil, because an empty encoding dispatches nothing
 	 and the caller has its own way of filling an image it has nothing to draw into.
+
 	 The recorded frame is dropped either way, as it is on a drain, because the surface replays
 	 its own list and not mine."
 
@@ -201,12 +205,7 @@ VGVulkanBackend >> dispatchOfRecordedFrameForExtent: anExtent [
 	encoding := VGTiledFillEncoding of: recordedFrame extent: anExtent.
 	^ [
 	  self dispatchOf: encoding during: [ :dispatch |
-		  dispatch
-			  draw: encoding
-			  into: (ByteArray new:
-					   anExtent x * anExtent y
-					   * VGTiledFillEncoding targetFormat bytesPerPixel)
-			  readBack: false.
+		  dispatch draw: encoding.
 		  dispatch ] ] ensure: [ recordedFrame reset ]
 ]
 

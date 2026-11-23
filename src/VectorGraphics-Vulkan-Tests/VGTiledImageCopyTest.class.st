@@ -41,6 +41,32 @@ VGTiledImageCopyTest >> testABackendWithNothingRecordedAnswersNoDispatch [
 ]
 
 { #category : 'tests' }
+VGTiledImageCopyTest >> testAFrameThatEndsInAnImageClearsItsDestinationAndAFrameReadBackDoesNot [
+	"The destination of a frame that ends on the device is cleared on the device, because the
+	 buffer holds the last frame drawn through it and the kernel composes over what it reads.
+	 A frame that reads back brings its own destination from the host, so the upload is the
+	 clear and the stage is not paid."
+
+	| encoding dispatch image |
+	self hasDevice ifFalse: [ ^ self ].
+	encoding := self
+		            encodingOfExtent: self caseExtent
+		            drawnWith: self mixedFillFrame.
+	dispatch := VGTiledFillDispatch on:
+		            VGVulkanDeviceSession default context.
+	image := self imageOfExtent: self caseExtent.
+	[
+	dispatch recordStages.
+	dispatch draw: encoding endingIn: image.
+	self assert: (dispatch stageMicroseconds includesKey: #clear).
+	dispatch recordStages.
+	dispatch draw: encoding into: (ByteArray new: encoding targetByteCount).
+	self deny: (dispatch stageMicroseconds includesKey: #clear) ] ensure: [
+		dispatch releaseDevice.
+		image destroy ]
+]
+
+{ #category : 'tests' }
 VGTiledImageCopyTest >> testAFrameThatEndsInAnImagePaysTheCopyAndNoReadback [
 	"The two last stages belong to one kind of frame each. A frame that ends in an image is
 	 timed for its copy and reaches no readback at all, so a report of it shows a copy row and
@@ -65,6 +91,28 @@ VGTiledImageCopyTest >> testAFrameThatEndsInAnImagePaysTheCopyAndNoReadback [
 		ensure: [
 			dispatch releaseDevice.
 			image destroy ]
+]
+
+{ #category : 'tests' }
+VGTiledImageCopyTest >> testAFrameThatEndsInAnImageUploadsNoDestinationPixels [
+	"A frame that ends on the device has no host destination at all: the pixels it composes
+	 over are the ones its own target buffer holds, so no block of destination pixels is named
+	 for the frame and none is uploaded. The blocks are what the upload reads, so a binding
+	 they do not name cannot have been sent."
+
+	| encoding dispatch image |
+	self hasDevice ifFalse: [ ^ self ].
+	encoding := self
+		            encodingOfExtent: self caseExtent
+		            drawnWith: self mixedFillFrame.
+	dispatch := VGTiledFillDispatch on:
+		            VGVulkanDeviceSession default context.
+	image := self imageOfExtent: self caseExtent.
+	[
+	dispatch draw: encoding endingIn: image.
+	self deny: (dispatch blocks includesKey: #target) ] ensure: [
+		dispatch releaseDevice.
+		image destroy ]
 ]
 
 { #category : 'tests' }
@@ -195,6 +243,21 @@ VGTiledImageCopyTest >> testTheBackendDrawsItsRecordedFrameStraightIntoAnImage [
 ]
 
 { #category : 'tests' }
+VGTiledImageCopyTest >> testTheBackendUploadsNoDestinationPixelsForTheFrameItRecords [
+	"The frame the backend hands to a caller that records the copy itself is a frame that ends
+	 on the device, so it brings no destination from the host either: no run of bytes the size
+	 of the surface is allocated for it and none is uploaded. This is what unit 7.5 removed
+	 from the present path, where the surface is redrawn whole on every frame."
+
+	| backend dispatch |
+	self hasDevice ifFalse: [ ^ self ].
+	backend := VGVulkanBackend new.
+	self recordFrame: self mixedFillFrame on: backend.
+	dispatch := backend dispatchOfRecordedFrameForExtent: self caseExtent.
+	self deny: (dispatch blocks includesKey: #target)
+]
+
+{ #category : 'tests' }
 VGTiledImageCopyTest >> testTheCopyIntoAnImageIsRecordedInTheCallersOwnSubmission [
 	"A presented frame cannot pay for a submission of its own: the copy into the acquired image
 	 has to sit in the submission that waits on the image being available and signals the one
@@ -236,6 +299,32 @@ VGTiledImageCopyTest >> testTheCopyIntoAnImageIsRecordedInTheCallersOwnSubmissio
 ]
 
 { #category : 'tests' }
+VGTiledImageCopyTest >> testTheFirstFrameAfterAReleaseEndsInTheSamePixels [
+	"A release destroys the target buffer, so the frame after it draws over memory the device
+	 hands out with no promise about what is in it. It ends in the pixels the frame before the
+	 release ended in, which is the degenerate state the clear exists for: undefined memory
+	 under a frame reads as a picture that differs from run to run."
+
+	| encoding dispatch image before after |
+	self hasDevice ifFalse: [ ^ self ].
+	encoding := self
+		            encodingOfExtent: self caseExtent
+		            drawnWith: self mixedFillFrame.
+	dispatch := VGTiledFillDispatch on:
+		            VGVulkanDeviceSession default context.
+	image := self imageOfExtent: self caseExtent.
+	[
+	dispatch draw: encoding endingIn: image.
+	before := self pixelsOfImage: image.
+	dispatch releaseDevice.
+	dispatch draw: encoding endingIn: image.
+	after := self pixelsOfImage: image.
+	self assert: after equals: before ] ensure: [
+		dispatch releaseDevice.
+		image destroy ]
+]
+
+{ #category : 'tests' }
 VGTiledImageCopyTest >> testTheImageAFrameEndsInHoldsThePixelsTheSameFrameReadBackHolds [
 	"A frame that ends on the device writes into the image what a frame read back writes into
 	 the host. The same encoding is drawn twice from a zeroed target, once ending in an image
@@ -257,4 +346,68 @@ VGTiledImageCopyTest >> testTheImageAFrameEndsInHoldsThePixelsTheSameFrameReadBa
 		description: 'the frame laid down no pixel at all'.
 	self assert: (self pixelsOfImage: image) equals: readBack ]
 		ensure: [ image destroy ]
+]
+
+{ #category : 'tests' }
+VGTiledImageCopyTest >> testTheRowsOfADeviceFrameSayWhichBufferTheHostFilledAndWhichTheDeviceDid [
+	"The buffer table of a frame that ends on the device has a row for every binding, the
+	 destination among them, although no block of the frame names it. Its row says the device
+	 filled it and counts the words of the buffer itself, because there is no block to count,
+	 and the row of any other binding says the host filled it."
+
+	| encoding dispatch image rows target other |
+	self hasDevice ifFalse: [ ^ self ].
+	encoding := self
+		            encodingOfExtent: self caseExtent
+		            drawnWith: self mixedFillFrame.
+	dispatch := VGTiledFillDispatch on:
+		            VGVulkanDeviceSession default context.
+	image := self imageOfExtent: self caseExtent.
+	[
+	dispatch draw: encoding endingIn: image.
+	rows := dispatch bufferRows.
+	self
+		assert: (rows collect: [ :each | each second ]) asArray
+		equals: VGTiledFillKernel bindingNames.
+	target := rows detect: [ :each | each second = #target ].
+	other := rows detect: [ :each | each second = #edges ].
+	self
+		assert: (target at: 7)
+		equals: VGTiledFillDispatch clearedOnTheDeviceLabel.
+	self
+		assert: (other at: 7)
+		equals: VGTiledFillDispatch uploadedFromTheHostLabel.
+	self
+		assert: (target at: 4)
+		equals: encoding targetByteCount / VGTiledFillKernel elementStride ]
+		ensure: [
+			dispatch releaseDevice.
+			image destroy ]
+]
+
+{ #category : 'tests' }
+VGTiledImageCopyTest >> testTheSameFrameDrawnTwiceEndsInTheSamePixels [
+	"One frame drawn twice through the same dispatch ends in the same pixels both times. This
+	 is the gate on the clear: without it the second frame would compose over the first, and
+	 every pixel the frame does not cover opaquely would come out darker the second time."
+
+	| encoding dispatch image first second |
+	self hasDevice ifFalse: [ ^ self ].
+	encoding := self
+		            encodingOfExtent: self caseExtent
+		            drawnWith: self mixedFillFrame.
+	dispatch := VGTiledFillDispatch on:
+		            VGVulkanDeviceSession default context.
+	image := self imageOfExtent: self caseExtent.
+	[
+	dispatch draw: encoding endingIn: image.
+	first := self pixelsOfImage: image.
+	dispatch draw: encoding endingIn: image.
+	second := self pixelsOfImage: image.
+	self
+		deny: (first allSatisfy: [ :each | each = 0 ])
+		description: 'the frame laid down no pixel at all'.
+	self assert: second equals: first ] ensure: [
+		dispatch releaseDevice.
+		image destroy ]
 ]

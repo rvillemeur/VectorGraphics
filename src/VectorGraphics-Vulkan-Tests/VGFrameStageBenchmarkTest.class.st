@@ -10,6 +10,25 @@ Class {
 	#tag : 'Tests'
 }
 
+{ #category : 'reading' }
+VGFrameStageBenchmarkTest >> collectTimedStagesOf: aSelector into: aCollection seen: aSet [
+	"The stages of that method of the dispatch added to the collection in the order its source
+	 pays them, then the stages of every method of the dispatch it sends. A method already
+	 walked is not walked again."
+
+	(aSet includes: aSelector) ifTrue: [ ^ self ].
+	aSet add: aSelector.
+	(VGTiledFillDispatch >> aSelector) ast sendNodes do: [ :each |
+		each selector = #timeStage:during:
+			ifTrue: [ aCollection add: each arguments first value ]
+			ifFalse: [
+				(VGTiledFillDispatch includesSelector: each selector) ifTrue: [
+					self
+						collectTimedStagesOf: each selector
+						into: aCollection
+						seen: aSet ] ] ]
+]
+
 { #category : 'accessing' }
 VGFrameStageBenchmarkTest >> defaultTimeLimit [
 	"Every test here measures a frame, and a measured frame is drawn: the stage census draws
@@ -370,21 +389,20 @@ VGFrameStageBenchmarkTest >> testTheViewsOfTheBudgetAreCheckedLikeAnyOther [
 		(guard viewMethodsTheProjectWroteOf: VGFrameStageBenchmark onTheBackgroundFrame) notEmpty
 ]
 
-{ #category : 'private' }
+{ #category : 'reading' }
 VGFrameStageBenchmarkTest >> timedStagesOf: aSelector [
 	"The stages that method of a dispatch wraps a block in, in the order it pays them, read out
-	 of its own source: the timings written there, and those of the one method of the dispatch
-	 it sends for a step."
+	 of its own source and out of the source of every method of the dispatch it reaches. The
+	 walk is recursive because the steps of a frame live one send below the two drawing methods
+	 since unit 7.5, and it visits a method once, so a step sent from two places is named once
+	 and the walk cannot turn on itself."
 
-	| timed |
+	| timed seen |
 	timed := OrderedCollection new.
-	(VGTiledFillDispatch >> aSelector) ast sendNodes do: [ :each |
-		each selector = #timeStage:during:
-			ifTrue: [ timed add: each arguments first value ]
-			ifFalse: [
-				(VGTiledFillDispatch includesSelector: each selector) ifTrue: [
-					((VGTiledFillDispatch >> each selector) ast sendNodes select: [
-						 :send | send selector = #timeStage:during: ]) do: [ :send |
-						timed add: send arguments first value ] ] ] ].
+	seen := Set new.
+	self
+		collectTimedStagesOf: aSelector
+		into: timed
+		seen: seen.
 	^ timed asArray
 ]

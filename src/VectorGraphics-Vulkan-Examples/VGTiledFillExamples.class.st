@@ -435,3 +435,48 @@ VGTiledFillExamples class >> tiledFillOfThreeShapes [
 		fill.
 	^ VGTiledFillRasteriser of: surface displayList extent: self frameExtent
 ]
+
+{ #category : 'examples' }
+VGTiledFillExamples class >> twoFramesEndedInAnImageOnThisMachine [
+	"One click: the frame of three shapes drawn twice on this machine, both times ending in a
+	 Vulkan image, answered as the dispatch that drew it. This is the frame of unit 7.5, and the
+	 two tabs say what the unit did. The Buffers tab shows the target row filled by the device
+	 and not by the host, with no words beside it, because nothing of the destination crosses
+	 the bus in either direction. The Stages tab shows the clear the frame pays instead of the
+	 upload of those pixels.
+
+	 The frame is drawn twice because the second one is the one that matters: the target buffer
+	 holds the first frame when it starts, and the clear is what keeps the second from composing
+	 over it.
+
+	 The image is destroyed before the dispatch is handed back: it holds the same pixels the
+	 target buffer holds, and an example that leaves a live image behind on every click leaks
+	 device memory. The dispatch is one of my own and not the session's, because an example
+	 answers a fresh object every call; its context is the session's, so the click opens no
+	 device of its own.
+
+	 Where no device computes, the frame is encoded and nothing is dispatched: an example may
+	 not raise on a machine with no driver, and the blocks it would have uploaded are worth
+	 reading there too."
+
+	<sampleInstance>
+	| encoding session dispatch image |
+	encoding := self encodingOfThreeShapes.
+	session := VGVulkanDeviceSession default.
+	session contextOrNil ifNil: [
+		dispatch := VGTiledFillDispatch new.
+		dispatch packBlocksOf: encoding.
+		^ dispatch ].
+	dispatch := VGTiledFillDispatch on: session context.
+	dispatch recordStages.
+	image := VkImage
+		         on: session context device
+		         format: VkFormat b8g8r8a8Unorm
+		         extent: self frameExtent
+		         usage:
+		         (VkImageUsage transferDstBit bitOr: VkImageUsage transferSrcBit).
+	[
+	dispatch draw: encoding endingIn: image.
+	dispatch draw: encoding endingIn: image ] ensure: [ image destroy ].
+	^ dispatch
+]
