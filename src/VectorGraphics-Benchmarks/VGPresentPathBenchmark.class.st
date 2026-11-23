@@ -198,6 +198,13 @@ VGPresentPathBenchmark >> hasRun [
 ]
 
 { #category : 'running' }
+VGPresentPathBenchmark >> hostCopiesOf: aPathName [
+	"The copies that path made in the host during this round, summed by stage. Made on the
+	 first copy of that path and empty for a path that makes none."
+	^ hostCopies at: aPathName ifAbsentPut: [ Dictionary new ]
+]
+
+{ #category : 'running' }
 VGPresentPathBenchmark >> imageOfExtent: anExtent on: aSession [
 	"The image a presented frame ends in: of the format a frame is encoded for and written by
 	 the copy of the dispatch. Nothing reads it here — what a swapchain does with such an image
@@ -354,11 +361,15 @@ VGPresentPathBenchmark >> readBack: anEncoding through: aDispatch into: aSurface
 	 back into the rows of the target. The two host copies are timed here and nowhere else,
 	 because they are the part of this path the device never sees."
 	| pixels |
-	pixels := self timed: self class pixelsOfStageName during: [
-		          backend pixelsOf: aSurface ].
+	pixels := self
+		          timed: self class pixelsOfStageName
+		          of: self class readBackPathName
+		          during: [ backend pixelsOf: aSurface ].
 	aDispatch draw: anEncoding into: pixels.
-	self timed: self class writeIntoStageName during: [
-		backend write: pixels into: aSurface ]
+	self
+		timed: self class writeIntoStageName
+		of: self class readBackPathName
+		during: [ backend write: pixels into: aSurface ]
 ]
 
 { #category : 'accessing' }
@@ -414,18 +425,17 @@ VGPresentPathBenchmark >> setRounds: aRoundCount timedDraws: aDrawCount [
 { #category : 'running' }
 VGPresentPathBenchmark >> stagesOf: aDispatch on: aPathName [
 	"What one draw of that round was made of, stage by stage. A dispatch sums each stage over
-	 every frame it drew since it was told to record, and the host copies are summed the same
-	 way, so both sides are divided by the draws of the round and the table reads as the mean
-	 draw of it. The host copies are stages of the readback path and of no other, so they join
-	 its table alone."
+	 every frame it drew since it was told to record, and the host copies of each path are
+	 summed the same way, so both sides are divided by the draws of the round and the table
+	 reads as the mean draw of it. The copies of the path alone are added: a path that makes
+	 none has an empty table and shows the stages of the dispatch and nothing else."
 	| answer drawsOfRound |
 	drawsOfRound := self drawsOfARound.
 	answer := Dictionary new.
 	aDispatch stageMicroseconds keysAndValuesDo: [ :stage :total |
 		answer at: stage put: (total / drawsOfRound) rounded ].
-	aPathName = self class readBackPathName ifTrue: [
-		hostCopies keysAndValuesDo: [ :stage :total |
-			answer at: stage put: (total / drawsOfRound) rounded ] ].
+	(self hostCopiesOf: aPathName) keysAndValuesDo: [ :stage :total |
+		answer at: stage put: (total / drawsOfRound) rounded ].
 	^ answer
 ]
 
@@ -441,17 +451,20 @@ VGPresentPathBenchmark >> surfaceOfFrameNamed: aName at: anExtent [
 ]
 
 { #category : 'running' }
-VGPresentPathBenchmark >> timed: aStageName during: aBlock [
-	"The block evaluated, its wall clock added to that stage of the host's own, and its value
+VGPresentPathBenchmark >> timed: aStageName of: aPathName during: aBlock [
+	"The block evaluated, its wall clock added to that stage of that path, and its value
 	 answered, so that a copy is timed where it is used rather than around it. The clock is
 	 added and not stored, as a dispatch adds its own stages: a round sums every draw it made
-	 and divides once, at the end."
-	| started answer |
+	 and divides once, at the end. The table is kept a path at a time because the stages a
+	 dispatch times are shared by both paths and these are not: a path that never copies in the
+	 host has an empty table, which is what makes it the path it is."
+	| started answer table |
+	table := self hostCopiesOf: aPathName.
 	started := Time microsecondClockValue.
 	answer := aBlock value.
-	hostCopies
+	table
 		at: aStageName
-		put: (hostCopies at: aStageName ifAbsent: [ 0 ])
+		put: (table at: aStageName ifAbsent: [ 0 ])
 			+ (Time microsecondClockValue - started).
 	^ answer
 ]
