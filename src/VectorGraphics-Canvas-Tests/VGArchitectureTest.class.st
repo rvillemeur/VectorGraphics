@@ -718,6 +718,26 @@ VGArchitectureTest >> testEveryAllowedDependencyNamesAPackageOfThisProject [
 ]
 
 { #category : 'tests' }
+VGArchitectureTest >> testEveryClassCommentOfThisProjectIsCrOnly [
+	"CLAUDE.md forbids LF in Pharo source, and a class comment is source. An LF in one is
+	 invisible in the browser and shows up as a working copy Iceberg reports modified for ever,
+	 because the comment on disk is CR and the comment in the image is not. The check is
+	 therefore in the image and nowhere else."
+
+	| commented offenders |
+	commented := OrderedCollection new.
+	offenders := OrderedCollection new.
+	self class projectPackageNames do: [ :each |
+		(PackageOrganizer default packageNamed: each) definedClasses do: [ :cls |
+			cls comment ifNotNil: [ :text |
+				commented add: cls name.
+				(text includes: Character lf) ifTrue: [ offenders add: cls name asString ] ] ] ].
+	"A mistyped query would leave nothing to scan and pass in silence."
+	self deny: commented isEmpty.
+	self assertEmpty: offenders asSortedCollection asArray
+]
+
+{ #category : 'tests' }
 VGArchitectureTest >> testEveryEdgeTheBaselineCannotDeclareIsOneHalfOfACycle [
 	"The exemption is not a place for an edge somebody forgot to declare. An edge belongs there
 	 only because its reverse is declared, which is what makes the pair a cycle no baseline can
