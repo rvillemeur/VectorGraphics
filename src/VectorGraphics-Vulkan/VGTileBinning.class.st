@@ -19,12 +19,13 @@ over the corpus and the reference frame.
 Class {
 	#name : 'VGTileBinning',
 	#superclass : 'Object',
+	#traits : 'TVGStageRecording',
+	#classTraits : 'TVGStageRecording classTrait',
 	#instVars : [
 		'grid',
 		'bins',
 		'entries',
-		'interiors',
-		'stages'
+		'interiors'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -208,7 +209,7 @@ VGTileBinning >> inspectorPhases: aBuilder [
 
 { #category : 'inspecting' }
 VGTileBinning >> inspectorPhasesContext: aContext [
-	aContext active: stages isNotNil
+	aContext active: self isRecordingStages
 ]
 
 { #category : 'accessing' }
@@ -256,17 +257,6 @@ VGTileBinning >> printOn: aStream [
 		nextPutAll: ' of ';
 		print: grid tileCount;
 		nextPutAll: ' tiles'
-]
-
-{ #category : 'measuring' }
-VGTileBinning >> recordStages [
-	"Time every phase of the binning I build from here on. A frame of a running tool does not,
-	 because the clock is read twice a phase and four times an entry, which on the reference
-	 frame is 15312 readings; the census asks, and nothing else does.
-	 Sent before the bins are built, since the phases run inside that build: the recipe is
-	 VGTileBinning new recordStages, then setDisplayList:grid:."
-	stages := VGStageTimings new.
-	^ self
 ]
 
 { #category : 'accessing' }
@@ -325,14 +315,6 @@ VGTileBinning >> setDisplayList: aDisplayList grid: aGrid [
 	entries withIndexDo: [ :each :ordinal | self bin: each at: ordinal ]
 ]
 
-{ #category : 'measuring' }
-VGTileBinning >> stageMicroseconds [
-	"What each phase of my own build cost, keyed by phase name. A phase that was never reached
-	 is absent rather than nought, so a binning of an empty frame can be told from one whose
-	 phase was too fast to measure."
-	^ stages ifNil: [ Dictionary new ] ifNotNil: [ stages microseconds ]
-]
-
 { #category : 'accessing' }
 VGTileBinning >> tileIndexesOfEntry: anEntry [
 	"The tiles that hold a reference to that entry. The entry is turned into its ordinal once,
@@ -345,15 +327,6 @@ VGTileBinning >> tileIndexesOfEntry: anEntry [
 	bins withIndexDo: [ :each :index |
 		(each notNil and: [ each includes: ordinal ]) ifTrue: [ answer add: index ] ].
 	^ answer
-]
-
-{ #category : 'measuring' }
-VGTileBinning >> timeStage: aSymbol during: aBlock [
-	"The block, answering what it answers, with the microseconds it took added to that phase
-	 where a caller asked for the phases. A binning that was not asked evaluates the block and
-	 reads no clock at all, so the phases cost a running tool nothing."
-	stages ifNil: [ ^ aBlock value ].
-	^ stages time: aSymbol during: aBlock
 ]
 
 { #category : 'accessing' }

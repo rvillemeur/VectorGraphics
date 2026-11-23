@@ -8,13 +8,14 @@ The frame is encoded for one surface format, which `targetFormat` names: the sou
 Class {
 	#name : 'VGTiledFillEncoding',
 	#superclass : 'Object',
+	#traits : 'TVGStageRecording',
+	#classTraits : 'TVGStageRecording classTrait',
 	#instVars : [
 		'grid',
 		'buffers',
 		'decoder',
 		'bands',
-		'sources',
-		'stages'
+		'sources'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -431,9 +432,9 @@ VGTiledFillEncoding >> inspectorPhases: aBuilder [
 		  yourself
 ]
 
-{ #category : 'inspector' }
+{ #category : 'inspecting' }
 VGTiledFillEncoding >> inspectorPhasesContext: aContext [
-	aContext active: stages isNotNil
+	aContext active: self isRecordingStages
 ]
 
 { #category : 'inspector' }
@@ -606,18 +607,6 @@ VGTiledFillEncoding >> printOn: aStream [
 		nextPutAll: ' tiles)'
 ]
 
-{ #category : 'measuring' }
-VGTiledFillEncoding >> recordStages [
-	"Time every phase of the frame I encode from here on. A frame of a running tool does not,
-	 because the clock is read twice a phase and a phase can be shorter than the reading; the
-	 benchmark asks, and nothing else does.
-	 Sent before the encoding is built, since the phases run inside that build: the recipe is
-	 VGTiledFillEncoding new recordStages, then encode:extent:."
-
-	stages := VGStageTimings new.
-	^ self
-]
-
 { #category : 'accessing' }
 VGTiledFillEncoding >> refShapes [
 	^ buffers refShapes
@@ -684,15 +673,6 @@ VGTiledFillEncoding >> shapes [
 { #category : 'accessing' }
 VGTiledFillEncoding >> sourcePixels [
 	^ buffers sourcePixels
-]
-
-{ #category : 'reading' }
-VGTiledFillEncoding >> stageMicroseconds [
-	"What each phase of the frame I encode cost, keyed by phase name. A phase that was never
-	 reached is absent rather than nought, so a frame that returned early can be told from one
-	 whose phase was too fast to measure."
-
-	^ stages ifNil: [ Dictionary new ] ifNotNil: [ stages microseconds ]
 ]
 
 { #category : 'accessing' }
@@ -762,18 +742,6 @@ VGTiledFillEncoding >> tileTableRows [
 			   @ (table at: base + VGTiledFillLayout tileTopField)).
 			  (table at: base + VGTiledFillLayout referenceOffsetField).
 			  (table at: base + VGTiledFillLayout referenceCountField) } ]
-]
-
-{ #category : 'measuring' }
-VGTiledFillEncoding >> timeStage: aSymbol during: aBlock [
-	"The block, answering what it answers, with the microseconds it took added to that phase
-	 where a caller asked for the phases. An encoding that was not asked evaluates the block and
-	 reads no clock at all, so the phases cost a running tool nothing.
-	 Public, because the display list is built before any encoding exists and the caller that
-	 builds it times it through me."
-
-	stages ifNil: [ ^ aBlock value ].
-	^ stages time: aSymbol during: aBlock
 ]
 
 { #category : 'writing' }

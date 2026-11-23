@@ -10,9 +10,10 @@ I take a context and never make one: the backend owns the device, and a dispatch
 Class {
 	#name : 'VGTiledFillDispatch',
 	#superclass : 'Object',
+	#traits : 'TVGStageRecording',
+	#classTraits : 'TVGStageRecording classTrait',
 	#instVars : [
 		'context',
-		'stages',
 		'kernel',
 		'buffers',
 		'tileExtent',
@@ -514,11 +515,6 @@ VGTiledFillDispatch >> inspectorStagesContext: aContext [
 	aContext active: true
 ]
 
-{ #category : 'measuring' }
-VGTiledFillDispatch >> isRecordingStages [
-	^ stages notNil
-]
-
 { #category : 'accessing' }
 VGTiledFillDispatch >> kernel [
 	"The kernel I keep prepared for my tile extent, or nil where no frame has been drawn since I
@@ -603,16 +599,6 @@ VGTiledFillDispatch >> recordCopyInto: anImage in: aRecorder [
 		region: region ] ensure: [ region getHandle free ]
 ]
 
-{ #category : 'measuring' }
-VGTiledFillDispatch >> recordStages [
-	"Time every stage of the frames I draw from here on. A dispatch of a running tool does not,
-	 because the clock is read twice a stage and a stage can be shorter than the reading; the
-	 benchmark asks, and nothing else does."
-
-	stages := VGStageTimings new.
-	^ self
-]
-
 { #category : 'device' }
 VGTiledFillDispatch >> releaseDevice [
 	"Everything of the device I hold destroyed, the kernel before the buffers, because a buffer
@@ -656,15 +642,6 @@ VGTiledFillDispatch >> setContext: aContext [
 	context := aContext
 ]
 
-{ #category : 'measuring' }
-VGTiledFillDispatch >> stageMicroseconds [
-	"What each stage of the frames I drew cost, summed over every frame, keyed by stage name. A
-	 stage that was never reached is absent rather than nought, so that a frame which returned
-	 early can be told from one whose stage was too fast to measure."
-
-	^ stages ifNil: [ Dictionary new ] ifNotNil: [ stages microseconds ]
-]
-
 { #category : 'accessing' }
 VGTiledFillDispatch >> stageRows [
 	"Every stage a frame can pay, in the order the table names them, each with what the frames
@@ -676,16 +653,6 @@ VGTiledFillDispatch >> stageRows [
 		  {
 			  each.
 			  (self microsecondsOfStage: each) } ]
-]
-
-{ #category : 'measuring' }
-VGTiledFillDispatch >> timeStage: aSymbol during: aBlock [
-	"The block, answering what it answers, with the microseconds it took added to that stage
-	 where a caller asked for the stages. A dispatch that was not asked evaluates the block and
-	 reads no clock at all, so the stages cost a running tool nothing."
-
-	stages ifNil: [ ^ aBlock value ].
-	^ stages time: aSymbol during: aBlock
 ]
 
 { #category : 'drawing' }
