@@ -20,6 +20,14 @@ Class {
 	#tag : 'Tests'
 }
 
+{ #category : 'constants' }
+VGAlexandrieCorpusTest class >> selectorsThatAskTheUser [
+	"The sends that stop an unattended run until someone clicks. UIManager answers them with a
+	 modal dialog, so a ported copy that sends one blocks every runner that evaluates it."
+
+	^ #( 'inform:' 'confirm:' 'request:' 'chooseFrom:' )
+]
+
 { #category : 'accessing' }
 VGAlexandrieCorpusTest >> defaultTimeLimit [
 	"Eighty-two experiments, each rendered twice, take minutes rather than the ten seconds SUnit
@@ -242,6 +250,24 @@ VGAlexandrieCorpusTest >> testNoDerivedCopyStillNamesAClassWeHave [
 			(case portedSource includesSubstring: each key) ifTrue: [
 				leaking add: case name , ' names ' , each key ] ] ].
 	self assert: leaking asArray isEmpty description: leaking asArray printString
+]
+
+{ #category : 'tests' }
+VGAlexandrieCorpusTest >> testNoPortedCopyAsksTheUser [
+	"A ported copy is evaluated by a test and by the example gate, with nobody watching. A send
+	 that opens a modal dialog holds that run until someone clicks it away, and answers nil
+	 besides, so the drawing fails on the next line anyway."
+
+	| asking |
+	self skipWithoutTheExperiments ifTrue: [ ^ self skip ].
+	asking := VGAlexandrieCorpus cases
+		          select: [ :each |
+			          self class selectorsThatAskTheUser anySatisfy: [ :selector |
+				          each portedSource includesSubstring: selector ] ]
+		          thenCollect: [ :each | each name ].
+	self
+		assert: asking asArray isEmpty
+		description: asking asArray printString
 ]
 
 { #category : 'tests - copies' }

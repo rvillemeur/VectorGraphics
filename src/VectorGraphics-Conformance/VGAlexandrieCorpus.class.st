@@ -113,7 +113,7 @@ VGAlexandrieCorpus class >> experimentSelectors [
 		  reject: [ :each | self nonPictureSelectors includes: each ]
 ]
 
-{ #category : 'ported copies' }
+{ #category : 'substitutions' }
 VGAlexandrieCorpus class >> fontLookupRewriteIndentedBy: aNumberOfTabs informing: aReceiverName [
 	"The rewrite that takes the font lookup of a ported copy off the global font manager of the
 	 image. Upstream replaces that manager, scans two sources into it, and asks it for a family
@@ -125,8 +125,11 @@ VGAlexandrieCorpus class >> fontLookupRewriteIndentedBy: aNumberOfTabs informing
 	 memory inside the finalisation process minutes after the drawing.
 	 The catalogue is asked for a family and no style, which answers the plainest face of it —
 	 upright, normal weight, normal width — the face the three Alexandrie category objects name.
-	 The receiver of the inform: is the copy's own: one experiment is written on an instance of
-	 the experiment class and another on the class itself."
+	 The receiver named here is the one upstream writes the inform: on, which is the instance for
+	 one experiment and the class for another, so the text being searched for differs between the
+	 two. What replaces it names the family and the directory and raises, because a copy is run
+	 by a test and by the example gate with nobody watching: a modal dialog holds that run until
+	 someone clicks it away, and answers nil besides, so the drawing fails on the next line."
 
 	^ (self
 		   source: 'AeFontManager resetGlobalInstance.
@@ -151,7 +154,7 @@ aManager := TTFontCatalogue new.
 aManager scanDirectory: AeFilesystemResources fontsDirectory.
 
 aFace := (aManager entryOfFamilyNamed: ''Cascadia Code'')
-	         ifNil: [ ' , aReceiverName , ' inform: ''missing font'' ]
+	         ifNil: [ self error: ''no font family named Cascadia Code in '' , AeFilesystemResources fontsDirectory fullName ]
 	         ifNotNil: [ :anEntry | VGFontFace newForBytes: anEntry bytes ].'
 			   indentedBy: aNumberOfTabs)
 ]

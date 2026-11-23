@@ -2263,7 +2263,7 @@ VGAlexandriePortedExperiments class >> texWithHarfbuzzWithFontManager [
 	aManager scanDirectory: AeFilesystemResources fontsDirectory.
 
 	aFace := (aManager entryOfFamilyNamed: 'Cascadia Code')
-		         ifNil: [ anAlexandrieCairoExperiment inform: 'missing font' ]
+		         ifNil: [ self error: 'no font family named Cascadia Code in ' , AeFilesystemResources fontsDirectory fullName ]
 		         ifNotNil: [ :anEntry | VGFontFace newForBytes: anEntry bytes ].
 
 	fontOptions := VGFontOptions new
@@ -2346,7 +2346,7 @@ aManager := TTFontCatalogue new.
 aManager scanDirectory: AeFilesystemResources fontsDirectory.
 
 aFace := (aManager entryOfFamilyNamed: 'Cascadia Code')
-	         ifNil: [ self inform: 'missing font' ]
+	         ifNil: [ self error: 'no font family named Cascadia Code in ' , AeFilesystemResources fontsDirectory fullName ]
 	         ifNotNil: [ :anEntry | VGFontFace newForBytes: anEntry bytes ].
 
 text := String new writeStream.
@@ -2424,7 +2424,7 @@ VGAlexandriePortedExperiments class >> textWithoutHarfbuzzWithFontManager [
 	aManager scanDirectory: AeFilesystemResources fontsDirectory.
 
 	aFace := (aManager entryOfFamilyNamed: 'Cascadia Code')
-		         ifNil: [ anAlexandrieCairoExperiment inform: 'missing font' ]
+		         ifNil: [ self error: 'no font family named Cascadia Code in ' , AeFilesystemResources fontsDirectory fullName ]
 		         ifNotNil: [ :anEntry | VGFontFace newForBytes: anEntry bytes ].
 
 	fontOptions := VGFontOptions new
