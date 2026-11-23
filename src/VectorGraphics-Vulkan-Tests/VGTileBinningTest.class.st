@@ -155,6 +155,24 @@ VGTileBinningTest >> testARectangleTouchesTheTilesItOverlapsAndNoOthers [
 		equals: grid tileCount
 ]
 
+{ #category : 'tests' }
+VGTileBinningTest >> testASuperTileAnEntryEnclosesWholeIsAskedOnceForAllItsTiles [
+	"The lever of unit 3.12: where an entry encloses a whole super tile, the sixteen tiles inside
+	 it are interior without being asked, so one walk over the edges of a shape answers for
+	 sixteen tiles. The frame is one super tile wide, so an entry covering it whole is asked
+	 once and the marks are the same sixteen a tile by tile ask would have made."
+	| grid stub list binning |
+	grid := VGTileGrid extent: 64 @ 64 tileExtent: 16 @ 16.
+	stub := VGCountingCoverageEntryStub coveringEverythingOf: (0 @ 0 corner: 64 @ 64).
+	list := VGDisplayList new.
+	list add: stub.
+	binning := VGTileBinning of: list grid: grid.
+	self assert: grid superTileCount equals: 1.
+	self assert: binning touchedTileCount equals: 16.
+	self assert: binning interiorReferenceCount equals: 16.
+	self assert: stub coverageQuestions equals: 1
+]
+
 { #category : 'tests - binning' }
 VGTileBinningTest >> testATileAnswersTheOrdinalOfEveryEntryItHoldsAndTheMarkOfThatPair [
 	"The encoding writes a reference a pair: the ordinal of the entry in the display list and

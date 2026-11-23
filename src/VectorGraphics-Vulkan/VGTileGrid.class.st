@@ -96,11 +96,9 @@ VGTileGrid >> columnsIntersecting: aRectangle [
 	"The columns of tiles a rectangle can touch, counted from nought, as the interval between
 	 the first and the last of them. What touches no tile touches no column, which is an empty
 	 interval."
-
 	| box |
-	aRectangle ifNil: [ ^ 1 to: 0 ].
-	box := self wholePixelsOf: (aRectangle intersect: (0 @ 0 corner: extent)).
-	(box width > 0 and: [ box height > 0 ]) ifFalse: [ ^ 1 to: 0 ].
+	box := self pixelBoxOf: aRectangle.
+	box ifNil: [ ^ 1 to: 0 ].
 	^ box origin x // tileExtent x to: box corner x - 1 // tileExtent x
 ]
 
@@ -230,6 +228,19 @@ VGTileGrid >> newBoundsOfTileAt: anIndex [
 	^ origin corner: ((origin + tileExtent) min: extent)
 ]
 
+{ #category : 'private' }
+VGTileGrid >> pixelBoxOf: aRectangle [
+	"The whole pixels of that rectangle inside my extent, or nil where it touches no pixel of
+	 mine at all. Three readers ask for tiles, for rows and columns, and for super tiles, and
+	 they must not disagree about what a box reaches, so the box is read in one place."
+	| box |
+	aRectangle ifNil: [ ^ nil ].
+	box := self wholePixelsOf: (aRectangle intersect: (0 @ 0 corner: extent)).
+	^ (box width > 0 and: [ box height > 0 ])
+		  ifTrue: [ box ]
+		  ifFalse: [ nil ]
+]
+
 { #category : 'printing' }
 VGTileGrid >> printOn: aStream [
 	aStream
@@ -253,11 +264,9 @@ VGTileGrid >> rowsIntersecting: aRectangle [
 	 first and the last of them. What touches no tile touches no row, which is an empty
 	 interval; the box is read exactly as indexesIntersecting: reads it, so a caller that holds
 	 rows and a caller that holds tiles cannot disagree about which rows an entry reaches."
-
 	| box |
-	aRectangle ifNil: [ ^ 1 to: 0 ].
-	box := self wholePixelsOf: (aRectangle intersect: (0 @ 0 corner: extent)).
-	(box width > 0 and: [ box height > 0 ]) ifFalse: [ ^ 1 to: 0 ].
+	box := self pixelBoxOf: aRectangle.
+	box ifNil: [ ^ 1 to: 0 ].
 	^ box origin y // tileExtent y to: box corner y - 1 // tileExtent y
 ]
 
@@ -279,6 +288,23 @@ VGTileGrid >> superTileCount [
 	"How many super tiles cover me. Row-major like the tiles, so a super tile is found by
 	 arithmetic and nothing is searched."
 	^ self superTileColumns * self superTileRows
+]
+
+{ #category : 'accessing' }
+VGTileGrid >> superTileIndexesIntersecting: aRectangle [
+	"The super tiles a rectangle can touch, in dispatch order. The box is read exactly as
+	 indexesIntersecting: reads it, so a super tile is reached where one of its own tiles is and
+	 nowhere else."
+	| box span answer |
+	box := self pixelBoxOf: aRectangle.
+	box ifNil: [ ^ #(  ) ].
+	span := self class interiorProbeFactor * tileExtent x
+	        @ (self class interiorProbeFactor * tileExtent y).
+	answer := OrderedCollection new.
+	box origin y // span y to: box corner y - 1 // span y do: [ :row |
+		box origin x // span x to: box corner x - 1 // span x do: [ :column |
+			answer add: row * self superTileColumns + column + 1 ] ].
+	^ answer
 ]
 
 { #category : 'accessing' }
