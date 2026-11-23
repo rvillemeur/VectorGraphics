@@ -231,7 +231,7 @@ VGTiledFillDispatch >> draw: anEncoding endingIn: anImage [
 		draw: anEncoding
 		into: (ByteArray new: anEncoding targetByteCount)
 		readBack: false.
-	anEncoding touchedTileCount = 0 ifTrue: [ ^ anImage ].
+	anEncoding touchesNoTile ifTrue: [ ^ anImage ].
 	self copyTargetInto: anImage.
 	^ anImage
 ]
@@ -263,7 +263,7 @@ VGTiledFillDispatch >> draw: anEncoding into: aByteArray readBack: aBoolean [
 
 	self timeStage: #writeBuffers during: [
 		self packBlocksOf: anEncoding target: aByteArray ].
-	anEncoding touchedTileCount = 0 ifTrue: [ ^ aByteArray ].
+	anEncoding touchesNoTile ifTrue: [ ^ aByteArray ].
 	self residentKernelFor: anEncoding.
 	self growBuffers.
 	self prepareOnce.

@@ -689,6 +689,15 @@ VGTiledFillEncoding >> touchedTileIndexes [
 			  (row - 1) * VGTiledFillLayout tileRecordWords + VGTiledFillLayout tileIndexField ]
 ]
 
+{ #category : 'testing' }
+VGTiledFillEncoding >> touchesNoTile [
+	"Nothing of this frame lands in any tile, so there is nothing for a kernel to run over and
+	 nothing for a copy to move. A dispatch asks me instead of comparing my count to zero in
+	 each of the places it decides that."
+
+	^ self touchedTileCount = 0
+]
+
 { #category : 'writing' }
 VGTiledFillEncoding >> writeBandBlocksAt: aDictionary [
 	"The band blocks: one block of shape records for every row of tiles an entry reaches, each

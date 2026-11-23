@@ -163,23 +163,25 @@ VGFrameStageBenchmarkTest >> testEveryStageTheDispatchTimesIsOneItNames [
 	"The table of stage names and the dispatch cannot drift: every stage the dispatch wraps a
 	 block in is read out of its own source here, in the order a frame pays them, and a stage
 	 named in the table and timed nowhere would be a row of the report that no code fills.
-	 A stage is timed either in `draw:into:readBack:` itself or in the one method of the dispatch
+	 A stage is timed either in the frame method itself or in the one method of the dispatch
 	 that it sends for that step, so the order is the order of the steps and not of the method
-	 dictionary. The frame walked is the one that takes the readback as a request, because
-	 `draw:into:` is that frame with the request answered yes."
+	 dictionary.
+	 The last two stages belong to one kind of frame each, which is why two frames are walked:
+	 the frame whose pixels the host reads pays every stage but the copy, and the frame that
+	 ends on the device is the only one that pays it."
 
-	| timed |
-	timed := OrderedCollection new.
-	(VGTiledFillDispatch >> #draw:into:readBack:) ast sendNodes do: [ :each |
-		each selector = #timeStage:during:
-			ifTrue: [ timed add: each arguments first value ]
-			ifFalse: [
-				(VGTiledFillDispatch includesSelector: each selector) ifTrue: [
-					((VGTiledFillDispatch >> each selector) ast sendNodes select: [
-						 :send | send selector = #timeStage:during: ]) do: [ :send |
-						timed add: send arguments first value ] ] ] ].
-	self assert: timed asArray equals: VGTiledFillDispatch stageNames.
-	self assert: timed asSet size equals: timed size
+	| readBack onDevice |
+	readBack := self timedStagesOf: #draw:into:readBack:.
+	onDevice := self timedStagesOf: #draw:endingIn:.
+	self
+		assert: readBack
+		equals: (VGTiledFillDispatch stageNames reject: [ :each | each = #copy ]).
+	self assert: (onDevice includes: #copy).
+	self deny: (readBack includes: #copy).
+	self
+		assert: (readBack , onDevice) asSet
+		equals: VGTiledFillDispatch stageNames asSet.
+	self assert: readBack asSet size equals: readBack size
 ]
 
 { #category : 'tests' }
@@ -366,4 +368,23 @@ VGFrameStageBenchmarkTest >> testTheViewsOfTheBudgetAreCheckedLikeAnyOther [
 	self
 		assert:
 		(guard viewMethodsTheProjectWroteOf: VGFrameStageBenchmark onTheBackgroundFrame) notEmpty
+]
+
+{ #category : 'private' }
+VGFrameStageBenchmarkTest >> timedStagesOf: aSelector [
+	"The stages that method of a dispatch wraps a block in, in the order it pays them, read out
+	 of its own source: the timings written there, and those of the one method of the dispatch
+	 it sends for a step."
+
+	| timed |
+	timed := OrderedCollection new.
+	(VGTiledFillDispatch >> aSelector) ast sendNodes do: [ :each |
+		each selector = #timeStage:during:
+			ifTrue: [ timed add: each arguments first value ]
+			ifFalse: [
+				(VGTiledFillDispatch includesSelector: each selector) ifTrue: [
+					((VGTiledFillDispatch >> each selector) ast sendNodes select: [
+						 :send | send selector = #timeStage:during: ]) do: [ :send |
+						timed add: send arguments first value ] ] ] ].
+	^ timed asArray
 ]

@@ -533,6 +533,19 @@ VGTiledFillTest >> testAnEncodingKnowsHowManyBytesItsTargetHolds [
 ]
 
 { #category : 'tests' }
+VGTiledFillTest >> testAnEncodingSaysWhetherItTouchesNoTile [
+	"Whether there is anything to dispatch is the encoding's own answer, asked by name, because
+	 three methods of a dispatch act on it and a count compared to zero in each of them is the
+	 same rule written three times."
+
+	self assert:
+		(self encodingOfExtent: 16 @ 16 drawnWith: [ :canvas | ]) touchesNoTile.
+	self deny:
+		(self encodingOfExtent: 16 @ 16 drawnWith: self mixedFillFrame)
+			touchesNoTile
+]
+
+{ #category : 'tests' }
 VGTiledFillTest >> testAnEvenOddStarDrawsTheSameBytesAsTheSoftwareBackend [
 	"A self-intersecting path, where the even-odd rule leaves the middle empty: the walk counts
 	 crossings rather than directions, and two edges can cross one point."
