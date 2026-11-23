@@ -130,6 +130,14 @@ VGPresentPathBenchmark >> comparisonsOfFrameNamed: aName at: anExtent [
 ]
 
 { #category : 'running' }
+VGPresentPathBenchmark >> discardDrawsOf: aBlock [
+	"The draws at the head of a round, which are thrown away. A round follows the other path,
+	 and what that path left in the buffers, in the caches and in the host's own heap is paid by
+	 the draw after it and by no other."
+	self class discardedDrawCount timesRepeat: [ aBlock value ]
+]
+
+{ #category : 'running' }
 VGPresentPathBenchmark >> drawsOf: anEncoding through: aDispatch endingIn: anImage orInto: aSurface [
 	"The one draw each path pays, as a block of no arguments, so that a round times the two of
 	 them the same way. The presented path ends in the image and names no destination at all;
@@ -144,9 +152,9 @@ VGPresentPathBenchmark >> drawsOf: anEncoding through: aDispatch endingIn: anIma
 
 { #category : 'accessing' }
 VGPresentPathBenchmark >> drawsOfARound [
-	"Every draw of one round of one path, the discarded ones among them: they pay stages too,
-	 and the stages of a round are summed over all of them."
-	^ self class discardedDrawCount + timedDrawCount
+	"The draws of one round of one path that are both timed and recorded in its stages. The
+	 discarded draws are neither: the tables of stages are emptied after them."
+	^ timedDrawCount
 ]
 
 { #category : 'running' }
@@ -279,9 +287,10 @@ VGPresentPathBenchmark >> measureFrameNamed: aName at: anExtent on: aSession [
 	 what is compared is the device trip and the host copies around it, not the binning of a
 	 display list, which units 3.0 and 3.8 already measure. Both paths draw through the one
 	 dispatch of that tile extent and alternate round by round, so neither is measured on a
-	 device the other warmed. Both tables of stages are emptied at the head of every round,
-	 because each of them sums the draws it was given: a round that did not empty them would
-	 show the draws the other path made beside its own."
+	 device the other warmed.
+	 A round discards its first draws, then empties both tables of stages, then times the rest:
+	 each table sums the draws it was given, so a table that was not emptied here would hold the
+	 draws of the other path and the discarded draws of this one beside the timed ones."
 	| surface encoding dispatch image comparisons draws |
 	surface := self surfaceOfFrameNamed: aName at: anExtent.
 	encoding := self encodingOf: surface at: anExtent.
@@ -296,6 +305,7 @@ VGPresentPathBenchmark >> measureFrameNamed: aName at: anExtent on: aSession [
 	[
 	1 to: roundCount do: [ :round |
 		self class pathNames do: [ :pathName |
+			self discardDrawsOf: (draws at: pathName).
 			dispatch recordStages.
 			hostCopies := Dictionary new.
 			(comparisons at: pathName)
@@ -457,10 +467,8 @@ VGPresentPathBenchmark >> timed: aStageName during: aBlock [
 
 { #category : 'running' }
 VGPresentPathBenchmark >> timedDrawsOf: aBlock [
-	"The timed draws of one round of one path. The draws at the head are thrown away: a round
-	 follows the other path, and what that path left in the buffers and in the caches is paid by
-	 the draw after it and by no other."
-	self class discardedDrawCount timesRepeat: [ aBlock value ].
+	"The timed draws of one round of one path, every one of them recorded in the stages of that
+	 round as well."
 	^ (1 to: timedDrawCount) collect: [ :each | self microsecondsOf: aBlock ]
 ]
 

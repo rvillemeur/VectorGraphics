@@ -41,27 +41,33 @@ VGTiledImageCopyTest >> testABackendWithNothingRecordedAnswersNoDispatch [
 ]
 
 { #category : 'tests' }
-VGTiledImageCopyTest >> testAFrameThatEndsInAnImageClearsItsDestinationAndAFrameReadBackDoesNot [
-	"The destination of a frame that ends on the device is cleared on the device, because the
+VGTiledImageCopyTest >> testAFrameDoesNotShowThroughTheFrameDrawnAfterIt [
+	"The destination of a frame that ends on the device is filled on the device, because the
 	 buffer holds the last frame drawn through it and the kernel composes over what it reads.
-	 A frame that reads back brings its own destination from the host, so the upload is the
-	 clear and the stage is not paid."
-
-	| encoding dispatch image |
+	 A small frame drawn after a large one ends in the pixels it would have ended in on its own,
+	 which it cannot do unless the fill happened and the dispatch waited for it: since unit 7.6
+	 the two ride in one command buffer, where nothing orders them but the barrier between."
+	| large small dispatch alone after image |
 	self hasDevice ifFalse: [ ^ self ].
-	encoding := self
-		            encodingOfExtent: self caseExtent
-		            drawnWith: self mixedFillFrame.
+	large := self
+		         encodingOfExtent: self caseExtent
+		         drawnWith: self mixedFillFrame.
+	small := self
+		         encodingOfExtent: self caseExtent
+		         drawnWith: self cornerFillFrame.
 	dispatch := VGTiledFillDispatch on:
 		            VGVulkanDeviceSession default context.
 	image := self imageOfExtent: self caseExtent.
 	[
-	dispatch recordStages.
-	dispatch draw: encoding endingIn: image.
-	self assert: (dispatch stageMicroseconds includesKey: #clear).
-	dispatch recordStages.
-	dispatch draw: encoding into: (ByteArray new: encoding targetByteCount).
-	self deny: (dispatch stageMicroseconds includesKey: #clear) ] ensure: [
+	dispatch draw: small endingIn: image.
+	alone := self pixelsOfImage: image.
+	dispatch draw: large endingIn: image.
+	dispatch draw: small endingIn: image.
+	after := self pixelsOfImage: image.
+	self
+		deny: (alone allSatisfy: [ :each | each = 0 ])
+		description: 'the frame laid down no pixel at all'.
+	self assert: after equals: alone ] ensure: [
 		dispatch releaseDevice.
 		image destroy ]
 ]

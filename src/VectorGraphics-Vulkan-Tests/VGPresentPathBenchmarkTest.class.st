@@ -80,10 +80,11 @@ VGPresentPathBenchmarkTest >> testAStageOfARoundIsAPartOfADrawOfIt [
 { #category : 'tests' }
 VGPresentPathBenchmarkTest >> testEachPathIsMeasuredOnTheStagesThatPathPays [
 	"What the two paths are, read off the stages they were measured on rather than off their
-	 names. The presented path clears its target on the device and copies it into an image; it
-	 reads nothing back and it copies nothing in the host. The readback path reads the target
-	 into the host's own pixels and pays a copy on each side of that, and it clears nothing,
-	 because the destination it uploads is the clearing."
+	 names. The presented path copies its target buffer into an image; it reads nothing back and
+	 it copies nothing in the host. The readback path reads the target into the host's own pixels
+	 and pays a copy on each side of that, and it copies nothing into an image.
+	 Neither of them shows a fill of the destination: unit 7.6 folded that into the command
+	 buffer of the dispatch, where it is a part of the dispatch and no stage of its own."
 	| benchmark presented readBack hostCopyStages |
 	self hasDevice ifFalse: [ ^ self ].
 	benchmark := VGPresentPathBenchmark rounds: 1 timedDraws: 2.
@@ -95,12 +96,12 @@ VGPresentPathBenchmarkTest >> testEachPathIsMeasuredOnTheStagesThatPathPays [
 	hostCopyStages := {
 		                  VGPresentPathBenchmark pixelsOfStageName.
 		                  VGPresentPathBenchmark writeIntoStageName }.
-	self assert: (presented stageNames includesAll: #( #clear #copy )).
+	self assert: (presented stageNames includes: #copy).
 	self deny: (presented stageNames includesAny: hostCopyStages).
 	self deny: (presented stageNames includes: #readback).
 	self assert: (readBack stageNames includesAll: hostCopyStages).
 	self assert: (readBack stageNames includes: #readback).
-	self deny: (readBack stageNames includes: #clear)
+	self deny: (readBack stageNames includes: #copy)
 ]
 
 { #category : 'tests' }

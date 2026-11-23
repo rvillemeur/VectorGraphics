@@ -105,21 +105,19 @@ VGTiledFillDispatch class >> stageNames [
 	 order the drawing methods wrap them in and the order a report shows them in. This table is
 	 the only place that names a stage: a report reads it, and a test reads the source of the
 	 frame against it so that a stage cannot be timed under a name no report shows.
-
 	 The first of them is named writeBuffers for the frames of units 3.0 to 3.3, where it packed
 	 the words of the already built encoding into runs of bytes; since unit 3.4 it writes the
 	 frame record alone and names the blocks the upload reads, and the name is kept so that the
 	 figures of every unit can be read against each other. It is not the building of the
 	 encoding, which a frame pays before a dispatch is asked for anything.
-
 	 There is no release among them, because unit 3.1 keeps the device objects of a frame for the
-	 session and a frame pays nothing to let go of them. Three of them are paid by one kind of
-	 frame each: a frame that ends on the device clears its destination on the device and copies
-	 its target buffer into an image, and a frame that asks for its pixels brings its own
-	 destination with it, so it clears nothing and pays the readback instead. A report shows a
-	 row for the ones its frame paid."
-
-	^ #( #writeBuffers #module #allocate #prepare #clear #upload #dispatch #copy
+	 session and a frame pays nothing to let go of them. There is no clear either: unit 7.5 gave
+	 the fill of the destination a stage of its own, and unit 7.6 folded that fill into the
+	 command buffer of the dispatch, where it is a part of the dispatch and no longer a stage.
+	 Two of them are paid by one kind of frame each: a frame that ends on the device copies its
+	 target buffer into an image, and a frame that asks for its pixels pays the readback. A
+	 report shows a row for the ones its frame paid."
+	^ #( #writeBuffers #module #allocate #prepare #upload #dispatch #copy
 	     #readback )
 ]
 
@@ -239,46 +237,50 @@ VGTiledFillDispatch >> byteCountOfBlock: aBlock [
 	^ aBlock byteSize
 ]
 
-{ #category : 'dispatching' }
-VGTiledFillDispatch >> clearTarget [
-	"The target buffer cleared on the device, for a frame that brings no destination from the
-	 host. The kernel composes over the destination, so the pixels under a frame are part of its
-	 result: an uncleared buffer shows whatever the device left there, which is undefined memory
-	 on the first frame and the last frame drawn on every frame after it.
-	 It is a fill recorded on the device and not an upload, so the frame pays a write of its own
-	 pixels in device memory and nothing across the bus, which is what this unit removed the
-	 upload of the destination for.
-	 A frame that brings its own destination clears nothing: the upload overwrites every pixel
+{ #category : 'drawing' }
+VGTiledFillDispatch >> clearAndDispatchOver: anEncoding [
+	"One workgroup for every tile the frame touches, with the fill of the destination recorded
+	 in front of it where the frame brings none from the host, in one command buffer and one
+	 submission. Unit 7.5 filled the destination in a submission of its own, which cost a frame
+	 that ends on the device a second wait on the queue; unit 7.6 measured that and folded it in
+	 here.
+	 The barrier between the two is what makes the fold legal: the fill is a transfer write and
+	 the kernel reads those pixels through a storage buffer, and a fill and a dispatch in one
+	 command buffer are not ordered against each other without it.
+	 A frame that brings its own destination fills nothing: the upload overwrites every pixel
 	 the kernel reads."
-	(self hostFilled: #target) ifTrue: [ ^ self ].
-	self timeStage: #clear during: [
+	self timeStage: #dispatch during: [
 		| command |
-		command := self copyCommandPool allocateBuffer.
+		command := self frameCommandPool allocateBuffer.
 		command do: [ :recorder |
-			recorder
-				recordFillOfBuffer: (buffers at: #target)
-				with: self class clearedTargetWord ].
+			(self hostFilled: #target) ifFalse: [
+				recorder
+					recordFillOfBuffer: (buffers at: #target)
+					with: self class clearedTargetWord.
+				recorder recordFillToComputeBarrier ].
+			kernel
+				recordComputeInto: recorder
+				groupsAcross: anEncoding touchedTileCount
+				down: self class rowsPerDispatch
+				layers: self class layersPerDispatch ].
 		context computeQueue submit: command andWait: true ]
 ]
 
-{ #category : 'dispatching' }
+{ #category : 'drawing' }
 VGTiledFillDispatch >> computeFrameOf: anEncoding [
 	"The steps of one frame on the device: the kernel of this tile extent prepared, a buffer for
-	 every binding large enough to hold what the frame owes it, the destination cleared when the
-	 frame brings none from the host, the blocks uploaded and one workgroup dispatched for every
-	 tile the frame touches. A frame that touches no tile has nothing to dispatch and leaves the
-	 pixels alone.
-
+	 every binding large enough to hold what the frame owes it, the blocks uploaded and one
+	 workgroup dispatched for every tile the frame touches, with the destination filled in front
+	 of that dispatch where the frame brings none from the host. A frame that touches no tile
+	 has nothing to dispatch and leaves the pixels alone.
 	 Nothing of the device is destroyed at the end of a frame: the kernel, the pipeline and the
 	 buffers are what unit 3.1 keeps for the session and releaseDevice is what lets go of them."
-
 	anEncoding touchesNoTile ifTrue: [ ^ self ].
 	self residentKernelFor: anEncoding.
 	self growBuffersFor: anEncoding.
 	self prepareOnce.
-	self clearTarget.
 	self upload.
-	self dispatchOver: anEncoding
+	self clearAndDispatchOver: anEncoding
 ]
 
 { #category : 'accessing' }
@@ -286,26 +288,14 @@ VGTiledFillDispatch >> context [
 	^ context
 ]
 
-{ #category : 'device' }
-VGTiledFillDispatch >> copyCommandPool [
-	"The pool the copy into an image cuts its command buffers from, made on the first such
-	 frame and kept until the device is released. A frame that only ever reads back never makes
-	 one: the kernel has a pool of its own and this one is of no use to it."
-
-	^ copyPool ifNil: [
-		  copyPool := context device createCommandPool:
-			              context computeQueueFamily ]
-]
-
 { #category : 'drawing' }
 VGTiledFillDispatch >> copyTargetInto: anImage [
 	"The target buffer into that image, in one submission of my own, for a frame that nobody
 	 else is recording around. The command pool is kept for the session like everything else of
 	 the device here, so a frame pays one allocation of a command buffer and not one of a pool."
-
 	self timeStage: #copy during: [
 		| command |
-		command := self copyCommandPool allocateBuffer.
+		command := self frameCommandPool allocateBuffer.
 		command do: [ :recorder | self recordCopyInto: anImage in: recorder ].
 		context computeQueue submit: command andWait: true ]
 ]
@@ -316,17 +306,6 @@ VGTiledFillDispatch >> deviceBuffers [
 	 has been drawn since I was last released."
 
 	^ buffers
-]
-
-{ #category : 'dispatching' }
-VGTiledFillDispatch >> dispatchOver: anEncoding [
-	"One workgroup for every tile the frame touches."
-
-	self timeStage: #dispatch during: [
-		kernel
-			dispatch: anEncoding touchedTileCount
-			y: self class rowsPerDispatch
-			z: self class layersPerDispatch ]
 ]
 
 { #category : 'drawing' }
@@ -392,6 +371,17 @@ VGTiledFillDispatch >> firstWordsOfBlock: aBlock upTo: aCount [
 	aBlock ifNil: [ ^ #(  ) ].
 	^ (1 to: (aCount min: self class shownWordCount)) collect: [ :word |
 		  self wordOfBlock: aBlock at: word ]
+]
+
+{ #category : 'accessing' }
+VGTiledFillDispatch >> frameCommandPool [
+	"The pool this dispatch cuts its own command buffers from — the one a frame is dispatched
+	 in and the one a copy into an image is recorded in — made on the first frame and kept until
+	 the device is released. The kernel has a pool of its own, which is where the blur's passes
+	 are recorded."
+	^ copyPool ifNil: [
+		  copyPool := context device createCommandPool:
+			              context computeQueueFamily ]
 ]
 
 { #category : 'encoding' }

@@ -220,12 +220,11 @@ VGTiledFillTest >> testAFramePaysOneQueueSubmissionWhateverItsTileCount [
 	 against a background frame whose dispatch is 4.1 ms, and the small share it makes holds
 	 only while each of the three counts below is one: a shape that splits the frame into two
 	 dispatches pays the fixed cost twice, and the plan's accounting would have to be redone.
-
 	 The dispatch is counted in the steps of a frame and no longer in the method a caller
-	 sends, because since unit 7.5 the two drawing methods share those steps. A frame that
-	 ends on the device pays one submission more than the count here, for the clear of its
-	 destination, which unit 7.6 measures against the upload it replaced."
-
+	 sends, because since unit 7.5 the two drawing methods share those steps. Since unit 7.6
+	 the frame records its own command buffer rather than asking the kernel for one, so that
+	 the fill of its destination rides in the same submission; the count below is of that
+	 submission."
 	| sendsOf |
 	sendsOf := [ :aMethod :aSelector |
 	           (aMethod ast allChildren select: [ :each |
@@ -233,16 +232,50 @@ VGTiledFillTest >> testAFramePaysOneQueueSubmissionWhateverItsTileCount [
 	self
 		assert: (sendsOf
 				 value: VGTiledFillDispatch >> #computeFrameOf:
-				 value: #dispatchOver:)
+				 value: #clearAndDispatchOver:)
 		equals: 1.
 	self
 		assert: (sendsOf
-				 value: VGTiledFillDispatch >> #dispatchOver:
-				 value: #dispatch:y:z:)
+				 value: VGTiledFillDispatch >> #clearAndDispatchOver:
+				 value: #recordComputeInto:groupsAcross:down:layers:)
 		equals: 1.
 	self
 		assert: (sendsOf
-				 value: PVComputeKernel >> #dispatch:y:z:
+				 value: VGTiledFillDispatch >> #clearAndDispatchOver:
+				 value: #submit:andWait:)
+		equals: 1
+]
+
+{ #category : 'tests' }
+VGTiledFillTest >> testAFrameThatClearsOnTheDeviceStillPaysOneSubmission [
+	"Unit 7.5 cleared the destination in a submission of its own, so a frame that ends on the
+	 device paid two where every other frame pays one: the fill and the dispatch. The fill is
+	 recorded into the command buffer of the dispatch now, so such a frame pays one submission
+	 like the rest. The barrier between them is not optional and is counted here: the fill is a
+	 transfer write and the kernel reads those pixels through a storage buffer, and without the
+	 barrier the shader may read what the fill has not written yet."
+	| sendsOf |
+	sendsOf := [ :aMethod :aSelector |
+	           (aMethod ast allChildren select: [ :each |
+		            each isMessage and: [ each selector = aSelector ] ]) size ].
+	self
+		assert: (sendsOf
+				 value: VGTiledFillDispatch >> #clearAndDispatchOver:
+				 value: #recordFillOfBuffer:with:)
+		equals: 1.
+	self
+		assert: (sendsOf
+				 value: VGTiledFillDispatch >> #clearAndDispatchOver:
+				 value: #recordFillToComputeBarrier)
+		equals: 1.
+	self
+		assert: (sendsOf
+				 value: VGTiledFillDispatch >> #clearAndDispatchOver:
+				 value: #recordComputeInto:groupsAcross:down:layers:)
+		equals: 1.
+	self
+		assert: (sendsOf
+				 value: VGTiledFillDispatch >> #clearAndDispatchOver:
 				 value: #submit:andWait:)
 		equals: 1
 ]

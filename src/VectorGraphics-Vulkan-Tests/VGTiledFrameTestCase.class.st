@@ -71,6 +71,17 @@ VGTiledFrameTestCase >> caseExtent [
 	^ VGConformanceCorpus caseExtent
 ]
 
+{ #category : 'fixtures' }
+VGTiledFrameTestCase >> cornerFillFrame [
+	"One opaque square in a corner of the case extent, which leaves most of the frame untouched:
+	 what shows outside it is whatever the destination held when the kernel read it."
+	^ [ :context |
+	  context
+		  sourceColorR: 0.2 g: 0.3 b: 0.9 a: 1.0;
+		  rectangleX: 2 y: 2 width: 12 height: 12;
+		  fill ]
+]
+
 { #category : 'private' }
 VGTiledFrameTestCase >> deviceFormOfExtent: anExtent drawnWith: aBlock [
 	"The same frame drawn on the device: encoded, dispatched over one workgroup a tile and the
