@@ -331,6 +331,14 @@ VGFrameDeviceBenchmark >> deviceRows [
 	^ outcome rows
 ]
 
+{ #category : 'reading' }
+VGFrameDeviceBenchmark >> drawingTimings [
+	"The timings of the phases of the drawing, which is one phase of the host half and is taken
+	 apart into four of its own."
+
+	^ self encodeTimings insideOf: #displayList
+]
+
 { #category : 'accessing' }
 VGFrameDeviceBenchmark >> encodeMilliseconds [
 	^ self millisecondsOf: #encode
@@ -341,7 +349,7 @@ VGFrameDeviceBenchmark >> encodePhaseMilliseconds [
 	"What each phase of the host half of my frame cost, in milliseconds, keyed by the names
 	 VGTiledFillEncoding gives them. Empty until the frame has been encoded."
 
-	^ (timings insideOf: #encode) means
+	^ self encodeTimings means
 ]
 
 { #category : 'reporting' }
@@ -370,6 +378,14 @@ VGFrameDeviceBenchmark >> encodePhaseRows [
 	^ (VGTiledFillEncoding stageNames select: [ :each |
 		   measured includesKey: each ]) collect: [ :each |
 		  each -> (measured at: each) ]
+]
+
+{ #category : 'reading' }
+VGFrameDeviceBenchmark >> encodeTimings [
+	"The timings of the phases of the host half of my frame, created on the first ask: a reader
+	 may ask before the frame has been encoded and read an empty table."
+
+	^ timings insideOf: #encode
 ]
 
 { #category : 'measuring' }
@@ -483,12 +499,11 @@ VGFrameDeviceBenchmark >> measureDisplayList [
 	 the font manager, which scans this machine's fonts once a session, and that scan is not a
 	 phase of a frame."
 
-	| phases drawing |
-	phases := timings insideOf: #encode.
-	drawing := phases insideOf: #displayList.
+	| drawing |
+	drawing := self drawingTimings.
 	self newSurface.
 	repeats timesRepeat: [
-		phases
+		self encodeTimings
 			add: (self microsecondsDuring: [
 					 self newSurfaceOnBackend: nil recordingInto: drawing ])
 			of: #displayList ]
@@ -516,7 +531,7 @@ VGFrameDeviceBenchmark >> measureEncodesOf: aDisplayList [
 	 One pass of each is thrown away first, for the first touch of the pages."
 
 	| phases |
-	phases := timings insideOf: #encode.
+	phases := self encodeTimings.
 	VGTiledFillEncoding of: aDisplayList extent: self extent.
 	self encodeWithStagesRecorded: aDisplayList.
 	repeats timesRepeat: [
@@ -633,7 +648,7 @@ VGFrameDeviceBenchmark >> minimumEncodePhaseMilliseconds [
 	 read against its own mean: the two differ by the collector and the scheduler, and a lever
 	 is chosen on the floor."
 
-	^ (timings insideOf: #encode) floors
+	^ self encodeTimings floors
 ]
 
 { #category : 'reading' }
@@ -682,10 +697,12 @@ VGFrameDeviceBenchmark >> newSurfaceOnBackend: aBackendOrNil recordingInto: aTim
 	 surface it was made for.
 	 The context the drawing records on is built inside the #surface phase and not between the
 	 phases: on the background frame, whose whole drawing is 0.14 ms, the context was a sixth
-	 of the drawing and no phase was measuring it."
+	 of the drawing and no phase was measuring it. The surface I answer is the one the context
+	 holds, so the phase reads as one expression and nothing is assigned across it."
 
-	| surface context |
+	| context |
 	context := self class timeDrawing: #surface into: aTimingsOrNil during: [
+		           | surface |
 		           surface := VGCairoImageSurface extent: self extent.
 		           aBackendOrNil ifNotNil: [ surface backend: aBackendOrNil ].
 		           surface newContext ].
@@ -693,7 +710,7 @@ VGFrameDeviceBenchmark >> newSurfaceOnBackend: aBackendOrNil recordingInto: aTim
 		 drawBlockNamed: frameName
 		 using: VGFrameDrawingKit ours
 		 recordingInto: aTimingsOrNil) value: context.
-	^ surface
+	^ context surface
 ]
 
 { #category : 'accessing' }
