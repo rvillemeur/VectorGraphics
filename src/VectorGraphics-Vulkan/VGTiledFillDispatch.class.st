@@ -130,6 +130,14 @@ VGTiledFillDispatch class >> uploadedFromTheHostLabel [
 	^ 'uploaded from the host'
 ]
 
+{ #category : 'encoding' }
+VGTiledFillDispatch >> blockOfBinding: aName [
+	"The words the host gave that binding for this frame, or nil when it gave none. A frame
+	 that ends on the device gives none for the destination: the pixels the kernel composes
+	 over are in its buffer already."
+	^ blocks at: aName ifAbsent: [ nil ]
+]
+
 { #category : 'accessing' }
 VGTiledFillDispatch >> blocks [
 	"What the last frame uploaded, by binding name: one block of words a binding, kept so that
@@ -173,9 +181,8 @@ VGTiledFillDispatch >> bufferRowOfBinding: aName at: anIndex [
 	 of the block the device was given rather than out of the encoding, and the address is
 	 asked of the buffer itself, so a row cannot say the frame sent something it did not or
 	 that a mapping is held where none is."
-
 	| block count |
-	block := blocks at: aName ifAbsent: [ nil ].
+	block := self blockOfBinding: aName.
 	count := self wordCountOfBinding: aName filledBy: block.
 	^ {
 		  (anIndex - 1).
@@ -203,15 +210,24 @@ VGTiledFillDispatch >> bufferRows [
 ]
 
 { #category : 'encoding' }
-VGTiledFillDispatch >> byteCountOfBinding: aName in: anEncoding [
-	"The bytes the buffer of that binding owes the device. A binding the blocks name is as
-	 large as its block; the one they do not is the destination of a frame that ends on the
-	 device, and its size is the encoding's own rule, since no host block states it."
+VGTiledFillDispatch >> bufferSizeForBinding: aName in: anEncoding [
+	"The bytes the buffer of that binding must hold for this frame: what the binding owes the
+	 device, rounded up to a whole number of elements and never smaller than the empty buffer,
+	 because a storage buffer of no bytes is refused at descriptor update."
+	^ ((self byteCountOfBinding: aName in: anEncoding)
+	    / VGTiledFillKernel elementStride
+	    max: self class emptyBufferWordCount)
+	  * VGTiledFillKernel elementStride
+]
 
-	^ blocks
-		  at: aName
-		  ifPresent: [ :block | self byteCountOfBlock: block ]
-		  ifAbsent: [ anEncoding targetByteCount ]
+{ #category : 'encoding' }
+VGTiledFillDispatch >> byteCountOfBinding: aName in: anEncoding [
+	"The bytes the buffer of that binding owes the device. A binding the host filled is as
+	 large as its block; the one it did not is the destination of a frame that ends on the
+	 device, and its size is the encoding's own rule, since no host block states it."
+	^ (self blockOfBinding: aName)
+		  ifNil: [ anEncoding targetByteCount ]
+		  ifNotNil: [ :block | self byteCountOfBlock: block ]
 ]
 
 { #category : 'encoding' }
@@ -229,15 +245,12 @@ VGTiledFillDispatch >> clearTarget [
 	 host. The kernel composes over the destination, so the pixels under a frame are part of its
 	 result: an uncleared buffer shows whatever the device left there, which is undefined memory
 	 on the first frame and the last frame drawn on every frame after it.
-
 	 It is a fill recorded on the device and not an upload, so the frame pays a write of its own
 	 pixels in device memory and nothing across the bus, which is what this unit removed the
 	 upload of the destination for.
-
 	 A frame that brings its own destination clears nothing: the upload overwrites every pixel
 	 the kernel reads."
-
-	(blocks includesKey: #target) ifTrue: [ ^ self ].
+	(self hostFilled: #target) ifTrue: [ ^ self ].
 	self timeStage: #clear during: [
 		| command |
 		command := self copyCommandPool allocateBuffer.
@@ -402,18 +415,11 @@ VGTiledFillDispatch >> growBuffersFor: anEncoding [
 	 frame that shrinks would otherwise pay an allocation for shrinking and another for growing
 	 back. A grown buffer is pointed at by the descriptor set before the one it replaces is
 	 destroyed, because a descriptor left pointing at freed memory takes the image with it on
-	 the next dispatch.
-
-	 The size of a binding the blocks do not name is the encoding's own rule: that binding is
-	 the destination of a frame that ends on the device, and no host block states its size."
-
+	 the next dispatch."
 	self timeStage: #allocate during: [
 		VGTiledFillKernel bindingNames withIndexDo: [ :name :index |
 			| needed held |
-			needed := ((self byteCountOfBinding: name in: anEncoding)
-			            / VGTiledFillKernel elementStride
-			            max: self class emptyBufferWordCount)
-			          * VGTiledFillKernel elementStride.
+			needed := self bufferSizeForBinding: name in: anEncoding.
 			held := buffers at: name ifAbsent: [ nil ].
 			(held isNil or: [ held size < needed ]) ifTrue: [
 				| grown |
@@ -425,6 +431,12 @@ VGTiledFillDispatch >> growBuffersFor: anEncoding [
 				prepared ifTrue: [
 					kernel rebindBuffer: grown atBinding: index - 1 ].
 				held ifNotNil: [ held destroy ] ] ] ]
+]
+
+{ #category : 'encoding' }
+VGTiledFillDispatch >> hostFilled: aName [
+	"Whether the host gave that binding words of its own for this frame."
+	^ (self blockOfBinding: aName) notNil
 ]
 
 { #category : 'initialization' }
@@ -690,13 +702,12 @@ VGTiledFillDispatch >> timeStage: aSymbol during: aBlock [
 VGTiledFillDispatch >> upload [
 	"The words of each block into the buffer kept for it, the two held together by the name of
 	 the binding. The copy reads the block's own memory, so a frame pays one copy a binding and
-	 not two. A binding the blocks do not name sends nothing: the destination of a frame that
+	 not two. A binding the host did not fill sends nothing: the destination of a frame that
 	 ends on the device is already in its buffer, which is what unit 7.5 removed the transfer
 	 for."
-
 	self timeStage: #upload during: [
 		VGTiledFillKernel bindingNames do: [ :name |
-			blocks at: name ifPresent: [ :block |
+			(self blockOfBinding: name) ifNotNil: [ :block |
 				(buffers at: name)
 					uploadBits: block
 					byteCount: (self byteCountOfBlock: block) ] ] ]
