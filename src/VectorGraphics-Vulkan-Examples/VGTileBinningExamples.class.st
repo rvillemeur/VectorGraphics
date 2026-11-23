@@ -73,7 +73,7 @@ VGTileBinningExamples class >> tileGridOfTheReferenceFrame [
 	<sampleInstance>
 	"The grid the reference frame of unit 1.11 is cut into at the default tile size: fifty columns
 	 by thirty-eight rows, the last row short because six hundred does not divide by sixteen. The
-	 Tiles tab lists every tile with the bounds it really answers."
-
+	 Tiles tab lists every tile with the bounds it really answers, and the Super tiles tab the
+	 groups of sixteen a binning asks about before it asks about the tiles inside them."
 	^ VGTileGrid extent: VGFrameProfile referenceExtent
 ]

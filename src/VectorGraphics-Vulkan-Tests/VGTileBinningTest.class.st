@@ -321,6 +321,31 @@ VGTileBinningTest >> testEveryPixelEveryCorpusFrameDrawsLiesInATouchedTile [
 ]
 
 { #category : 'tests' }
+VGTileBinningTest >> testEverySuperTileOfTheDefaultGridHoldsTheTilesItCovers [
+	"A super tile is the rectangle a binning asks about before it asks about the tiles inside it,
+	 so the tiles it names must be exactly the tiles its own pixels hold, and every tile of the
+	 grid must be named by one super tile and no other. A tile named by none would never be
+	 marked interior and a tile named by two would be asked twice."
+	| grid seen |
+	grid := VGTileGrid extent: 800 @ 600.
+	seen := Bag new.
+	1 to: grid superTileCount do: [ :superIndex |
+		| bounds children |
+		bounds := grid boundsOfSuperTileAt: superIndex.
+		children := grid tileIndexesOfSuperTileAt: superIndex.
+		self deny: children isEmpty.
+		children do: [ :each |
+			seen add: each.
+			self assert: (bounds containsRect: (grid boundsOfTileAt: each)) ].
+		self
+			assert: children asSortedCollection asArray
+			equals: ((1 to: grid tileCount) select: [ :each |
+					 bounds containsRect: (grid boundsOfTileAt: each) ]) asArray ].
+	self assert: seen size equals: grid tileCount.
+	self assert: seen asSet size equals: grid tileCount
+]
+
+{ #category : 'tests' }
 VGTileBinningTest >> testTheBinningReportNamesHowManyPairsAreInteriorOfHowManyBinned [
 	"The interior marks are what the kernel reads instead of walking sub rows, so the report has
 	 to show them: a frame whose marks vanished would otherwise look exactly like one whose marks

@@ -18,7 +18,9 @@ Class {
 	#instVars : [
 		'extent',
 		'tileExtent',
-		'bounds'
+		'bounds',
+		'superBounds',
+		'superTileIndexes'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -47,6 +49,26 @@ VGTileGrid class >> extent: anExtent [
 { #category : 'instance creation' }
 VGTileGrid class >> extent: anExtent tileExtent: aTileExtent [
 	^ self new setExtent: anExtent tileExtent: aTileExtent
+]
+
+{ #category : 'constants' }
+VGTileGrid class >> interiorProbeFactor [
+	"How many tiles a super tile holds along each axis. A binning asks whether a whole super
+	 tile is interior to an entry before it asks about the sixteen tiles inside it, so one walk
+	 over the edges of a shape answers for sixteen tiles where it answers yes. Four was measured
+	 on the reference frame against two and eight: 3.815 ms of interior testing against 4.307 and
+	 4.304, where asking every tile on its own costs 5.036."
+	^ 4
+]
+
+{ #category : 'accessing' }
+VGTileGrid >> boundsOfSuperTileAt: anIndex [
+	"The pixels of that super tile. The rectangle is remembered, and the same object comes back
+	 every time: a scanner remembers its answer under the rectangle it was asked about, and an
+	 answer is reused only where the rectangle is the same object."
+	superBounds ifNil: [ superBounds := Array new: self superTileCount ].
+	^ (superBounds at: anIndex) ifNil: [
+		  superBounds at: anIndex put: (self newBoundsOfSuperTileAt: anIndex) ]
 ]
 
 { #category : 'accessing' }
@@ -112,6 +134,44 @@ VGTileGrid >> indexesIntersecting: aRectangle [
 ]
 
 { #category : 'inspector' }
+VGTileGrid >> inspectorSuperTiles: aBuilder [
+	"Every super tile with the tiles it holds, which is what a binning asks about before it asks
+	 about those tiles one by one. The counts are read from the grid itself, so a change of the
+	 factor shows here and nothing is restated."
+	<inspectorPresentationOrder: 2 title: 'Super tiles'>
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn
+				   title: 'Super tile'
+				   evaluated: [ :each | each printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Column'
+				   evaluated: [ :each |
+					   ((each - 1) \\ self superTileColumns) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Row'
+				   evaluated: [ :each |
+					   ((each - 1) // self superTileColumns) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Bounds'
+				   evaluated: [ :each | (self boundsOfSuperTileAt: each) printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Tiles'
+				   evaluated: [ :each |
+					   (self tileIndexesOfSuperTileAt: each) size printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'First tile'
+				   evaluated: [ :each |
+					   (self tileIndexesOfSuperTileAt: each) first printString ]);
+		  items: (1 to: self superTileCount) asArray;
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGTileGrid >> inspectorSuperTilesContext: aContext [
+	aContext active: extent isNotNil
+]
+
+{ #category : 'inspector' }
 VGTileGrid >> inspectorTiles: aBuilder [
 	"Every tile with the bounds it really answers, so the short tiles of the last column and the
 	 last row are visible as such."
@@ -143,6 +203,19 @@ VGTileGrid >> inspectorTiles: aBuilder [
 { #category : 'inspector' }
 VGTileGrid >> inspectorTilesContext: aContext [
 	aContext active: extent isNotNil
+]
+
+{ #category : 'accessing' }
+VGTileGrid >> newBoundsOfSuperTileAt: anIndex [
+	"The pixels of that super tile, clipped to the extent, worked out from the index the same way
+	 a tile's bounds are."
+	| factor column row origin span |
+	factor := self class interiorProbeFactor.
+	column := (anIndex - 1) \\ self superTileColumns.
+	row := (anIndex - 1) // self superTileColumns.
+	span := factor * tileExtent x @ (factor * tileExtent y).
+	origin := column * span x @ (row * span y).
+	^ origin corner: ((origin + span) min: extent)
 ]
 
 { #category : 'private' }
@@ -195,6 +268,26 @@ VGTileGrid >> setExtent: anExtent tileExtent: aTileExtent [
 ]
 
 { #category : 'accessing' }
+VGTileGrid >> superTileColumns [
+	"How many super tiles a row of the grid holds. The last one is short where the columns do not
+	 divide by the factor, as the last tile of a row is short where the pixels do not."
+	^ (self columns / self class interiorProbeFactor) ceiling
+]
+
+{ #category : 'accessing' }
+VGTileGrid >> superTileCount [
+	"How many super tiles cover me. Row-major like the tiles, so a super tile is found by
+	 arithmetic and nothing is searched."
+	^ self superTileColumns * self superTileRows
+]
+
+{ #category : 'accessing' }
+VGTileGrid >> superTileRows [
+	"How many super tiles a column of the grid holds."
+	^ (self rows / self class interiorProbeFactor) ceiling
+]
+
+{ #category : 'accessing' }
 VGTileGrid >> tileCount [
 	^ self columns * self rows
 ]
@@ -202,6 +295,17 @@ VGTileGrid >> tileCount [
 { #category : 'accessing' }
 VGTileGrid >> tileExtent [
 	^ tileExtent
+]
+
+{ #category : 'accessing' }
+VGTileGrid >> tileIndexesOfSuperTileAt: anIndex [
+	"The tiles that super tile holds, in dispatch order. Remembered, because a binning reads them
+	 once for every entry whose box reaches that super tile."
+	superTileIndexes ifNil: [ superTileIndexes := Array new: self superTileCount ].
+	^ (superTileIndexes at: anIndex) ifNil: [
+		  superTileIndexes
+			  at: anIndex
+			  put: (self indexesIntersecting: (self boundsOfSuperTileAt: anIndex)) asArray ]
 ]
 
 { #category : 'binning' }
