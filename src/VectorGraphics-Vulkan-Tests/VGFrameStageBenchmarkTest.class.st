@@ -372,6 +372,38 @@ VGFrameStageBenchmarkTest >> testTheStagesOfAMeasuredFrameAreTheStagesTheDispatc
 ]
 
 { #category : 'tests' }
+VGFrameStageBenchmarkTest >> testTheStagesOfAnEncodeAccountForTheWholeOfIt [
+	"Unit 3.10 reads the host half of a frame the way unit 3.0 read the device half, so the
+	 encode's own phases have to add up to the encode they were measured in. Within a tenth of
+	 it: the clock is read twice a phase, eleven phases deep, and those readings are inside the
+	 whole and outside every row.
+	 Nothing here needs a device. The display list, the binning and the buffers are all built on
+	 the host, so this test runs in an image with no driver, unlike the dispatch's own stage
+	 test above.
+	 One encode is thrown away before the clock starts, because the first one of an image pays
+	 for the first touch of its pages and that cost would land in whichever phase ran first."
+
+	| benchmark list encoding started whole total |
+	benchmark := VGFrameStageBenchmark onTheBackgroundFrame.
+	list := benchmark newSurface displayList.
+	VGTiledFillEncoding of: list extent: benchmark extent.
+	encoding := VGTiledFillEncoding new recordStages.
+	started := Time microsecondClockValue.
+	encoding encode: list extent: benchmark extent.
+	whole := Time microsecondClockValue - started.
+	total := encoding stageMicroseconds values inject: 0 into: [ :sum :each |
+		         sum + each ].
+	self
+		assert: total <= whole
+		description: total printString , ' us of phases against '
+			, whole printString , ' us of encode'.
+	self
+		assert: total * 10 >= (whole * 9)
+		description: total printString , ' us of phases accounts for less than nine tenths of '
+			, whole printString , ' us of encode'
+]
+
+{ #category : 'tests' }
 VGFrameStageBenchmarkTest >> testTheViewsOfTheBudgetAreCheckedLikeAnyOther [
 	"The budget — the two benchmarks and the drawing kit — lives in the test package, because
 	 measuring against Cairo means naming Alexandrie's classes and a package the failover loads

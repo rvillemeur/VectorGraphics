@@ -13,7 +13,8 @@ Class {
 		'buffers',
 		'decoder',
 		'bands',
-		'sources'
+		'sources',
+		'stages'
 	],
 	#category : 'VectorGraphics-Vulkan-Tiles',
 	#package : 'VectorGraphics-Vulkan',
@@ -96,13 +97,15 @@ VGTiledFillEncoding class >> maskBytesShownPerEntry [
 { #category : 'instance creation' }
 VGTiledFillEncoding class >> of: aDisplayList extent: anExtent [
 	"The frame of a surface of that extent, binned over a grid of the default tile size and
-	 encoded."
-	^ self on: (VGTileBinning of: aDisplayList extent: anExtent)
+	 encoded. The binning is built inside the encoding so that a caller which asked for the
+	 phases is charged for it as the bin phase."
+
+	^ self new encode: aDisplayList extent: anExtent
 ]
 
 { #category : 'instance creation' }
 VGTiledFillEncoding class >> of: aDisplayList grid: aGrid [
-	^ self on: (VGTileBinning of: aDisplayList grid: aGrid)
+	^ self new encode: aDisplayList grid: aGrid
 ]
 
 { #category : 'instance creation' }
@@ -123,6 +126,22 @@ VGTiledFillEncoding class >> operatorTable [
 	 standing for a word never written."
 	^ VGTiledFillRasteriser supportedOperators withIndexCollect: [ :each :index |
 		  index -> each ]
+]
+
+{ #category : 'accessing' }
+VGTiledFillEncoding class >> stageNames [
+	"The phases the host half of a frame is paid in, in the order it pays them, which is the
+	 order the encoding wraps them in and the order a report shows them in. This table is the
+	 only place that names a phase: a report reads it and a test reads the source against it, so
+	 a phase cannot be timed under a name no report shows. The dispatch's own table,
+	 VGTiledFillDispatch class >> stageNames, is the device half and starts where this one ends.
+	 The first two are paid before an encoding exists. The display list is built by a caller
+	 drawing on a surface, and the binning is built by my own of:extent:, so each is timed
+	 around the build rather than inside it; a caller that already holds a binning and sends
+	 on: pays neither."
+
+	^ #( #displayList #bin #entriesAsFills #bands #sources #offsets #allocate
+	     #writeEntries #writeSourcePixels #writeBandBlocks #writeTiles )
 ]
 
 { #category : 'codes' }
@@ -180,6 +199,31 @@ VGTiledFillEncoding >> edgeCount [
 { #category : 'accessing' }
 VGTiledFillEncoding >> edges [
 	^ buffers edges
+]
+
+{ #category : 'encoding' }
+VGTiledFillEncoding >> encode: aDisplayList extent: anExtent [
+	"The frame of a surface of that extent, binned over a grid of the default tile size and
+	 written out, with every phase of the work timed where recordStages asked for it."
+
+	^ self encodeBinnedBy: [ VGTileBinning of: aDisplayList extent: anExtent ]
+]
+
+{ #category : 'encoding' }
+VGTiledFillEncoding >> encode: aDisplayList grid: aGrid [
+	"The frame of that display list over a grid given rather than derived, written out, with
+	 every phase timed where recordStages asked for it."
+
+	^ self encodeBinnedBy: [ VGTileBinning of: aDisplayList grid: aGrid ]
+]
+
+{ #category : 'encoding' }
+VGTiledFillEncoding >> encodeBinnedBy: aBlock [
+	"The binning the block builds, timed as the bin phase, and then the frame it holds written
+	 out. The binning is built here and not by my caller so that its cost is one phase of the
+	 host half of a frame rather than a figure nothing reads."
+
+	^ self setBinning: (self timeStage: #bin during: aBlock)
 ]
 
 { #category : 'accessing' }
@@ -526,6 +570,18 @@ VGTiledFillEncoding >> printOn: aStream [
 		nextPutAll: ' tiles)'
 ]
 
+{ #category : 'stages' }
+VGTiledFillEncoding >> recordStages [
+	"Time every phase of the frame I encode from here on. A frame of a running tool does not,
+	 because the clock is read twice a phase and a phase can be shorter than the reading; the
+	 benchmark asks, and nothing else does.
+	 Sent before the encoding is built, since the phases run inside that build: the recipe is
+	 VGTiledFillEncoding new recordStages, then encode:extent:."
+
+	stages := Dictionary new.
+	^ self
+]
+
 { #category : 'accessing' }
 VGTiledFillEncoding >> refShapes [
 	^ buffers refShapes
@@ -554,30 +610,29 @@ VGTiledFillEncoding >> rowOfTileAt: anIndex [
 	^ nil
 ]
 
-{ #category : 'initialization' }
+{ #category : 'private' }
 VGTiledFillEncoding >> setBinning: aBinning [
-	"Write the frame out: a header, a clip rectangle, a mask rectangle, a paint block, a run of
-	 shapes, a run of edges, a run of stops and a run of mask bytes for every entry, then the
-	 pixels of every source the frame paints out of, then the blocks of shape records its rows of
-	 tiles read, then the table of the tiles it touches and the references into it. Every entry is
-	 written as the fill it is drawn as, which for a blit is a fill of its own narrowed clip
-	 carrying the alpha of its mask, so the buffers describe one kind of entry and the kernel
-	 reads one kind. The entries are the binnings own copy of the display list, so nothing here
-	 reads a frame that has already drained, and the tiles are written from the binning itself,
-	 which knows the entries it binned and not the fills they became."
+	"Read the frame the binning holds: every entry as the fill it is drawn as, which for a blit
+	 is a fill of its own narrowed clip carrying the alpha of its mask, so the buffers describe
+	 one kind of entry and the kernel reads one kind; the bands those fills fall in; the sources
+	 they paint out of; where each of them lands in the buffers; and the buffers themselves.
+	 The entries are the binning's own copy of the display list, so nothing here reads a frame
+	 that has already drained. Writing them out is writeBuffersOf:fills:offsets:.
+	 Each step is one phase of VGTiledFillEncoding class >> stageNames, timed where a caller
+	 asked for the phases and free where it did not."
 
 	| entries offsets |
 	grid := aBinning grid.
-	entries := aBinning entries collect: [ :each | each asTiledFill ].
-	bands := VGTiledFillBands binning: aBinning fills: entries.
-	sources := VGTiledFillSources of: entries.
-	offsets := self offsetsOf: entries.
-	self allocateBuffersFor: entries offsets: offsets.
-	entries withIndexDo: [ :each :index |
-		self writeEntry: each at: index offsets: offsets ].
-	sources writeInto: buffers sourcePixels.
-	self writeBandBlocksAt: offsets.
-	self writeTilesOf: aBinning
+	entries := self timeStage: #entriesAsFills during: [
+		           aBinning entries collect: [ :each | each asTiledFill ] ].
+	bands := self timeStage: #bands during: [
+		         VGTiledFillBands binning: aBinning fills: entries ].
+	sources := self timeStage: #sources during: [
+		           VGTiledFillSources of: entries ].
+	offsets := self timeStage: #offsets during: [ self offsetsOf: entries ].
+	self timeStage: #allocate during: [
+		self allocateBuffersFor: entries offsets: offsets ].
+	self writeBuffersOf: aBinning fills: entries offsets: offsets
 ]
 
 { #category : 'writing' }
@@ -593,6 +648,15 @@ VGTiledFillEncoding >> shapes [
 { #category : 'accessing' }
 VGTiledFillEncoding >> sourcePixels [
 	^ buffers sourcePixels
+]
+
+{ #category : 'stages' }
+VGTiledFillEncoding >> stageMicroseconds [
+	"What each phase of the frame I encode cost, keyed by phase name. A phase that was never
+	 reached is absent rather than nought, so a frame that returned early can be told from one
+	 whose phase was too fast to measure."
+
+	^ stages ifNil: [ Dictionary new ]
 ]
 
 { #category : 'accessing' }
@@ -664,6 +728,25 @@ VGTiledFillEncoding >> tileTableRows [
 			  (table at: base + VGTiledFillLayout referenceCountField) } ]
 ]
 
+{ #category : 'stages' }
+VGTiledFillEncoding >> timeStage: aSymbol during: aBlock [
+	"The block, answering what it answers, with the microseconds it took added to that phase
+	 where a caller asked for the phases. An encoding that was not asked evaluates the block and
+	 reads no clock at all, so the phases cost a running tool nothing.
+	 Public, because the display list is built before any encoding exists and the caller that
+	 builds it times it through me."
+
+	| answer started |
+	stages ifNil: [ ^ aBlock value ].
+	started := Time microsecondClockValue.
+	answer := aBlock value.
+	stages
+		at: aSymbol
+		put: (stages at: aSymbol ifAbsent: [ 0 ])
+			+ (Time microsecondClockValue - started).
+	^ answer
+]
+
 { #category : 'writing' }
 VGTiledFillEncoding >> totalEdgeCountOf: anEntry [
 	"The edges of every shape of an entry, which is the room its run of the edge buffer takes.
@@ -733,6 +816,30 @@ VGTiledFillEncoding >> writeBandBlocksAt: aDictionary [
 						put: (segments at: offset + each - 1) ].
 				cursor := cursor + 1 ].
 			record := record + 1 ] ]
+]
+
+{ #category : 'private' }
+VGTiledFillEncoding >> writeBuffersOf: aBinning fills: aCollection offsets: anOffsetTable [
+	"Write the frame out: a header, a clip rectangle, a mask rectangle, a paint block, a run of
+	 shapes, a run of edges, a run of stops and a run of mask bytes for every fill, then the
+	 pixels of every source the frame paints out of, then the blocks of shape records its rows
+	 of tiles read, then the table of the tiles it touches and the references into it. The tiles
+	 are written from the binning itself, which knows the entries it binned and not the fills
+	 they became.
+	 Each step is one phase of VGTiledFillEncoding class >> stageNames. The source pixel buffer
+	 is fetched before its phase rather than inside it, because a buffer is never fetched inside
+	 a block here: see
+	 VGTiledFillTest >> testEveryBufferAnEncodingWritesIsFetchedOnceAndNotOncePerElement."
+
+	| pixels |
+	self timeStage: #writeEntries during: [
+		aCollection withIndexDo: [ :each :index |
+			self writeEntry: each at: index offsets: anOffsetTable ] ].
+	pixels := buffers sourcePixels.
+	self timeStage: #writeSourcePixels during: [ sources writeInto: pixels ].
+	self timeStage: #writeBandBlocks during: [
+		self writeBandBlocksAt: anOffsetTable ].
+	self timeStage: #writeTiles during: [ self writeTilesOf: aBinning ]
 ]
 
 { #category : 'writing' }
