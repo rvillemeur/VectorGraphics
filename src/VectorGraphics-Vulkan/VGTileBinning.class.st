@@ -57,9 +57,6 @@ VGTileBinning >> bin: anEntry at: anOrdinal [
 	 clip and operator included, so an operator that writes beyond its shape widens the box there
 	 and not here. A tile the entry covers in full is marked as it is binned, because the tile
 	 and the entry are both in hand here and nothing later holds the pair.
-	 What a bin holds is the ordinal of the entry in the frame, and beside it the mark of the
-	 pair: that is what a reference of the device carries, and it is what spares the writer a
-	 search for an ordinal and a second question for the mark.
 	 The super tile is asked before the tiles inside it: an entry that covers a whole super tile
 	 covers every tile of it, so one walk over the edges of a shape marks sixteen tiles and the
 	 tiles themselves are never asked. On the reference frame that is 4.587 ms of binning against
@@ -68,27 +65,45 @@ VGTileBinning >> bin: anEntry at: anOrdinal [
 	box := self timeStage: #boundingBox during: [ anEntry boundingBox ].
 	(self timeStage: #indexes during: [ grid superTileIndexesIntersecting: box ])
 		do: [ :superIndex |
-			| superBounds interior tileIndexes |
-			superBounds := grid boundsOfSuperTileAt: superIndex.
-			interior := self
-				            timeStage: #interior
-				            during: [ anEntry coversEveryPixelOf: superBounds ].
-			tileIndexes := self
-				               timeStage: #indexes
-				               during: [ grid indexesIntersecting: (box intersect: superBounds) ].
-			tileIndexes do: [ :index |
-				| mark |
-				mark := interior or: [
-					        self
-						        timeStage: #interior
-						        during: [
-						        anEntry coversEveryPixelOf: (grid boundsOfTileAt: index) ] ].
-				self timeStage: #bins during: [
-					(bins at: index) ifNil: [
-						bins at: index put: (OrderedCollection new: 4).
-						interiors at: index put: (OrderedCollection new: 4) ].
-					(bins at: index) add: anOrdinal.
-					(interiors at: index) add: mark ] ] ]
+			self
+				bin: anEntry
+				at: anOrdinal
+				inSuperTileAt: superIndex
+				of: box ]
+]
+
+{ #category : 'building' }
+VGTileBinning >> bin: anEntry at: anOrdinal inSuperTileAt: aSuperIndex of: aBoundingBox [
+	"The tiles of that super tile the bounding box reaches, each referenced and marked. The super
+	 tile is asked first: where the entry covers the whole of it, every tile inside it is
+	 interior and no tile is asked on its own.
+	 The reference is written here rather than through a method of its own. Measured against each
+	 other in one session, twenty passes of each alternating, writing it through a method cost
+	 5.235 ms of the reference frame against 4.541 and 4.140 ms of the cards frame against 3.617:
+	 the write is paid once a pair, 3828 times on that frame, and a send of it is dearer than the
+	 five lines are worth. Splitting the super tile off is the opposite — it is paid 130 times a
+	 frame and measures faster than the one method it came out of."
+	| superBounds interior |
+	superBounds := grid boundsOfSuperTileAt: aSuperIndex.
+	interior := self
+		            timeStage: #interior
+		            during: [ anEntry coversEveryPixelOf: superBounds ].
+	(self
+		 timeStage: #indexes
+		 during: [ grid indexesIntersecting: (aBoundingBox intersect: superBounds) ])
+		do: [ :index |
+			| mark |
+			mark := interior or: [
+				        self
+					        timeStage: #interior
+					        during: [
+					        anEntry coversEveryPixelOf: (grid boundsOfTileAt: index) ] ].
+			self timeStage: #bins during: [
+				(bins at: index) ifNil: [
+					bins at: index put: (OrderedCollection new: 4).
+					interiors at: index put: (OrderedCollection new: 4) ].
+				(bins at: index) add: anOrdinal.
+				(interiors at: index) add: mark ] ]
 ]
 
 { #category : 'accessing' }
