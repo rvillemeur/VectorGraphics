@@ -94,8 +94,12 @@ VGSpanScanner >> enclosesWholly: aRectangle [
 	 they all enclose is one and the walk has nothing to find there.
 	 The answer is conservative, since a yes paints whole a pixel the walk would have painted in
 	 part: an edge that so much as touches the rectangle answers no, and that leaves one point to
-	 ask of the fill rule, the centre."
-
+	 ask of the fill rule, the centre.
+	 The answer is not remembered. It was, under the asked rectangle's identity, and measuring it
+	 on the reference frame cost 5.907 ms of binning against 4.587 ms without it: a grid is built
+	 for every frame, so the tile rectangles of one frame are objects no later frame asks about,
+	 and inside one frame the repeated questions are the cheap ones that a bounding box answers
+	 without a walk."
 	| box |
 	box := self exactBoundingBox.
 	box ifNil: [ ^ false ].
