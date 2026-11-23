@@ -32,6 +32,13 @@ VGBlitEntry >> boundingBox [
 	^ clip boundsNarrowedTo: (origin extent: surface extent)
 ]
 
+{ #category : 'counting' }
+VGBlitEntry >> countedBy: aCensusRow [
+	"Double dispatch, so that a census of a frame needs no test of my class. I am pixels: the
+	 mask surface I carry is what I cost to record."
+	aCensusRow countBlit: self
+]
+
 { #category : 'inspector' }
 VGBlitEntry >> inspectorBlit: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Blit'>

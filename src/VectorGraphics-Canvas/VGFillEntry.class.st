@@ -38,6 +38,13 @@ VGFillEntry >> boundingBox [
 	^ box ifNotNil: [ clip boundsNarrowedTo: box ]
 ]
 
+{ #category : 'counting' }
+VGFillEntry >> countedBy: aCensusRow [
+	"Double dispatch, so that a census of a frame needs no test of my class. I am geometry: my
+	 edges and my coordinates are what I cost to record."
+	aCensusRow countFill: self
+]
+
 { #category : 'testing' }
 VGFillEntry >> coversEveryPixelOf: aRectangle [
 	"Whether every pixel of that device rectangle is painted whole by me: my clip must hold the
