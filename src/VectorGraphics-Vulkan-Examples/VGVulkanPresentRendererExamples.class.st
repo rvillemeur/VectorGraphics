@@ -25,12 +25,39 @@ Class {
 }
 
 { #category : 'examples' }
+VGVulkanPresentRendererExamples class >> intervalsOfFrameNamed: aName presentedIn: aHostSpace of: aSpace [
+	"One frame presented presentsPerFrame times, every present timed from the host, as one
+	 round of one comparison. The first present is thrown away: it is the one that builds the
+	 pipeline of that tile extent and acquires the first image of the swapchain."
+	| comparison intervals |
+	comparison := VGPresentPathComparison
+		              frameName: aName
+		              extent: aSpace extent
+		              path: VGPresentPathBenchmark presentedPathName.
+	aSpace invalidateAll.
+	aHostSpace render: aSpace.
+	intervals := (1 to: self presentsPerFrame) collect: [ :each |
+		             | started |
+		             started := Time microsecondClockValue.
+		             aSpace invalidateAll.
+		             aHostSpace render: aSpace.
+		             Time microsecondClockValue - started ].
+	comparison addRound: intervals stages: Dictionary new.
+	^ comparison
+]
+
+{ #category : 'examples' }
 VGVulkanPresentRendererExamples class >> openWindowAndPresentTheBenchmarkFrames [
 	<sampleInstance>
 	"One click: a real, visible Vulkan window, the three frames VGFrameDeviceBenchmark measures
-	 drawn on the device and presented through its swapchain two seconds apart, and the renderer
-	 of that window answered once the window is closed. Answers nil on a machine with no Vulkan
-	 device."
+	 drawn on the device and presented through its swapchain, and the interval each frame
+	 achieved answered as one VGPresentPathComparison a frame once the window is closed.
+	 Answers nil on a machine with no Vulkan device.
+	 This is the windowed half of unit 7.6. The offscreen half, VGPresentPathBenchmark, is what
+	 the two paths are compared on, because every present here waits for the vertical blank: a
+	 FIFO swapchain is what VkRenderConfig asks for, so the intervals below are the refresh
+	 period of the screen wherever the frame is faster than it, and they say that the path keeps
+	 up and nothing about how fast it is."
 	"The host space is built by hand, the way every device test of this unit builds it, and not
 	 by showing the space: BlSpace >> show hands the space to BlHostRegistry default
 	 preferredHost, which is set at image start and kept there, so a shown space opens on the
@@ -39,7 +66,6 @@ VGVulkanPresentRendererExamples class >> openWindowAndPresentTheBenchmarkFrames 
 	 the universe, which is also why each frame is rendered directly and waited on instead of
 	 settled."
 	"Named open… so that the example gates do not run it: see the class comment."
-
 	| element space hostSpace |
 	VGVulkanDeviceSession default contextOrNil ifNil: [ ^ nil ].
 	element := VGDrawnFrameElement new.
@@ -50,20 +76,24 @@ VGVulkanPresentRendererExamples class >> openWindowAndPresentTheBenchmarkFrames 
 			  hostSpace initializeRenderer.
 			  [
 			  hostSpace show.
-			  VGFrameDeviceBenchmark frameNames do: [ :each |
-				  element drawBlock: (VGFrameDeviceBenchmark drawBlockNamed: each).
-				  space invalidateAll.
-				  hostSpace render: space.
-				  (Delay forSeconds: self secondsPerFrame) wait ].
-			  hostSpace renderer ] ensure: [ hostSpace close ] ] ]
+			  VGFrameDeviceBenchmark frameNames collect: [ :each |
+				  element drawBlock:
+					  (VGFrameDeviceBenchmark drawBlockNamed: each).
+				  self
+					  intervalsOfFrameNamed: each
+					  presentedIn: hostSpace
+					  of: space ] ] ensure: [ hostSpace close ] ] ]
 ]
 
 { #category : 'constants' }
-VGVulkanPresentRendererExamples class >> secondsPerFrame [
-	"How long each of the three frames stays on screen. Long enough to see which frame it is,
-	 short enough that the window is gone before a watcher wonders whether it is stuck."
-
-	^ 2
+VGVulkanPresentRendererExamples class >> presentsPerFrame [
+	"How many times each of the three frames is drawn and presented. The swapchain of this
+	 project is FIFO, so a present waits for the vertical blank and the count is also how long
+	 the frame stays on screen: a hundred and twenty presents are two seconds at sixty hertz,
+	 which is what secondsPerFrame asked for when the frames were shown one present each.
+	 Long enough to see which frame it is, short enough that the window is gone before a watcher
+	 wonders whether it is stuck."
+	^ 120
 ]
 
 { #category : 'examples' }
