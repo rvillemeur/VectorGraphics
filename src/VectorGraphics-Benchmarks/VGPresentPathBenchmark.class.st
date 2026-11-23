@@ -12,8 +12,9 @@ Class {
 		'backend',
 		'hostCopies'
 	],
-	#category : 'VectorGraphics-Benchmarks',
-	#package : 'VectorGraphics-Benchmarks'
+	#category : 'VectorGraphics-Benchmarks-Present',
+	#package : 'VectorGraphics-Benchmarks',
+	#tag : 'Present'
 }
 
 { #category : 'constants' }

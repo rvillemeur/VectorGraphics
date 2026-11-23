@@ -14,79 +14,13 @@ backends it drives and the corpus it draws.
 
 `VGArchitectureTest class >> allowedDependencies` states what this package may name.
 
+Tags:
+- `Frames` — the frame harness: the kit that draws the corpus and the two benchmarks
+that time one frame of it, stage by stage through Bloc and through the Vulkan device path.
+- `Present` — the present path: the benchmark of a frame reaching a window, and the
+comparison of that path against the readback path.
+- `Manifest` — this comment and the Renraku rule configuration.
 
-T
-a
-g
-s
-:
-
-
-
-
--
- 
-`
-M
-a
-n
-i
-f
-e
-s
-t
-`
- 
-—
- 
-t
-h
-i
-s
- 
-c
-o
-m
-m
-e
-n
-t
- 
-a
-n
-d
- 
-t
-h
-e
- 
-R
-e
-n
-r
-a
-k
-u
- 
-r
-u
-l
-e
- 
-c
-o
-n
-f
-i
-g
-u
-r
-a
-t
-i
-o
-n
-.
 "
 Class {
 	#name : 'ManifestVectorGraphicsBenchmarks',

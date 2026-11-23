@@ -22,8 +22,9 @@ Class {
 		'encodePhases',
 		'encodePhaseMinimums'
 	],
-	#category : 'VectorGraphics-Benchmarks',
-	#package : 'VectorGraphics-Benchmarks'
+	#category : 'VectorGraphics-Benchmarks-Frames',
+	#package : 'VectorGraphics-Benchmarks',
+	#tag : 'Frames'
 }
 
 { #category : 'frames' }

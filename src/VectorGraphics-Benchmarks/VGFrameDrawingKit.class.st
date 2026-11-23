@@ -12,8 +12,9 @@ Class {
 		'canvasClass',
 		'rendererClass'
 	],
-	#category : 'VectorGraphics-Benchmarks',
-	#package : 'VectorGraphics-Benchmarks'
+	#category : 'VectorGraphics-Benchmarks-Frames',
+	#package : 'VectorGraphics-Benchmarks',
+	#tag : 'Frames'
 }
 
 { #category : 'instance creation' }
