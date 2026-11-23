@@ -14,9 +14,9 @@ Class {
 		'insides',
 		'counts'
 	],
-	#category : 'VectorGraphics-Benchmarks-Frames',
-	#package : 'VectorGraphics-Benchmarks',
-	#tag : 'Frames'
+	#category : 'VectorGraphics-Vulkan-Budget',
+	#package : 'VectorGraphics-Vulkan',
+	#tag : 'Budget'
 }
 
 { #category : 'measuring' }
@@ -118,6 +118,15 @@ VGStageTimings >> means [
 	table := Dictionary new.
 	totals keysDo: [ :each | table at: each put: (self meanOf: each) ].
 	^ table
+]
+
+{ #category : 'reading' }
+VGStageTimings >> microseconds [
+	"What every stage read for has cost in all, in microseconds, keyed by stage. The unit is
+	 the clock's own, for the reader that adds a reading of mine to a table of its own and
+	 cannot add a figure already rounded to milliseconds."
+
+	^ totals copy
 ]
 
 { #category : 'printing' }

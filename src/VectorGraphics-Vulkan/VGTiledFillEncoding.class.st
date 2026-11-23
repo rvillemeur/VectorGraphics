@@ -606,7 +606,7 @@ VGTiledFillEncoding >> printOn: aStream [
 		nextPutAll: ' tiles)'
 ]
 
-{ #category : 'stages' }
+{ #category : 'measuring' }
 VGTiledFillEncoding >> recordStages [
 	"Time every phase of the frame I encode from here on. A frame of a running tool does not,
 	 because the clock is read twice a phase and a phase can be shorter than the reading; the
@@ -614,7 +614,7 @@ VGTiledFillEncoding >> recordStages [
 	 Sent before the encoding is built, since the phases run inside that build: the recipe is
 	 VGTiledFillEncoding new recordStages, then encode:extent:."
 
-	stages := Dictionary new.
+	stages := VGStageTimings new.
 	^ self
 ]
 
@@ -686,13 +686,13 @@ VGTiledFillEncoding >> sourcePixels [
 	^ buffers sourcePixels
 ]
 
-{ #category : 'stages' }
+{ #category : 'reading' }
 VGTiledFillEncoding >> stageMicroseconds [
 	"What each phase of the frame I encode cost, keyed by phase name. A phase that was never
 	 reached is absent rather than nought, so a frame that returned early can be told from one
 	 whose phase was too fast to measure."
 
-	^ stages ifNil: [ Dictionary new ]
+	^ stages ifNil: [ Dictionary new ] ifNotNil: [ stages microseconds ]
 ]
 
 { #category : 'accessing' }
@@ -764,7 +764,7 @@ VGTiledFillEncoding >> tileTableRows [
 			  (table at: base + VGTiledFillLayout referenceCountField) } ]
 ]
 
-{ #category : 'stages' }
+{ #category : 'measuring' }
 VGTiledFillEncoding >> timeStage: aSymbol during: aBlock [
 	"The block, answering what it answers, with the microseconds it took added to that phase
 	 where a caller asked for the phases. An encoding that was not asked evaluates the block and
@@ -772,15 +772,8 @@ VGTiledFillEncoding >> timeStage: aSymbol during: aBlock [
 	 Public, because the display list is built before any encoding exists and the caller that
 	 builds it times it through me."
 
-	| answer started |
 	stages ifNil: [ ^ aBlock value ].
-	started := Time microsecondClockValue.
-	answer := aBlock value.
-	stages
-		at: aSymbol
-		put: (stages at: aSymbol ifAbsent: [ 0 ])
-			+ (Time microsecondClockValue - started).
-	^ answer
+	^ stages time: aSymbol during: aBlock
 ]
 
 { #category : 'writing' }

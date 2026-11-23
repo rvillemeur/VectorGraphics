@@ -609,7 +609,7 @@ VGTiledFillDispatch >> recordStages [
 	 because the clock is read twice a stage and a stage can be shorter than the reading; the
 	 benchmark asks, and nothing else does."
 
-	stages := Dictionary new.
+	stages := VGStageTimings new.
 	^ self
 ]
 
@@ -662,7 +662,7 @@ VGTiledFillDispatch >> stageMicroseconds [
 	 stage that was never reached is absent rather than nought, so that a frame which returned
 	 early can be told from one whose stage was too fast to measure."
 
-	^ stages ifNil: [ Dictionary new ]
+	^ stages ifNil: [ Dictionary new ] ifNotNil: [ stages microseconds ]
 ]
 
 { #category : 'accessing' }
@@ -684,15 +684,8 @@ VGTiledFillDispatch >> timeStage: aSymbol during: aBlock [
 	 where a caller asked for the stages. A dispatch that was not asked evaluates the block and
 	 reads no clock at all, so the stages cost a running tool nothing."
 
-	| answer started |
 	stages ifNil: [ ^ aBlock value ].
-	started := Time microsecondClockValue.
-	answer := aBlock value.
-	stages
-		at: aSymbol
-		put: (stages at: aSymbol ifAbsent: [ 0 ])
-			+ (Time microsecondClockValue - started).
-	^ answer
+	^ stages time: aSymbol during: aBlock
 ]
 
 { #category : 'drawing' }
