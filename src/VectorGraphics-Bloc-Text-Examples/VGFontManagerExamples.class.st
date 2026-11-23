@@ -90,3 +90,16 @@ VGFontManagerExamples class >> refusalOfAMachineHoldingNoPreferredFamily [
 		  on: VGFontManagerHasNoUsableFamily
 		  do: [ :each | each ]
 ]
+
+{ #category : 'examples' }
+VGFontManagerExamples class >> sharedManagerOfTheMachineFonts [
+	<sampleInstance>
+	"The one manager of this machine's fonts the image shares, which every drawing of this
+	 project poses. Click twice and the same object comes back: that identity is what unit 3.11
+	 is, because building one meets every font installed here — 116 ms, which unit 3.10 measured
+	 once a frame, where it was 86 per cent of what drawing the reference frame cost.
+	 The first click of a fresh image pays that scan; from then on nothing does, until a reader
+	 sends VGFontManager forgetDefaultFaces or the session changes."
+
+	^ VGFontManager withDefaultFaces
+]

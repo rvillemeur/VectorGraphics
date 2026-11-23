@@ -11,7 +11,8 @@ Class {
 	#instVars : [
 		'previousGlobalInstance',
 		'previousInstalledInstance',
-		'previousFontFamilyState'
+		'previousFontFamilyState',
+		'previousSharedInstance'
 	],
 	#category : 'VectorGraphics-Bloc-Text-Tests-Tests',
 	#package : 'VectorGraphics-Bloc-Text-Tests',
@@ -20,13 +21,18 @@ Class {
 
 { #category : 'running' }
 VGFontManagerInstallationTest >> setUp [
-	"Remember both slots, and the three class variables of FontFamily an installation writes,
+	"Remember all three slots, and the three class variables of FontFamily an installation writes,
 	 before a test writes any of them. The dictionary of families is copied, since a test that
-	 registers a family would otherwise fill the very object tearDown puts back."
+	 registers a family would otherwise fill the very object tearDown puts back.
+	 The shared manager is remembered as well as the installed one: a test that forgets it would
+	 otherwise leave the next reader of fonts in this image to scan the machine again, which is
+	 116 ms and the cost unit 3.11 removed."
 
 	super setUp.
 	previousGlobalInstance := VGFontManager managerUpstreamHolds.
 	previousInstalledInstance := VGFontManager installedInstance.
+	previousSharedInstance := VGFontManager hasDefaultFaces
+		                          ifTrue: [ VGFontManager withDefaultFaces ].
 	previousFontFamilyState := #( AvailableFamilies DefaultFamilyName
 	                              DefaultPointSize ) collect: [ :name |
 		                          (FontFamily classPool at: name) copy ]
@@ -36,12 +42,15 @@ VGFontManagerInstallationTest >> setUp [
 VGFontManagerInstallationTest >> tearDown [
 	"Put the image back the way I found it, whichever way the test went. Upstream's slot is
 	 written through the project's own writer, since uninstallGlobally would leave it at nil and
-	 this image had a manager there before I ran. Ours is written directly, having no writer of
-	 its own. FontFamily's three class variables go back by name, an installation having written
-	 all three."
+	 this image had a manager there before I ran. The two of ours are written directly, having no
+	 writer of their own. FontFamily's three class variables go back by name, an installation
+	 having written all three."
 
 	(VGFontManager class slotNamed: #installedInstance)
 		write: previousInstalledInstance
+		to: VGFontManager.
+	(VGFontManager class slotNamed: #sharedInstance)
+		write: previousSharedInstance
 		to: VGFontManager.
 	VGFontManager restoreUpstreamManager: previousGlobalInstance.
 	#( AvailableFamilies DefaultFamilyName DefaultPointSize )
@@ -84,6 +93,33 @@ VGFontManagerInstallationTest >> testAnImageThatInstalledNothingLeavesUpstreamsO
 	VGFontManager startUp: true.
 	self assert: AeFontManager globalInstance identicalTo: theirs.
 	self assert: VGFontManager installedInstance isNil
+]
+
+{ #category : 'tests' }
+VGFontManagerInstallationTest >> testForgettingTheDefaultFacesMakesTheNextReaderMeetTheMachineAgain [
+	"The one door onto a machine whose fonts changed while this image ran. Forgetting is the
+	 whole mechanism: the next reader builds a manager, which scans."
+
+	| first second |
+	first := VGFontManager withDefaultFaces.
+	VGFontManager forgetDefaultFaces.
+	self deny: VGFontManager hasDefaultFaces.
+	second := VGFontManager withDefaultFaces.
+	self assert: VGFontManager hasDefaultFaces.
+	self deny: second identicalTo: first
+]
+
+{ #category : 'tests' }
+VGFontManagerInstallationTest >> testInstallingGloballyPosesTheSharedManagerAndNotOneOfItsOwn [
+	"Installing and posing reach the same object, so an image that drew a frame before it
+	 installed pays nothing to install, and an image that installed pays nothing to draw."
+
+	| installed posed |
+	installed := VGFontManager installGlobally.
+	posed := VGFontManager poseFacesOfThisProject: true during: [
+		         VGFontManager managerUpstreamHolds ].
+	self assert: installed identicalTo: VGFontManager withDefaultFaces.
+	self assert: posed identicalTo: installed
 ]
 
 { #category : 'tests' }
@@ -194,4 +230,21 @@ VGFontManagerInstallationTest >> testTheUpstreamSlotIsReadAndWrittenWithoutEverB
 	#( #managerUpstreamHolds #restoreUpstreamManager: ) do: [ :selector |
 		self deny:
 			((VGFontManager class >> selector) messages includes: #globalInstance) ]
+]
+
+{ #category : 'tests' }
+VGFontManagerInstallationTest >> testTwoPosesSeeTheSameManagerAndNotAScanEach [
+	"Reproduces a defect unit 3.10 measured: posing the faces of this project built a manager
+	 every time, and building one meets every font this machine has installed — 116 ms, which
+	 was 86 per cent of what drawing the reference frame cost. The manager the pose installs is
+	 one object for the image, so two poses answer the same one.
+	 Identity is the whole assertion: a scan can only be reached by building a manager, so two
+	 poses that answer one object have scanned once."
+
+	| first second |
+	first := VGFontManager poseFacesOfThisProject: true during: [
+		         VGFontManager managerUpstreamHolds ].
+	second := VGFontManager poseFacesOfThisProject: true during: [
+		          VGFontManager managerUpstreamHolds ].
+	self assert: first identicalTo: second
 ]

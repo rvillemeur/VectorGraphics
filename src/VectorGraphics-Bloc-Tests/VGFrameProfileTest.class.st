@@ -244,3 +244,20 @@ VGFrameProfileTest >> testTwoFramesOfTheSameSceneShareNoEntry [
 		assert: (first select: [ :each | second identityIncludes: each ]) size
 		equals: 0
 ]
+
+{ #category : 'tests' }
+VGFrameProfileTest >> testTwoSceneBuildsPoseTheSameFontManager [
+	"The gate on the path a benchmark walks: building a scene poses the faces of this project,
+	 and unit 3.10 measured that pose at 116 ms, 86 per cent of what drawing the reference frame
+	 cost, because every build met the machine's fonts again. The manager is shared, so the
+	 second build poses the object the first one built.
+	 Observed through the slot the pose writes, which is what every consumer of a face reads."
+
+	| first second |
+	first := profile withRendererClass: VGRenderer during: [
+		         VGFontManager managerUpstreamHolds ].
+	second := profile withRendererClass: VGRenderer during: [
+		          VGFontManager managerUpstreamHolds ].
+	self assert: first identicalTo: second.
+	self assert: first identicalTo: VGFontManager withDefaultFaces
+]

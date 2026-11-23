@@ -19,7 +19,8 @@ Class {
 		'rebuildsFromDefaultDirectories'
 	],
 	#classInstVars : [
-		'installedInstance'
+		'installedInstance',
+		'sharedInstance'
 	],
 	#category : 'VectorGraphics-Bloc-Text-Fonts',
 	#package : 'VectorGraphics-Bloc-Text',
@@ -42,6 +43,25 @@ VGFontManager class >> ensureUpstreamHoldsMine [
 	AeFontManager globalInstance: installedInstance
 ]
 
+{ #category : 'instance creation' }
+VGFontManager class >> forgetDefaultFaces [
+	"Drop the shared manager, so the next reader meets the machine's fonts again. A font
+	 installed on the machine since this image started is invisible until then: a scan per
+	 frame was 116 ms and is not the price of noticing it.
+	 The installed manager is left alone. It may be this same object, and uninstalling is about
+	 the slot every consumer of a face reaches, not about what the machine holds."
+
+	sharedInstance := nil
+]
+
+{ #category : 'testing' }
+VGFontManager class >> hasDefaultFaces [
+	"Whether the shared manager is built. Reads the slot rather than sending withDefaultFaces,
+	 which would build one at the moment a reader asks the question — an inspector tab asks it."
+
+	^ sharedInstance isNotNil
+]
+
 { #category : 'class initialization' }
 VGFontManager class >> initialize [
 	"Register for the image start. The priority is 115: above the 110 where upstream registers
@@ -56,24 +76,28 @@ VGFontManager class >> initialize [
 
 { #category : 'inspector' }
 VGFontManager class >> inspectorInstallation: aBuilder [
-
 	<inspectorPresentationOrder: 1 title: 'Installation'>
 	"Whether this project has posed a font manager as the one Bloc asks for its faces, and
 	 which one. Says that and nothing else: what the manager knows — its families, its entries,
 	 the faces it has built — is what its own State view says, so a reader dives into the row
 	 rather than reading a second copy of those counts that could disagree with the first.
-	 Reads my own slot only, through the accessor: sending AeFontManager globalInstance would
+	 Reads my own slots only, through the accessors: sending AeFontManager globalInstance would
 	 build a complete FreeType manager at the moment a reader opens an inspector, which is the
 	 opposite of what this unit is for. A reader who wants the real route asks
 	 AeFontManager globalInstance in a playground and accepts that it builds one.
 	 The second row is the fact #ensureUpstreamHoldsMine keeps true: a reader who emptied
-	 upstream''s slot sees it false here until the next measurement or drawing poses the
-	 route again."
+	 upstream's slot sees it false here until the next measurement or drawing poses the
+	 route again.
+	 The third row is the cache of unit 3.11, asked through #hasDefaultFaces so that reading it
+	 builds nothing: a manager of the machine's fonts costs a scan of every font installed,
+	 116 ms here, and a reader who opens this view has not asked for one."
 
 	^ aBuilder newTable
 		  items: {
 				  ('Installed manager' -> self installedInstance).
-				  ('Upstream slot holds it' -> (self managerUpstreamHolds == self installedInstance)) };
+				  ('Upstream slot holds it'
+				   -> (self managerUpstreamHolds == self installedInstance)).
+				  ('Default faces scanned' -> self hasDefaultFaces) };
 		  addColumn:
 			  (SpStringTableColumn title: 'Property' evaluated: [ :each | each key ]);
 		  addColumn: (SpStringTableColumn
@@ -96,9 +120,10 @@ VGFontManager class >> inspectorInstallationContext: aContext [
 { #category : 'installing' }
 VGFontManager class >> installGlobally [
 	"Make a manager of mine the one every consumer of a face reaches through
-	 AeFontManager globalInstance. It is built with the default faces, so it can draw the
-	 moment it is posed: BAFontConverter >> faceFor: falls back on the default face for every
-	 family a text names and nobody holds, and a nil there would break in the drawing.
+	 AeFontManager globalInstance. It is the shared manager of this machine's fonts, so it can
+	 draw the moment it is posed and an image that has already measured a frame pays nothing
+	 to install: BAFontConverter >> faceFor: falls back on the default face for every family a
+	 text names and nobody holds, and a nil there would break in the drawing.
 	 Kept here as well as written upstream, so that startUp: can put the same object back after
 	 upstream nils its slot at every image start, and so that nothing of mine has to read a
 	 slot of Alexandrie's to know what it posed.
@@ -107,7 +132,8 @@ VGFontManager class >> installGlobally [
 	 face when a reader first asks for it. A default family or point size the image has not
 	 chosen is given the one this manager can draw with — the family of the face it chose for
 	 itself, so the two doors name the same font; a choice already made is left alone."
-	installedInstance := self newWithDefaultFaces.
+
+	installedInstance := self withDefaultFaces.
 	AeFontManager globalInstance: installedInstance.
 	FontFamily addFamiliesFrom: installedInstance catalogue.
 	FontFamily defaultFamilyName ifNil: [
@@ -205,6 +231,20 @@ VGFontManager class >> uninstallGlobally [
 
 	installedInstance := nil.
 	AeFontManager globalInstance: nil
+]
+
+{ #category : 'instance creation' }
+VGFontManager class >> withDefaultFaces [
+	"The one manager of this machine's fonts the image shares, built the first time anybody asks
+	 for it. Building one meets every font the machine has installed, which is 116 ms here and
+	 was paid once a frame before unit 3.11: posing the faces of this project built a manager
+	 every time, and that scan was 86 per cent of what drawing the reference frame cost.
+	 Shared rather than built per reader, and safe to share across sessions: a manager built
+	 this way rebuilds its catalogue when the session changes, which every reader of it asks
+	 through. A reader that wants a manager of its own asks newWithDefaultFaces, which is what
+	 a test of the scan itself does."
+
+	^ sharedInstance ifNil: [ sharedInstance := self newWithDefaultFaces ]
 ]
 
 { #category : 'accessing' }
