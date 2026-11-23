@@ -52,7 +52,7 @@ VGTileGrid class >> extent: anExtent tileExtent: aTileExtent [
 ]
 
 { #category : 'constants' }
-VGTileGrid class >> interiorProbeFactor [
+VGTileGrid class >> tilesPerSuperTileSide [
 	"How many tiles a super tile holds along each axis. A binning asks whether a whole super
 	 tile is interior to an entry before it asks about the sixteen tiles inside it, so one walk
 	 over the edges of a shape answers for sixteen tiles where it answers yes. Four was measured
@@ -169,7 +169,7 @@ VGTileGrid >> inspectorSuperTilesContext: aContext [
 	aContext active: extent isNotNil
 ]
 
-{ #category : 'inspector' }
+{ #category : 'inspecting' }
 VGTileGrid >> inspectorTiles: aBuilder [
 	"Every tile with the bounds it really answers, so the short tiles of the last column and the
 	 last row are visible as such."
@@ -191,9 +191,9 @@ VGTileGrid >> inspectorTiles: aBuilder [
 		  addColumn: (SpStringTableColumn
 				   title: 'Pixels'
 				   evaluated: [ :each |
-					   | bounds |
-					   bounds := self boundsOfTileAt: each.
-					   (bounds width * bounds height) printString ]);
+					   | tileBounds |
+					   tileBounds := self boundsOfTileAt: each.
+					   (tileBounds width * tileBounds height) printString ]);
 		  items: (1 to: self tileCount) asArray;
 		  yourself
 ]
@@ -203,15 +203,15 @@ VGTileGrid >> inspectorTilesContext: aContext [
 	aContext active: extent isNotNil
 ]
 
-{ #category : 'accessing' }
+{ #category : 'private' }
 VGTileGrid >> newBoundsOfSuperTileAt: anIndex [
 	"The pixels of that super tile, clipped to the extent, worked out from the index the same way
 	 a tile's bounds are."
-	| factor column row origin span |
-	factor := self class interiorProbeFactor.
+	| side column row origin span |
+	side := self class tilesPerSuperTileSide.
 	column := (anIndex - 1) \\ self superTileColumns.
 	row := (anIndex - 1) // self superTileColumns.
-	span := factor * tileExtent x @ (factor * tileExtent y).
+	span := side * tileExtent x @ (side * tileExtent y).
 	origin := column * span x @ (row * span y).
 	^ origin corner: ((origin + span) min: extent)
 ]
@@ -280,7 +280,7 @@ VGTileGrid >> setExtent: anExtent tileExtent: aTileExtent [
 VGTileGrid >> superTileColumns [
 	"How many super tiles a row of the grid holds. The last one is short where the columns do not
 	 divide by the factor, as the last tile of a row is short where the pixels do not."
-	^ (self columns / self class interiorProbeFactor) ceiling
+	^ (self columns / self class tilesPerSuperTileSide) ceiling
 ]
 
 { #category : 'accessing' }
@@ -295,11 +295,11 @@ VGTileGrid >> superTileIndexesIntersecting: aRectangle [
 	"The super tiles a rectangle can touch, in dispatch order. The box is read exactly as
 	 indexesIntersecting: reads it, so a super tile is reached where one of its own tiles is and
 	 nowhere else."
-	| box span answer |
+	| box side span answer |
 	box := self pixelBoxOf: aRectangle.
 	box ifNil: [ ^ #(  ) ].
-	span := self class interiorProbeFactor * tileExtent x
-	        @ (self class interiorProbeFactor * tileExtent y).
+	side := self class tilesPerSuperTileSide.
+	span := side * tileExtent x @ (side * tileExtent y).
 	answer := OrderedCollection new.
 	box origin y // span y to: box corner y - 1 // span y do: [ :row |
 		box origin x // span x to: box corner x - 1 // span x do: [ :column |
@@ -310,7 +310,7 @@ VGTileGrid >> superTileIndexesIntersecting: aRectangle [
 { #category : 'accessing' }
 VGTileGrid >> superTileRows [
 	"How many super tiles a column of the grid holds."
-	^ (self rows / self class interiorProbeFactor) ceiling
+	^ (self rows / self class tilesPerSuperTileSide) ceiling
 ]
 
 { #category : 'accessing' }
