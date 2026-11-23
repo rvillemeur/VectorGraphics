@@ -16,7 +16,11 @@ Class {
 		'deviceForm',
 		'pixelsEqual',
 		'deviceName',
-		'unavailableReason'
+		'unavailableReason',
+		'extent',
+		'minimums',
+		'encodePhases',
+		'encodePhaseMinimums'
 	],
 	#category : 'VectorGraphics-Benchmarks',
 	#package : 'VectorGraphics-Benchmarks'
@@ -139,14 +143,35 @@ VGFrameDeviceBenchmark class >> extentOfItsFrames [
 	^ VGFrameProfile referenceExtent
 ]
 
+{ #category : 'accessing' }
+VGFrameDeviceBenchmark class >> extentsOfItsCensus [
+	"The two surfaces a frame of the budget is measured on: the one every number already in the
+	 plan was measured at, and a screen. Smallest first, so a report reads in the order a cost
+	 would grow if the cost grew with the area at all."
+
+	^ {
+		  self extentOfItsFrames.
+		  self fullScreenExtent }
+]
+
 { #category : 'instance creation' }
 VGFrameDeviceBenchmark class >> frameName: aSymbol [
 	^ self frameName: aSymbol repeats: self defaultRepeats
 ]
 
 { #category : 'instance creation' }
+VGFrameDeviceBenchmark class >> frameName: aSymbol extent: anExtent [
+	^ self frameName: aSymbol repeats: self defaultRepeats extent: anExtent
+]
+
+{ #category : 'instance creation' }
 VGFrameDeviceBenchmark class >> frameName: aSymbol repeats: anInteger [
 	^ self new setFrameName: aSymbol repeats: anInteger
+]
+
+{ #category : 'instance creation' }
+VGFrameDeviceBenchmark class >> frameName: aSymbol repeats: anInteger extent: anExtent [
+	^ self new setFrameName: aSymbol repeats: anInteger extent: anExtent
 ]
 
 { #category : 'constants' }
@@ -155,6 +180,17 @@ VGFrameDeviceBenchmark class >> frameNames [
 	 itself, which unit 2.7 made drawable on the device."
 
 	^ #( #background #cards #reference )
+]
+
+{ #category : 'accessing' }
+VGFrameDeviceBenchmark class >> fullScreenExtent [
+	"A surface the size of a screen, which is the other extent the census of unit 3.10 is read
+	 at. The picture is the same one: every frame of the budget is drawn at extentOfItsFrames,
+	 so what this extent varies is the surface and the grid of tiles over it and not the entries
+	 binned into them. That is the question it answers — whether the host half of a frame is
+	 paid for the area it covers or for the entries it carries."
+
+	^ 1920 @ 1080
 ]
 
 { #category : 'instance creation' }
@@ -198,6 +234,20 @@ VGFrameDeviceBenchmark class >> phaseLabels [
 		  (#buildSpirv -> 'build SPIR-V, once a session').
 		  (#dispatch -> 'dispatch').
 		  (#software -> 'software frame') }
+]
+
+{ #category : 'measuring' }
+VGFrameDeviceBenchmark >> addMicroseconds: aNumber of: aPhase toTotals: aTotalTable minimums: aMinimumTable [
+	"One reading of a phase, added to what its passes have cost and compared with the fastest of
+	 them. A phase is kept as both, because the mean is the figure every unit before this one
+	 quotes and the fastest pass is the work without whatever the machine was doing beside it."
+
+	aTotalTable
+		at: aPhase
+		put: (aTotalTable at: aPhase ifAbsent: [ 0 ]) + aNumber.
+	aMinimumTable
+		at: aPhase
+		put: ((aMinimumTable at: aPhase ifAbsent: [ aNumber ]) min: aNumber)
 ]
 
 { #category : 'accessing' }
@@ -263,6 +313,54 @@ VGFrameDeviceBenchmark >> encodeMilliseconds [
 ]
 
 { #category : 'accessing' }
+VGFrameDeviceBenchmark >> encodePhaseMilliseconds [
+	"What each phase of the host half of my frame cost, in milliseconds, keyed by the names
+	 VGTiledFillEncoding gives them. Empty until the frame has been encoded."
+
+	^ encodePhases ifNil: [ Dictionary new ]
+]
+
+{ #category : 'reporting' }
+VGFrameDeviceBenchmark >> encodePhaseReportRows [
+	"The phases of the host half, labelled as what they are inside of, each with its floor
+	 beside its mean. They sit under the encode row and not beside it, because they are that
+	 row taken apart and a reader adding them to it would count the frame twice."
+
+	| minimumOf |
+	minimumOf := self minimumEncodePhaseMilliseconds.
+	^ self encodePhaseRows collect: [ :each |
+		  'encode: ' , each key asString
+		  -> (self
+				   millisecondStringFor: each value
+				   minimum: (minimumOf at: each key ifAbsent: [ nil ])) ]
+]
+
+{ #category : 'accessing' }
+VGFrameDeviceBenchmark >> encodePhaseRows [
+	"One row a phase of the host half of my frame, in the order a frame pays them, each the
+	 phase name and the mean of its passes. A phase the frame never reached is left out, which
+	 is what a frame with no source pixel to write answers for that one."
+
+	| measured |
+	measured := self encodePhaseMilliseconds.
+	^ (VGTiledFillEncoding stageNames select: [ :each |
+		   measured includesKey: each ]) collect: [ :each |
+		  each -> (measured at: each) ]
+]
+
+{ #category : 'measuring' }
+VGFrameDeviceBenchmark >> encodeWithStagesRecorded: aDisplayList [
+	"One encoding of that list with every phase of it timed. The encoding is answered rather
+	 than kept, because what is read afterwards is its phase table and the one a report keeps is
+	 the encoding built without the clock."
+
+	^ VGTiledFillEncoding new
+		  recordStages;
+		  encode: aDisplayList extent: self extent;
+		  yourself
+]
+
+{ #category : 'accessing' }
 VGFrameDeviceBenchmark >> encoding [
 	^ encoding
 ]
@@ -274,7 +372,7 @@ VGFrameDeviceBenchmark >> entryCount [
 
 { #category : 'accessing' }
 VGFrameDeviceBenchmark >> extent [
-	^ self class extentOfItsFrames
+	^ extent
 ]
 
 { #category : 'accessing' }
@@ -341,24 +439,109 @@ VGFrameDeviceBenchmark >> isAvailable [
 ]
 
 { #category : 'measuring' }
+VGFrameDeviceBenchmark >> measure: aPhase perRepeatOf: aBlock [
+	"The named phase, measured over the repeats, kept as the mean of them and as the fastest of
+	 them. The mean is what every figure already in the plan is, so it stays the number a report
+	 quotes first; the minimum is the work without the collector and the scheduler of whichever
+	 pass met them, which is what a decision between two levers is read off.
+	 One pass is run and thrown away before the clock starts, because the first one pays for the
+	 first touch of the pages and the warm-up of whatever cache is behind the block."
+
+	| total best |
+	aBlock value.
+	total := 0.
+	best := nil.
+	repeats timesRepeat: [
+		| taken |
+		taken := self microsecondsDuring: aBlock.
+		total := total + taken.
+		best := best ifNil: [ taken ] ifNotNil: [ best min: taken ] ].
+	milliseconds at: aPhase put: (self millisecondsOfMicroseconds: total / repeats).
+	minimums at: aPhase put: (self millisecondsOfMicroseconds: best).
+	^ self
+]
+
+{ #category : 'measuring' }
+VGFrameDeviceBenchmark >> measureDisplayListIntoTotals: aTotalTable minimums: aMinimumTable [
+	"Drawing the frame, which is the first phase of its host half. It is measured apart from the
+	 encodes and not between them: it allocates a surface a pass, and an encode measured
+	 directly after such an allocation pays for it — with the drawing inside that loop the plain
+	 encode read a quarter more than the phases it is the sum of."
+
+	self newSurface.
+	repeats timesRepeat: [
+		self
+			addMicroseconds: (self microsecondsDuring: [ self newSurface ])
+			of: #displayList
+			toTotals: aTotalTable
+			minimums: aMinimumTable ]
+]
+
+{ #category : 'measuring' }
+VGFrameDeviceBenchmark >> measureEncodeOf: aDisplayList [
+	"The encode figure, the phases inside it and the drawing of the list, measured into one pair
+	 of tables and then published as milliseconds. The clocked encode that carries the phases is
+	 reported nowhere: the readings inside it are what the plain encode beside it is free of."
+
+	| totals best |
+	totals := Dictionary new.
+	best := Dictionary new.
+	self measureEncodesOf: aDisplayList intoTotals: totals minimums: best.
+	self measureDisplayListIntoTotals: totals minimums: best.
+	milliseconds at: #encode put:
+		(self millisecondsOfMicroseconds: (totals removeKey: #encode) / repeats).
+	minimums at: #encode put:
+		(self millisecondsOfMicroseconds: (best removeKey: #encode)).
+	encodePhases := totals collect: [ :each |
+		                self millisecondsOfMicroseconds: each / repeats ].
+	encodePhaseMinimums := best collect: [ :each |
+		                       self millisecondsOfMicroseconds: each ].
+	^ self
+]
+
+{ #category : 'measuring' }
+VGFrameDeviceBenchmark >> measureEncodesOf: aDisplayList intoTotals: aTotalTable minimums: aMinimumTable [
+	"Pass by pass: the list encoded once with no clock inside it, which is the figure the plan
+	 quotes, then the same list encoded again with every phase timed. The two are interleaved
+	 because a machine is not the same machine a second later — a frame of a full screen has met
+	 the garbage collector in one window and not the next — and phases measured in a window of
+	 their own cannot be read against a whole measured in another.
+	 One pass of each is thrown away first, for the first touch of the pages."
+
+	VGTiledFillEncoding of: aDisplayList extent: self extent.
+	self encodeWithStagesRecorded: aDisplayList.
+	repeats timesRepeat: [
+		self
+			addMicroseconds: (self microsecondsDuring: [
+					 VGTiledFillEncoding of: aDisplayList extent: self extent ])
+			of: #encode
+			toTotals: aTotalTable
+			minimums: aMinimumTable.
+		(self encodeWithStagesRecorded: aDisplayList) stageMicroseconds
+			keysAndValuesDo: [ :phase :taken |
+				self
+					addMicroseconds: taken
+					of: phase
+					toTotals: aTotalTable
+					minimums: aMinimumTable ] ]
+]
+
+{ #category : 'measuring' }
 VGFrameDeviceBenchmark >> measureEncoding [
-	"Everything a frame costs off the device: the encoding of its entries and the SPIR-V the
-	 kernel builds for the tile extent. The module is built here and not read from the cache,
-	 because what is worth reporting is the build a session pays once and a frame used to pay
-	 every time. The encoding itself is kept, so that a machine with no driver still reports what
-	 the frame weighs and what it would dispatch."
+	"Everything a frame costs off the device: the encoding of its entries, every phase inside
+	 that encoding, and the SPIR-V the kernel builds for the tile extent. The module is built
+	 here and not read from the cache, because what is worth reporting is the build a session
+	 pays once and a frame used to pay every time. The encoding itself is kept, so that a
+	 machine with no driver still reports what the frame weighs and what it would dispatch."
 
 	| surface |
 	surface := self newSurface.
-	milliseconds
-		at: #encode
-		put: (self millisecondsPerRepeatOf: [
-				 VGTiledFillEncoding of: surface displayList extent: self extent ]).
+	self measureEncodeOf: surface displayList.
 	encoding := VGTiledFillEncoding of: surface displayList extent: self extent.
-	milliseconds
-		at: #buildSpirv
-		put: (self millisecondsPerRepeatOf: [
-				 (VGTiledFillKernel onTileExtent: encoding grid tileExtent) spirv ]).
+	self
+		measure: #buildSpirv
+		perRepeatOf: [
+			(VGTiledFillKernel onTileExtent: encoding grid tileExtent) spirv ].
 	^ self
 ]
 
@@ -368,8 +551,8 @@ VGFrameDeviceBenchmark >> measureOn: aSession [
 	 inside the number — every binding uploaded, one workgroup dispatched a tile, the wait, and
 	 the target read back — because that is what a frame really costs and no part of it can be
 	 skipped by a caller. The module, the pipeline and the buffers are the session's and are
-	 built on the first of the repeats, which is why a warm-up frame is drawn before the clock
-	 starts: a resident frame is what a tool really pays after the first.
+	 built on the first of the repeats, which measure:perRepeatOf: throws away: a resident frame
+	 is what a tool really pays after the first.
 	 The pixels are packed by the backend itself, which is how a drained surface hands a frame to
 	 one, and the form is kept so that the software measurement has something to compare."
 
@@ -381,14 +564,12 @@ VGFrameDeviceBenchmark >> measureOn: aSession [
 	backend := VGVulkanBackend new.
 	pixels := backend pixelsOf: surface.
 	dispatch := aSession dispatchForEncoding: encoding.
-	dispatch draw: encoding into: pixels.
-	milliseconds
-		at: #dispatch
-		put: (self millisecondsPerRepeatOf: [ dispatch draw: encoding into: pixels ]).
+	self measure: #dispatch perRepeatOf: [ dispatch draw: encoding into: pixels ].
 	uploadedByteCount := dispatch blocks values inject: 0 into: [ :sum :each |
 		                     sum + (dispatch byteCountOfBlock: each) ].
 	backend write: pixels into: surface.
-	deviceForm := surface asForm
+	deviceForm := surface asForm.
+	^ self
 ]
 
 { #category : 'measuring' }
@@ -407,10 +588,34 @@ VGFrameDeviceBenchmark >> measureSoftwareFrame [
 	^ self
 ]
 
+{ #category : 'measuring' }
+VGFrameDeviceBenchmark >> microsecondsDuring: aBlock [
+	"The microseconds one pass of the block took. The clock is read in microseconds because the
+	 encoding of a frame, and every phase inside it, can finish inside a millisecond."
+
+	| start |
+	start := Time microsecondClockValue.
+	aBlock value.
+	^ Time microsecondClockValue - start
+]
+
 { #category : 'reporting' }
 VGFrameDeviceBenchmark >> millisecondStringFor: aNumber [
 	^ (aNumber asFloat printShowingDecimalPlaces:
 		   VGVulkanRoundTrip millisecondDecimalPlaces) , ' ms'
+]
+
+{ #category : 'printing' }
+VGFrameDeviceBenchmark >> millisecondStringFor: aNumber minimum: aMinimumOrNil [
+	"A measured phase as a report reads it: the mean, which is the figure every unit before this
+	 one quotes, and the fastest pass beside it where the phase was measured more than once."
+
+	^ aMinimumOrNil
+		  ifNil: [ self millisecondStringFor: aNumber ]
+		  ifNotNil: [
+			  (self millisecondStringFor: aNumber) , ' (fastest '
+			  , (aMinimumOrNil asFloat printShowingDecimalPlaces:
+					   VGVulkanRoundTrip millisecondDecimalPlaces) , ')' ]
 ]
 
 { #category : 'accessing' }
@@ -441,18 +646,29 @@ VGFrameDeviceBenchmark >> millisecondsOf: aPhase [
 ]
 
 { #category : 'measuring' }
-VGFrameDeviceBenchmark >> millisecondsPerRepeatOf: aBlock [
-	"One pass is run and thrown away before the clock starts, because the first dispatch of a
-	 session pays for the first touch of the pages and the warm-up of the pipeline. The
-	 microsecond clock is read rather than millisecondsToRun:, since the encoding of a frame can
-	 finish inside a millisecond."
+VGFrameDeviceBenchmark >> millisecondsOfMicroseconds: aNumber [
+	"Microseconds as the milliseconds every row of a report is in. One place does the division,
+	 so a row and a phase and a stage all answer the same unit."
 
-	| start |
-	aBlock value.
-	start := Time microsecondClockValue.
-	repeats timesRepeat: [ aBlock value ].
-	^ (Time microsecondClockValue - start / repeats
-	   / VGVulkanRoundTrip microsecondsPerMillisecond) asFloat
+	^ (aNumber / VGVulkanRoundTrip microsecondsPerMillisecond) asFloat
+]
+
+{ #category : 'accessing' }
+VGFrameDeviceBenchmark >> minimumEncodePhaseMilliseconds [
+	"The fastest pass of each phase of the host half of my frame, in milliseconds. A phase is
+	 read against its own mean: the two differ by the collector and the scheduler, and a lever
+	 is chosen on the floor."
+
+	^ encodePhaseMinimums ifNil: [ Dictionary new ]
+]
+
+{ #category : 'accessing' }
+VGFrameDeviceBenchmark >> minimumMillisecondsOf: aPhase [
+	"The fastest pass of the named phase, or nil where the phase was measured once or not at
+	 all. A phase timed by one pass has no floor to report: there is nothing for it to be the
+	 floor of."
+
+	^ minimums at: aPhase ifAbsent: [ nil ]
 ]
 
 { #category : 'running' }
@@ -558,9 +774,22 @@ VGFrameDeviceBenchmark >> run [
 
 { #category : 'initialization' }
 VGFrameDeviceBenchmark >> setFrameName: aSymbol repeats: anInteger [
+	"The extent every number in the plan was measured at. A census that reads a frame at more
+	 than one extent names the extent it wants."
+
+	^ self
+		  setFrameName: aSymbol
+		  repeats: anInteger
+		  extent: self class extentOfItsFrames
+]
+
+{ #category : 'initialization' }
+VGFrameDeviceBenchmark >> setFrameName: aSymbol repeats: anInteger extent: anExtent [
 	frameName := aSymbol.
 	repeats := anInteger.
-	milliseconds := Dictionary new
+	extent := anExtent.
+	milliseconds := Dictionary new.
+	minimums := Dictionary new
 ]
 
 { #category : 'accessing' }
@@ -584,14 +813,20 @@ VGFrameDeviceBenchmark >> spirvMilliseconds [
 
 { #category : 'reporting' }
 VGFrameDeviceBenchmark >> timeRows [
-	"One row for every phase that was measured, in the order a frame pays them, and the factor
-	 between the device and the software path where both were measured."
+	"One row for every phase that was measured, in the order a frame pays them, each with the
+	 fastest of its passes beside its mean; the phases of the host half beneath the encode row
+	 they are the inside of; and the factor between the device and the software path where both
+	 were measured."
 
 	| rows |
 	rows := OrderedCollection new.
 	self class phaseLabels do: [ :each |
 		(self millisecondsOf: each key) ifNotNil: [ :measured |
-			rows add: each value -> (self millisecondStringFor: measured) ] ].
+			rows add: each value
+				-> (self
+						 millisecondStringFor: measured
+						 minimum: (self minimumMillisecondsOf: each key)).
+			each key = #encode ifTrue: [ rows addAll: self encodePhaseReportRows ] ] ].
 	self speedupOverSoftware ifNotNil: [ :factor |
 		rows add: 'faster by'
 			-> ((factor asFloat printShowingDecimalPlaces: 1) , ' times') ].

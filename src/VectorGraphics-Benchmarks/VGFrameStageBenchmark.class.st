@@ -136,10 +136,10 @@ VGFrameStageBenchmark >> measureCairoFrame [
 	| kit surface |
 	kit := VGFrameDrawingKit alexandrie.
 	surface := kit surfaceOfExtent: self extent.
-	milliseconds at: #cairo put: (self millisecondsPerRepeatOf: [
-			 (self class drawBlockNamed: frameName using: kit) value:
-				 surface newContext.
-			 surface flush ]).
+	self measure: #cairo perRepeatOf: [
+		(self class drawBlockNamed: frameName using: kit) value:
+			surface newContext.
+		surface flush ].
 	cairoForm := surface asForm.
 	^ self
 ]

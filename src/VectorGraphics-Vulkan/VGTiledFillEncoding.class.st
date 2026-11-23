@@ -401,6 +401,42 @@ VGTiledFillEncoding >> inspectorPaintsContext: aContext [
 ]
 
 { #category : 'inspector' }
+VGTiledFillEncoding >> inspectorPhases: aBuilder [
+	<inspectorPresentationOrder: 16 title: 'Phases'>
+	"Where the milliseconds of this encoding went: every phase of
+	 VGTiledFillEncoding class >> stageNames the build reached, its microseconds, and its share
+	 of the ones measured. The order is the table's own, so a phase cannot be shown under a name
+	 no report has, and the share is computed from the rows beside it rather than from a figure
+	 of my own, which is why it reads as a share of what was timed and not of the frame.
+	 The tab is inactive on an encoding built without recordStages, which is every encoding a
+	 running tool makes."
+
+	| measured total |
+	measured := self stageMicroseconds.
+	total := measured values inject: 0 into: [ :sum :each | sum + each ].
+	^ aBuilder newTable
+		  addColumn: (SpStringTableColumn
+				   title: 'Phase'
+				   evaluated: [ :each | each key asString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Microseconds'
+				   evaluated: [ :each | each value printString ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'Share'
+				   evaluated: [ :each |
+					   (each value * 100 / total) asFloat printShowingDecimalPlaces: 1 ]);
+		  items: ((self class stageNames select: [ :each |
+					    measured includesKey: each ]) collect: [ :each |
+				   each -> (measured at: each) ]);
+		  yourself
+]
+
+{ #category : 'inspector' }
+VGTiledFillEncoding >> inspectorPhasesContext: aContext [
+	aContext active: stages isNotNil
+]
+
+{ #category : 'inspector' }
 VGTiledFillEncoding >> inspectorStops: aBuilder [
 	<inspectorPresentationOrder: 13 title: 'Stops'>
 	"The stop buffer as the kernel searches it: the entry a stop belongs to, its place in that

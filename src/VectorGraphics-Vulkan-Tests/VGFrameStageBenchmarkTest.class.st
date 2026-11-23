@@ -118,6 +118,39 @@ VGFrameStageBenchmarkTest >> testEveryClassOfAKitIsNamedByTheRoleItPlays [
 ]
 
 { #category : 'tests' }
+VGFrameStageBenchmarkTest >> testEveryEncodePhaseOfEveryFrameIsMeasuredAtBothExtentsAsAMeanAndAMinimum [
+	"The census of unit 3.10: every frame of the budget, at the extent phase 3 quotes and at the
+	 extent of a full screen, with every phase of its host half measured. A phase is reported as
+	 a mean and as a minimum, because the means of the earlier units are what the plan quotes and
+	 the floor is what a decision about a lever is read off: a mean carries the garbage collector
+	 and the scheduler of whichever pass met them, and the minimum is the work itself.
+	 Only the encode is measured here, so the gate needs no device, no Cairo frame and no
+	 software frame. Three repeats, because a minimum needs more than one pass and the encode of
+	 a full screen is tens of milliseconds."
+
+	| extents |
+	extents := VGFrameStageBenchmark extentsOfItsCensus.
+	self assert: extents size equals: 2.
+	VGFrameStageBenchmark frameNames do: [ :name |
+		extents do: [ :extent |
+			| benchmark means minimums |
+			benchmark := (VGFrameStageBenchmark
+				              frameName: name
+				              repeats: 3
+				              extent: extent) measureEncoding.
+			means := benchmark encodePhaseRows.
+			minimums := benchmark minimumEncodePhaseMilliseconds.
+			self
+				assert: (means collect: [ :each | each key ]) asArray
+				equals: VGTiledFillEncoding stageNames.
+			means do: [ :each |
+				self
+					assert: (minimums at: each key) <= each value
+					description: name asString , ' at ' , extent printString , ': '
+						, each key asString ] ] ]
+]
+
+{ #category : 'tests' }
 VGFrameStageBenchmarkTest >> testEveryFrameOfTheBudgetCarriesACairoFigureMeasuredHere [
 	"The number phase 3 is held to. Cairo draws every frame of the budget on this machine in
 	 this session, so the gap the plan quotes is a measurement and not a figure carried over
@@ -175,6 +208,34 @@ VGFrameStageBenchmarkTest >> testEveryPairOfTheTwoKitsIsHeldByTheNameMapOrByTheH
 				 pairingOf: VGCairoImageSurface
 				 with: AeCanvas)
 		equals: nil
+]
+
+{ #category : 'tests' }
+VGFrameStageBenchmarkTest >> testEveryPhaseTheEncodingTimesIsOnePhaseItNames [
+	"The phase table is the only place a phase of the host half is named, so the names in it and
+	 the names the encoding times have to be the same set. A phase timed under a name no table
+	 holds would be measured and never reported; a name in the table that nothing times would be
+	 reported as missing on every frame.
+	 The source is read rather than a measured frame, because a phase a frame never reaches —
+	 the pixels of a frame that paints out of nothing — is absent from that frame's table and
+	 present in the code all the same.
+	 displayList is timed by the benchmark and not by the encoding, since the list is drawn
+	 before an encoding holds anything, so it is expected in the table, and in the benchmark's
+	 source, and not in the encoding's."
+
+	| timed |
+	timed := Set new.
+	VGTiledFillEncoding selectorsAndMethodsDo: [ :selector :method |
+		method ast sendNodes do: [ :send |
+			send selector = #timeStage:during: ifTrue: [
+				self assert: send arguments first isLiteralNode.
+				timed add: send arguments first value ] ] ].
+	self
+		assert: (VGTiledFillEncoding stageNames copyWithout: #displayList) asSet
+		equals: timed.
+	self assert: (VGFrameDeviceBenchmark methods anySatisfy: [ :each |
+			 each ast allChildren anySatisfy: [ :node |
+				 node isLiteralNode and: [ node value = #displayList ] ] ])
 ]
 
 { #category : 'tests' }
@@ -311,6 +372,41 @@ VGFrameStageBenchmarkTest >> testTheKitOfThisProjectNamesTheCounterpartOfEveryCl
 			assert: ((map at: their name ifAbsent: [ nil ]) = our name or: [
 					 our inheritsFrom: their ])
 			description: their name , ' is not the counterpart of ' , our name ]
+]
+
+{ #category : 'tests' }
+VGFrameStageBenchmarkTest >> testThePhasesOfEveryMeasuredFrameAccountForItsEncode [
+	"The census is read as a breakdown of the encode figure the plan quotes, so the phases have
+	 to add up to that figure and not to some other frame. Within a tenth of it: the clock is
+	 read twice a phase, eleven phases deep, and those readings are inside the carrier encode
+	 and outside every row.
+	 The floors are compared and not the means. A mean over a handful of passes carries whichever
+	 pass met the garbage collector, and such a pass has been ten times the others on a frame of
+	 a full screen; the fastest pass of a phase and the fastest encode are both the work itself.
+	 Five passes and not the three a report takes: the floor is itself an estimate, and at three
+	 passes eighteen measurements of this ratio ran from 0.84 to 1.03, where at five passes they
+	 ran from 0.95 to 1.01.
+	 The display list is left out of the sum, because the encode figure is measured over a list
+	 already drawn and drawing it is a phase of the frame and not of the encoding.
+	 No device is asked for anything here: a display list, a binning and a buffer are all built
+	 on the host."
+
+	VGFrameStageBenchmark frameNames do: [ :name |
+		VGFrameStageBenchmark extentsOfItsCensus do: [ :extent |
+			| benchmark whole sum floors |
+			benchmark := (VGFrameStageBenchmark
+				              frameName: name
+				              repeats: 5
+				              extent: extent) measureEncoding.
+			whole := benchmark minimumMillisecondsOf: #encode.
+			floors := benchmark minimumEncodePhaseMilliseconds.
+			sum := (floors keys reject: [ :each | each = #displayList ]) inject: 0
+				       into: [ :total :each | total + (floors at: each) ].
+			self
+				assert: (sum - whole) abs < (whole / 10)
+				description: name asString , ' at ' , extent printString , ': '
+					, sum printString , ' of phases against ' , whole printString
+					, ' of encode' ] ]
 ]
 
 { #category : 'tests' }

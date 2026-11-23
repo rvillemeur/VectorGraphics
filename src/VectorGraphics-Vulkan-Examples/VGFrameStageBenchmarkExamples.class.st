@@ -14,6 +14,22 @@ Class {
 }
 
 { #category : 'examples' }
+VGFrameStageBenchmarkExamples class >> phasesOfTheReferenceFrameEncoding [
+	<sampleInstance>
+	"The host half of the frame the plan is written about, taken apart: the reference frame
+	 encoded once with every phase of it timed. The Phases tab names each phase of
+	 VGTiledFillEncoding class >> stageNames the build reached, its microseconds and its share
+	 of them, and the other tabs show the buffers that encoding wrote.
+	 Nothing here asks for a device: a display list, a binning and a buffer are all built on the
+	 host, so this is the one example of this class that runs in an image with no driver. It
+	 takes a few tens of milliseconds."
+
+	| benchmark |
+	benchmark := VGFrameStageBenchmark onTheReferenceFrame.
+	^ benchmark encodeWithStagesRecorded: benchmark newSurface displayList
+]
+
+{ #category : 'examples' }
 VGFrameStageBenchmarkExamples class >> stagesOfTheBackgroundFrame [
 	<sampleInstance>
 	"The cheapest frame the device draws — one solid fill over the whole extent — measured stage
