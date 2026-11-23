@@ -138,18 +138,30 @@ VGFrameDeviceBenchmark class >> drawReferenceOn: aContext using: aKit [
 	^ self drawReferenceOn: aContext using: aKit recordingInto: nil
 ]
 
-{ #category : 'frames' }
+{ #category : 'drawing' }
 VGFrameDeviceBenchmark class >> drawReferenceOn: aContext using: aKit recordingInto: aTimingsOrNil [
+	"The whole reference frame, every part of the scene present."
+	^ self
+		  drawReferenceOn: aContext
+		  using: aKit
+		  recordingInto: aTimingsOrNil
+		  without: nil
+]
+
+{ #category : 'drawing' }
+VGFrameDeviceBenchmark class >> drawReferenceOn: aContext using: aKit recordingInto: aTimingsOrNil without: aSymbolOrNil [
 	"The frame unit 1.11 profiles, drawn through the kit's renderer onto the surface that context
 	 records on: eight hundred by six hundred, with gradients, strokes, glyphs and blits in it,
 	 which is the frame a backend is really asked to draw. A scene draws on a canvas and not on a
 	 context, so the canvas is built over the surface the context was made for and the entries
 	 reach the one display list either way.
 	 The scene is laid out through the kit's renderer class, because a text span measured on one
-	 backend keeps that backend's scaled font and the other backend cannot draw it.
+	 backend keeps that backend scaled font and the other backend cannot draw it.
+	 One part of the scene can be left out by name — unit 3.13 prices the glyphs, the strokes,
+	 the gradients and the cards of a frame by recording it without them and subtracting. nil
+	 leaves nothing out.
 	 Three phases of unit 3.11: the canvas, the scene — the layout, where text is measured and
 	 where the font manager is posed — and the recording of the entries."
-
 	| canvas scene |
 	canvas := self timeDrawing: #canvas into: aTimingsOrNil during: [
 		          | built |
@@ -157,7 +169,9 @@ VGFrameDeviceBenchmark class >> drawReferenceOn: aContext using: aKit recordingI
 		          built clippingRectangle: (0 @ 0 extent: self extentOfItsFrames).
 		          built ].
 	scene := self timeDrawing: #scene into: aTimingsOrNil during: [
-		         VGFrameProfile new sceneForRendererClass: aKit rendererClass ].
+		         VGFrameProfile new
+			         sceneForRendererClass: aKit rendererClass
+			         without: aSymbolOrNil ].
 	^ self timeDrawing: #record into: aTimingsOrNil during: [
 		  scene aeFullDrawOn: canvas ]
 ]

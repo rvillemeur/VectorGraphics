@@ -19,6 +19,13 @@ Class {
 	#tag : 'Frames'
 }
 
+{ #category : 'constants' }
+VGFrameRecordCensusRow class >> edgesOfARectangle [
+	"A rectangle is recorded as four edges, and each edge carries four coordinates. The counts
+	 of a census are read against this, which is why it is named rather than written."
+	^ 4
+]
+
 { #category : 'instance creation' }
 VGFrameRecordCensusRow class >> name: aSymbol extent: aPoint displayList: aDisplayList [
 	"The counts of that display list, under the name of the frame it was recorded from and the

@@ -23,6 +23,24 @@ VGFrameRecordCensusTest >> censusOfExtent: aPoint drawnWith: aBlock [
 ]
 
 { #category : 'building' }
+VGFrameRecordCensusTest >> censusOfTheReferenceFrameWithout: aSymbolOrNil [
+	"The census of the reference frame drawn with one of its parts left out, which is the
+	 variant unit 3.13 subtracts."
+	| kit surface |
+	kit := VGFrameDrawingKit ours.
+	surface := kit surfaceOfExtent: VGFrameDeviceBenchmark extentOfItsFrames.
+	VGFrameDeviceBenchmark
+		drawReferenceOn: surface newContext
+		using: kit
+		recordingInto: nil
+		without: aSymbolOrNil.
+	^ VGFrameRecordCensus
+		  overTheDisplayList: surface displayList
+		  named: #reference
+		  extent: VGFrameDeviceBenchmark extentOfItsFrames
+]
+
+{ #category : 'building' }
 VGFrameRecordCensusTest >> maskSurfaceOfExtent: aPoint [
 	"A small mask surface, which is the shape a glyph arrives in. Its content does not matter
 	 to a census: what is counted is that it exists and how many pixels it carries."
@@ -157,4 +175,67 @@ VGFrameRecordCensusTest >> testTheCensusOfOneFilledRectangleCountsOneFillAndItsC
 	self assert: row coordinates equals: 16.
 	self assert: row distinctPaints equals: 1.
 	self assert: row distinctClips equals: 1
+]
+
+{ #category : 'tests' }
+VGFrameRecordCensusTest >> testTheReferenceFrameWithoutItsBorderLosesAlmostEveryEdge [
+	"Where the geometry of the frame is. Twelve of the twenty-five fills are the stroked
+	 borders of the cards, and they carry all but a handful of the edges: the fills that remain
+	 are rectangles of four edges each. The strokes, not the rounded corners and not the
+	 glyphs, are what the recording of this frame is mostly made of."
+	| whole stripped |
+	whole := (self censusOfTheReferenceFrameWithout: nil) rows first.
+	stripped := (self censusOfTheReferenceFrameWithout: #border) rows first.
+	self assert: stripped blits equals: whole blits.
+	self assert: stripped fills < whole fills.
+	self assert: stripped segments * 10 < whole segments.
+	self
+		assert: stripped segments
+		equals: stripped fills * VGFrameRecordCensusRow edgesOfARectangle
+]
+
+{ #category : 'tests' }
+VGFrameRecordCensusTest >> testTheReferenceFrameWithoutItsCardsRecordsTheBackgroundAlone [
+	"The floor of the variants, and the one that prices everything the cards bring together:
+	 one fill of four edges, no blit, one paint and one clip."
+	| stripped |
+	stripped := (self censusOfTheReferenceFrameWithout: #cards) rows first.
+	self assert: stripped entries equals: 1.
+	self assert: stripped fills equals: 1.
+	self assert: stripped blits equals: 0.
+	self
+		assert: stripped segments
+		equals: VGFrameRecordCensusRow edgesOfARectangle.
+	self assert: stripped distinctPaints equals: 1.
+	self assert: stripped distinctClips equals: 1
+]
+
+{ #category : 'tests' }
+VGFrameRecordCensusTest >> testTheReferenceFrameWithoutItsGradientRecordsTheSameGeometry [
+	"A gradient is a paint and not a shape, so leaving it out changes nothing that is counted.
+	 The variant is measured all the same: what it prices is the per-pixel cost of reading a
+	 gradient, which no census can see."
+	| whole stripped |
+	whole := (self censusOfTheReferenceFrameWithout: nil) rows first.
+	stripped := (self censusOfTheReferenceFrameWithout: #gradient) rows first.
+	self assert: stripped entries equals: whole entries.
+	self assert: stripped segments equals: whole segments.
+	self assert: stripped blitPixels equals: whole blitPixels
+]
+
+{ #category : 'tests' }
+VGFrameRecordCensusTest >> testTheReferenceFrameWithoutItsLabelsRecordsItsFillsAndNoBlit [
+	"The variant subtracted to price the glyphs records the same fills as the whole frame and
+	 not one blit. It does not record the same geometry: a card clips its children, so a card
+	 with no label pushes no clip, and its rounded rectangle is then recorded whole instead of
+	 trimmed. The subtraction therefore prices the glyphs together with the clips they bring,
+	 which is what the verdict of unit 3.13 has to say rather than hide."
+	| whole stripped |
+	whole := (self censusOfTheReferenceFrameWithout: nil) rows first.
+	stripped := (self censusOfTheReferenceFrameWithout: #labels) rows first.
+	self assert: whole blits > 0.
+	self assert: stripped blits equals: 0.
+	self assert: stripped fills equals: whole fills.
+	self assert: stripped distinctClips equals: 1.
+	self assert: stripped segments > whole segments
 ]

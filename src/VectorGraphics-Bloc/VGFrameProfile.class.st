@@ -276,6 +276,26 @@ VGFrameProfile >> cairoMilliseconds [
 	^ cairoMilliseconds
 ]
 
+{ #category : 'building' }
+VGFrameProfile >> cardBorderWithout: aSymbolOrNil [
+	"The stroked border of a card, or no border at all where the border is the part left out.
+	 A stroke is an outline built from the card's own geometry, which is work the fill does not
+	 pay."
+	aSymbolOrNil = #border ifTrue: [ ^ BlBorder empty ].
+	^ BlBorder paint: Color gray width: self class cardBorderWidth
+]
+
+{ #category : 'building' }
+VGFrameProfile >> cardPaintWithout: aSymbolOrNil [
+	"What a card is filled with: the vertical gradient of the reference scene, or its first
+	 stop alone where the gradient is the part left out. A flat colour is read once a shape
+	 and a gradient once a pixel, which is the difference unit 3.13 prices."
+	aSymbolOrNil = #gradient ifTrue: [ ^ Color white ].
+	^ BlLinearGradientPaint vertical stops: {
+			  (0 -> Color white).
+			  (1 -> Color lightBlue) }
+]
+
 { #category : 'accessing' }
 VGFrameProfile >> cards [
 	^ cards
@@ -454,11 +474,17 @@ VGFrameProfile >> newCanvas [
 	^ canvas
 ]
 
-{ #category : 'scene' }
+{ #category : 'building' }
 VGFrameProfile >> newCardAt: anIndex [
-	"The card of this index, placed in a grid as wide as the frame allows. A card that falls past
-	 the edge of the frame is clipped, which is also what a scrolled list does."
+	"The whole card of this index, every part of it present."
+	^ self newCardAt: anIndex without: nil
+]
 
+{ #category : 'building' }
+VGFrameProfile >> newCardAt: anIndex without: aSymbolOrNil [
+	"The card of this index, placed in a grid as wide as the frame allows, with the part named
+	 left out. A card that falls past the edge of the frame is clipped, which is also what a
+	 scrolled list does."
 	| card label columns column row gap |
 	gap := self class cardGap.
 	columns := extent x // (self class cardExtent x + gap) max: 1.
@@ -468,42 +494,45 @@ VGFrameProfile >> newCardAt: anIndex [
 		        geometry:
 			        (BlRoundedRectangleGeometry cornerRadius:
 					         self class cardCornerRadius);
-		        background: (BlLinearGradientPaint vertical stops: {
-						         (0 -> Color white).
-						         (1 -> Color lightBlue) });
-		        border:
-			        (BlBorder
-				         paint: Color gray
-				         width: self class cardBorderWidth);
+		        background: (self cardPaintWithout: aSymbolOrNil);
+		        border: (self cardBorderWithout: aSymbolOrNil);
 		        extent: self class cardExtent;
 		        position: gap + (column * (self class cardExtent x + gap))
 			        @ (gap + (row * (self class cardExtent y + gap)));
 		        yourself.
-	label := BlTextElement new
-		         text: ('Card ' , anIndex printString) asRopedText;
-		         position: self class labelInset;
-		         yourself.
-	card addChild: label.
+	aSymbolOrNil = #labels ifFalse: [
+		label := BlTextElement new
+			         text: ('Card ' , anIndex printString) asRopedText;
+			         position: self class labelInset;
+			         yourself.
+		card addChild: label ].
 	^ card
 ]
 
-{ #category : 'scene' }
+{ #category : 'building' }
 VGFrameProfile >> newScene [
+	"The whole reference scene, every part of it present."
+	^ self newSceneWithout: nil
+]
+
+{ #category : 'building' }
+VGFrameProfile >> newSceneWithout: aSymbolOrNil [
 	"A frame of what a real tool draws: a filled background, and cards in a grid, each a rounded
 	 rectangle with a vertical gradient, a stroked border and a text label. Between them the four
 	 things that cost in a software rasteriser are all present — curved edges, a gradient read per
-	 pixel, a stroke outline, and glyphs through the atlas.
-
+	 pixel, a stroke outline, and glyphs through the atlas. Each of those four can be left out by
+	 name, which is how unit 3.13 prices it.
 	 The layout is forced rather than settled by a space, because this tree is never attached to
 	 one: that is also what `BlElement >> aeAsForm` does with a detached element, so the critique
 	 Renraku raises here is the same one that method carries."
-
 	| root |
 	root := BlElement new
 		        extent: extent;
 		        background: Color veryVeryLightGray;
 		        yourself.
-	1 to: cards do: [ :index | root addChild: (self newCardAt: index) ].
+	aSymbolOrNil = #cards ifFalse: [
+		1 to: cards do: [ :index |
+			root addChild: (self newCardAt: index without: aSymbolOrNil) ] ].
 	root forceLayout.
 	^ root
 ]
@@ -609,14 +638,22 @@ VGFrameProfile >> sampleOneFrameOf: aScene [
 	stageSamples := self attribute: profiler tallyRoot
 ]
 
-{ #category : 'running' }
+{ #category : 'building' }
 VGFrameProfile >> sceneForRendererClass: aRendererClass [
 	"The reference scene, laid out, with every text span measured through the renderer class
 	 given and through the font manager that renderer needs. Bloc measures text during layout
 	 through BlHostRenderer preferableClass, and a span measured on one backend keeps that
 	 backend scaled font, which the other backend cannot draw."
+	^ self sceneForRendererClass: aRendererClass without: nil
+]
 
-	^ self withRendererClass: aRendererClass during: [ self newScene ]
+{ #category : 'building' }
+VGFrameProfile >> sceneForRendererClass: aRendererClass without: aSymbolOrNil [
+	"The reference scene with one part of it left out, laid out through the renderer class
+	 given as sceneForRendererClass: lays the whole scene out. Unit 3.13 prices a part of a
+	 frame by recording the scene without it and subtracting; nil leaves nothing out."
+	^ self withRendererClass: aRendererClass during: [
+		  self newSceneWithout: aSymbolOrNil ]
 ]
 
 { #category : 'reading' }

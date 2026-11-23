@@ -74,6 +74,60 @@ VGFrameProfileTest >> testAProfileThatHasNotRunNamesNoStage [
 ]
 
 { #category : 'tests' }
+VGFrameProfileTest >> testASceneWithoutItsBorderCarriesNoStrokedCard [
+	"The variant unit 3.13 subtracts to price the stroke outlines of a frame: the same rounded
+	 rectangles and the same gradients, and no border on any of them."
+	| full stripped |
+	full := VGFrameProfile new newCardAt: 1 without: nil.
+	stripped := VGFrameProfile new newCardAt: 1 without: #border.
+	self assert: full border width equals: VGFrameProfile cardBorderWidth.
+	self assert: stripped border width equals: 0
+]
+
+{ #category : 'tests' }
+VGFrameProfileTest >> testASceneWithoutItsCardsIsTheBackgroundAlone [
+	"The floor of the variants: the root and its one filled background, which is the cheapest
+	 frame that still records something."
+	| stripped |
+	stripped := VGFrameProfile new
+		            sceneForRendererClass: VGRenderer
+		            without: #cards.
+	self assert: stripped children isEmpty.
+	self deny: stripped background isTransparent
+]
+
+{ #category : 'tests' }
+VGFrameProfileTest >> testASceneWithoutItsGradientPaintsItsCardsWithOneColour [
+	"The variant unit 3.13 subtracts to price the gradients of a frame: the same rounded
+	 rectangles, the same strokes and the same labels, and a flat colour where the gradient
+	 was. The colour is the first stop of that gradient, so the picture stays the one the
+	 frame is about."
+	| full stripped |
+	full := VGFrameProfile new newCardAt: 1 without: nil.
+	stripped := VGFrameProfile new newCardAt: 1 without: #gradient.
+	self assert: (full background paint isKindOf: BlLinearGradientPaint).
+	self deny: (stripped background paint isKindOf: BlLinearGradientPaint).
+	self assert: stripped background paint color equals: Color white
+]
+
+{ #category : 'tests' }
+VGFrameProfileTest >> testASceneWithoutItsLabelsCarriesNoTextElement [
+	"The variant unit 3.13 subtracts to price the glyphs of a frame: the same cards, the same
+	 gradients and the same strokes, and no text at all."
+	| full stripped |
+	full := VGFrameProfile new
+		        sceneForRendererClass: VGRenderer
+		        without: nil.
+	stripped := VGFrameProfile new
+		            sceneForRendererClass: VGRenderer
+		            without: #labels.
+	self
+		assert: (self textElementsOf: full) size
+		equals: VGFrameProfile referenceCards.
+	self assert: (self textElementsOf: stripped) isEmpty
+]
+
+{ #category : 'tests' }
 VGFrameProfileTest >> testBothBackendsDrawTheSameExtent [
 	"Two frame times are comparable only when the two frames are the same size."
 
@@ -260,4 +314,12 @@ VGFrameProfileTest >> testTwoSceneBuildsPoseTheSameFontManager [
 		          VGFontManager managerUpstreamHolds ].
 	self assert: first identicalTo: second.
 	self assert: first identicalTo: VGFontManager withDefaultFaces
+]
+
+{ #category : 'building' }
+VGFrameProfileTest >> textElementsOf: anElement [
+	"Every text element of that tree, which is what a scene without its labels must hold none
+	 of."
+	^ anElement allChildrenBreadthFirstSelect: [ :each |
+		  each isKindOf: BlTextElement ]
 ]
