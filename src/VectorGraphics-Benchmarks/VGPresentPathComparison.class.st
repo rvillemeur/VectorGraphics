@@ -49,6 +49,12 @@ VGPresentPathComparison >> extent [
 	^ extent
 ]
 
+{ #category : 'printing' }
+VGPresentPathComparison >> fastestMillisecondString [
+	"My verdict figure, printed: the fastest draw I ever held."
+	^ self millisecondStringOf: self minimumMicroseconds
+]
+
 { #category : 'accessing' }
 VGPresentPathComparison >> firstDrawMicroseconds [
 	"The first timed draw of the first round, kept because the stages of a dispatch grow frame
@@ -57,6 +63,12 @@ VGPresentPathComparison >> firstDrawMicroseconds [
 	^ roundDraws
 		  ifEmpty: [ nil ]
 		  ifNotEmpty: [ :rounds | rounds first ifEmpty: [ nil ] ifNotEmpty: [ :draws | draws first ] ]
+]
+
+{ #category : 'printing' }
+VGPresentPathComparison >> firstDrawMillisecondString [
+	"My first timed draw, printed, which is the one that followed the other path."
+	^ self millisecondStringOf: self firstDrawMicroseconds
 ]
 
 { #category : 'accessing' }
@@ -101,6 +113,23 @@ VGPresentPathComparison >> medianMicroseconds [
 	| sorted |
 	sorted := self allDraws asSortedCollection asArray.
 	^ sorted ifEmpty: [ nil ] ifNotEmpty: [ sorted at: (sorted size + 1) // 2 ]
+]
+
+{ #category : 'printing' }
+VGPresentPathComparison >> medianMillisecondString [
+	"My middle draw, printed, which says how much of the fastest one was the state of the
+	 image rather than the work."
+	^ self millisecondStringOf: self medianMicroseconds
+]
+
+{ #category : 'printing' }
+VGPresentPathComparison >> millisecondStringOf: microsecondsOrNil [
+	"Microseconds of mine printed as milliseconds, because every other report of this project is
+	 in milliseconds. A figure that was never measured prints as a dash and not as a zero."
+	^ microsecondsOrNil
+		  ifNil: [ '-' ]
+		  ifNotNil: [ :microseconds |
+		  (microseconds / 1000.0) printShowingDecimalPlaces: 3 ]
 ]
 
 { #category : 'accessing' }

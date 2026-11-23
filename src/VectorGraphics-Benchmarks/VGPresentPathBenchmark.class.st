@@ -209,7 +209,7 @@ VGPresentPathBenchmark >> imageOfExtent: anExtent on: aSession [
 		  usage: VkImageUsage transferDstBit
 ]
 
-{ #category : 'inspector' }
+{ #category : 'views' }
 VGPresentPathBenchmark >> inspectorDraws: aBuilder [
 	<inspectorPresentationOrder: 20 title: 'Draws'>
 	"Every comparison of the run, both paths among them, with the fastest draw beside the middle
@@ -227,13 +227,13 @@ VGPresentPathBenchmark >> inspectorDraws: aBuilder [
 					   each pathName ]);
 		  addColumn:
 			  (SpStringTableColumn title: 'Fastest ms' evaluated: [ :each |
-					   self millisecondStringOf: each minimumMicroseconds ]);
+					   each fastestMillisecondString ]);
 		  addColumn:
 			  (SpStringTableColumn title: 'Median ms' evaluated: [ :each |
-					   self millisecondStringOf: each medianMicroseconds ]);
+					   each medianMillisecondString ]);
 		  addColumn:
 			  (SpStringTableColumn title: 'First ms' evaluated: [ :each |
-					   self millisecondStringOf: each firstDrawMicroseconds ]);
+					   each firstDrawMillisecondString ]);
 		  yourself
 ]
 
@@ -243,7 +243,7 @@ VGPresentPathBenchmark >> inspectorDrawsContext: aContext [
 	aContext active: rows isNotEmpty
 ]
 
-{ #category : 'inspector' }
+{ #category : 'views' }
 VGPresentPathBenchmark >> inspectorVerdict: aBuilder [
 	<inspectorPresentationOrder: 10 title: 'Verdict'>
 	"The two paths side by side, one row a frame an extent, read off the fastest draw each of
@@ -259,10 +259,10 @@ VGPresentPathBenchmark >> inspectorVerdict: aBuilder [
 					   each extent printString ]);
 		  addColumn:
 			  (SpStringTableColumn title: 'Presented ms' evaluated: [ :each |
-					   self millisecondStringOf: each minimumMicroseconds ]);
+					   each fastestMillisecondString ]);
 		  addColumn:
 			  (SpStringTableColumn title: 'Read back ms' evaluated: [ :each |
-					   self millisecondStringOf: (self readBackMinimumOf: each) ]);
+					   self readBackStringOf: each ]);
 		  addColumn:
 			  (SpStringTableColumn title: 'Faster by' evaluated: [ :each |
 					   self factorStringOf: each ]);
@@ -325,16 +325,6 @@ VGPresentPathBenchmark >> microsecondsOf: aBlock [
 	^ Time microsecondClockValue - started
 ]
 
-{ #category : 'printing' }
-VGPresentPathBenchmark >> millisecondStringOf: microsecondsOrNil [
-	"Microseconds printed as milliseconds, because every other report of this project is in
-	 milliseconds. A figure that was never measured prints as a dash and not as a zero."
-	^ microsecondsOrNil
-		  ifNil: [ '-' ]
-		  ifNotNil: [ :microseconds |
-		  (microseconds / 1000.0) printShowingDecimalPlaces: 3 ]
-]
-
 { #category : 'accessing' }
 VGPresentPathBenchmark >> presentedComparisons [
 	"One comparison a frame an extent: the presented side of each pair, which is what a verdict
@@ -372,20 +362,21 @@ VGPresentPathBenchmark >> readBack: anEncoding through: aDispatch into: aSurface
 ]
 
 { #category : 'accessing' }
-VGPresentPathBenchmark >> readBackMinimumOf: aComparison [
-	"The fastest readback draw of the same frame, or nil where a run stopped before it reached
-	 that side of the pair."
-	^ (self readBackOf: aComparison) ifNotNil: [ :other |
-		  other minimumMicroseconds ]
-]
-
-{ #category : 'accessing' }
 VGPresentPathBenchmark >> readBackOf: aComparison [
 	"The comparison of the other path on the same frame at the same extent."
 	^ self
 		  comparisonOfFrameNamed: aComparison frameName
 		  at: aComparison extent
 		  path: self class readBackPathName
+]
+
+{ #category : 'reporting' }
+VGPresentPathBenchmark >> readBackStringOf: aComparison [
+	"The fastest readback draw of the same frame, printed, or a dash where a run stopped before
+	 it reached that side of the pair."
+	^ (self readBackOf: aComparison)
+		  ifNil: [ '-' ]
+		  ifNotNil: [ :other | other fastestMillisecondString ]
 ]
 
 { #category : 'running' }
