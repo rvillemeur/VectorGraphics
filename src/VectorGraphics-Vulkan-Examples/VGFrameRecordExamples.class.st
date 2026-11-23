@@ -20,3 +20,16 @@ VGFrameRecordExamples class >> censusOfTheThreeFrames [
 	 VGFrameRecordComparison overTheReferenceVariants."
 	^ VGFrameRecordCensus overItsFrames
 ]
+
+{ #category : 'examples' }
+VGFrameRecordExamples class >> recordComparisonOfTheReferenceVariants [
+	"The parity floor of unit 3.13 over the five variants at the extent every figure of the plan
+	 was measured at. Five passes and one extent, not the twenty passes at both extents that
+	 VGFrameRecordComparison class >> overTheReferenceVariants runs: an example is rebuilt on
+	 every click, and the budget's own run costs a reader most of a minute."
+	<sampleInstance>
+	^ VGFrameRecordComparison
+		  overVariants: VGFrameRecordComparison variantNames
+		  extents: { VGFrameDeviceBenchmark extentOfItsFrames }
+		  passes: 5
+]
