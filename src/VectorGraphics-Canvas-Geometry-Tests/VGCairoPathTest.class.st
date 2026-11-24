@@ -213,6 +213,47 @@ VGCairoPathTest >> testDrawingAfterACloseStartsANewSubPath [
 	self assert: path subPaths second points last equals: 8 @ 8
 ]
 
+{ #category : 'tests' }
+VGCairoPathTest >> testEveryCoordinateOfTheSweepLandsOnTheGridItsScaledHalfAsksFor [
+	"Unit 3.15 rewrote the comparison inside VGPathBuilder class >> fixedOf: to read the half as
+	 a Float instead of as the fraction one half, which is the dearest single thing the path
+	 half of a stroke recording did. The rule itself is unchanged, and this holds it to its
+	 arithmetic over a deterministic sweep: exact halves of the grid step of both signs, where
+	 the even neighbour is chosen, coordinates between two steps, where the nearer one is, a
+	 coordinate off the grid, a point far from the origin, zero, and a Fraction as well as a
+	 Float, because a caller may hand it either."
+
+	| grid sweep |
+	grid := 256.
+	sweep := {
+		         0.
+		         0.0.
+		         (1 / 512).
+		         (1 / 512) asFloat.
+		         (3 / 512).
+		         (-1 / 512).
+		         (-3 / 512).
+		         (1 / 400).
+		         4.2.
+		         -4.2.
+		         1024.25.
+		         -4096.75 }.
+	sweep do: [ :each |
+		| scaled floor expected |
+		scaled := each * grid.
+		floor := scaled floor.
+		expected := scaled - floor = (1 / 2)
+			            ifTrue: [
+				            floor even
+					            ifTrue: [ floor ]
+					            ifFalse: [ floor + 1 ] ]
+			            ifFalse: [ scaled rounded ].
+		self
+			assert: (VGPathBuilder fixedOf: each)
+			equals: expected / 256.0.
+		self assert: (VGPathBuilder fixedOf: each) isFloat ]
+]
+
 { #category : 'tests - building' }
 VGCairoPathTest >> testMoveToThenLineToMakesOneOpenSubPath [
 	| path |

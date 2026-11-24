@@ -42,7 +42,11 @@ VGPathBuilder class >> fixedOf: aNumber [
 	| scaled floor |
 	scaled := aNumber * 256.
 	floor := scaled floor.
-	^ (scaled - floor = (1 / 2)
+	"The half is read as a Float and not as the fraction one half: a Float compared against a
+	 Fraction goes through the coercing path of Number, and unit 3.15 priced that at two thirds
+	 of everything the path half of a stroke recording costs. The scaling stays whole, so a
+	 Fraction coordinate is still scaled exactly."
+	^ (scaled - floor = 0.5
 		   ifTrue: [ floor even ifTrue: [ floor ] ifFalse: [ floor + 1 ] ]
 		   ifFalse: [ scaled rounded ]) / 256.0
 ]
