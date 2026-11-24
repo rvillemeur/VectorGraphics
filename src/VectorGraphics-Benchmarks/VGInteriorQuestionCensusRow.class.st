@@ -18,7 +18,8 @@ Class {
 		'superTileRefusals',
 		'tileQuestions',
 		'interiorMarks',
-		'stages'
+		'stages',
+		'pairsReaching'
 	],
 	#category : 'VectorGraphics-Benchmarks-Tiles',
 	#package : 'VectorGraphics-Benchmarks',
@@ -95,6 +96,15 @@ VGInteriorQuestionCensusRow class >> stageNames [
 	^ { self noShapeStage . self clipBoundsStage . self shapeBoxStage . self shapeEdgeStage . self shapeWalkStage . self clipShapeStage . self coveredStage }
 ]
 
+{ #category : 'accessing' }
+VGInteriorQuestionCensusRow >> askedPairs [
+	"Every (entry, rectangle) pair the binning of my frame asks about. A question of a blit
+	 pays the flat refusal and nothing else, and a question of a fill pays the clip's bounding
+	 rectangle first, so those two stages together hold each question exactly once."
+	^ (self pairsReaching: self class noShapeStage)
+	  , (self pairsReaching: self class clipBoundsStage)
+]
+
 { #category : 'counting' }
 VGInteriorQuestionCensusRow >> count [
 	"Walk the descent VGTileBinning walks, over every entry of my frame. Which kind of entry it
@@ -106,33 +116,38 @@ VGInteriorQuestionCensusRow >> count [
 { #category : 'counting' }
 VGInteriorQuestionCensusRow >> countBlit: anEntry [
 	"A blit is pixels: VGDisplayListEntry >> coversEveryPixelOf: answers no flat, whatever the
-	 rectangle, so every question it is asked stops before any geometry is read."
+	 rectangle, so a question it is asked pays one stage and reaches no geometry."
 	self
 		countEntry: anEntry
-		stagedBy: [ :rectangle | self class noShapeStage ]
+		stagedBy: [ :rectangle |
+			Array with: self class noShapeStage ]
 ]
 
 { #category : 'counting' }
 VGInteriorQuestionCensusRow >> countEntry: anEntry stagedBy: aBlock [
 	"The descent of VGTileBinning >> bin:at:inSuperTileAt:of:, with that block asked for the
-	 stage each question stopped at. A super tile covered whole marks every tile of it with no
-	 question of its own, which is the gain unit 3.12 built and the reason a tile question is
-	 counted apart from a super tile one."
+	 stages each question paid, the one it stopped at last. A super tile covered whole marks
+	 every tile of it with no question of its own, which is the gain unit 3.12 built and the
+	 reason a tile question is counted apart from a super tile one."
 	| box |
 	box := anEntry boundingBox.
 	(grid superTileIndexesIntersecting: box) do: [ :superIndex |
 		| superBounds tileIndexes |
 		superBounds := grid boundsOfSuperTileAt: superIndex.
-		superTileQuestions := superTileQuestions + 1.
 		tileIndexes := grid indexesIntersecting: (box intersect: superBounds).
-		(self tally: (aBlock value: superBounds))
+		superTileQuestions := superTileQuestions + 1.
+		(self tally: (aBlock value: superBounds) of: anEntry -> superBounds)
 			ifTrue: [ interiorMarks := interiorMarks + tileIndexes size ]
 			ifFalse: [
 				superTileRefusals := superTileRefusals + 1.
 				tileIndexes do: [ :index |
+					| tileBounds |
+					tileBounds := grid boundsOfTileAt: index.
 					tileQuestions := tileQuestions + 1.
-					(self tally: (aBlock value: (grid boundsOfTileAt: index)))
-						ifTrue: [ interiorMarks := interiorMarks + 1 ] ] ] ]
+					(self
+						 tally: (aBlock value: tileBounds)
+						 of: anEntry -> tileBounds) ifTrue: [
+						interiorMarks := interiorMarks + 1 ] ] ] ]
 ]
 
 { #category : 'counting' }
@@ -141,7 +156,7 @@ VGInteriorQuestionCensusRow >> countFill: anEntry [
 	 inside it."
 	self
 		countEntry: anEntry
-		stagedBy: [ :rectangle | self stageOfFill: anEntry over: rectangle ]
+		stagedBy: [ :rectangle | self stagesOfFill: anEntry over: rectangle ]
 ]
 
 { #category : 'counting' }
@@ -190,6 +205,14 @@ VGInteriorQuestionCensusRow >> interiorMarks [
 	^ interiorMarks
 ]
 
+{ #category : 'accessing' }
+VGInteriorQuestionCensusRow >> pairsReaching: aStage [
+	"The (entry, rectangle) pairs of my frame that paid the test of that stage, which is what
+	 VGInteriorQuestionBudget times: a stage is paid by every question that gets to it, not
+	 only by the ones it refuses."
+	^ (pairsReaching at: aStage) asArray
+]
+
 { #category : 'inspector' }
 VGInteriorQuestionCensusRow >> reportRows [
 	"My counts as lines of a two-column table: what was asked, what was marked, and then one
@@ -215,7 +238,10 @@ VGInteriorQuestionCensusRow >> setFrame: aSymbol extent: anExtent [
 	tileQuestions := 0.
 	interiorMarks := 0.
 	stages := Dictionary new.
-	self class stageNames do: [ :stage | stages at: stage put: 0 ]
+	pairsReaching := Dictionary new.
+	self class stageNames do: [ :stage |
+		stages at: stage put: 0.
+		pairsReaching at: stage put: OrderedCollection new ]
 ]
 
 { #category : 'accessing' }
@@ -225,25 +251,29 @@ VGInteriorQuestionCensusRow >> stageCount: aStage [
 ]
 
 { #category : 'counting' }
-VGInteriorQuestionCensusRow >> stageOfFill: anEntry over: aRectangle [
-	"Where the predicate of that fill stops on that rectangle. Every test here is the one
-	 VGFillEntry >> coversEveryPixelOf: and VGSpanScanner >> enclosesWholly: send, in their
-	 order, so the census stays an account of the real descent and not a second rule: an
-	 agreement test holds the verdict it reads to coversEveryPixelOf: itself."
-	| scanner box |
-	(anEntry clip bounds containsRect: aRectangle) ifFalse: [
-		^ self class clipBoundsStage ].
+VGInteriorQuestionCensusRow >> stagesOfFill: anEntry over: aRectangle [
+	"The stages the predicate of that fill pays on that rectangle, the one it stops at last.
+	 Every test here is the one VGFillEntry >> coversEveryPixelOf: and
+	 VGSpanScanner >> enclosesWholly: send, in their order, so the census stays an account of
+	 the real descent and not a second rule: an agreement test holds the verdict it reads to
+	 coversEveryPixelOf: itself."
+	| paid scanner box |
+	paid := OrderedCollection with: self class clipBoundsStage.
+	(anEntry clip bounds containsRect: aRectangle) ifFalse: [ ^ paid ].
+	paid add: self class shapeBoxStage.
 	scanner := anEntry segments scanner.
 	box := scanner exactBoundingBox.
-	(box notNil and: [ box containsRect: aRectangle ]) ifFalse: [
-		^ self class shapeBoxStage ].
-	(scanner anEdgeMeets: aRectangle) ifTrue: [ ^ self class shapeEdgeStage ].
-	(scanner isInsideAt: aRectangle center) ifFalse: [
-		^ self class shapeWalkStage ].
+	(box notNil and: [ box containsRect: aRectangle ]) ifFalse: [ ^ paid ].
+	paid add: self class shapeEdgeStage.
+	(scanner anEdgeMeets: aRectangle) ifTrue: [ ^ paid ].
+	paid add: self class shapeWalkStage.
+	(scanner isInsideAt: aRectangle center) ifFalse: [ ^ paid ].
+	paid add: self class clipShapeStage.
 	anEntry clip shapes do: [ :shape |
-		(shape enclosesWholly: aRectangle) ifFalse: [
-			^ self class clipShapeStage ] ].
-	^ self class coveredStage
+		(shape enclosesWholly: aRectangle) ifFalse: [ ^ paid ] ].
+	^ paid
+		  add: self class coveredStage;
+		  yourself
 ]
 
 { #category : 'accessing' }
@@ -260,11 +290,15 @@ VGInteriorQuestionCensusRow >> superTileRefusals [
 ]
 
 { #category : 'counting' }
-VGInteriorQuestionCensusRow >> tally: aStage [
-	"Count one question at that stage and answer whether it got as far as covered, which is the
-	 verdict the binning writes."
-	stages at: aStage put: (stages at: aStage) + 1.
-	^ aStage = self class coveredStage
+VGInteriorQuestionCensusRow >> tally: aStageSequence of: aPair [
+	"Count one question, which stopped at the last stage of that sequence and paid the test of
+	 every stage in it. Answer whether it got as far as covered, which is the verdict the
+	 binning writes."
+	| stop |
+	stop := aStageSequence last.
+	stages at: stop put: (stages at: stop) + 1.
+	aStageSequence do: [ :stage | (pairsReaching at: stage) add: aPair ].
+	^ stop = self class coveredStage
 ]
 
 { #category : 'accessing' }

@@ -112,3 +112,24 @@ VGInteriorQuestionCensusTest >> testTheMarksTheCensusCountsAreTheMarksTheBinning
 				           grid: (VGTileGrid extent: extent).
 			self assert: row interiorMarks equals: binning interiorReferenceCount ] ]
 ]
+
+{ #category : 'tests' }
+VGInteriorQuestionCensusTest >> testTheQuestionsReachingAStageAreTheQuestionsNothingStoppedBefore [
+	"A row keeps the pairs that got as far as each stage, because that is what a budget has to
+	 time: the test of a stage is paid by every question that reaches it, not only by the ones
+	 it refuses. A pair reaches a stage when no earlier stage stopped it, and the questions of
+	 a blit reach nothing but the stage of their own flat refusal."
+	| stageNames |
+	stageNames := VGInteriorQuestionCensusRow stageNames.
+	VGInteriorQuestionCensus new rows do: [ :row |
+		| asked |
+		asked := row superTileQuestions + row tileQuestions.
+		stageNames doWithIndex: [ :stage :index |
+			| expected |
+			expected := index = 1
+				            ifTrue: [ row stageCount: stage ]
+				            ifFalse: [
+					            asked - ((stageNames first: index - 1) inject: 0 into: [
+							             :sum :earlier | sum + (row stageCount: earlier) ]) ].
+			self assert: (row pairsReaching: stage) size equals: expected ] ]
+]
