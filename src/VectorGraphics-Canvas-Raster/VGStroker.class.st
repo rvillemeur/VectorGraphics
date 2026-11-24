@@ -50,7 +50,13 @@ VGStroker >> appendPolygon: userPoints into: aStream [
 	 their union rather than holes where they overlap."
 
 	| devicePoints |
-	devicePoints := userPoints collect: [ :each | self matrix value: each ].
+	"Under the identity matrix a mapped point equals the point itself, so the map and the array
+	 it would allocate are both skipped. Unit 3.15 priced it; the premise is pinned by
+	 VGCairoMatrixTest."
+	devicePoints := self matrix isIdentity
+		                ifTrue: [ userPoints ]
+		                ifFalse: [
+		                userPoints collect: [ :each | self matrix value: each ] ].
 	devicePoints size < 3 ifTrue: [ ^ self ].
 	(self signedAreaOf: devicePoints) sign = self class polygonWindingSign ifFalse: [
 		devicePoints := devicePoints reversed ].
@@ -208,17 +214,24 @@ VGStroker >> discPointCount [
 		  max: self class minimumDiscPointCount
 ]
 
-{ #category : 'private' }
+{ #category : 'accessing' }
 VGStroker >> edgeCoordinates [
 	"The edges of the outline, four floats to an edge. A line width of nothing has no outline at
 	 all: Cairo draws no hairline, and half of nothing is nothing on each side of the path."
+
 	| stream inverse |
 	self lineWidth <= 0 ifTrue: [ ^ #(  ) ].
-	inverse := self matrix inverted.
+	"The identity answers the point it is given, so under it no inverse is built and the points
+	 of a sub-path are stroked where they already lie. Unit 3.15 priced the short circuit: a
+	 frame that applies no transform pays the map and the copy of every path point for nothing."
+	inverse := self matrix isIdentity
+		           ifFalse: [ self matrix inverted ].
 	stream := WriteStream on: (Array new: path pointCount * 16).
 	path subPaths do: [ :subPath |
 		self
-			strokeRun: (subPath points collect: [ :each | inverse value: each ])
+			strokeRun: (inverse
+					 ifNil: [ subPath points ]
+					 ifNotNil: [ subPath points collect: [ :each | inverse value: each ] ])
 			closed: subPath isClosed
 			smoothSeam: subPath comesBackToItsStartSmoothly
 			into: stream ].

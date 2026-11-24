@@ -82,6 +82,28 @@ VGCairoMatrixTest >> testEqualityAndHashFollowTheSixFields [
 ]
 
 { #category : 'tests' }
+VGCairoMatrixTest >> testIdentityAndItsInverseAnswerEveryCoordinateOfTheSweepUnchangedAndInItsOwnClass [
+	"VGStroker skips both of its maps when the matrix is the identity, which is only sound if
+	 the identity answers the very point it is given — the same number, and for a Float
+	 coordinate the same class of number, because a Float that came back a Fraction would
+	 change every sum downstream of it. A path holds Floats and nothing else: VGPathBuilder
+	 snaps every coordinate onto Cairo's fixed grid by dividing by 256.0. The sweep holds the
+	 halves of both signs, a coordinate off that grid, a point far from the origin and zero."
+
+	| matrix sweep |
+	matrix := VGCairoMatrix newIdentity.
+	sweep := { 0.0. 0.5. -0.5. (1 / 512) asFloat. 1024.25. -4096.75. 3.0 }.
+	sweep do: [ :x |
+		sweep do: [ :y |
+			| point |
+			point := x @ y.
+			self assert: (matrix value: point) equals: point.
+			self assert: (matrix inverted value: point) equals: point.
+			self assert: (matrix value: point) x class equals: point x class.
+			self assert: (matrix inverted value: point) y class equals: point y class ] ]
+]
+
+{ #category : 'tests' }
 VGCairoMatrixTest >> testIdentityMapsPointsUnchanged [
 	| matrix |
 	matrix := VGCairoMatrix newIdentity.
