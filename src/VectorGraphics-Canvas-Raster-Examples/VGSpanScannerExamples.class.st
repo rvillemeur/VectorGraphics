@@ -31,6 +31,24 @@ VGSpanScannerExamples class >> aliasedScannerOnATriangle [
 ]
 
 { #category : 'examples' }
+VGSpanScannerExamples class >> scannerOnADeviceRectangle [
+	<sampleInstance>
+	"Four axis-aligned edges on the corners of their own box, which is the shape most of a
+	 frame's fills and clips are. Its Enclosure tab answers from the box alone: no edge is read
+	 and no fill rule is asked."
+	| builder |
+	builder := VGPathBuilder new.
+	builder
+		moveTo: 8 @ 8;
+		lineTo: 40 @ 8;
+		lineTo: 40 @ 40;
+		lineTo: 8 @ 40;
+		closePath.
+	^ VGSpanScanner of:
+		  (builder path segmentsWithFillRule: #winding antialias: #grey)
+]
+
+{ #category : 'examples' }
 VGSpanScannerExamples class >> scannerOnAStarUnderTheEvenOddRule [
 	<sampleInstance>
 	"A self-crossing shape, so the spans show where the even-odd rule leaves the heart hollow."

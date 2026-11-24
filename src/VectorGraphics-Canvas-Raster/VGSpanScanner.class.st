@@ -11,7 +11,8 @@ Class {
 		'fillRule',
 		'antialias',
 		'exactBounds',
-		'edgeIndex'
+		'edgeIndex',
+		'rectangular'
 	],
 	#category : 'VectorGraphics-Canvas-Raster-Rasterising',
 	#package : 'VectorGraphics-Canvas-Raster',
@@ -51,6 +52,23 @@ VGSpanScanner >> antialias [
 ]
 
 { #category : 'private' }
+VGSpanScanner >> computeIsDeviceRectangle [
+	"Four edges, each horizontal or vertical, every end of them a corner of my bounding box."
+	| box corners |
+	segments size = (4 * 4) ifFalse: [ ^ false ].
+	box := self exactBoundingBox.
+	box ifNil: [ ^ false ].
+	corners := box corners asSet.
+	1 to: segments size by: 4 do: [ :index |
+		| from to |
+		from := (segments at: index) @ (segments at: index + 1).
+		to := (segments at: index + 2) @ (segments at: index + 3).
+		(from x = to x or: [ from y = to y ]) ifFalse: [ ^ false ].
+		((corners includes: from) and: [ corners includes: to ]) ifFalse: [ ^ false ] ].
+	^ true
+]
+
+{ #category : 'private' }
 VGSpanScanner >> crossingsAt: aNumber [
 	"Every edge the line crosses, as an x to direction association sorted by x. An edge is taken
 	 half open, from its upper end inclusive to its lower end exclusive, so a vertex shared by two
@@ -86,7 +104,7 @@ VGSpanScanner >> edgeIndex [
 			               (self exactBoundingBox ifNil: [ 0 @ 0 corner: 0 @ 0 ]) ]
 ]
 
-{ #category : 'testing' }
+{ #category : 'scanning' }
 VGSpanScanner >> enclosesWholly: aRectangle [
 	"Whether every point of that rectangle, its boundary included, is inside me under my own
 	 fill rule. A tiled rasteriser asks this of a tile before it walks it, of the fill and of
@@ -95,6 +113,9 @@ VGSpanScanner >> enclosesWholly: aRectangle [
 	 The answer is conservative, since a yes paints whole a pixel the walk would have painted in
 	 part: an edge that so much as touches the rectangle answers no, and that leaves one point to
 	 ask of the fill rule, the centre.
+	 A rectangle of mine answers from my box alone. My only edges are then the sides of that box,
+	 so one of them touches the rectangle exactly when the rectangle touches the boundary, and
+	 every point my box holds and my sides miss is inside me under either fill rule.
 	 The answer is not remembered. It was, under the asked rectangle's identity, and measuring it
 	 on the reference frame cost 5.907 ms of binning against 4.587 ms without it: a grid is built
 	 for every frame, so the tile rectangles of one frame are objects no later frame asks about,
@@ -104,6 +125,8 @@ VGSpanScanner >> enclosesWholly: aRectangle [
 	box := self exactBoundingBox.
 	box ifNil: [ ^ false ].
 	(box containsRect: aRectangle) ifFalse: [ ^ false ].
+	self isDeviceRectangle ifTrue: [
+		^ box origin < aRectangle origin and: [ aRectangle corner < box corner ] ].
 	(self anEdgeMeets: aRectangle) ifTrue: [ ^ false ].
 	^ self isInsideAt: aRectangle center
 ]
@@ -164,10 +187,12 @@ VGSpanScanner >> fillRule [
 VGSpanScanner >> inspectorEnclosure: aBuilder [
 	<inspectorPresentationOrder: 2 title: 'Enclosure'>
 	"Whether I enclose a rectangle wholly, asked of every rectangle of a four by four grid over my
-	 own box, with the three answers it is built from beside it. A tiled rasteriser takes the
-	 coverage of a tile I enclose as one without sampling it, so each column sends the real
-	 question: a rectangle whose answer says yes while an edge meets it would show here."
-
+	 own box, with the answers it is built from beside it. A tiled rasteriser takes the coverage
+	 of a tile I enclose as one without sampling it, so each column sends the real question: a
+	 rectangle whose answer says yes while an edge meets it would show here.
+	 The last column says whether the question was answered from the box alone, which it is when
+	 my edges are that box; the two walk columns are then shown for the reader and are not what
+	 the answer was read from."
 	^ aBuilder newTable
 		  addColumn: (SpStringTableColumn title: 'Tile' evaluated: [ :each |
 					   each printString ]);
@@ -179,6 +204,8 @@ VGSpanScanner >> inspectorEnclosure: aBuilder [
 					   (self anEdgeMeets: each) printString ]);
 		  addColumn: (SpStringTableColumn title: 'Inside at its centre' evaluated: [ :each |
 					   (self isInsideAt: each center) printString ]);
+		  addColumn: (SpStringTableColumn title: 'Read from my box alone' evaluated: [ :each |
+					   self isDeviceRectangle printString ]);
 		  items: self enclosureSampleTiles;
 		  yourself
 ]
@@ -234,6 +261,17 @@ VGSpanScanner >> isAliased [
 	 one quality or another and we sample them all the same way."
 
 	^ antialias == #none
+]
+
+{ #category : 'testing' }
+VGSpanScanner >> isDeviceRectangle [
+	"Whether my edges are four axis-aligned ones running between the corners of my own
+	 bounding box, which is the clip a Bloc element of a rectangular geometry builds and the
+	 shape of most of a frame's fills. Such a shape holds every point its box holds, so an
+	 enclosure needs no edge of mine read.
+	 The answer is remembered, because a binning asks the enclosure of one shape once a tile."
+	rectangular ifNotNil: [ ^ rectangular ].
+	^ rectangular := self computeIsDeviceRectangle
 ]
 
 { #category : 'testing' }

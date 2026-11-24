@@ -89,24 +89,15 @@ VGSegments >> antialias [
 	^ antialias
 ]
 
-{ #category : 'testing' }
+{ #category : 'converting' }
 VGSegments >> asDeviceRectangle [
-	"The device-space rectangle my edges are, or nil when they are anything else. Four edges, each
-	 one horizontal or vertical, whose corners are the four corners of my bounding box: that is
-	 the clip a Bloc element with a rectangular geometry builds, and a clip of one needs no scan
-	 conversion at all."
-
-	| box corners |
-	self size = 4 ifFalse: [ ^ nil ].
-	box := self exactBoundingBox.
-	corners := box corners asSet.
-	1 to: coordinates size by: 4 do: [ :index |
-		| from to |
-		from := (coordinates at: index) @ (coordinates at: index + 1).
-		to := (coordinates at: index + 2) @ (coordinates at: index + 3).
-		(from x = to x or: [ from y = to y ]) ifFalse: [ ^ nil ].
-		((corners includes: from) and: [ corners includes: to ]) ifFalse: [ ^ nil ] ].
-	^ box
+	"The device-space rectangle my edges are, or nil when they are anything else: that is the
+	 clip a Bloc element with a rectangular geometry builds, and a clip of one needs no scan
+	 conversion at all. My scanner holds the test, which an enclosure asks of a shape once a
+	 tile and remembers there."
+	^ self scanner isDeviceRectangle
+		  ifTrue: [ self scanner exactBoundingBox ]
+		  ifFalse: [ nil ]
 ]
 
 { #category : 'accessing' }

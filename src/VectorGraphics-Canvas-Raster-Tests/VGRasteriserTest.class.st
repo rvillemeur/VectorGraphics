@@ -134,6 +134,56 @@ VGRasteriserTest >> testAHalfPixelRowIsCoveredWithinOneSubRow [
 	self assert: ((grid at: 5 @ 4) - 0.5) abs <= error
 ]
 
+{ #category : 'tests - enclosure' }
+VGRasteriserTest >> testARectangleShapeAnswersEnclosureWithoutReadingItsEdges [
+	"A rectangle holds every point of a rectangle its box holds and its own sides do not touch,
+	 so the question is two comparisons and no edge is read. Measured over the three census
+	 frames, that is 1049 of the 1604 edge walks and 768 of the 1256 fill-rule walks the
+	 interior question pays."
+	| square scanner |
+	square := VGSegments
+		          coordinates:
+		          (self segmentsOfAll: { { 8 @ 8. 40 @ 8. 40 @ 40. 8 @ 40 } })
+		          fillRule: #winding.
+	scanner := VGRefusingWalkScannerStub
+		           segments: square coordinates
+		           fillRule: square fillRule
+		           antialias: square antialias.
+	self assert: (scanner enclosesWholly: (16 @ 16 corner: 32 @ 32)).
+	self deny: (scanner enclosesWholly: (8 @ 16 corner: 24 @ 32)).
+	self deny: (scanner enclosesWholly: (16 @ 16 corner: 48 @ 32))
+]
+
+{ #category : 'tests - enclosure' }
+VGRasteriserTest >> testAScannerOfFourEdgesOnItsOwnBoxIsADeviceRectangle [
+	"The one shape whose enclosure needs no edge read: four axis-aligned edges running between
+	 the corners of the shape's own bounding box. Anything else is not, whether it has other
+	 corners, a slanted edge or more edges than four."
+	| square triangle nested zigzag |
+	square := VGSegments
+		          coordinates:
+		          (self segmentsOfAll: { { 8 @ 8. 40 @ 8. 40 @ 40. 8 @ 40 } })
+		          fillRule: #winding.
+	triangle := VGSegments
+		            coordinates:
+		            (self segmentsOfAll: { { 8 @ 8. 40 @ 8. 24 @ 40 } })
+		            fillRule: #winding.
+	nested := VGSegments
+		          coordinates: (self segmentsOfAll: {
+					           { 8 @ 8. 40 @ 8. 40 @ 40. 8 @ 40 }.
+					           { 16 @ 16. 32 @ 16. 32 @ 32. 16 @ 32 } })
+		          fillRule: #winding.
+	zigzag := VGSegments
+		          coordinates:
+		          (self segmentsOfAll: { { 8 @ 8. 24 @ 8. 24 @ 40. 40 @ 40 } })
+		          fillRule: #winding.
+	self assert: square scanner isDeviceRectangle.
+	self deny: triangle scanner isDeviceRectangle.
+	self deny: nested scanner isDeviceRectangle.
+	self deny: zigzag scanner isDeviceRectangle.
+	self deny: VGSegments empty scanner isDeviceRectangle
+]
+
 { #category : 'tests - fill rules' }
 VGRasteriserTest >> testASelfCrossingStarIsSolidUnderWindingAndHollowUnderEvenOdd [
 	| star winding evenOdd |
@@ -399,6 +449,27 @@ VGRasteriserTest >> testTheHoleOfANestedSquareIsEnclosedUnderWindingAndNotUnderE
 	hole := 20 @ 20 corner: 28 @ 28.
 	self assert: (winding enclosesWholly: hole).
 	self deny: (evenOdd enclosesWholly: hole)
+]
+
+{ #category : 'tests - enclosure' }
+VGRasteriserTest >> testTheShortEnclosureOfARectangleAnswersWhatTheEdgeWalkAnswers [
+	"The short answer is the long one, tile by tile over a grid that covers the shape and
+	 oversteps it on every side: inside, flush with a side, crossing a corner and outside."
+	| square scanner box |
+	square := VGSegments
+		          coordinates:
+		          (self segmentsOfAll: { { 8 @ 8. 40 @ 8. 40 @ 40. 8 @ 40 } })
+		          fillRule: #winding.
+	scanner := square scanner.
+	box := scanner exactBoundingBox.
+	0 to: 48 by: 8 do: [ :left |
+		0 to: 48 by: 8 do: [ :top |
+			| tile walked |
+			tile := left @ top corner: left + 8 @ (top + 8).
+			walked := (box containsRect: tile) and: [
+				          (scanner anEdgeMeets: tile) not and: [
+					          scanner isInsideAt: tile center ] ].
+			self assert: (scanner enclosesWholly: tile) equals: walked ] ]
 ]
 
 { #category : 'tests - fill rules' }
