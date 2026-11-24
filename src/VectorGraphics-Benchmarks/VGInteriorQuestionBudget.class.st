@@ -99,9 +99,14 @@ VGInteriorQuestionBudget >> rows [
 VGInteriorQuestionBudget >> runOverFrames: aFrameNameCollection extent: anExtent [
 	"One row a frame, then every pass over every row. The first pass is kept like any other:
 	 the figure a row reports is the floor of its passes, and a warm-up thrown away would only
-	 remove a reading that was never going to be the fastest."
+	 remove a reading that was never going to be the fastest.
+	 The heap is collected before the first pass. Building the rows draws the frames and keeps a
+	 pair for every question of every stage, which is tens of thousands of objects, and a run
+	 made on that heap read the whole predicate of the reference frame at 4096 us where three
+	 runs made on a collected heap agree within five per cent at 2975, 3122 and 3100."
 	rows := aFrameNameCollection collect: [ :name |
 		        VGInteriorQuestionBudgetRow frameNamed: name extent: anExtent ].
+	Smalltalk garbageCollect.
 	1 to: passes do: [ :pass |
 		rows do: [ :each | each measurePass: pass ] ].
 	^ self
