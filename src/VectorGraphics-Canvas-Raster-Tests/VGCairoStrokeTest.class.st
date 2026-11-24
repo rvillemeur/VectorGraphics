@@ -702,6 +702,35 @@ VGCairoStrokeTest >> testTheAntialiasModeTravelsInsideTheSegments [
 	self deny: VGSegments empty isAliased
 ]
 
+{ #category : 'tests' }
+VGCairoStrokeTest >> testTheDirectionOfASegmentIsItsDifferenceOverItsLengthForEveryPairOfTheSweep [
+	"The direction of a segment is the difference of its two points divided by the length of
+	 that difference, and nothing when the two points are the same one. Unit 3.15 rewrote the
+	 method to compute the two coordinates without allocating a point for the difference, so
+	 this holds the arithmetic to the formula it replaced over a deterministic sweep: the
+	 halves of both signs, a coordinate off Cairo's fixed grid, a point far from the origin and
+	 zero."
+
+	| stroker sweep |
+	stroker := VGStroker
+		           path: VGPathBuilder new path
+		           state: VGCairoState new.
+	sweep := { 0.0. 0.5. -0.5. (1 / 512) asFloat. 1024.25. -4096.75 }.
+	sweep do: [ :x |
+		sweep do: [ :y |
+			| from to difference |
+			from := x @ y.
+			to := y @ x.
+			self assert: (stroker directionFrom: from to: from) isNil.
+			difference := to - from.
+			difference isZero
+				ifTrue: [ self assert: (stroker directionFrom: from to: to) isNil ]
+				ifFalse: [
+					self
+						assert: (stroker directionFrom: from to: to)
+						equals: difference / difference r ] ] ]
+]
+
 { #category : 'tests - outline' }
 VGCairoStrokeTest >> testThePolygonsOfAnOutlineAllWindTheSameWay [
 	"The outline is a union of overlapping polygons under the winding rule, so a polygon handed

@@ -176,11 +176,15 @@ VGStroker >> directionFrom: aStartPoint to: anEndPoint [
 	"The unit vector along the segment, or nil when the two points are the same one and the
 	 segment has no direction at all."
 
-	| direction length |
-	direction := anEndPoint - aStartPoint.
-	length := direction r.
+	| dx dy length |
+	"Coordinate by coordinate, so the difference and its quotient allocate no point of their
+	 own: this is the second dearest thing a stroke does, and unit 3.15 priced the rewrite at a
+	 twelfth of the outline. VGCairoStrokeTest holds the arithmetic to the formula."
+	dx := anEndPoint x - aStartPoint x.
+	dy := anEndPoint y - aStartPoint y.
+	length := (dx * dx + (dy * dy)) sqrt.
 	length isZero ifTrue: [ ^ nil ].
-	^ direction / length
+	^ dx / length @ (dy / length)
 ]
 
 { #category : 'private' }
