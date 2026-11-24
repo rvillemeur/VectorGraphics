@@ -55,7 +55,7 @@ VGSpanScanner >> antialias [
 VGSpanScanner >> computeIsDeviceRectangle [
 	"Four edges, each horizontal or vertical, every end of them a corner of my bounding box."
 	| box corners |
-	segments size = (4 * 4) ifFalse: [ ^ false ].
+	self edgeCount = 4 ifFalse: [ ^ false ].
 	box := self exactBoundingBox.
 	box ifNil: [ ^ false ].
 	corners := box corners asSet.
@@ -89,6 +89,12 @@ VGSpanScanner >> crossingsAt: aNumber [
 					x0 + ((x1 - x0) * (aNumber - y0) / (y1 - y0))
 					-> (y1 > y0 ifTrue: [ 1 ] ifFalse: [ -1 ]) ] ] ].
 	^ crossings asArray sort: [ :a :b | a key <= b key ]
+]
+
+{ #category : 'accessing' }
+VGSpanScanner >> edgeCount [
+	"How many edges I hold. My coordinates are four numbers an edge, the two ends of it."
+	^ segments size // 4
 ]
 
 { #category : 'accessing' }

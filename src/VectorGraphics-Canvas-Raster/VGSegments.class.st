@@ -95,8 +95,10 @@ VGSegments >> asDeviceRectangle [
 	 clip a Bloc element with a rectangular geometry builds, and a clip of one needs no scan
 	 conversion at all. My scanner holds the test, which an enclosure asks of a shape once a
 	 tile and remembers there."
-	^ self scanner isDeviceRectangle
-		  ifTrue: [ self scanner exactBoundingBox ]
+	| scanner |
+	scanner := self scanner.
+	^ scanner isDeviceRectangle
+		  ifTrue: [ scanner exactBoundingBox ]
 		  ifFalse: [ nil ]
 ]
 
