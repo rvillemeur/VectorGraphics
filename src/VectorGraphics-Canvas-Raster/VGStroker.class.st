@@ -441,6 +441,13 @@ VGStroker >> printOn: aStream [
 VGStroker >> quadFrom: aStartPoint to: anEndPoint into: aStream [
 	"The segment widened by half the line width on each side."
 
+	"Unit 3.15 measured this one computed coordinate by coordinate, with no point built for the
+	 direction, the perpendicular or the offset: byte identical output, and the outline of one
+	 card border fell from 63 to 60 microseconds, of twelve from 785 to 765. Three microseconds
+	 is under the twentieth of the recording the unit set as its floor, so the clearer version
+	 stays. What is left to win here is the array of points this hands to appendPolygon:into:,
+	 which is a change of that sink and not of this method."
+
 	| direction offset |
 	direction := self directionFrom: aStartPoint to: anEndPoint.
 	direction ifNil: [ ^ self ].
