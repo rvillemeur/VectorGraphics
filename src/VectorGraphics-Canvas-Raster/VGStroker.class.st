@@ -627,6 +627,13 @@ VGStroker >> strokeWholeRun: vertices closed: aBoolean into: aStream [
 	 A run of one point has no direction at all, which is the degenerate case Cairo draws only
 	 under a round cap."
 
+	"The direction of a segment is computed three times here: once for its quadrilateral and
+	 once for each of the joins at its two ends. Unit 3.15 priced computing it once per segment
+	 and sharing it, byte identical over the nine combinations of cap and join: the outline of
+	 one card border fell from 55 to 53 microseconds and of the reference grid from 709 to 681.
+	 Two microseconds is under the twentieth of the card border recording the unit set as its
+	 floor, so the three computations stay and the array of directions is not built. A square
+	 root and two divisions are cheap beside the polygon each of them is for."
 	vertices size = 1 ifTrue: [
 		^ self degenerateCapAt: vertices first into: aStream ].
 	1 to: vertices size - 1 do: [ :index |
