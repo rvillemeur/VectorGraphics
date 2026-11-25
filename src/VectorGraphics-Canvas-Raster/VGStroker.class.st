@@ -43,32 +43,48 @@ VGStroker class >> polygonWindingSign [
 ]
 
 { #category : 'private' }
-VGStroker >> appendPolygon: userPoints into: aStream [
-	"The polygon's edges, closed, mapped to device space. A polygon whose device winding came
-	 out the other way round — a mirroring matrix, or a wedge built on the far side of a vertex
-	 — is reversed, so every polygon of one outline winds the same way and the winding rule sees
-	 their union rather than holes where they overlap."
+VGStroker >> appendEdgeOf: coordinates from: anIndex to: anotherIndex into: aStream [
+	"The edge between those two vertices of the polygon, four floats: the vertex an index names
+	 is the pair of coordinates at twice it, less one and whole."
 
-	| devicePoints |
-	"Under the identity matrix a mapped point equals the point itself, so the map and the array
-	 it would allocate are both skipped. Unit 3.15 priced it; the premise is pinned by
-	 VGCairoMatrixTest."
-	devicePoints := self matrix isIdentity
-		                ifTrue: [ userPoints ]
-		                ifFalse: [
-		                userPoints collect: [ :each | self matrix value: each ] ].
-	devicePoints size < 3 ifTrue: [ ^ self ].
-	(self signedAreaOf: devicePoints) sign = self class polygonWindingSign ifFalse: [
-		devicePoints := devicePoints reversed ].
-	1 to: devicePoints size do: [ :index |
-		| from to |
-		from := devicePoints at: index.
-		to := devicePoints at: index \\ devicePoints size + 1.
-		aStream
-			nextPut: from x asFloat;
-			nextPut: from y asFloat;
-			nextPut: to x asFloat;
-			nextPut: to y asFloat ]
+	aStream
+		nextPut: (coordinates at: anIndex * 2 - 1) asFloat;
+		nextPut: (coordinates at: anIndex * 2) asFloat;
+		nextPut: (coordinates at: anotherIndex * 2 - 1) asFloat;
+		nextPut: (coordinates at: anotherIndex * 2) asFloat
+]
+
+{ #category : 'private' }
+VGStroker >> appendPolygonCoordinates: userCoordinates into: aStream [
+	"The polygon's edges, closed, mapped to device space: the coordinates of its vertices, two
+	 floats a vertex, in user space. A polygon whose device winding came out the other way round
+	 — a mirroring matrix, or a wedge built on the far side of a vertex — is written backwards,
+	 so every polygon of one outline winds the same way and the winding rule sees their union
+	 rather than holes where they overlap."
+
+	| coordinates count |
+	"Coordinates and not points: every producer of a polygon builds the numbers it already has,
+	 and nothing between here and the edge stream allocates a point. Unit 3.15 priced it at
+	 three tenths of the outline of a card border."
+	coordinates := self deviceCoordinatesOf: userCoordinates.
+	count := coordinates size // 2.
+	count < 3 ifTrue: [ ^ self ].
+	(self signedAreaOfCoordinates: coordinates) sign
+		= self class polygonWindingSign
+		ifTrue: [
+			1 to: count do: [ :index |
+				self
+					appendEdgeOf: coordinates
+					from: index
+					to: index \\ count + 1
+					into: aStream ] ]
+		ifFalse: [
+			1 to: count do: [ :index |
+				self
+					appendEdgeOf: coordinates
+					from: count + 1 - index
+					to: count + 1 - (index \\ count + 1)
+					into: aStream ] ]
 ]
 
 { #category : 'private' }
@@ -172,6 +188,26 @@ VGStroker >> degenerateCapAt: aVertex into: aStream [
 ]
 
 { #category : 'private' }
+VGStroker >> deviceCoordinatesOf: userCoordinates [
+	"Those coordinates in device space. Under the identity matrix they are already there, which
+	 is the short circuit unit 3.15 priced first; under any other matrix every vertex is mapped,
+	 two coordinates at a time."
+
+	| count coordinates |
+	self matrix isIdentity ifTrue: [ ^ userCoordinates ].
+	count := userCoordinates size // 2.
+	coordinates := Array new: count * 2.
+	1 to: count do: [ :index |
+		| mapped |
+		mapped := self matrix
+			          valueX: (userCoordinates at: index * 2 - 1)
+			          y: (userCoordinates at: index * 2).
+		coordinates at: index * 2 - 1 put: mapped x.
+		coordinates at: index * 2 put: mapped y ].
+	^ coordinates
+]
+
+{ #category : 'private' }
 VGStroker >> directionFrom: aStartPoint to: anEndPoint [
 	"The unit vector along the segment, or nil when the two points are the same one and the
 	 segment has no direction at all."
@@ -192,16 +228,17 @@ VGStroker >> discAt: aPoint into: aStream [
 	"A polygon inscribed in the circle of half the line width around aPoint, which is the shape
 	 of a round cap and of a round join."
 
-	| count radius |
+	| count radius coordinates |
 	radius := self radius.
 	radius isZero ifTrue: [ ^ self ].
 	count := self discPointCount.
-	self
-		appendPolygon: ((0 to: count - 1) collect: [ :index |
-				 | angle |
-				 angle := index * -2.0 * Float pi / count.
-				 aPoint + (radius * angle cos @ (radius * angle sin)) ])
-		into: aStream
+	coordinates := Array new: count * 2.
+	1 to: count do: [ :index |
+		| angle |
+		angle := index - 1 * -2.0 * Float pi / count.
+		coordinates at: index * 2 - 1 put: aPoint x + (radius * angle cos).
+		coordinates at: index * 2 put: aPoint y + (radius * angle sin) ].
+	self appendPolygonCoordinates: coordinates into: aStream
 ]
 
 { #category : 'private' }
@@ -331,39 +368,25 @@ VGStroker >> isMiteredBetween: incoming and: outgoing [
 
 { #category : 'private' }
 VGStroker >> joinAt: aVertex from: aPreviousPoint to: aNextPoint into: aStream [
-	"The wedge between the two segment quadrilaterals, on the outer side of the turn: a round
-	 join fills it with the disc, a bevel join closes the two outer corners with one straight
-	 edge, and a miter join runs out to the tip. Two collinear segments leave no wedge at all."
+	"The join between the two segments that meet at aVertex: a round join fills the disc, and
+	 any other join fills the wedge on the outer side of the turn. Two collinear segments leave
+	 no wedge at all, and a segment of no length gives no direction to turn from."
 
-	| incoming outgoing cross sign outer |
+	| incoming outgoing cross |
 	self style lineJoin == #round ifTrue: [ ^ self discAt: aVertex into: aStream ].
 	incoming := self directionFrom: aPreviousPoint to: aVertex.
 	outgoing := self directionFrom: aVertex to: aNextPoint.
 	(incoming isNil or: [ outgoing isNil ]) ifTrue: [ ^ self ].
 	cross := (incoming x * outgoing y) - (incoming y * outgoing x).
 	cross isZero ifTrue: [ ^ self ].
-	sign := cross > 0
-		        ifTrue: [ -1 ]
-		        ifFalse: [ 1 ].
-	outer := { incoming. outgoing } collect: [ :direction |
-		         aVertex + ((self perpendicularOf: direction) * (sign * self radius)) ].
 	self
-		appendPolygon: ((self isMiteredBetween: incoming and: outgoing)
-				 ifTrue: [
-						 {
-							 aVertex.
-							 outer first.
-							 (self
-								  miterTipAt: aVertex
-								  between: incoming
-								  and: outgoing
-								  side: sign).
-							 outer second } ]
-				 ifFalse: [
-						 {
-							 aVertex.
-							 outer first.
-							 outer second } ])
+		appendPolygonCoordinates: (self
+				 wedgeCoordinatesAt: aVertex
+				 between: incoming
+				 and: outgoing
+				 side: (cross > 0
+						  ifTrue: [ -1 ]
+						  ifFalse: [ 1 ]))
 		into: aStream
 ]
 
@@ -441,23 +464,21 @@ VGStroker >> printOn: aStream [
 VGStroker >> quadFrom: aStartPoint to: anEndPoint into: aStream [
 	"The segment widened by half the line width on each side."
 
-	"Unit 3.15 measured this one computed coordinate by coordinate, with no point built for the
-	 direction, the perpendicular or the offset: byte identical output, and the outline of one
-	 card border fell from 63 to 60 microseconds, of twelve from 785 to 765. Three microseconds
-	 is under the twentieth of the recording the unit set as its floor, so the clearer version
-	 stays. What is left to win here is the array of points this hands to appendPolygon:into:,
-	 which is a change of that sink and not of this method."
-
-	| direction offset |
+	| direction offsetX offsetY |
 	direction := self directionFrom: aStartPoint to: anEndPoint.
 	direction ifNil: [ ^ self ].
-	offset := (self perpendicularOf: direction) * self radius.
+	offsetX := direction y negated * self radius.
+	offsetY := direction x * self radius.
 	self
-		appendPolygon: {
-				aStartPoint + offset.
-				anEndPoint + offset.
-				anEndPoint - offset.
-				aStartPoint - offset }
+		appendPolygonCoordinates: {
+				aStartPoint x + offsetX.
+				aStartPoint y + offsetY.
+				anEndPoint x + offsetX.
+				anEndPoint y + offsetY.
+				anEndPoint x - offsetX.
+				anEndPoint y - offsetY.
+				aStartPoint x - offsetX.
+				aStartPoint y - offsetY }
 		into: aStream
 ]
 
@@ -504,15 +525,18 @@ VGStroker >> setPath: aPath state: aState [
 ]
 
 { #category : 'private' }
-VGStroker >> signedAreaOf: devicePoints [
-	"Twice the signed area of the closed polygon, by the shoelace sum. Only the sign of the
-	 answer is read, so the factor of two is left where it is."
+VGStroker >> signedAreaOfCoordinates: coordinates [
+	"Twice the signed area of the closed polygon those coordinates describe, by the shoelace
+	 sum. Only the sign of the answer is read, so the factor of two is left where it is."
 
-	^ (1 to: devicePoints size) inject: 0.0 into: [ :sum :index |
-		  | from to |
-		  from := devicePoints at: index.
-		  to := devicePoints at: index \\ devicePoints size + 1.
-		  sum + (from x * to y) - (to x * from y) ]
+	| count |
+	count := coordinates size // 2.
+	^ (1 to: count) inject: 0.0 into: [ :sum :index |
+		  | next |
+		  next := index \\ count + 1.
+		  sum
+		  + ((coordinates at: index * 2 - 1) * (coordinates at: next * 2))
+		  - ((coordinates at: next * 2 - 1) * (coordinates at: index * 2)) ]
 ]
 
 { #category : 'private' }
@@ -520,15 +544,21 @@ VGStroker >> squareCapAt: aVertex along: aDirection into: aStream [
 	"The square a square cap adds: half the line width further along the direction, and half the
 	 line width to each side of it."
 
-	| offset extent |
-	offset := (self perpendicularOf: aDirection) * self radius.
-	extent := aDirection * self radius.
+	| offsetX offsetY extentX extentY |
+	offsetX := aDirection y negated * self radius.
+	offsetY := aDirection x * self radius.
+	extentX := aDirection x * self radius.
+	extentY := aDirection y * self radius.
 	self
-		appendPolygon: {
-				aVertex + offset.
-				aVertex + offset + extent.
-				aVertex - offset + extent.
-				aVertex - offset }
+		appendPolygonCoordinates: {
+				aVertex x + offsetX.
+				aVertex y + offsetY.
+				aVertex x + offsetX + extentX.
+				aVertex y + offsetY + extentY.
+				aVertex x - offsetX + extentX.
+				aVertex y - offsetY + extentY.
+				aVertex x - offsetX.
+				aVertex y - offsetY }
 		into: aStream
 ]
 
@@ -642,4 +672,29 @@ VGStroker >> verticesOf: userPoints closed: aBoolean [
 		 vertices size > 1 and: [ vertices first = vertices last ] ]) ifTrue: [
 		vertices removeLast ].
 	^ vertices asArray
+]
+
+{ #category : 'private' }
+VGStroker >> wedgeCoordinatesAt: aVertex between: incoming and: outgoing side: aSign [
+	"The coordinates of the wedge the two segment quadrilaterals leave on the outer side of the
+	 turn, aSign naming that side: the vertex, the outer corner of the incoming segment, the
+	 miter tip where the miter limit allows one, and the outer corner of the outgoing segment."
+
+	| radius incomingX incomingY outgoingX outgoingY tip |
+	radius := aSign * self radius.
+	incomingX := aVertex x + (incoming y negated * radius).
+	incomingY := aVertex y + (incoming x * radius).
+	outgoingX := aVertex x + (outgoing y negated * radius).
+	outgoingY := aVertex y + (outgoing x * radius).
+	(self isMiteredBetween: incoming and: outgoing) ifFalse: [
+		^ {
+			  aVertex x. aVertex y.
+			  incomingX. incomingY.
+			  outgoingX. outgoingY } ].
+	tip := self miterTipAt: aVertex between: incoming and: outgoing side: aSign.
+	^ {
+		  aVertex x. aVertex y.
+		  incomingX. incomingY.
+		  tip x. tip y.
+		  outgoingX. outgoingY }
 ]

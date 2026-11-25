@@ -413,6 +413,20 @@ VGCairoStrokeTest >> testAPatternOfOneLengthAlternatesOnAndOffWithThatLength [
 		equals: (self paintedPixelCountIn: (self cairoFormOf: (script value: 0)))
 ]
 
+{ #category : 'tests' }
+VGCairoStrokeTest >> testAPolygonOfFewerThanThreeVerticesWritesNoEdgeAtAll [
+	"A degenerate polygon — the wedge of a collinear corner, the disc of a zero line width —
+	 encloses nothing, so it contributes no edge. The sink answers for that case rather than
+	 every producer answering for it."
+
+	| stroker stream |
+	stroker := VGStroker path: VGPath new state: VGCairoState new.
+	#( #(  ) #( 1.0 2.0 ) #( 1.0 2.0 3.0 4.0 ) ) do: [ :coordinates |
+		stream := WriteStream on: (Array new: 16).
+		stroker appendPolygonCoordinates: coordinates into: stream.
+		self assert: stream contents isEmpty ]
+]
+
 { #category : 'tests - joins' }
 VGCairoStrokeTest >> testARunOfLinesThatComesBackToItsStartIsStillCappedThere [
 	"Coming back to the first point is not a close: Cairo caps both ends of such a run and leaves
@@ -731,23 +745,42 @@ VGCairoStrokeTest >> testTheDirectionOfASegmentIsItsDifferenceOverItsLengthForEv
 						equals: difference / difference r ] ] ]
 ]
 
-{ #category : 'tests - outline' }
+{ #category : 'tests' }
+VGCairoStrokeTest >> testThePolygonSinkWritesTheDeviceCoordinatesOfTheVerticesItIsGiven [
+	"The producers of a polygon work in user space; the edges go to the fill in device space.
+	 The sink is the one place that maps, so a scaling matrix shows up in every edge it writes.
+	 This square winds against the sign the fill wants, so it comes out walked backwards from
+	 its last vertex, which is the normalisation the sink exists for."
+
+	| stroker state stream square |
+	state := VGCairoState new.
+	state matrix: (VGCairoMatrix newScalingByX: 2.0 y: 4.0).
+	stroker := VGStroker path: VGPath new state: state.
+	square := #( 0.0 0.0 4.0 0.0 4.0 4.0 0.0 4.0 ).
+	stream := WriteStream on: (Array new: 16).
+	stroker appendPolygonCoordinates: square into: stream.
+	self
+		assert: stream contents asArray
+		equals: #( 0.0 16.0 8.0 16.0 8.0 16.0 8.0 0.0 8.0 0.0 0.0 0.0 0.0
+			         0.0 0.0 16.0 )
+]
+
+{ #category : 'tests' }
 VGCairoStrokeTest >> testThePolygonsOfAnOutlineAllWindTheSameWay [
 	"The outline is a union of overlapping polygons under the winding rule, so a polygon handed
 	 over the wrong way round would punch a hole in the stroke. The stroker normalises the
-	 winding, so the same polygon in either order gives the same edges."
+	 winding, so the same polygon in either order gives the same edges. The polygon arrives as
+	 the coordinates of its vertices, two floats a vertex, which is what unit 3.15 changed it to."
 
 	| stroker clockwise anticlockwise square |
 	stroker := VGStroker path: VGPath new state: VGCairoState new.
-	square := {
-		          (0 @ 0).
-		          (4 @ 0).
-		          (4 @ 4).
-		          (0 @ 4) }.
+	square := #( 0 0 4 0 4 4 0 4 ).
 	clockwise := WriteStream on: (Array new: 16).
 	anticlockwise := WriteStream on: (Array new: 16).
-	stroker appendPolygon: square into: clockwise.
-	stroker appendPolygon: square reversed into: anticlockwise.
+	stroker appendPolygonCoordinates: square into: clockwise.
+	stroker
+		appendPolygonCoordinates: #( 0 4 4 4 4 0 0 0 )
+		into: anticlockwise.
 	self assert: clockwise contents asArray equals: anticlockwise contents asArray
 ]
 
