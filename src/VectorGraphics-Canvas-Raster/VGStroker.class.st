@@ -69,6 +69,8 @@ VGStroker >> appendPolygonCoordinates: userCoordinates into: aStream [
 	coordinates := self deviceCoordinatesOf: userCoordinates.
 	count := coordinates size // 2.
 	count < 3 ifTrue: [ ^ self ].
+	"The two walks differ only in the index arithmetic. One loop asking which way to go would
+	 ask it once a vertex; the design review of unit 3.15 kept the duplication for that reason."
 	(self signedAreaOfCoordinates: coordinates) sign
 		= self class polygonWindingSign
 		ifTrue: [
@@ -464,6 +466,10 @@ VGStroker >> printOn: aStream [
 VGStroker >> quadFrom: aStartPoint to: anEndPoint into: aStream [
 	"The segment widened by half the line width on each side."
 
+	"The perpendicular offset is written out here, in squareCapAt:along:into: and in
+	 wedgeCoordinatesAt:between:and:side:. Three occurrences are what the rule of three asks an
+	 abstraction for, and the design review of unit 3.15 refused it: two helper sends per
+	 polygon land in the loop the five levers of that unit were spent emptying."
 	| direction offsetX offsetY |
 	direction := self directionFrom: aStartPoint to: anEndPoint.
 	direction ifNil: [ ^ self ].
