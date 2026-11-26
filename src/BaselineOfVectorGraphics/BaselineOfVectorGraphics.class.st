@@ -15,17 +15,19 @@ Class {
 { #category : 'baselines' }
 BaselineOfVectorGraphics >> baseline: spec [
 	<baseline>
-	"The load declaration of this project, in six parts so that no one method holds a block
+	"The load declaration of this project, in seven parts so that no one method holds a block
 	 per package: the external projects a layer needs, the rasteriser's own twelve packages,
 	 the three backends above it, the font engine above the Bloc renderer, the corpus and the
-	 benchmarks beside them, and the groups.
+	 benchmarks beside them, the documentation that draws the architecture, and the groups.
 	 The default group is the rasteriser and the canvas, which is three packages since the
 	 split of 2026-11. The Bloc renderer is a group of its own because this project is
 	 Alexandrie's replacement inside Bloc, not a part of Bloc: loading the default group must
 	 work in an image where no Bloc class exists, and VGRenderer is a subclass of BARenderer.
 	 VGArchitectureTest holds both halves of that.
 	 The font engine is a group apart again: it writes the slots that decide what every space
-	 of the image draws with, which loading a renderer must not do on its own."
+	 of the image draws with, which loading a renderer must not do on its own.
+	 The documentation is a group apart for a third reason: it draws the architecture rather
+	 than taking part in it, so nobody who loads the rasteriser pays for ArchDoc or Roassal."
 
 	spec for: #common do: [
 		self declareExternalProjectsOn: spec.
@@ -33,6 +35,7 @@ BaselineOfVectorGraphics >> baseline: spec [
 		self declareBackendPackagesOn: spec.
 		self declareFontEnginePackagesOn: spec.
 		self declareSupportPackagesOn: spec.
+		self declareDocumentationPackagesOn: spec.
 		self declareGroupsOn: spec ]
 ]
 
@@ -186,7 +189,34 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 					   'VectorGraphics-Vulkan-Examples' ) ]
 ]
 
-{ #category : 'baseline' }
+{ #category : 'baselines' }
+BaselineOfVectorGraphics >> declareDocumentationPackagesOn: spec [
+	"The package that draws this project's architecture, with its examples and its gate. It takes
+	 part in nothing: its two inspector tabs are extension methods on Pharo's Package and on
+	 VGScaledFont, so no package of this project names it and the default group loads with no
+	 ArchDoc and no Roassal in the image.
+	 Its requires are not reference edges and so cannot appear in VGArchitectureTest class >>
+	 allowedDependencies, which reads what a method names: a tab installed on a class of the font
+	 package needs that package loaded, and the gate needs the package whose tabs it builds."
+
+	spec
+		package: 'VectorGraphics-Documentation'
+		with: [
+			spec requires: #( 'VectorGraphics-Canvas-Fonts' 'ArchDoc' ) ];
+		package: 'VectorGraphics-Documentation-Examples'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Documentation' 'VectorGraphics-Canvas-Fonts-Examples'
+					   'ArchDoc' ) ];
+		package: 'VectorGraphics-Documentation-Tests'
+		with: [
+			spec requires:
+					#( 'VectorGraphics-Documentation' 'VectorGraphics-Documentation-Examples'
+					   'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Fonts-Examples'
+					   'ArchDoc' ) ]
+]
+
+{ #category : 'baselines' }
 BaselineOfVectorGraphics >> declareExternalProjectsOn: spec [
 	"The projects outside this repository that a layer or a group of it needs. Bloc: the
 	 renderer of the bloc group subclasses BARenderer, so that group fetches Bloc rather than
@@ -197,7 +227,12 @@ BaselineOfVectorGraphics >> declareExternalProjectsOn: spec [
 	 compiler and its driver, so they fetch it rather than assume it loaded by hand. They ask
 	 for its default group, which brings its SPIR-V and compiler packages through that
 	 project's own requires. It is pinned to a branch like Bloc, and for one reason more: it is
-	 written alongside this project, so a tag cut today is stale a week later."
+	 written alongside this project, so a tag cut today is stale a week later.
+	 ArchDoc: the documentation group reads the declarations the font classes carry and draws
+	 them, and that is ArchDoc's work. Roassal is not named here although the diagram is drawn
+	 with it: ArchDoc's own baseline pins the Roassal it was written against, and naming it here
+	 as well would mean two pins of one project in one load. ArchDoc is pinned to a branch for
+	 the same reason as PharoVulkan: it is written alongside this project."
 
 	spec
 		baseline: 'Bloc'
@@ -209,6 +244,11 @@ BaselineOfVectorGraphics >> declareExternalProjectsOn: spec [
 		with: [
 			spec
 				repository: 'github://rvillemeur/PharoVulkan:main/src';
+				loads: #( 'default' ) ];
+		baseline: 'ArchDoc'
+		with: [
+			spec
+				repository: 'github://rvillemeur/ArchDoc:main/src';
 				loads: #( 'default' ) ]
 ]
 
@@ -313,7 +353,11 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 	 another project a package names. None of the three holds a TestCase, and each is a group
 	 of its own so that it loads with no test package at all. 'reflection' is in no group
 	 above it: the test packages and the Bloc renderer that read the scan require it, so it
-	 arrives with whichever of them is asked for."
+	
+	 'documentation' is the picture of this project rather than a part of it: it is in no group
+	 above 'examples' and 'tests', and the default group does not name it, so loading the
+	 rasteriser brings neither ArchDoc nor Roassal. 'dev' leaves it out for the same reason:
+	 that group must load in a plain Pharo image."
 
 	spec
 		group: 'paths' with: #( 'VectorGraphics-Paths' );
@@ -360,6 +404,11 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 		group: 'vulkan' with: #( 'core' 'VectorGraphics-Vulkan' );
 		group: 'vulkan-examples' with: #( 'VectorGraphics-Vulkan-Examples' );
 		group: 'vulkan-tests' with: #( 'VectorGraphics-Vulkan-Tests' );
+		group: 'documentation' with: #( 'VectorGraphics-Documentation' );
+		group: 'documentation-examples'
+			with: #( 'VectorGraphics-Documentation-Examples' );
+		group: 'documentation-tests'
+			with: #( 'VectorGraphics-Documentation-Tests' );
 		group: 'conformance' with: #( 'VectorGraphics-Conformance' );
 		group: 'benchmarks' with: #( 'VectorGraphics-Benchmarks' );
 		group: 'reflection' with: #( 'VectorGraphics-Reflection' );
@@ -370,12 +419,12 @@ BaselineOfVectorGraphics >> declareGroupsOn: spec [
 			   'canvas-examples' 'canvas-raster-examples' 'canvas-fonts-examples'
 			   'canvas-geometry-examples'
 			   'bloc-examples' 'bloc-text-examples' 'fonts-examples'
-			   'reflection-examples' 'vulkan-examples' );
+			   'reflection-examples' 'vulkan-examples' 'documentation-examples' );
 		group: 'tests'
 		with: #( 'paths-tests' 'engine-tests' 'truetype-tests' 'text-tests' 'canvas-tests'
 			   'canvas-raster-tests' 'canvas-fonts-tests' 'canvas-geometry-tests'
 			   'bloc-tests' 'bloc-text-tests' 'fonts-tests'
-			   'vulkan-tests' );
+			   'vulkan-tests' 'documentation-tests' );
 		group: 'default'
 			with: #( 'core' 'canvas' 'canvas-raster' 'canvas-fonts' 'canvas-geometry' );
 		group: 'dev'

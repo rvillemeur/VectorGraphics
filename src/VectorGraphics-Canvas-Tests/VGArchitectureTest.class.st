@@ -253,7 +253,22 @@ VGArchitectureTest class >> allowedDependencies [
 			  'VectorGraphics-Benchmarks'
 			  -> #( 'VectorGraphics-Bloc' 'VectorGraphics-Canvas'
 				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance'
-				    'VectorGraphics-Vulkan' ) }
+				    'VectorGraphics-Vulkan' ).
+
+			"The documentation package, which draws the architecture rather than taking part in it:
+			  two inspector tabs, installed as extension methods on Pharo's Package and on
+			  VGScaledFont, so no font class is edited for the sake of a picture. It names the font
+			  packages it draws and nothing of this project names it, which is what keeps the
+			  rasteriser loadable with no documentation and no Roassal in the image. Its edges out of
+			  this project, to ArchDoc and Roassal, are the baseline's business and are named there."
+			"The tabs are extension methods on a Package and on VGScaledFont, which the organiser
+			  records and no method of this package names, so the documentation package makes no
+			  reference edge at all. What it must load is another matter, and the baseline says it."
+			'VectorGraphics-Documentation' -> #(  ).
+			'VectorGraphics-Documentation-Examples' -> #( 'VectorGraphics-Canvas-Fonts-Examples' ).
+			'VectorGraphics-Documentation-Tests'
+			-> #( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Fonts-Examples'
+			      'VectorGraphics-Documentation-Examples' ) }
 ]
 
 { #category : 'layering' }
@@ -653,6 +668,21 @@ VGArchitectureTest >> testConformanceStaysInsideItsAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Conformance'
 ]
 
+{ #category : 'tests' }
+VGArchitectureTest >> testDocumentationExamplesStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Documentation-Examples'
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testDocumentationStaysInsideItsAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Documentation'
+]
+
+{ #category : 'tests' }
+VGArchitectureTest >> testDocumentationTestsStayInsideTheirAllowedDependencies [
+	self assertEdgesOfPackageNamed: 'VectorGraphics-Documentation-Tests'
+]
+
 { #category : 'tests - dependencies' }
 VGArchitectureTest >> testEngineExamplesStayInsideTheirAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Engine-Examples'
@@ -761,6 +791,8 @@ VGArchitectureTest >> testEveryExternalProjectIsPinnedWhereThisProjectMeansIt [
 	 image, so the version doing the rewriting is part of this project's own setup. Bloc is a
 	 branch because it publishes no release tag. PharoVulkan is a branch because it is this
 	 project's own Vulkan binding, written alongside it, so a tag cut today is stale a week later.
+	 ArchDoc is a branch for the same reason: it is this project's own documentation library, and
+	 it is where Roassal is pinned, so no group here names Roassal.
 	 The pins are read through `repositorySpecs`: the MuTalk-only test this one replaces sent
 	 `map`, which MetacelloRepositoriesSpec no longer understands."
 
@@ -772,6 +804,7 @@ VGArchitectureTest >> testEveryExternalProjectIsPinnedWhereThisProjectMeansIt [
 			put: (each repositories repositorySpecs collect: [ :one | one description ])
 					asArray ].
 	self assert: pins equals: (Dictionary newFrom: {
+			 ('ArchDoc' -> #( 'github://rvillemeur/ArchDoc:main/src' )).
 			 ('Bloc' -> #( 'github://pharo-graphics/Bloc:master' )).
 			 ('MuTalk' -> #( 'github://pharo-contributions/mutalk:v3.0.8/src' )).
 			 ('PharoVulkan' -> #( 'github://rvillemeur/PharoVulkan:main/src' )) })
@@ -1042,16 +1075,19 @@ VGArchitectureTest >> testTextTestsStayInsideTheirAllowedDependencies [
 ]
 
 { #category : 'tests' }
-VGArchitectureTest >> testTheBaselineNamesOnlyBlocMuTalkAndPharoVulkanAsExternalProjects [
+VGArchitectureTest >> testTheBaselineNamesOnlyArchDocBlocMuTalkAndPharoVulkanAsExternalProjects [
 	"Every project outside this repository that a load can reach, named here so one cannot be
-	 added without saying which group needs it: Bloc for the renderer group, MuTalk for the dev
-	 group, PharoVulkan for the vulkan group, whose three packages name its bindings, its
-	 compiler and its driver. What each one is pinned to, and why, is the test above."
+	 added without saying which group needs it: ArchDoc for the documentation group, which reads
+	 the declarations the font classes carry and draws them, Bloc for the renderer group, MuTalk
+	 for the dev group, PharoVulkan for the vulkan group, whose three packages name its bindings,
+	 its compiler and its driver. Roassal draws the diagram and is not named here: ArchDoc's own
+	 baseline pins the Roassal it was written against, and two pins of one project in one load is
+	 how a Metacello conflict is built. What each one is pinned to, and why, is the test above."
 
 	self
 		assert: (BaselineOfVectorGraphics project version projects collect: [ :each |
 				 each name ]) asSortedCollection asArray
-		equals: #( 'Bloc' 'MuTalk' 'PharoVulkan' )
+		equals: #( 'ArchDoc' 'Bloc' 'MuTalk' 'PharoVulkan' )
 ]
 
 { #category : 'tests' }
@@ -1244,9 +1280,9 @@ VGArchitectureTest >> testTheDocumentationGatePackageStaysInsideItsAllowedDepend
 VGArchitectureTest >> testTheExamplesAndTestsGroupsAreTheUnionOfTheirLayerGroups [
 	"One group per layer for examples and for tests, and the project-wide group is their union.
 	 Stating the union as the layer group names rather than as package names is what keeps the
-	 two from drifting apart when a layer gains a package. Twelve layers: the four packages of
+	 two from drifting apart when a layer gains a package. Thirteen layers: the four packages of
 	 the rasteriser, then the canvas, its renderer, its font layer and its geometry, then
-	 Bloc, the cairo text route, the font engine and Vulkan."
+	 Bloc, the cairo text route, the font engine, Vulkan and the documentation that draws them."
 
 	| groups |
 	groups := Dictionary new.
@@ -1256,11 +1292,11 @@ VGArchitectureTest >> testTheExamplesAndTestsGroupsAreTheUnionOfTheirLayerGroups
 			 'truetype-examples' 'text-examples' 'canvas-examples'
 			 'canvas-raster-examples' 'canvas-fonts-examples' 'canvas-geometry-examples'
 			 'bloc-examples' 'bloc-text-examples' 'fonts-examples'
-			 'reflection-examples' 'vulkan-examples' ).
+			 'reflection-examples' 'vulkan-examples' 'documentation-examples' ).
 	self assert: (groups at: 'tests') equals: #( 'paths-tests' 'engine-tests' 'truetype-tests'
 			 'text-tests' 'canvas-tests' 'canvas-raster-tests' 'canvas-fonts-tests'
 			 'canvas-geometry-tests' 'bloc-tests' 'bloc-text-tests' 'fonts-tests'
-			 'vulkan-tests' ).
+			 'vulkan-tests' 'documentation-tests' ).
 	#( 'examples' 'tests' ) do: [ :name |
 		self
 			assert: (self class packagesLoadedByGroupNamed: name)
