@@ -81,13 +81,14 @@ VGAeTextFont >> cairoMaskAssociations [
 		  ifNotNil: [ :maskAtlas | maskAtlas masks associations asArray ]
 ]
 
-{ #category : 'masks' }
+{ #category : 'accessing' }
 VGAeTextFont >> cairoMaskAtlas [
 	"The glyphs Cairo rasterised for my font, built on the first glyph drawn this way. It is a
 	 second atlas and not the one in the font's `atlas`, because a mask is only usable by the
 	 renderer that made it: these live in externally allocated A8 surfaces Cairo composites
 	 from, those in surfaces of object memory our own rasteriser blits."
 
+	<archCache: #one to: #VGGlyphAtlas>
 	^ cairoMaskAtlas ifNil: [ cairoMaskAtlas := VGGlyphAtlas new ]
 ]
 
@@ -359,6 +360,7 @@ VGAeTextFont >> poseOnAeContext: aContext [
 VGAeTextFont >> scaledFont [
 	"The font model I answer for."
 
+	<archRelation: #one to: #VGScaledFont opposite: #aeTextFont>
 	^ scaledFont
 ]
 

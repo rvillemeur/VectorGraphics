@@ -106,6 +106,11 @@ VGGlyphAtlas >> maskForGlyph: aGlyphIndex phase: aPoint matrix: aMatrix ifAbsent
 
 { #category : 'accessing' }
 VGGlyphAtlas >> masks [
+	"The masks worked out so far, by glyph, phase and matrix. A cache of many: the answer for a
+	 glyph that inks nothing is nil, remembered like any other answer, so a space is looked at
+	 once and never again."
+
+	<archCache: #many to: #VGGlyphMask>
 	^ masks
 ]
 

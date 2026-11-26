@@ -93,5 +93,10 @@ VGGlyphMask >> setSurface: aSurface offset: aPoint [
 
 { #category : 'accessing' }
 VGGlyphMask >> surface [
+	"The A8 surface my glyph was rasterised into. It is this package's own surface class and not
+	 Alexandrie's: a mask of ours lives in object memory, where our rasteriser blits it from,
+	 while the Cairo route keeps its masks in externally allocated Cairo surfaces."
+
+	<archRelation: #one to: #VGCairoImageSurface>
 	^ surface
 ]

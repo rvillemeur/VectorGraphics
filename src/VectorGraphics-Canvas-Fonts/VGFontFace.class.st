@@ -29,6 +29,29 @@ Class {
 	#tag : 'Text'
 }
 
+{ #category : 'architecture' }
+VGFontFace class >> archClassRelations [
+	"What I hold myself: the bundled face, parsed once and kept for the life of the image, so
+	 that every default scaled font shares one glyph cache. resetDefault empties it."
+
+	^ #( #( #defaultFace #cacheOne #VGFontFace nil ) )
+]
+
+{ #category : 'architecture' }
+VGFontFace class >> archRelations [
+	"What an instance of me holds, declared here because I expose no accessor for any of it: a
+	 face answers facts about the font, not the objects it read them from. Each row is the role,
+	 the multiplicity, the target and the opposite, and nil names no opposite.
+	 glyphSource is the reader of the outline table, whichever of the two formats the font
+	 carries; metadata is the parsed name table; outlines is the per-glyph shape cache, filled
+	 by outlineOfGlyphAt: because a page of text asks for the same few glyphs again and again."
+
+	^ #(
+		#( #glyphSource #one #TTGlyphSource nil )
+		#( #metadata #one #TTFontMetadata nil )
+		#( #outlines #cacheMany #VGGlyphOutline nil ) )
+]
+
 { #category : 'default face' }
 VGFontFace class >> default [
 	"The default face, read once and kept, so that a text verb with no font parses the tables of
