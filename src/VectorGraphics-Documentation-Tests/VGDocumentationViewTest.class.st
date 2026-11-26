@@ -86,7 +86,8 @@ VGDocumentationViewTest >> testTheScaledFontObjectGraphTabWalksARealFont [
 	presenter := self
 		presenterOf: VGScaledFontExamples scaledFontAtAReadableSize
 		on: #inspectionObjectGraph:.
-	labels := presenter canvas nodes collect: [ :each | each text ].
+	labels := presenter canvas nodes collect: [ :each |
+		(each shapes detect: [ :shape | shape class = RSLabel ]) text ].
 	self assert: (labels anySatisfy: [ :each | each includesSubstring: 'VGScaledFont' ]).
 	self assert: (labels anySatisfy: [ :each | each includesSubstring: 'VGFontFace' ])
 ]
