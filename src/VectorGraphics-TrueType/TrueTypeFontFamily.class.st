@@ -31,6 +31,17 @@ Class {
 	#tag : 'Fonts'
 }
 
+{ #category : 'architecture' }
+TrueTypeFontFamily class >> archRelations [
+	"What an instance of me holds beyond my superclass's cache of base fonts: one face per
+	 emphasis — plain, bold, italic, bold italic — each one a file the scan met or a description
+	 posed by hand. A scan adds them, so a family just made holds none, and an empty holding of
+	 many is no fault.
+	 My superclass's row is kept, because an instance of mine holds that too."
+
+	^ super archRelations , #( #( #facesByEmphasis #many #TTFamilyFace nil ) )
+]
+
 { #category : 'instance creation' }
 TrueTypeFontFamily class >> baseCatalogueEntry: aCatalogueEntry [
 	^ self new baseCatalogueEntry: aCatalogueEntry

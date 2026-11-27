@@ -61,6 +61,16 @@ FontFamily class >> addFamily: aFontFamily [
 	self availableFamilies at: aFontFamily familyName put: aFontFamily
 ]
 
+{ #category : 'architecture' }
+FontFamily class >> archRelations [
+	"What an instance of me holds in a slot no accessor of mine exposes: the plain font at each
+	 point size that has been asked for, built at the first ask and kept, which is what
+	 clearCache empties. Each row is the role, the multiplicity, the target and the opposite;
+	 nil names no opposite."
+
+	^ #( #( #baseFontBySizes #cacheMany #TrueTypeFont nil ) )
+]
+
 { #category : 'accessing' }
 FontFamily class >> availableFamilies [
 

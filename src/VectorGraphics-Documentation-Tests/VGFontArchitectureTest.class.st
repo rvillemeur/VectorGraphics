@@ -172,7 +172,7 @@ VGFontArchitectureTest >> testTheTrueTypePackageDeclaresEveryHoldingOfItsFourTag
 		byTag at: tag put: (byTag at: tag ifAbsent: [ 0 ]) + 1 ].
 	self
 		assert: byTag
-		equals: (Dictionary newFrom: { 'Reading' -> 18. 'Glyphs' -> 3. 'Fonts' -> 0. 'CFF' -> 1 })
+		equals: (Dictionary newFrom: { 'Reading' -> 18. 'Glyphs' -> 3. 'Fonts' -> 11. 'CFF' -> 1 })
 ]
 
 { #category : 'accessing' }

@@ -33,8 +33,11 @@ TTFamilyFace class >> ttFontDescription: aTTFontDescription [
 
 { #category : 'accessing' }
 TTFamilyFace >> catalogueEntry [
-	"The entry a scan made of me, or nil when I was posed as a parsed description."
+	"The entry a scan made of me, or nil when I was posed as a parsed description.
+	 Declared a cache rather than a holding, because a face holds this one or the description
+	 below it and never needs both: the absence of either says nothing about the face."
 
+	<archCache: #one to: #TTFontCatalogueEntry>
 	^ catalogueEntry
 ]
 
@@ -118,6 +121,7 @@ TTFamilyFace >> ttFontDescription [
 	"My outlines, parsed. A face that came from a catalogue entry reads the bytes here, at the
 	 first ask, and keeps what it read."
 
+	<archCache: #one to: #TTFontDescription>
 	^ ttFontDescription ifNil: [
 		  ttFontDescription := TTFontReader readTTFFrom: catalogueEntry bytes ]
 ]

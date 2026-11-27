@@ -38,6 +38,22 @@ Class {
 	#tag : 'Fonts'
 }
 
+{ #category : 'architecture' }
+TrueTypeFont class >> archRelations [
+	"What an instance of me holds in a slot no accessor of mine exposes. Each row is the role,
+	 the multiplicity, the target and the opposite; nil names no opposite.
+	 ttFontDescription is the parsed font I measure and draw from, given when I was made.
+	 glyphFormsByUtf8 is two hundred and fifty-six slots, one per code point of the first page,
+	 each filled with a rasterised glyph at the first ask — so a cache, and the empty slots are
+	 the glyphs nobody has drawn. derivativeFonts holds the emphasized fonts made from me, and
+	 it is nil in a font that is itself a derivative."
+
+	^ #(
+		#( #ttFontDescription #one #TTFontDescription nil )
+		#( #glyphFormsByUtf8 #cacheMany #FormGlyph nil )
+		#( #derivativeFonts #cacheMany #TrueTypeFont nil ) )
+]
+
 { #category : 'instance creation' }
 TrueTypeFont class >> family: aTrueTypeFontFamily ttFontDescription: aTTFontDescription pointSize: aNumber [
 
@@ -72,7 +88,11 @@ TrueTypeFont >> ascent [
 
 { #category : 'accessing' }
 TrueTypeFont >> baseFont [
+	"The plain font I was emphasized from, or myself when I am that font.
+	 Declared a cache, because the slot is empty in a base font and that says nothing about it:
+	 the emphasized fonts are made from the base one and point back at it."
 
+	<archCache: #one to: #TrueTypeFont>
 	^ baseFont ifNil: [ self ]
 ]
 
@@ -118,7 +138,9 @@ TrueTypeFont >> emphasized: code [
 
 { #category : 'accessing' }
 TrueTypeFont >> family [
+	"The family I belong to, given when I was made."
 
+	<archRelation: #one to: #TrueTypeFontFamily>
 	^ family
 ]
 

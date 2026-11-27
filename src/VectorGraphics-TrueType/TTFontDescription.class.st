@@ -53,6 +53,16 @@ Class {
 	#tag : 'Fonts'
 }
 
+{ #category : 'architecture' }
+TTFontDescription class >> archRelations [
+	"What an instance of me holds in a slot no accessor of mine exposes: the kerning pairs of the
+	 font, read from the kern table. A font that carries no kern table holds none, so the row is
+	 a cache. Each row is the role, the multiplicity, the target and the opposite; nil names no
+	 opposite."
+
+	^ #( #( #kernPairs #cacheMany #TTKernPair nil ) )
+]
+
 { #category : 'constants' }
 TTFontDescription class >> highestCodePointShownInInspector [
 	"The scan the glyph map view runs goes up to here. The map is four levels deep, which covers
