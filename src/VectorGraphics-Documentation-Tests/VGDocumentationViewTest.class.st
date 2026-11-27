@@ -26,6 +26,20 @@ VGDocumentationViewTest >> isArchitectureTabActiveFor: aPackageName [
 ]
 
 { #category : 'running' }
+VGDocumentationViewTest >> isComponentsTabActiveFor: aPackageName [
+	"Ask the gate the way the inspector does, for the components tab this time."
+
+	| context package |
+	package := Smalltalk packageOrganizer packageNamed: aPackageName.
+	context := StInspectionContext new
+		inspectedObject: package;
+		methodSelector: #inspectionComponents:;
+		yourself.
+	package inspectionComponentsContext: context.
+	^ context isActive
+]
+
+{ #category : 'running' }
 VGDocumentationViewTest >> presenterOf: anObject on: aSelector [
 	"Build one inspector tab the way a reader opens it, through the inspection context, which is
 	 what hands the view its presenter builder. Not newInspectionPresenterOnApplication:, which
@@ -64,6 +78,17 @@ VGDocumentationViewTest >> testTheArchitectureTabIsOfferedOnThisProjectsPackages
 ]
 
 { #category : 'tests' }
+VGDocumentationViewTest >> testTheComponentsTabIsOfferedOnThePackagesAMapClaimsAlone [
+	"A package no map claims has no components to show, so the tab is not built for it. The
+	 architecture tab stays wherever it was: the two altitudes sit side by side."
+
+	self assert: (self isComponentsTabActiveFor: 'VectorGraphics-Canvas-Fonts').
+	self assert: (self isComponentsTabActiveFor: 'VectorGraphics-Bloc-Text').
+	self deny: (self isComponentsTabActiveFor: 'VectorGraphics-Engine').
+	self assert: (self isArchitectureTabActiveFor: 'VectorGraphics-Engine')
+]
+
+{ #category : 'tests' }
 VGDocumentationViewTest >> testThePackageArchitectureTabDrawsTheDeclaredFontGraph [
 	"A reader opens the font package and sees its classes and what they hold. The tab is on
 	 Package, so it is reached from the browser without knowing this library exists."
@@ -75,6 +100,17 @@ VGDocumentationViewTest >> testThePackageArchitectureTabDrawsTheDeclaredFontGrap
 	canvas := presenter canvas.
 	self assert: ((canvas nodes collect: [ :each | each model ]) includes: VGScaledFont).
 	self assert: ((canvas lines collect: [ :each | each model label ]) includes: 'fontFace')
+]
+
+{ #category : 'tests' }
+VGDocumentationViewTest >> testThePackageComponentsTabDrawsTheRouteMap [
+	| package presenter boxes |
+	package := Smalltalk packageOrganizer packageNamed: 'VectorGraphics-Canvas-Fonts'.
+	presenter := self presenterOf: package on: #inspectionComponents:.
+	boxes := presenter canvas nodes select: [ :each | each class = RSComposite ].
+	self
+		assert: (boxes collect: [ :each | each model name ]) asArray
+		equals: (VGFontRouteMap new components collect: [ :each | each name ]) asArray
 ]
 
 { #category : 'tests' }

@@ -265,10 +265,11 @@ VGArchitectureTest class >> allowedDependencies [
 			  records and no method of this package names, so the documentation package makes no
 			  reference edge at all. What it must load is another matter, and the baseline says it."
 			'VectorGraphics-Documentation' -> #(  ).
-			'VectorGraphics-Documentation-Examples' -> #( 'VectorGraphics-Canvas-Fonts-Examples' ).
+			'VectorGraphics-Documentation-Examples'
+			-> #( 'VectorGraphics-Canvas-Fonts-Examples' 'VectorGraphics-Documentation' ).
 			'VectorGraphics-Documentation-Tests'
 			-> #( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Fonts-Examples'
-			      'VectorGraphics-Documentation-Examples' ) }
+			      'VectorGraphics-Documentation' 'VectorGraphics-Documentation-Examples' ) }
 ]
 
 { #category : 'layering' }

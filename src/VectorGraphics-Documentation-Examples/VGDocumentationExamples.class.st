@@ -23,6 +23,15 @@ VGDocumentationExamples class >> architectureOfTheFontPackage [
 ]
 
 { #category : 'examples' }
+VGDocumentationExamples class >> fontRouteMap [
+	"The component map of the font route: six parts over the two packages of slice one. Its
+	 diagram tab is the picture that answers the heap of class names."
+
+	<sampleInstance>
+	^ VGFontRouteMap new
+]
+
+{ #category : 'examples' }
 VGDocumentationExamples class >> objectGraphOfAWarmScaledFont [
 	"The graph a reader sees in the Object graph tab, after one run has been measured: the face now
 	 holds an outline per letter of the run, because measuring reads them, while the glyph atlas is

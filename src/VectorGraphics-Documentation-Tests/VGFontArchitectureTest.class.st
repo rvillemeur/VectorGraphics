@@ -83,3 +83,22 @@ VGFontArchitectureTest >> testTheOpenTypeExampleIsTheOnlyExampleThatCannotRun [
 		equals: 1.
 	self assert: (broken allSatisfy: [ :each | self isKnownBrokenExample: each ])
 ]
+
+{ #category : 'tests' }
+VGFontArchitectureTest >> testTheRouteMapClaimsTheFontPackagesAndMapsEveryClassOfThem [
+	"The component map is the altitude a reader meets first, so a class added to the route must be
+	 put in a part of it. The map answers its own faults: a class no part names, a class two parts
+	 name, and a part naming a class the image does not hold."
+
+	| map |
+	map := VGFontRouteMap new.
+	self assert: VGFontRouteMap packageNames asArray equals: self fontPackageNames.
+	self
+		assert: (map unmappedClasses collect: [ :each | each name ]) asArray
+		equals: #().
+	self assert: map ambiguousClasses asArray equals: #().
+	self assert: map unknownClassNames asArray equals: #().
+	self
+		assert: (map findings collect: [ :each | each explanation ]) asArray
+		equals: #()
+]
