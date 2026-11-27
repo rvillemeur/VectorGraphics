@@ -160,7 +160,8 @@ VGFontArchitectureTest >> testTheTrueTypePackageDeclaresEveryHoldingOfItsFourTag
 	 A class-side table is inherited, so one row on TTFontParser is a declaration of every table
 	 parser, which is the truth about them: each one holds the entry it reads from. That is why
 	 the Reading tag counts eighteen for six written rows, and why the CFF tag already counts the
-	 one TTCffTableParser inherits."
+	 one TTCffTableParser inherits. A pragma is read from the methods a class defines itself, so
+	 it is counted once however many subclasses inherit the accessor."
 
 	| byTag |
 	byTag := Dictionary new.
@@ -171,7 +172,7 @@ VGFontArchitectureTest >> testTheTrueTypePackageDeclaresEveryHoldingOfItsFourTag
 		byTag at: tag put: (byTag at: tag ifAbsent: [ 0 ]) + 1 ].
 	self
 		assert: byTag
-		equals: (Dictionary newFrom: { 'Reading' -> 18. 'Glyphs' -> 0. 'Fonts' -> 0. 'CFF' -> 1 })
+		equals: (Dictionary newFrom: { 'Reading' -> 18. 'Glyphs' -> 3. 'Fonts' -> 0. 'CFF' -> 1 })
 ]
 
 { #category : 'accessing' }

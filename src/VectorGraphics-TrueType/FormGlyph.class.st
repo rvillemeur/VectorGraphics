@@ -63,7 +63,10 @@ FormGlyph >> deltaXToCenter: aNumber [
 
 { #category : 'accessing' }
 FormGlyph >> form [
+	"The rasterised glyph, as a Form: what the Morphic route blits. The offsets beside me say
+	 where it is drawn relative to the pen, because the Form holds the ink alone."
 
+	<archRelation: #one to: #Form>
 	^ form
 ]
 

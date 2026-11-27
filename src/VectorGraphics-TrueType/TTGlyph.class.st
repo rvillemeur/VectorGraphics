@@ -141,7 +141,11 @@ TTGlyph >> contourCount [
 
 { #category : 'accessing' }
 TTGlyph >> contours [
+	"The closed outlines of my shape, each one a contour under construction: the points of the
+	 outline and the flag saying which of them is a control point. They keep that name and that
+	 class after the reading, because a glyph is drawn straight from them."
 
+	<archRelation: #many to: #TTContourConstruction>
 	^ contours
 ]
 

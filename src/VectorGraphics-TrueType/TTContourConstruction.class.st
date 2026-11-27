@@ -135,7 +135,10 @@ TTContourConstruction >> pathCommand: anAffineTransformationOrNil [
 
 { #category : 'accessing' }
 TTContourConstruction >> points [
+	"My points, in font units, in one Int16PointArray: a pair of signed sixteen-bit numbers per
+	 point, which is how the glyf table states them and what controlPointFlags is indexed by."
 
+	<archRelation: #one to: #Int16PointArray>
 	^ points
 ]
 
