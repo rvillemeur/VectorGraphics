@@ -3,7 +3,7 @@ The examples of the text glue: the six that need both halves of the project at o
 
 Every one of them exercises a method of VectorGraphics-Text, which is why none of them can live with the canvas examples or with the font examples: `drawString` and `drawUtf8` send the canvas methods, and the four glyph examples go through TTFontDescription >> formGlyphForUtf8Byte1:byte2:byte3:byte4:pixelSize:, which rasterises on a canvas of its own.
 
-`defaultFontPath` and `loadFontFrom:` read the .ttf file, and `newForm` and `newCanvasOn:` build the surface drawn on. They are copies of the helpers in TrueTypeExamples and VectorCanvasExamples rather than sends to them, so that this package needs no examples package of another layer.
+`defaultFontDescription` reads the font every example draws: `defaultFontPath` finds the first .ttf of the directories TTFontCatalogue scans, and `loadFontFrom:` reads it. The path is found and never named, because a path written by hand is a path of one machine. `newForm` and `newCanvasOn:` build the surface drawn on. They are copies of the helpers in TrueTypeExamples and VectorCanvasExamples rather than sends to them, so that this package needs no examples package of another layer.
 
 ## The examples
 
@@ -21,21 +21,42 @@ Class {
 }
 
 { #category : 'private' }
+TextDrawingExamples class >> defaultFontDescription [
+	"The first .ttf installed on this machine, read into a description. Every example of this
+	 package draws it, so the reading is asked for in one place. A machine with no .ttf installed
+	 at all draws no text anywhere, so this says so rather than answering nil: an example
+	 answering nil would show the reader an empty Form and no reason for it."
+
+	^ self loadFontFrom: (self defaultFontPath ifNil: [
+			   self error: 'no .ttf font is installed in the system font directories' ])
+]
+
+{ #category : 'private' }
 TextDrawingExamples class >> defaultFontPath [
-	"Override this or pass a path directly to loadFontFrom:.
-	Set this to the absolute path of any .ttf file on your system."
-	^ '/home/renaud/Downloads/Digital7Mono-Yz9J4.ttf'
+	"The absolute path of the first .ttf file installed on this machine, or nil when it has none.
+	 The directories are the ones the font catalogue scans. A path written by hand here would be a
+	 path of one machine: the examples are read and clicked on every machine that loads the
+	 project, so the file is found rather than named."
+
+	TTFontCatalogue defaultFontDirectories do: [ :each |
+		| directory |
+		directory := each asFileReference.
+		directory exists ifTrue: [
+			directory allFiles
+				detect: [ :file | file basename asLowercase endsWith: '.ttf' ]
+				ifFound: [ :file | ^ file fullName ] ] ].
+	^ nil
 ]
 
 { #category : 'examples' }
 TextDrawingExamples class >> drawString [
 	"Render a Latin string using drawString:from:to:at:font:color:.
-	Requires a TTF font at defaultFontPath.
+	Draws the first .ttf installed on this machine.
 	TextDrawingExamples drawString inspect"
 <sampleInstance>
 	| form canvas font str |
 	font := (TrueTypeFontFamily
-		baseTTFontDescription: (self loadFontFrom: self defaultFontPath))
+		baseTTFontDescription: self defaultFontDescription)
 		atPointSize: 28.
 	form := self newForm.
 	form fillColor: Color white.
@@ -51,12 +72,12 @@ TextDrawingExamples class >> drawString [
 TextDrawingExamples class >> drawUtf8 [
 	"Render pre-encoded UTF-8 bytes using drawUtf8:at:font:color:.
 	Demonstrates multi-byte characters: 'café' encodes é as #[195 169].
-	Requires a TTF font at defaultFontPath.
+	Draws the first .ttf installed on this machine.
 	TextDrawingExamples drawUtf8 inspect"
 <sampleInstance>
 	| form canvas font cafe greeting |
 	font := (TrueTypeFontFamily
-		baseTTFontDescription: (self loadFontFrom: self defaultFontPath))
+		baseTTFontDescription: self defaultFontDescription)
 		atPointSize: 28.
 	form := self newForm.
 	form fillColor: Color white.
@@ -76,7 +97,7 @@ TextDrawingExamples class >> glyphForm [
 	TextDrawingExamples glyphForm inspect"
 <sampleInstance>
 	| font bytes |
-	font := self loadFontFrom: self defaultFontPath.
+	font := self defaultFontDescription.
 	bytes := Character utf8BytesOf: $A codePoint.
 	^ (font
 		formGlyphForUtf8Byte1: (bytes at: 1)
@@ -90,7 +111,7 @@ TextDrawingExamples class >> glyphLarge [
 	TextDrawingExamples glyphLarge inspect"
 <sampleInstance>
 	| font bytes |
-	font := self loadFontFrom: self defaultFontPath.
+	font := self defaultFontDescription.
 	bytes := Character utf8BytesOf: $Q codePoint.
 	^ (font
 		formGlyphForUtf8Byte1: (bytes at: 1)
@@ -104,7 +125,7 @@ TextDrawingExamples class >> glyphSmall [
 	TextDrawingExamples glyphSmall inspect"
 <sampleInstance>
 	| font bytes |
-	font := self loadFontFrom: self defaultFontPath.
+	font := self defaultFontDescription.
 	bytes := Character utf8BytesOf: $g codePoint.
 	^ (font
 		formGlyphForUtf8Byte1: (bytes at: 1)
@@ -126,7 +147,7 @@ TextDrawingExamples class >> multipleGlyphs [
 	TextDrawingExamples multipleGlyphs inspect"
 <sampleInstance>
 	| font form x glyphForm bytes |
-	font := self loadFontFrom: self defaultFontPath.
+	font := self defaultFontDescription.
 	form := Form extent: 400 @ 120 depth: 32.
 	form fillColor: Color white.
 	x := 10.

@@ -43,19 +43,15 @@ VGCairoTextTest class >> oneStepOfTheFixedPointGrid [
 	^ 1 / 256
 ]
 
-{ #category : 'private' }
+{ #category : 'helpers' }
 VGCairoTextTest >> anInstalledOpenTypeFontFile [
-	"The first .otf file this machine's font directory holds, or nil when it holds none. A
-	 gate built on a real font says nothing on a machine that has no such font. The directory
-	 is the one VGScaledFontExamples reads, because allowedDependencies forbids this package
-	 from naming the catalogue that knows all five of them."
+	"The first installed OpenType font this layer can read into a face, or nil when this machine
+	 has none. A gate built on a real font says nothing on a machine that has no such font, and
+	 the extension alone is not the question: a .otf holding CFF2 carries no outlines this
+	 reader reads. The file is the one the examples of this layer show, so the scan and the
+	 judgement of what is readable live in one place."
 
-	| directory |
-	directory := VGScaledFontExamples fontDirectory.
-	directory exists ifFalse: [ ^ nil ].
-	directory allFiles do: [ :file |
-		(file basename asLowercase endsWith: '.otf') ifTrue: [ ^ file ] ].
-	^ nil
+	^ VGScaledFontExamples openTypeFontFile
 ]
 
 { #category : 'helpers' }
@@ -648,7 +644,7 @@ VGCairoTextTest >> testAnInstalledOpenTypeFontDrawsItsGlyphs [
 
 	| file face outline |
 	file := self anInstalledOpenTypeFontFile.
-	file ifNil: [ ^ self skip: 'this machine has no .otf font installed' ].
+	file ifNil: [ ^ self skip: TTInstalledFonts noCffFontInstalledReason ].
 	face := VGFontFace newForBytes: file binaryReadStream upToEnd.
 	outline := face outlineOfGlyphAt: (face glyphIndexForCodePoint: $a codePoint).
 	self deny: outline contours isEmpty description: file basename , ' draws no a'.

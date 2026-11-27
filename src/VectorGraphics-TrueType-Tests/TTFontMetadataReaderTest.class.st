@@ -15,14 +15,11 @@ Class {
 
 { #category : 'private' }
 TTFontMetadataReaderTest >> anInstalledOpenTypeFontFile [
-	"The first .otf file the font directories of this platform hold, or nil when they hold
-	 none. A gate built on a real font says nothing on a machine that has no such font."
+	"The first installed font this reader can read the outlines of, or nil when this machine has
+	 none. A gate built on a real font says nothing on a machine that has no such font, and the
+	 extension alone is not the question: a .otf holding CFF2 is a font this reader refuses."
 
-	TTFontCatalogue defaultFontDirectories do: [ :directory |
-		directory exists ifTrue: [
-			directory allFiles do: [ :file |
-				(file basename asLowercase endsWith: '.otf') ifTrue: [ ^ file ] ] ] ].
-	^ nil
+	^ TTInstalledFonts openTypeFontFile
 ]
 
 { #category : 'tests' }
@@ -213,12 +210,12 @@ TTFontMetadataReaderTest >> testAWeightClassOfZeroFallsBackToMacStyle [
 { #category : 'tests' }
 TTFontMetadataReaderTest >> testAnInstalledOpenTypeFontIsNamedAndNotRejected [
 	"A gate on a real file: a font nobody wrote for this suite is read through the stream door,
-	 named, and not rejected. The fixtures say what the reader does with bytes of our own; this
-	 says it holds for the OpenType fonts of this machine."
+	named, and not rejected. The fixtures say what the reader does with bytes of our own; this
+	says it holds for the OpenType fonts of this machine."
 
 	| file metadata |
 	file := self anInstalledOpenTypeFontFile.
-	file ifNil: [ ^ self skip: 'this machine has no .otf font installed' ].
+	file ifNil: [ ^ self skip: TTInstalledFonts noCffFontInstalledReason ].
 	metadata := file binaryReadStreamDo: [ :stream |
 		            TTFontMetadataReader readStream: stream ].
 	self

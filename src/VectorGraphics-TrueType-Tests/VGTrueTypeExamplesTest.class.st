@@ -52,6 +52,16 @@ VGTrueTypeExamplesTest >> exampleMethods [
 		  each selector beginsWith: self class windowExamplePrefix ]
 ]
 
+{ #category : 'accessing' }
+VGTrueTypeExamplesTest >> mayAnswerNil: aMethod [
+	"Whether this example is allowed to answer nil. An example marked
+	 <needsAFontThisMachineMayLack:> draws on a font the machine running the suite may not have
+	 installed, and nil is then the honest answer rather than a broken example. The pragma
+	 carries what to install, so the fact is stated by the example and nowhere else."
+
+	^ aMethod hasPragmaNamed: #needsAFontThisMachineMayLack:
+]
+
 { #category : 'tests' }
 VGTrueTypeExamplesTest >> testAKeptPathThatNoLongerNamesAFileIsFoundAgain [
 	"The kept path outlives what it names: a font is uninstalled, or the image file itself is
@@ -62,6 +72,23 @@ VGTrueTypeExamplesTest >> testAKeptPathThatNoLongerNamesAFileIsFoundAgain [
 	found := TrueTypeExamples defaultFontPath.
 	TrueTypeExamples defaultFontPath: '/no/such/directory/NoSuchFont.ttf'.
 	self assert: TrueTypeExamples defaultFontPath equals: found
+]
+
+{ #category : 'tests' }
+VGTrueTypeExamplesTest >> testAnExampleThatNeedsAFontThisMachineMayLackSaysWhichFontToInstall [
+	"The pragma that lets an example answer nil is also the only place a reader is told what to
+	 install, so an empty reason would make the gates silent for nothing. Two examples of the
+	 reader carry it today: the CFF glyph source and the format 12 character map."
+
+	| marked |
+	marked := self allExampleMethods select: [ :each | self mayAnswerNil: each ].
+	self
+		assert: (marked collect: [ :each | each selector ]) asSortedCollection asArray
+		equals: #( #cffGlyphSource #characterMapOfAFormatTwelveFont ).
+	marked do: [ :each |
+		self
+			deny: (each pragmaAt: #needsAFontThisMachineMayLack:) arguments first trimBoth isEmpty
+			description: each selector , ' says nothing about the font it needs' ]
 ]
 
 { #category : 'tests' }
@@ -97,7 +124,8 @@ VGTrueTypeExamplesTest >> testEveryExampleHolderHasAComment [
 VGTrueTypeExamplesTest >> testEveryExampleRebuildsItsObject [
 	"An example must answer a fresh object each call, or inspecting one would show state another
 	inspection left behind. A class is its own single instance, so an example that answers a
-	class is exempt."
+	class is exempt, and so is one marked <needsAFontThisMachineMayLack:> that answered nil
+	because the font it reads is not installed."
 
 	| shared |
 	shared := OrderedCollection new.
@@ -106,7 +134,9 @@ VGTrueTypeExamplesTest >> testEveryExampleRebuildsItsObject [
 		holder := each methodClass instanceSide.
 		first := holder perform: each selector.
 		second := holder perform: each selector.
-		(first isClass not and: [ first == second ]) ifTrue: [ shared add: each selector ] ].
+		(first isNil and: [ self mayAnswerNil: each ]) ifFalse: [
+			(first isClass not and: [ first == second ]) ifTrue: [
+				shared add: each selector ] ] ].
 	self
 		assert: shared isEmpty
 		description: 'these examples answer the same object twice: ' , shared asArray printString
@@ -115,14 +145,17 @@ VGTrueTypeExamplesTest >> testEveryExampleRebuildsItsObject [
 { #category : 'tests' }
 VGTrueTypeExamplesTest >> testEveryExampleRunsAndAnswersSomething [
 	"An example asserts nothing itself, so this is what keeps them working: each one must run
-	from a cold start and answer something for the browser to show."
+	from a cold start and answer something for the browser to show. An example marked
+	<needsAFontThisMachineMayLack:> may answer nil, since the font it reads is not in this
+	repository and the machine may not have it."
 
 	| broken |
 	broken := OrderedCollection new.
 	self exampleMethods do: [ :each |
 		[
-		(each methodClass instanceSide perform: each selector)
-			ifNil: [ broken add: each selector -> 'answered nil' ] ]
+		(each methodClass instanceSide perform: each selector) ifNil: [
+			(self mayAnswerNil: each) ifFalse: [
+				broken add: each selector -> 'answered nil' ] ] ]
 			on: Error
 			do: [ :error |
 				broken add:
@@ -206,6 +239,25 @@ VGTrueTypeExamplesTest >> testTheDefaultFontPathIsFoundOnceAndForgottenOnDemand 
 	third := TrueTypeExamples defaultFontPath.
 	self assert: third equals: first.
 	self deny: third == first
+]
+
+{ #category : 'tests' }
+VGTrueTypeExamplesTest >> testTheOpenTypeFontOfTheExamplesCarriesCharstringsThisReaderCanRead [
+	"openTypeFontPath means a font whose outlines this reader can read, which is a CFF table of
+	 Type 2 charstrings. A .otf file can hold CFF2 instead, a format this reader does not read,
+	 and answering such a file made every CFF example fail on the missing table rather than on
+	 what the example means to show. Nil is a correct answer: a machine may hold no such font."
+
+	| path directory |
+	path := TrueTypeExamples openTypeFontPath.
+	path ifNil: [
+		^ self skip:
+			  'no installed font holds a CFF table; carry one in the repository to run this' ].
+	directory := path asFileReference binaryReadStreamDo: [ :stream |
+		             TTFontReader buildTableDirectory: stream contents offset: 0 ].
+	self
+		assert: (directory includesKey: 'CFF ')
+		description: path , ' has no CFF table'
 ]
 
 { #category : 'accessing' }

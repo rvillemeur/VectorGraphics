@@ -27,6 +27,17 @@ VGScaledFontExamples class >> atlasFilledByARunDrawnTwice [
 ]
 
 { #category : 'fixture' }
+VGScaledFontExamples class >> canReadAFaceOf: aFileReference [
+	"Whether this file reads into a face. A font of a format the reader refuses is a no and not a
+	 failure: the question asked is which fonts of a machine the examples can show, and the font
+	 directory holds collections, bitmap fonts and CFF2 files too."
+
+	^ [ (VGFontFace newForFile: aFileReference) notNil ]
+		  on: Error
+		  do: [ :error | false ]
+]
+
+{ #category : 'fixture' }
 VGScaledFontExamples class >> candidateFontFileNames [
 	"Plain TrueType faces that carry glyph outlines in a glyf table, in the order they are
 	 preferred. One of them is on almost any desktop; a font with its outlines in a CFF table
@@ -97,12 +108,14 @@ VGScaledFontExamples class >> fontFaceOfAnOpenTypeFont [
 	 written: the same glyph count, the same metrics, the same outlines. Its glyphs draw
 	 themselves the first time one is asked for its shape, so opening the face reads no
 	 charstring at all.
+	 Answers nil on a machine whose .otf files are all CFF2, a format the reader does not read.
 	 Open the Glyphs tab and click a glyph to see one drawn.
 
 	 VGScaledFontExamples fontFaceOfAnOpenTypeFont inspect"
 
 	<sampleInstance>
-	^ VGFontFace newForFile: self openTypeFontFile
+	<needsAFontThisMachineMayLack: 'an installed font with a CFF table of Type 2 charstrings'>
+	^ self openTypeFontFile ifNotNil: [ :file | VGFontFace newForFile: file ]
 ]
 
 { #category : 'fixture' }
@@ -137,19 +150,18 @@ VGScaledFontExamples class >> glyphMaskOfOneLetter [
 	^ font atlas masks values detect: [ :each | each notNil ]
 ]
 
-{ #category : 'private' }
+{ #category : 'fixture' }
 VGScaledFontExamples class >> openTypeFontFile [
-	"The first .otf file this machine has, searched for by extension rather than by name: an
-	 OpenType font carries its outlines in a CFF table, and which family a distribution
-	 installs in that format is its own business."
+	"The first installed .otf file this layer can read into a face, or nil when the machine has
+	 none. The extension alone is not the rule: a .otf can hold its outlines in CFF2, a format
+	 the reader does not read, and such a file made the example raise on the missing table
+	 instead of showing a face. This package may not name the reader's table classes, so
+	 building the face is how the question is asked."
 
-	self fontDirectory exists ifFalse: [
-		^ Error signal: 'no font directory at ' , self fontDirectory fullName ].
+	self fontDirectory exists ifFalse: [ ^ nil ].
 	^ (self fontDirectory allChildrenMatching: '*.otf')
-		  detect: [ :each | true ]
-		  ifNone: [
-		  Error signal: 'no OpenType font is installed under '
-			  , self fontDirectory fullName ]
+		  detect: [ :each | self canReadAFaceOf: each ]
+		  ifNone: [ nil ]
 ]
 
 { #category : 'examples' }

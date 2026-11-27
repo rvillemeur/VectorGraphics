@@ -145,16 +145,8 @@ TTFontReaderTest >> testAnInstalledOpenTypeFontIsReadIntoADescription [
 	 on a real file, because the fixtures of this package build glyphs and not whole fonts."
 
 	| file description |
-	file := TTFontCatalogue defaultFontDirectories
-		        inject: nil
-		        into: [ :found :directory |
-			        found ifNil: [
-				        directory exists ifTrue: [
-					        directory allFiles
-						        detect: [ :each |
-						        each basename asLowercase endsWith: '.otf' ]
-						        ifNone: [ nil ] ] ] ].
-	file ifNil: [ ^ self skip: 'this machine has no .otf font installed' ].
+	file := TTInstalledFonts openTypeFontFile.
+	file ifNil: [ ^ self skip: TTInstalledFonts noCffFontInstalledReason ].
 	description := TTFontReader readTTFFrom: file binaryReadStream upToEnd.
 	self assert: description unitsPerEm > 0.
 	self

@@ -135,6 +135,21 @@ VGTextExamplesTest >> testEveryExampleTakesNoArgumentAndIsOnTheClassSide [
 					printString
 ]
 
+{ #category : 'tests' }
+VGTextExamplesTest >> testTheFontTheExamplesReadIsAFileOfThisMachine [
+	"The six examples of this package draw a real font, so the path they read must be a file of
+	 the machine running them and not of the machine they were written on. A hard-coded path
+	 under one developer's home directory breaks every one of them for everybody else."
+
+	| path |
+	path := TextDrawingExamples defaultFontPath.
+	path ifNil: [
+		^ self skip: 'no .ttf font is installed in the system font directories' ].
+	self
+		assert: path asFileReference exists
+		description: path , ' is not a file of this machine'
+]
+
 { #category : 'accessing' }
 VGTextExamplesTest >> windowExampleMethods [
 	"The examples that open a window, which a suite must not run: an error inside one opens a

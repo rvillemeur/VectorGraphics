@@ -136,6 +136,24 @@ VectorGraphicsDocumentationTest >> behaviourNamedBy: aString [
 ]
 
 { #category : 'running' }
+VectorGraphicsDocumentationTest >> breakageOf: aSelector on: aHolder [
+	"How this example is broken, or nil when it runs. An example marked
+	 <needsAFontThisMachineMayLack:> may answer nil: the font it reads is not in this repository
+	 and the machine may not have it installed."
+
+	^ [
+	  (aHolder perform: aSelector)
+		  ifNil: [
+			  (self mayAnswerNil: aHolder class >> aSelector)
+				  ifTrue: [ nil ]
+				  ifFalse: [ aHolder name , ' >> ' , aSelector , ' answers nil' ] ]
+		  ifNotNil: [ nil ] ]
+		  on: Error
+		  do: [ :error |
+		  aHolder name , ' >> ' , aSelector , ' ' , error messageText printString ]
+]
+
+{ #category : 'running' }
 VectorGraphicsDocumentationTest >> buildView: aSelector of: anObject [
 	"Build one inspector view the way the inspector really builds it, through
 	StInspectionContext, so that a view this gate passes is a view a reader can open:
@@ -184,6 +202,14 @@ VectorGraphicsDocumentationTest >> documentedPackages [
 	"Every code package this hierarchy documents; the class side walks the hierarchy for them."
 
 	^ self class documentedPackages
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> exampleHoldersOfThisPackage [
+	"The classes of the sibling examples package that hold at least one <sampleInstance> example."
+
+	^ self examplesPackageUnderTest definedClasses select: [ :each |
+		  (self sampleInstanceSelectorsOf: each) notEmpty ]
 ]
 
 { #category : 'accessing' }
@@ -249,6 +275,17 @@ VectorGraphicsDocumentationTest >> isQualifiedSelectorToken: aToken [
 ]
 
 { #category : 'accessing' }
+VectorGraphicsDocumentationTest >> mayAnswerNil: aMethod [
+	"Whether this example is allowed to answer nil. An example marked
+	 <needsAFontThisMachineMayLack:> reads a font that is not in this repository and that the
+	 machine running the suite may not have installed, so nil is the honest answer there rather
+	 than a broken example. The pragma carries what to install, so the fact is stated by the
+	 example and nowhere else."
+
+	^ aMethod hasPragmaNamed: #needsAFontThisMachineMayLack:
+]
+
+{ #category : 'accessing' }
 VectorGraphicsDocumentationTest >> packageComment [
 	"What a reader sees first when the package is selected in the browser. Pharo keeps it as the
 	 comment of the package manifest class."
@@ -271,6 +308,15 @@ VectorGraphicsDocumentationTest >> qualifiedSelectorSeparator [
 { #category : 'accessing' }
 VectorGraphicsDocumentationTest >> repositoryName [
 	^ 'VectorGraphics'
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> sampleInstanceSelectorsOf: aClass [
+	"The class-side selectors of this class marked <sampleInstance>, which is what makes a method
+	 an example a reader can click."
+
+	^ aClass class selectors select: [ :selector |
+		  (aClass class >> selector) hasPragmaNamed: #sampleInstance ]
 ]
 
 { #category : 'accessing' }
@@ -353,7 +399,7 @@ VectorGraphicsDocumentationTest >> tagNamesOfThePackage [
 { #category : 'tests' }
 VectorGraphicsDocumentationTest >> testEveryClassWithAViewIsFedByAnExampleOfItsOwnKind [
 	self viewSubjects do: [ :pair |
-		| subject holder selector instance |
+		| subject holder selector |
 		subject := pair key.
 		holder := pair value key.
 		selector := pair value value.
@@ -363,10 +409,10 @@ VectorGraphicsDocumentationTest >> testEveryClassWithAViewIsFedByAnExampleOfItsO
 		self
 			assert: ((holder class >> selector) pragmas anySatisfy: [ :each | each selector = #sampleInstance ])
 			description: holder name , ' >> ' , selector , ' is not a sample instance'.
-		instance := holder perform: selector.
-		self
-			assert: (instance isKindOf: subject)
-			description: holder name , ' >> ' , selector , ' does not answer a ' , subject name.
+		(self viewInstanceOf: pair) ifNotNil: [ :instance |
+			self
+				assert: (instance isKindOf: subject)
+				description: holder name , ' >> ' , selector , ' does not answer a ' , subject name ].
 		self
 			assert: (self inspectorViewSelectorsOf: subject) notEmpty
 			description: subject name , ' has no inspector view' ]
@@ -375,10 +421,9 @@ VectorGraphicsDocumentationTest >> testEveryClassWithAViewIsFedByAnExampleOfItsO
 { #category : 'tests' }
 VectorGraphicsDocumentationTest >> testEveryInspectorViewOfThisPackageBuildsFromItsExample [
 	self viewSubjects do: [ :pair |
-		| instance |
-		instance := pair value key perform: pair value value.
-		(self inspectorViewSelectorsOf: pair key) do: [ :selector |
-			self buildView: selector of: instance ] ]
+		(self viewInstanceOf: pair) ifNotNil: [ :instance |
+			(self inspectorViewSelectorsOf: pair key) do: [ :selector |
+				self buildView: selector of: instance ] ] ]
 ]
 
 { #category : 'tests' }
@@ -432,24 +477,17 @@ VectorGraphicsDocumentationTest >> testEveryNameTheArchitectureDocumentBackticks
 { #category : 'tests' }
 VectorGraphicsDocumentationTest >> testEverySampleInstanceOfThisPackageRuns [
 	"Each example of this package rebuilds its subject on every call and must run with one click.
-	A failure here is a broken example, which a reader meets before any test."
+	 A failure here is a broken example, which a reader meets before any test."
 
 	| holders broken |
-	holders := self examplesPackageUnderTest definedClasses select: [ :each |
-		           each class selectors anySatisfy: [ :selector |
-			           (each class >> selector) pragmas anySatisfy: [ :pragma |
-				           pragma selector = #sampleInstance ] ] ].
+	holders := self exampleHoldersOfThisPackage.
 	self
 		assert: holders notEmpty
 		description: self examplesPackageUnderTest name , ' holds no example'.
-	broken := OrderedCollection new.
-	holders do: [ :holder |
-		(holder class selectors select: [ :selector |
-			 (holder class >> selector) pragmas anySatisfy: [ :pragma |
-				 pragma selector = #sampleInstance ] ]) do: [ :selector |
-			[ (holder perform: selector) ifNil: [ broken add: holder name , ' >> ' , selector , ' answers nil' ] ]
-				on: Error
-				do: [ :error | broken add: holder name , ' >> ' , selector , ' ' , error messageText printString ] ] ].
+	broken := holders flatCollect: [ :holder |
+		          (self sampleInstanceSelectorsOf: holder) collect: [ :selector |
+			          self breakageOf: selector on: holder ] ].
+	broken := broken reject: [ :each | each isNil ].
 	self assert: broken isEmpty description: broken asArray printString
 ]
 
@@ -493,17 +531,17 @@ VectorGraphicsDocumentationTest >> testNoInspectorViewOfThisPackageChangesWhatIt
 	element after every view of the class has been built."
 
 	self viewSubjects do: [ :pair |
-		| instance before after |
-		instance := pair value key perform: pair value value.
-		before := self stateSnapshotOf: instance.
-		(self inspectorViewSelectorsOf: pair key) do: [ :selector |
-			self buildView: selector of: instance ].
-		after := self stateSnapshotOf: instance.
-		before doWithIndex: [ :value :index |
-			self
-				assert: value = (after at: index)
-				description: pair key name , ' changed instance variable '
-					, (instance class allInstVarNames at: index) , ' while a view was built' ] ]
+		(self viewInstanceOf: pair) ifNotNil: [ :instance |
+			| before after |
+			before := self stateSnapshotOf: instance.
+			(self inspectorViewSelectorsOf: pair key) do: [ :selector |
+				self buildView: selector of: instance ].
+			after := self stateSnapshotOf: instance.
+			before doWithIndex: [ :value :index |
+				self
+					assert: value = (after at: index)
+					description: pair key name , ' changed instance variable '
+						, (instance class allInstVarNames at: index) , ' while a view was built' ] ] ]
 ]
 
 { #category : 'tests - hierarchy' }
@@ -587,6 +625,24 @@ VectorGraphicsDocumentationTest >> testTheTokeniserReadsBackticksOutsideAFenceAn
 	self
 		assert: (self backtickedTokensOf: document) asArray
 		equals: #( 'VectorCanvas' 'TTGlyph' )
+]
+
+{ #category : 'accessing' }
+VectorGraphicsDocumentationTest >> viewInstanceOf: aPair [
+	"The object the view gates read for one entry of viewSubjects, or nil when its example is
+	 marked <needsAFontThisMachineMayLack:> and answered nil. A gate then has nothing to build
+	 and passes over the subject. An example that answers nil without carrying the pragma fails
+	 here instead: nil would otherwise make every view gate pass over a subject in silence."
+
+	| holder selector instance |
+	holder := aPair value key.
+	selector := aPair value value.
+	instance := holder perform: selector.
+	instance ifNil: [
+		self
+			assert: (self mayAnswerNil: holder class >> selector)
+			description: holder name , ' >> ' , selector , ' answers nil' ].
+	^ instance
 ]
 
 { #category : 'accessing' }

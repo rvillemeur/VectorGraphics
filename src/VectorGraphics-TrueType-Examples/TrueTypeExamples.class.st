@@ -146,16 +146,18 @@ TrueTypeExamples class >> cffGlyphRecordNotYetDrawn [
 	^ TTCffGlyph onTable: self cffTableOfATwoGlyphFont index: 2
 ]
 
-{ #category : 'examples' }
+{ #category : 'examples - cff' }
 TrueTypeExamples class >> cffGlyphSource [
 	"The glyph source of a real OpenType font, whose outlines are charstrings in a CFF table
 	 rather than points in glyf. The same factory reads it, so a face cannot tell the two
 	 formats apart, and the Glyphs tab says of every glyph whether its charstring has been
 	 interpreted yet: opening the font interprets none of them.
-	 Answers nil on a machine with no .otf file installed.
+	 Answers nil on a machine with no font carrying a CFF table of Type 2 charstrings. The .otf
+	 files of a distribution can all be CFF2, a format this reader does not read.
 	TrueTypeExamples cffGlyphSource inspect"
 
 	<sampleInstance>
+	<needsAFontThisMachineMayLack: 'an installed font with a CFF table of Type 2 charstrings'>
 	| path |
 	path := self openTypeFontPath.
 	path ifNil: [ ^ nil ].
@@ -223,6 +225,7 @@ TrueTypeExamples class >> characterMapOfAFormatTwelveFont [
 	 TrueTypeExamples characterMapOfAFormatTwelveFont inspect"
 
 	<sampleInstance>
+	<needsAFontThisMachineMayLack: 'DroidSansJapanese.ttf, or another font whose character map is of format 12'>
 	| path directory |
 	"The finder lowercases the name it compares, so the name asked for is lowercase too."
 	path := self installedFontPathEndingWith: 'droidsansjapanese.ttf'.
@@ -338,6 +341,21 @@ TrueTypeExamples class >> findDefaultFontPath [
 	found ifNil: [
 		^ self error: 'no drawable font in the default font directories' ].
 	^ found source fullName
+]
+
+{ #category : 'support' }
+TrueTypeExamples class >> font: aFileReference holdsTableNamed: aTableTag [
+	"Whether this file is an sfnt font carrying this table. Only the offset table and one record
+	 per table are read, not the glyphs. A file that is not a font at all, or one this reader
+	 cannot even index, is a no and not a failure: the question asked is which fonts of a
+	 machine a reader can use, and the directories hold licence files and caches too."
+
+	^ [
+	  (aFileReference binaryReadStreamDo: [ :stream |
+		   TTFontReader buildTableDirectory: stream contents offset: 0 ])
+		  includesKey: aTableTag ]
+		  on: Error
+		  do: [ :error | false ]
 ]
 
 { #category : 'examples' }
@@ -498,15 +516,35 @@ TrueTypeExamples class >> installedFontPathEndingWith: anExtensionString [
 	 or nil when this machine has none. The examples of the reader need a font of a stated
 	 format: .ttf keeps its outlines in glyf, .otf keeps them in a CFF table, and
 	 defaultFontPath answers whichever of the two the preferred families lead to, which on
-	 this machine is a .otf. The directories are the ones the catalogue scans."
+	 this machine is a .otf."
+
+	^ self installedFontPathSuchThat: [ :file |
+		  file basename asLowercase endsWith: anExtensionString ]
+]
+
+{ #category : 'support' }
+TrueTypeExamples class >> installedFontPathEndingWith: anExtensionString holdingTableNamed: aTableTag [
+	"The absolute path of the first installed font named for this format and carrying this table,
+	 or nil when this machine has none. The name narrows the candidates so that the table
+	 directory of every font on the machine need not be read."
+
+	^ self installedFontPathSuchThat: [ :file |
+		  (file basename asLowercase endsWith: anExtensionString) and: [
+			  self font: file holdsTableNamed: aTableTag ] ]
+]
+
+{ #category : 'support' }
+TrueTypeExamples class >> installedFontPathSuchThat: aBlock [
+	"The absolute path of the first installed font file this block accepts, or nil when this
+	 machine has none. The directories are the ones the catalogue scans. Two questions are asked
+	 of a candidate — its name, and the tables it carries — and both walk the same files."
 
 	TTFontCatalogue defaultFontDirectories do: [ :each |
 		| directory |
 		directory := each asFileReference.
 		directory exists ifTrue: [
 			directory allFiles do: [ :file |
-				(file basename asLowercase endsWith: anExtensionString) ifTrue: [
-					^ file fullName ] ] ] ].
+				(aBlock value: file) ifTrue: [ ^ file fullName ] ] ] ].
 	^ nil
 ]
 
@@ -544,9 +582,13 @@ TrueTypeExamples class >> newContourFromAbsolutePoints: anArrayOfPairs [
 
 { #category : 'support' }
 TrueTypeExamples class >> openTypeFontPath [
-	"The path of an installed font whose outlines are charstrings in a CFF table."
+	"The path of an installed font whose outlines are charstrings in a CFF table, or nil when
+	 this machine has none. The extension alone is not the rule: a .otf file can hold CFF2, a
+	 format this reader does not read, and answering such a file made every CFF example fail on
+	 the missing table instead of showing what it means to show. Cantarell-VF.otf, the only .otf
+	 of the machine this was written on, is such a font."
 
-	^ self installedFontPathEndingWith: '.otf'
+	^ self installedFontPathEndingWith: '.otf' holdingTableNamed: 'CFF '
 ]
 
 { #category : 'accessing' }

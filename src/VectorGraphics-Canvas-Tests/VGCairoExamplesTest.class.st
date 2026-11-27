@@ -124,6 +124,17 @@ VGCairoExamplesTest >> exampleSubjects [
 ]
 
 { #category : 'accessing' }
+VGCairoExamplesTest >> mayAnswerNil: aMethod [
+	"Whether this example is allowed to answer nil. An example marked
+	 <needsAFontThisMachineMayLack:> reads a font that is not in this repository and that the
+	 machine running the suite may not have installed, so nil is the honest answer there rather
+	 than a broken example. The pragma carries what to install, so the fact is stated by the
+	 example and nowhere else."
+
+	^ aMethod hasPragmaNamed: #needsAFontThisMachineMayLack:
+]
+
+{ #category : 'accessing' }
 VGCairoExamplesTest >> projectDefines: aCompiledMethodOrClass [
 	"Whether this project wrote the method, or the class, it is asked about: both answer the
 	 package they live in. An example answers an ordinary Pharo object as often as one of ours — a
@@ -192,7 +203,8 @@ VGCairoExamplesTest >> testEveryExampleHolderHasAComment [
 VGCairoExamplesTest >> testEveryExampleRebuildsItsObject [
 	"An example must answer a fresh object each call, or inspecting one would show state another
 	 inspection left behind. A class is its own single instance, so an example that answers a class
-	 is exempt."
+	 is exempt, and so is one marked <needsAFontThisMachineMayLack:> that answered nil because the
+	 font it reads is not installed."
 
 	| shared |
 	shared := OrderedCollection new.
@@ -201,7 +213,9 @@ VGCairoExamplesTest >> testEveryExampleRebuildsItsObject [
 		holder := each methodClass instanceSide.
 		first := holder perform: each selector.
 		second := holder perform: each selector.
-		(first isClass not and: [ first == second ]) ifTrue: [ shared add: each selector ] ].
+		(first isNil and: [ self mayAnswerNil: each ]) ifFalse: [
+			(first isClass not and: [ first == second ]) ifTrue: [
+				shared add: each selector ] ] ].
 	self
 		assert: shared isEmpty
 		description: 'these examples answer the same object twice: ' , shared asArray printString
@@ -209,12 +223,16 @@ VGCairoExamplesTest >> testEveryExampleRebuildsItsObject [
 
 { #category : 'tests' }
 VGCairoExamplesTest >> testEveryExampleRunsAndAnswersSomething [
+	"An example marked <needsAFontThisMachineMayLack:> may answer nil: the font it reads is not
+	 in this repository and the machine may not have it installed."
+
 	| broken |
 	broken := OrderedCollection new.
 	self exampleMethods do: [ :each |
 		[
-		(each methodClass instanceSide perform: each selector)
-			ifNil: [ broken add: each selector -> 'answered nil' ] ]
+		(each methodClass instanceSide perform: each selector) ifNil: [
+			(self mayAnswerNil: each) ifFalse: [
+				broken add: each selector -> 'answered nil' ] ] ]
 			on: Error
 			do: [ :error | broken add: each selector -> (error class name , ': ' , error messageText printString) ] ].
 	self

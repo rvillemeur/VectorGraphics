@@ -252,3 +252,37 @@ route never reaches.
 Each unit is committed from the image through Iceberg at its green step. Documents outside `src/`
 are committed from the host shell *before* any image commit, because an image commit sweeps every
 untracked file in the checkout.
+
+## 10. The fonts this repository does not carry
+
+Two of the examples of the font route read a font that is neither in this repository nor certain to
+be installed on the machine running them. They are parked rather than deleted, and they re-arm by
+themselves on the day the file lands.
+
+What is missing, and what to carry:
+
+- An `.otf` file holding a `CFF ` table of Type 2 charstrings, for the twelve `TTCff…` classes and
+  for the OpenType gates of the reader, of the metadata reader and of the scaled-font layer. The
+  extension is not the rule: the one `.otf` installed on the machine this was written on,
+  `Cantarell-VF.otf`, holds a `CFF2` table and no `CFF ` one, and `CFF2` is a different format this
+  reader does not read.
+- A font whose character map is of format 12, for `TTCharacterMapReader`. `DroidSansJapanese.ttf`
+  is one.
+
+How the absence is stated, in one place each:
+
+- `TrueTypeExamples class >> openTypeFontPath` asks for a `.otf` *holding a `CFF ` table*, by
+  reading the table directory of each candidate. It answers nil when the machine has none.
+- An example that may answer nil carries `<needsAFontThisMachineMayLack: '<what to install>'>`
+  beside its `<sampleInstance>`. The example gates read that pragma and tolerate nil for those
+  methods alone; every other example still has to answer an object, twice, rebuilt. A pragma
+  crosses no package edge, which is why the mechanism is a pragma: the two marked examples sit in
+  packages that may not name each other, nor the test packages that gate them.
+- `TTInstalledFonts class >> noCffFontInstalledReason` holds the one sentence the three machine-font
+  tests skip with: `'no installed font holds a CFF table; carry one in the repository to run this'`.
+- `VGFontArchitectureTest` pins nothing any more. It states that no example of the route raises and
+  that the marked example says which font it needs; the four whitelist methods it used to carry are
+  gone.
+
+When the two files are carried in the repository, the examples read them instead of scanning the
+machine, the three skips become runs, and the pragmas come off. Nothing else has to change.
