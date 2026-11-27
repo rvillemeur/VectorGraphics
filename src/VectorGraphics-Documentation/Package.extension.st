@@ -84,13 +84,11 @@ Package >> inspectionNeighboursContext: aContext [
 
 { #category : '*VectorGraphics-Documentation' }
 Package >> inspectionWhereToStart: aBuilder [
-	"Extension of Pharo's Package: after where the package sits and what its parts are, which of
-	 its classes to read first. The order and the table are ArchDocReadingOrder's, built through
-	 the same builder, so the rows here are the rows a reader meets at every other altitude."
+	"Where a newcomer starts in this package: the classes it defines, weighed and ordered. The
+	 model reads the package, and the graph answers the order itself, so this tab is one line."
 
 	<inspectorPresentationOrder: 95 title: 'Where to start'>
-	^ (ArchDocReadingOrder on: (ArchDocModel onPackage: self) graph)
-		inspectionWhereToStart: aBuilder
+	^ (ArchDocModel onPackage: self) graph inspectionWhereToStart: aBuilder
 ]
 
 { #category : '*VectorGraphics-Documentation' }
