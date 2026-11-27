@@ -202,15 +202,43 @@ Then stop, open the two tabs, and judge whether the picture answers the question
 ## 7. Slice two, once slice one is judged
 
 - Relations on the eight classes of `VectorGraphics-Bloc-Text` and the whole of
-  `VectorGraphics-TrueType`, with a diagram for each package.
+  `VectorGraphics-TrueType`, with a diagram for each package. *Done* — the Bloc side in one commit,
+  the reader one commit per tag, Reading, Glyphs, Fonts and CFF.
 - `ManifestVectorGraphicsBlocText` and `ManifestVectorGraphicsBlocFontEngine`, their class comments
   holding the architecture of the route in Microdown, plus `archDocEntryPoints` and
-  `archDocForbiddenDependencies` on the manifest of `VectorGraphics-Canvas-Fonts`.
+  `archDocForbiddenDependencies` on the manifest of `VectorGraphics-Canvas-Fonts`. *Done, except
+  the forbidden dependencies*, which were cut from the slice when it was agreed: the dependency
+  table in `VGArchitectureTest class >> allowedDependencies` already states every edge of this
+  project and enforces it, so declaring the same rule a second time on a manifest buys a reader
+  nothing and gives the two statements room to disagree. The entry points went on all four
+  manifests of the route rather than on Canvas-Fonts alone, since a reader asks the same question
+  of every package and silence reads as an oversight.
 - AlgoTrace, `AlgoMetaLinkRecorder`, the declared route list, the recorded trace fixture, and the
   *Route* tab that shows the hand-offs in order — extending the `inspectorRoute:` view that
-  `VGFontEngine class` already carries.
+  `VGFontEngine class` already carries. *Deferred by agreement*, as its own slice: it is a
+  recorder of a live run rather than a reading of declarations, and the declarations were worth
+  judging first.
 - The pointers in `doc/ARCHITECTURE.md`, which today states that the canvas layer is deliberately
-  not described there, and in `README.md` beside the `load: 'fonts'` recipe.
+  not described there, and in `README.md` beside the `load: 'fonts'` recipe. *Done* — section 14 of
+  the first and a *Reading the font route* section in the second, plus the rows the packages and
+  groups tables of `README.md` were missing.
+
+Three facts the slice turned up, each worth its own decision:
+
+- `VGAeTextContext >> ownTextFont` is declared a cache, by this project's reading of the word: a
+  holding whose absence in a live object means nothing. It is nil for the whole life of a context
+  that a real Alexandrie font is posed on, and that route never reads it.
+- `VectorGraphics-Documentation-Examples` was walking a live `VGFontManager`, which is an edge to
+  `VectorGraphics-Bloc-Text` that neither the dependency table nor the baseline granted. Both now
+  state it, and the baseline requires the package for the documentation itself as well, because the
+  *Object graph* tab is an extension installed on that class and an extension of an absent class is
+  dropped at load.
+- The one `.otf` installed on this machine, `Cantarell-VF.otf`, holds a `CFF2` table and no `CFF `
+  one. Every OpenType failure of the suite is that: `VGScaledFontExamples class >>
+  fontFaceOfAnOpenTypeFont`, `TrueTypeExamples class >> cffGlyphSource`, three failures and five
+  errors in `VectorGraphics-TrueType-Tests` and one error in `VectorGraphics-Canvas-Fonts-Tests`.
+  Reading `CFF2`, or testing OpenType against a font the project carries, is the next decision on
+  the reader and not part of this documentation work.
 
 ## 8. Out of scope
 
