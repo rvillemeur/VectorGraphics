@@ -19,7 +19,7 @@ Class {
 	#tag : 'Tests'
 }
 
-{ #category : 'accessing' }
+{ #category : 'layering' }
 VGArchitectureTest class >> allowedDependencies [
 	"The outgoing package references each package of this project may make, keyed by package
 	 name. This table is the agreement: a package missing from it is one nobody has placed in
@@ -263,10 +263,15 @@ VGArchitectureTest class >> allowedDependencies [
 			  this project, to ArchDoc and Roassal, are the baseline's business and are named there."
 			"The tabs are extension methods on a Package and on VGScaledFont, which the organiser
 			  records and no method of this package names, so the documentation package makes no
-			  reference edge at all. What it must load is another matter, and the baseline says it."
+			  reference edge at all. What it must load is another matter, and the baseline says it.
+			  The examples do make one: the object graph of the Bloc side is walked from a real
+			  VGFontManager, which is a class of VectorGraphics-Bloc-Text, so that edge is granted
+			  here and required in the baseline. A documentation package that draws the font route
+			  without the half where FreeType disappears would draw the lesser half."
 			'VectorGraphics-Documentation' -> #(  ).
 			'VectorGraphics-Documentation-Examples'
-			-> #( 'VectorGraphics-Canvas-Fonts-Examples' 'VectorGraphics-Documentation' ).
+			-> #( 'VectorGraphics-Bloc-Text' 'VectorGraphics-Canvas-Fonts-Examples'
+			      'VectorGraphics-Documentation' ).
 			'VectorGraphics-Documentation-Tests'
 			-> #( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Canvas-Fonts-Examples'
 			      'VectorGraphics-Documentation' 'VectorGraphics-Documentation-Examples' ) }

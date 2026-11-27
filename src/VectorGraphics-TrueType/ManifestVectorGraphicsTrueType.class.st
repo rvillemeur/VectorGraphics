@@ -27,3 +27,14 @@ Class {
 	#package : 'VectorGraphics-TrueType',
 	#tag : 'Manifest'
 }
+
+{ #category : 'architecture' }
+ManifestVectorGraphicsTrueType class >> archDocEntryPoints [
+	"Where a reader of this package starts, in the order to read them, which is the prose of my
+	 comment said in a form a tool can read. Forty-four classes are too many to meet at once:
+	 the family is what a caller asks for a font by name, the reader is what turns bytes into a
+	 description, the description is what the rest of the project draws from, and the glyph is
+	 the one object a reader must understand before any table parser makes sense."
+
+	^ #( #FontFamily #TTFontReader #TTFontDescription #TTGlyph )
+]

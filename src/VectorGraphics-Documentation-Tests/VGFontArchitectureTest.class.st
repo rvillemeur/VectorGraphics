@@ -29,6 +29,16 @@ VGFontArchitectureTest >> fontPackageNames [
 	^ #( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Bloc-Text' )
 ]
 
+{ #category : 'accessing' }
+VGFontArchitectureTest >> fontRoutePackageNames [
+	"Every package of the font work, the reader included: the four whose manifests must say where
+	 a reader starts. It is held apart from fontPackageNames, which is what the route map claims,
+	 and from trueTypePackageName, which is the reader alone."
+
+	^ self fontPackageNames
+		, { 'VectorGraphics-Bloc-FontEngine'. self trueTypePackageName }
+]
+
 { #category : 'private' }
 VGFontArchitectureTest >> isKnownBrokenExample: aFinding [
 	"One example of the font package cannot run in an image whose fonts carry no CFF table, which
@@ -88,6 +98,24 @@ VGFontArchitectureTest >> testEveryDeclarationOfTheTrueTypePackageResolvesAndAgr
 	self
 		assert: (findings collect: [ :each | each explanation ]) asArray
 		equals: #()
+]
+
+{ #category : 'tests' }
+VGFontArchitectureTest >> testEveryPackageOfTheFontRouteSaysWhereAReaderStarts [
+	"A diagram of seventeen boxes says what exists and not what to read first, and the formula
+	 that orders them knows nothing of intention. So each manifest of the route declares its own
+	 entry points, and this gate says that none of the four is silent and that every name
+	 declared is a class of the package declaring it."
+
+	self fontRoutePackageNames do: [ :each |
+		| model |
+		model := ArchDocModel onPackageNamed: each.
+		self
+			deny: model entryPointNames isEmpty
+			description: each , ' declares no entry point'.
+		self
+			assert: (model entryPointClasses collect: [ :class | class name ]) asArray
+			equals: (model entryPointNames collect: [ :name | name asString ]) asArray ]
 ]
 
 { #category : 'tests' }

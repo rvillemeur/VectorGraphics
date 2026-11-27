@@ -33,3 +33,13 @@ Class {
 	#package : 'VectorGraphics-Canvas-Fonts',
 	#tag : 'Manifest'
 }
+
+{ #category : 'architecture' }
+ManifestVectorGraphicsCanvasFonts class >> archDocEntryPoints [
+	"Where a reader of this package starts, in the order to read them, which is the prose of my
+	 comment said in a form a tool can read. The face is a font file in the image, the scaled
+	 font is that face at a size under a matrix, and the atlas is what keeps a glyph from being
+	 rasterised twice."
+
+	^ #( #VGFontFace #VGScaledFont #VGGlyphAtlas )
+]

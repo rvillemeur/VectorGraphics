@@ -197,16 +197,22 @@ BaselineOfVectorGraphics >> declareDocumentationPackagesOn: spec [
 	 ArchDoc and no Roassal in the image.
 	 Its requires are not reference edges and so cannot appear in VGArchitectureTest class >>
 	 allowedDependencies, which reads what a method names: a tab installed on a class of the font
-	 package needs that package loaded, and the gate needs the package whose tabs it builds."
+	 package needs that package loaded, and the gate needs the package whose tabs it builds.
+	 Bloc-Text is required twice over: the object graph tab is installed on VGFontManager, which
+	 is a class of that package, and an extension of a class the image has not got is dropped at
+	 load with a Monticello warning rather than an error. The examples name that class as well,
+	 which is the one documentation edge VGArchitectureTest class >> allowedDependencies grants."
 
 	spec
 		package: 'VectorGraphics-Documentation'
 		with: [
-			spec requires: #( 'VectorGraphics-Canvas-Fonts' 'ArchDoc' ) ];
+			spec requires:
+					#( 'VectorGraphics-Canvas-Fonts' 'VectorGraphics-Bloc-Text' 'ArchDoc' ) ];
 		package: 'VectorGraphics-Documentation-Examples'
 		with: [
 			spec requires:
-					#( 'VectorGraphics-Documentation' 'VectorGraphics-Canvas-Fonts-Examples'
+					#( 'VectorGraphics-Documentation'
+					   'VectorGraphics-Canvas-Fonts-Examples' 'VectorGraphics-Bloc-Text'
 					   'ArchDoc' ) ];
 		package: 'VectorGraphics-Documentation-Tests'
 		with: [
