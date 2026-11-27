@@ -32,11 +32,11 @@ Package >> inspectionArchitecture: aBuilder [
 
 { #category : '*VectorGraphics-Documentation' }
 Package >> inspectionArchitectureContext: aContext [
-	"Extension of Pharo's Package: offer the tab on this project's packages alone. Deciding by
-	 reading a package's declarations would cost a scan of every method of every package a reader
-	 opens, and this package is only entitled to answer for its own project anyway."
+	"Extension of Pharo's Package: this project's packages alone. Deciding by reading a package's
+	 declarations would cost a scan of every method of every package a reader opens, and this
+	 package is only entitled to answer for its own project anyway."
 
-	^ aContext active: (self name beginsWith: VGDocumentation packagePrefix)
+	^ aContext active: self isDocumentedByThisProject
 ]
 
 { #category : '*VectorGraphics-Documentation' }
@@ -75,9 +75,37 @@ Package >> inspectionNeighbours: aBuilder [
 
 { #category : '*VectorGraphics-Documentation' }
 Package >> inspectionNeighboursContext: aContext [
-	"Extension of Pharo's Package: offer the tab on this project's packages alone, the same rule
-	 the architecture tab is gated by. Drawing another project would claim to speak for code
-	 this one does not own."
+	"Extension of Pharo's Package: this project's packages alone, the same rule the architecture
+	 tab is gated by. Drawing another project would claim to speak for code this one does not
+	 own."
 
-	^ aContext active: (self name beginsWith: VGDocumentation packagePrefix)
+	^ aContext active: self isDocumentedByThisProject
+]
+
+{ #category : '*VectorGraphics-Documentation' }
+Package >> inspectionWhereToStart: aBuilder [
+	"Extension of Pharo's Package: after where the package sits and what its parts are, which of
+	 its classes to read first. The order and the table are ArchDocReadingOrder's, built through
+	 the same builder, so the rows here are the rows a reader meets at every other altitude."
+
+	<inspectorPresentationOrder: 95 title: 'Where to start'>
+	^ (ArchDocReadingOrder on: (ArchDocModel onPackage: self) graph)
+		inspectionWhereToStart: aBuilder
+]
+
+{ #category : '*VectorGraphics-Documentation' }
+Package >> inspectionWhereToStartContext: aContext [
+	"Extension of Pharo's Package: this project's packages alone."
+
+	^ aContext active: self isDocumentedByThisProject
+]
+
+{ #category : '*VectorGraphics-Documentation' }
+Package >> isDocumentedByThisProject [
+	"Extension of Pharo's Package: whether this documentation package is entitled to answer for
+	 me. Three tabs are gated by this one rule — reading another project's layering would cost a
+	 scan of every method of every package a reader opens, and would claim to speak for code
+	 this project does not own."
+
+	^ self name beginsWith: VGDocumentation packagePrefix
 ]

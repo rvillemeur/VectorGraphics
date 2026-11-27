@@ -54,6 +54,20 @@ VGDocumentationViewTest >> isNeighboursTabActiveFor: aPackageName [
 ]
 
 { #category : 'running' }
+VGDocumentationViewTest >> isWhereToStartTabActiveFor: aPackageName [
+	"Ask the gate the way the inspector does, for the where-to-start tab this time."
+
+	| context package |
+	package := Smalltalk packageOrganizer packageNamed: aPackageName.
+	context := StInspectionContext new
+		inspectedObject: package;
+		methodSelector: #inspectionWhereToStart:;
+		yourself.
+	package inspectionWhereToStartContext: context.
+	^ context isActive
+]
+
+{ #category : 'running' }
 VGDocumentationViewTest >> presenterOf: anObject on: aSelector [
 	"Build one inspector tab the way a reader opens it, through the inspection context, which is
 	 what hands the view its presenter builder. Not newInspectionPresenterOnApplication:, which
@@ -167,4 +181,20 @@ VGDocumentationViewTest >> testTheScaledFontObjectGraphTabWalksARealFont [
 		(each shapes detect: [ :shape | shape class = RSLabel ]) text ].
 	self assert: (labels anySatisfy: [ :each | each includesSubstring: 'VGScaledFont' ]).
 	self assert: (labels anySatisfy: [ :each | each includesSubstring: 'VGFontFace' ])
+]
+
+{ #category : 'tests' }
+VGDocumentationViewTest >> testTheWhereToStartTabOrdersTheClassesOfThePackageAndIsOfferedOnThisProjectAlone [
+	"A reader who has seen where the package sits asks which of its classes to read first. The
+	 tab answers the reading order over the package's own class graph, and it is gated by the
+	 same rule as its siblings: this project's packages alone."
+
+	| package presenter order |
+	package := Smalltalk packageOrganizer packageNamed: 'VectorGraphics-Canvas-Fonts'.
+	presenter := self presenterOf: package on: #inspectionWhereToStart:.
+	order := ArchDocReadingOrder on: (ArchDocModel onPackage: package) graph.
+	self assert: presenter items asArray equals: order nodesInOrder.
+	self deny: presenter items isEmpty.
+	self assert: (self isWhereToStartTabActiveFor: 'VectorGraphics-Canvas-Fonts').
+	self deny: (self isWhereToStartTabActiveFor: 'Kernel')
 ]

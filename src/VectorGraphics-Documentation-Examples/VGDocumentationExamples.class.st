@@ -57,3 +57,14 @@ VGDocumentationExamples class >> projectPackageGraph [
 		onProject: package archDocProject
 		focusing: package
 ]
+
+{ #category : 'examples' }
+VGDocumentationExamples class >> readingOrderOfTheFontPackage [
+	"Which class of the font package to read first: the thirteen classes weighed by their source
+	 and by how much of the package reaches them. Open the Where to start tab."
+
+	<sampleInstance>
+	| package |
+	package := Smalltalk packageOrganizer packageNamed: 'VectorGraphics-Canvas-Fonts'.
+	^ ArchDocReadingOrder on: (ArchDocModel onPackage: package) graph
+]
