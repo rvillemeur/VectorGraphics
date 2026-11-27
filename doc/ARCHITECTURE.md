@@ -16,7 +16,8 @@ The code lives in four packages, and each section below names the one it describ
 path commands. `VectorGraphics-Text` is the one package that needs both the rasteriser and the font
 reader, which is why the glue sits in a package of its own: no edge runs from the engine to the
 font code or back. `VGArchitectureTest class >> allowedDependencies` states every edge, and its
-tests hold the statement against what the code really names. Sections 12 and 13 span all four.
+tests hold the statement against what the code really names. Sections 12 and 13 span all four, and
+section 14 says where the same facts are drawn from the code itself.
 
 The canvas above them — `VectorGraphics-Canvas`, `VectorGraphics-Canvas-Raster` and
 `VectorGraphics-Canvas-Fonts`, which stand in for the Cairo layer — is not described here. Each of
@@ -220,7 +221,16 @@ Two details the chain depends on:
 - A composite glyph holds indexes rather than contours until
   `TTGlyph >> replaceIndexesByComponentGlyphsIn:` resolves them, and `TTGlyph >> isComposite`
   answers whether it had any.
-- An OpenType font states its outlines in a `CFF ` table instead of `glyf`, and  `TTFontReader class >> holdsTrueTypeOutlines:` is the one place that decides which route a  file takes. `TTCffTableParser` reads everything the table says about the font, and one  `TTCffGlyph` a glyph interprets its Type 2 charstring the first time somebody asks for its  shape: `TTCffCharstringInterpreter` runs the charstring against `TTCffOutlineBuilder`, a cubic  becomes the quadratics of `TTCffCubic`, and `TTCffContour` segments come out as the contours of  an ordinary `TTGlyph`, whose box is computed from its points because CFF states none. So no  method of `TTGlyph` may read the state of a glyph behind its own accessors, which  `TTGlyphTest >> testOnlyTheGetterOfAnInstanceVariableReadsItDirectly` pins. A CID-keyed font  is rejected with `#cidKeyedFont`, and the CFF2 table of a variable font is not read.
+- An OpenType font states its outlines in a `CFF ` table instead of `glyf`, and
+  `TTFontReader class >> holdsTrueTypeOutlines:` is the one place that decides which route a
+  file takes. `TTCffTableParser` reads everything the table says about the font, and one
+  `TTCffGlyph` a glyph interprets its Type 2 charstring the first time somebody asks for its
+  shape: `TTCffCharstringInterpreter` runs the charstring against `TTCffOutlineBuilder`, a cubic
+  becomes the quadratics of `TTCffCubic`, and `TTCffContour` segments come out as the contours of
+  an ordinary `TTGlyph`, whose box is computed from its points because CFF states none. So no
+  method of `TTGlyph` may read the state of a glyph behind its own accessors, which
+  `TTGlyphTest >> testOnlyTheGetterOfAnInstanceVariableReadsItDirectly` pins. A CID-keyed font
+  is rejected with `#cidKeyedFont`, and the CFF2 table of a variable font is not read.
 
 - The records themselves belong to a glyph source rather than to the face.
   `TTGlyphSource class >> on:count:indexToLocFormat:` asks
@@ -283,7 +293,8 @@ rebuilds its subject every call.
 | `TTGlyph >> inspectorGlyph:` | the same example | the glyph as `VectorCanvas` really fills it |
 | `TTFontDescription >> inspectorGlyphMap:` | `TrueTypeExamples class >> glyphMap` | every code point the font maps, with the record it points at |
 | `TTFontDescription >> inspectorMapDensity:` | the same example | what that map costs in floats and index entries |
-| `TTCffGlyph >> inspectorRecord:` | `TrueTypeExamples class >> cffGlyphRecordNotYetDrawn` | what is known of a lazy glyph, read without drawing it || `TTCffCharstringInterpreter >> inspectorContours:` | `TrueTypeExamples class >> cffGlyphInterpreter` | the contours a Type 2 charstring draws, segment by segment |
+| `TTCffGlyph >> inspectorRecord:` | `TrueTypeExamples class >> cffGlyphRecordNotYetDrawn` | what is known of a lazy glyph, read without drawing it |
+| `TTCffCharstringInterpreter >> inspectorContours:` | `TrueTypeExamples class >> cffGlyphInterpreter` | the contours a Type 2 charstring draws, segment by segment |
 `VectorGraphicsDocumentationTest` holds this document and those artefacts to the code: every name
 written in backticks here must exist, every example must run, every view must build from its
 example, and no view may change what it inspects. It is abstract, and its four concrete
@@ -291,3 +302,29 @@ subclasses — `VGEngineDocumentationTest`, `VGPathsDocumentationTest`,
 `VGTrueTypeDocumentationTest` and `VGTextDocumentationTest` — each name one package, so every
 package's own examples, views and package comment are gated by its own suite, and this document
 is read by all four.
+
+## 14. The same facts, drawn from the code — the documentation group
+
+This document is prose, and prose drifts. The facts of sections 8 to 10 are also declared on the
+classes themselves, as pragmas on the accessors that hold them, and the documentation group draws
+a reader a picture from those declarations rather than from this file:
+
+```smalltalk
+Metacello new
+	baseline: 'VectorGraphics';
+	repository: 'github://rvillemeur/VectorGraphics:main/src';
+	load: 'documentation'.
+```
+
+It installs four tabs on the inspector of every package of this project — *Neighbours*, the project
+with that package filled apart from the rest; *Components*, the six parts of the font route rather
+than its classes; *Architecture*, the classes of the package and what each holds; and *Where to
+start*, those classes in reading order. The entry points a package's manifest declares head that
+last list, in the order they are declared, which is the one place in the documentation where the
+author's intention beats a formula.
+
+Five packages take part: the four of the font route, each declaring its own entry points in a
+class-side `archDocEntryPoints` on its manifest, and the documentation package that reads them.
+The group is not loaded by the default one, and nothing of this project names it, so the pictures
+cost nothing to an image that does not ask for them. The `Reading the font route` section of
+`README.md` says what each tab shows and where the declarations live.

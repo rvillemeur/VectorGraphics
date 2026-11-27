@@ -32,6 +32,7 @@ neither is present. Every layer above them is a group of its own.
 | `VectorGraphics-Vulkan` | The GPU backend: device session, tiled fill, the present host and its SDL2 host |
 | `VectorGraphics-Conformance` | The corpus every backend is compared against: the cases, the ported Alexandrie corpus, the `Form` comparison |
 | `VectorGraphics-Benchmarks` | The frame harness: the drawing kit, the stage benchmark and the device benchmark |
+| `VectorGraphics-Documentation` | The architecture of this project drawn from the code: the inspector tabs installed on Pharo's `Package`, the object graph of a live font or font manager, and `VGFontRouteMap`, the six parts of the font route |
 | `VectorGraphics-Engine-Examples`, `VectorGraphics-Paths-Examples`, `VectorGraphics-TrueType-Examples`, `VectorGraphics-Text-Examples` | One `<sampleInstance>` example per subject of the rasteriser |
 | `VectorGraphics-Canvas-Examples`, `VectorGraphics-Canvas-Raster-Examples`, `VectorGraphics-Canvas-Fonts-Examples`, `VectorGraphics-Canvas-Geometry-Examples`, `VectorGraphics-Reflection-Examples`, `VectorGraphics-Bloc-Examples`, `VectorGraphics-Bloc-Text-Examples`, `VectorGraphics-Bloc-FontEngine-Examples`, `VectorGraphics-Vulkan-Examples` | One `<sampleInstance>` example per subject of the layers above it |
 | `VectorGraphics-Tests` | `VectorGraphicsDocumentationTest`, the abstract documentation gate the four suites below subclass |
@@ -62,6 +63,8 @@ neither is present. Every layer above them is a group of its own.
 | `bloc-text-examples`, `bloc-text-tests` | the examples and the suite of that route |
 | `fonts` | `bloc-text` and the engine that poses it, seven packages: the six of that route and `VectorGraphics-Bloc-FontEngine`, which carries a `postLoadDoIt:`, so the load poses the route itself and leaves nothing to evaluate. `VectorGraphics-Canvas` and its rasteriser stay out of this group too |
 | `fonts-examples`, `fonts-tests` | the example and the suite of the font engine |
+| `documentation` | the package that draws this project's architecture from the declarations its classes carry, with ArchDoc and Roassal. It installs the inspector tabs on every package of the project, and it names `VGFontManager`, so it brings `bloc-text` and Bloc with it |
+| `documentation-examples`, `documentation-tests` | the examples that open each picture with one click, and the gate that holds them to the code |
 | `vulkan` | `core`, `VectorGraphics-Vulkan` and PharoVulkan from `github://rvillemeur/PharoVulkan:main/src`, whose `default` group the three Vulkan packages require. The machine needs `libvulkan.so.1` and a driver; nothing else of this project does |
 | `vulkan-examples`, `vulkan-tests` | the examples and the suites of the GPU backend |
 | `conformance` | the corpus alone. It names the canvas and no test package, so a comparison can be drawn with no suite loaded |
@@ -183,6 +186,43 @@ say so, rather than keep FreeType and look as though it had switched.
 To draw with the software rasteriser instead of Cairo, and keep FreeType for the glyphs, load
 `bloc` and pose `VGRenderer` as the section above shows. The two are separate choices: `fonts`
 changes where a glyph comes from, `bloc` changes what rasterises it.
+
+## Reading the font route
+
+The route is documented from the code itself, not from a file that drifts from it. Each class of it
+declares what it holds as a pragma on its accessor, each manifest declares where a reader starts,
+and the pictures a reader opens are drawn from those declarations:
+
+```smalltalk
+Metacello new
+	baseline: 'VectorGraphics';
+	repository: 'github://rvillemeur/VectorGraphics:main/src';
+	load: 'documentation'.
+```
+
+That group brings `VectorGraphics-Documentation`, ArchDoc and Roassal, and adds four tabs to the
+inspector of every package of this project:
+
+- *Neighbours* — the whole project with this package filled apart from the rest, a forbidden arrow
+  drawn in red.
+- *Components* — the six parts of the font route rather than its classes, `The face`,
+  `The scaled font`, `The glyph cache`, `The measurements`, `The Bloc seat` and `The Cairo route`,
+  each opening on its own diagram. `VGFontRouteMap` declares them.
+- *Architecture* — the classes of the package and what each holds, read from the pragmas.
+- *Where to start* — the classes in reading order, with the ones the package's manifest declares as
+  entry points at the head of the list and marked as declared.
+
+`ManifestVectorGraphicsCanvasFonts class >> archDocEntryPoints` is one such declaration: a manifest
+of the route answers the three or four classes to read first, in the order to read them, and
+`VGFontArchitectureTest` holds every manifest of the route to it — no package of the route may be
+silent, and no name declared may be absent from the package declaring it.
+
+A fifth tab, *Object graph*, is installed on `VGScaledFont` and on `VGFontManager`. It walks a live
+font or a live manager and shows what it holds at this moment, which is not what the declarations
+say it may hold: a manager nobody has drawn with keeps no face at all.
+
+Sections 8 to 10 of `doc/ARCHITECTURE.md` describe the chain from a character to a glyph in prose,
+and `VGDocumentationExamples` opens each of these pictures with one click from the browser.
 
 ## Using the layer directly
 
