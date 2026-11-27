@@ -88,8 +88,12 @@ VGAeTextContext >> glyphExtentsThroughCairoOf: aGlyphArray size: aNumberOfGlyphs
 { #category : 'accessing' }
 VGAeTextContext >> ownTextFont [
 	"The adapter of one of our scaled fonts, posed on me, nil while a real Alexandrie font is
-	 posed."
+	 posed.
+	 Declared as a cache and not as a structural holding, because the diagram and the checker
+	 read a cache as a holding whose absence says nothing — which is exactly the Cairo route,
+	 where a context draws text through a font this project never built."
 
+	<archCache: #one to: #VGAeTextFont>
 	^ ownTextFont
 ]
 

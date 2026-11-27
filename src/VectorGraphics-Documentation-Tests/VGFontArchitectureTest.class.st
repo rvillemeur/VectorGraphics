@@ -56,16 +56,18 @@ VGFontArchitectureTest >> testEveryDeclarationOfTheFontPackagesResolvesAndAgrees
 ]
 
 { #category : 'tests' }
-VGFontArchitectureTest >> testTheFontPackagesDeclareTheThirteenHoldingsOfTheRoute [
-	"A gate over no declarations passes for the wrong reason, so count them. Thirteen is what the
+VGFontArchitectureTest >> testTheFontPackagesDeclareTheTwentyHoldingsOfTheRoute [
+	"A gate over no declarations passes for the wrong reason, so count them. Twenty is what the
 	 route holds today: five on the scaled font, one on the atlas, one on the mask, two on the
-	 Alexandrie adapter, and four the font face states in its two class-side tables."
+	 Alexandrie adapter, four the font face states in its two class-side tables, and the six of
+	 the Bloc side — the adapter a text context is posed with, the catalogue a font manager
+	 answers from, its three caches of faces, and the two managers its class keeps."
 
 	| declared |
 	declared := self fontPackageNames
 		inject: 0
 		into: [ :sum :each | sum + (ArchDocModel onPackageNamed: each) relations size ].
-	self assert: declared equals: 13
+	self assert: declared equals: 20
 ]
 
 { #category : 'tests' }

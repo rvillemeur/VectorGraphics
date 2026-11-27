@@ -27,6 +27,35 @@ Class {
 	#tag : 'Fonts'
 }
 
+{ #category : 'architecture' }
+VGFontManager class >> archClassRelations [
+	"What I hold myself, in two class-side slots. installedInstance is the manager posed in the
+	 image, kept so that startUp: can put it back after upstream nils the slot it was written
+	 into; sharedInstance is the manager built from this machine's fonts, kept because building
+	 one meets every installed font and that scan was 86 per cent of what drawing a frame cost.
+	 Both are caches: an image that installed nothing and asked for nothing has neither."
+
+	^ #(
+		#( #installedInstance #cacheOne #VGFontManager nil )
+		#( #sharedInstance #cacheOne #VGFontManager nil ) )
+]
+
+{ #category : 'architecture' }
+VGFontManager class >> archRelations [
+	"What an instance of me holds in a slot of upstream's, which no accessor of mine exposes and
+	 no pragma of mine may claim: AeFontManager declares those slots and this project must not
+	 edit that package. Each row is the role, the multiplicity, the target and the opposite; nil
+	 names no opposite.
+	 All three are caches. faceByEntryCache holds the face of every entry a session has drawn
+	 with, parsed once out of the entry's own bytes; the two defaults are the faces the scan
+	 chose, and a manager nobody scanned for has neither."
+
+	^ #(
+		#( #faceByEntryCache #cacheMany #VGFontFace nil )
+		#( #defaultFace #cacheOne #VGFontFace nil )
+		#( #defaultCodeFace #cacheOne #VGFontFace nil ) )
+]
+
 { #category : 'installation' }
 VGFontManager class >> ensureUpstreamHoldsMine [
 	"Put my manager back in the slot every consumer of a face reaches, if it is not there
@@ -256,8 +285,10 @@ VGFontManager >> catalogue [
 	 Checks the session first, as upstream's four accessors do with the slots they guard. An
 	 entry met in another session names bytes nobody here has read, so a manager left over from
 	 a dead session rebuilds before it answers. Every reader and every writer of mine asks
-	 through this accessor rather than the slot, so the check cannot be walked around."
+	 through this accessor rather than the slot, so the check cannot be walked around.
+	 A structural holding and not a cache: reset builds one, so a live manager always has it."
 
+	<archRelation: #one to: #TTFontCatalogue>
 	self checkSession.
 	^ catalogue
 ]

@@ -117,6 +117,22 @@ VGDocumentationViewTest >> testTheComponentsTabIsOfferedOnThePackagesAMapClaimsA
 ]
 
 { #category : 'tests' }
+VGDocumentationViewTest >> testTheFontManagerObjectGraphTabWalksTheManagerAndTheFacesItKeeps [
+	"The Bloc side of the route starts at the manager Bloc asks for a face. What it holds now is
+	 the catalogue it answers from and the faces a session has drawn with, and neither is visible
+	 in the declarations alone: a manager nobody drew with keeps no face at all."
+
+	| presenter labels |
+	presenter := self
+		presenterOf: VGDocumentationExamples objectGraphOfTheSharedFontManager root
+		on: #inspectionObjectGraph:.
+	labels := presenter canvas nodes collect: [ :each |
+		(each shapes detect: [ :shape | shape class = RSLabel ]) text ].
+	self assert: (labels anySatisfy: [ :each | each includesSubstring: 'VGFontManager' ]).
+	self assert: (labels anySatisfy: [ :each | each includesSubstring: 'TTFontCatalogue' ])
+]
+
+{ #category : 'tests' }
 VGDocumentationViewTest >> testTheNeighboursTabDrawsTheWholeProjectWithThisPackageInFocus [
 	"A reader opening a package of this project meets the project first: every package of it, the
 	 arrows between them, and the one they came from filled apart from the rest. The picture is

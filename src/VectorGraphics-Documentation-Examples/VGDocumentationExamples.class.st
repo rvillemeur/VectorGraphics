@@ -46,6 +46,20 @@ VGDocumentationExamples class >> objectGraphOfAWarmScaledFont [
 ]
 
 { #category : 'examples' }
+VGDocumentationExamples class >> objectGraphOfTheSharedFontManager [
+	"The Bloc side of the route, walked from the manager Bloc asks for a face: the catalogue it
+	 answers from, and the one face a draw has made it parse. A face is read here on purpose —
+	 a manager nobody has drawn with keeps none, and a graph of such a manager shows the
+	 catalogue alone, which is the truth about it and a poor picture of the route."
+
+	<sampleInstance>
+	| manager |
+	manager := VGFontManager withDefaultFaces.
+	manager defaultFaceOfFirstFamilyNamedIn: { manager familyNames first }.
+	^ ArchDocObjectGraph of: manager
+]
+
+{ #category : 'examples' }
 VGDocumentationExamples class >> projectPackageGraph [
 	"Where the font packages sit in this project: forty-five packages, the arrows between them,
 	 and VectorGraphics-Canvas-Fonts filled apart from the rest."
