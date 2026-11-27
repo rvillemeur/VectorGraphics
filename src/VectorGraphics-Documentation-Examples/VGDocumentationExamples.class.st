@@ -44,3 +44,16 @@ VGDocumentationExamples class >> objectGraphOfAWarmScaledFont [
 	font textExtentsOf: VGScaledFontExamples exampleRun.
 	^ ArchDocObjectGraph of: font
 ]
+
+{ #category : 'examples' }
+VGDocumentationExamples class >> projectPackageGraph [
+	"Where the font packages sit in this project: forty-five packages, the arrows between them,
+	 and VectorGraphics-Canvas-Fonts filled apart from the rest."
+
+	<sampleInstance>
+	| package |
+	package := Smalltalk packageOrganizer packageNamed: 'VectorGraphics-Canvas-Fonts'.
+	^ ArchDocPackageRenderer
+		onProject: package archDocProject
+		focusing: package
+]

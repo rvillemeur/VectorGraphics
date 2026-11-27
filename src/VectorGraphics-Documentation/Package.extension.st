@@ -11,6 +11,14 @@ Package >> archDocComponentMap [
 ]
 
 { #category : '*VectorGraphics-Documentation' }
+Package >> archDocProject [
+	"The project I belong to, read as a graph of packages. This package answers for its own
+	 project alone, which is the same rule the architecture tab is gated by."
+
+	^ ArchDocProjectModel onPrefix: VGDocumentation packagePrefix
+]
+
+{ #category : '*VectorGraphics-Documentation' }
 Package >> inspectionArchitecture: aBuilder [
 	"Extension of Pharo's Package: a reader asks a package what it holds, so the tab belongs on
 	 the package and not on a class of ours. It is here, in this project's own documentation
@@ -49,4 +57,27 @@ Package >> inspectionComponentsContext: aContext [
 	 nowhere else. A package no map claims has no parts to draw."
 
 	^ aContext active: self archDocComponentMap notNil
+]
+
+{ #category : '*VectorGraphics-Documentation' }
+Package >> inspectionNeighbours: aBuilder [
+	"Extension of Pharo's Package: the widest altitude, before the parts and the classes,
+	 because the first question asked of a package is where it sits. The project is drawn whole
+	 with this package filled apart from the rest, and a forbidden arrow is drawn in red."
+
+	<inspectorPresentationOrder: 80 title: 'Neighbours'>
+	^ aBuilder newRoassal
+		canvas: (ArchDocPackageRenderer
+			onProject: self archDocProject
+			focusing: self) canvas;
+		yourself
+]
+
+{ #category : '*VectorGraphics-Documentation' }
+Package >> inspectionNeighboursContext: aContext [
+	"Extension of Pharo's Package: offer the tab on this project's packages alone, the same rule
+	 the architecture tab is gated by. Drawing another project would claim to speak for code
+	 this one does not own."
+
+	^ aContext active: (self name beginsWith: VGDocumentation packagePrefix)
 ]

@@ -39,6 +39,20 @@ VGDocumentationViewTest >> isComponentsTabActiveFor: aPackageName [
 	^ context isActive
 ]
 
+{ #category : 'private' }
+VGDocumentationViewTest >> isNeighboursTabActiveFor: aPackageName [
+	"Ask the gate the way the inspector does, for the neighbours tab this time."
+
+	| context package |
+	package := Smalltalk packageOrganizer packageNamed: aPackageName.
+	context := StInspectionContext new
+		inspectedObject: package;
+		methodSelector: #inspectionNeighbours:;
+		yourself.
+	package inspectionNeighboursContext: context.
+	^ context isActive
+]
+
 { #category : 'running' }
 VGDocumentationViewTest >> presenterOf: anObject on: aSelector [
 	"Build one inspector tab the way a reader opens it, through the inspection context, which is
@@ -86,6 +100,33 @@ VGDocumentationViewTest >> testTheComponentsTabIsOfferedOnThePackagesAMapClaimsA
 	self assert: (self isComponentsTabActiveFor: 'VectorGraphics-Bloc-Text').
 	self deny: (self isComponentsTabActiveFor: 'VectorGraphics-Engine').
 	self assert: (self isArchitectureTabActiveFor: 'VectorGraphics-Engine')
+]
+
+{ #category : 'tests' }
+VGDocumentationViewTest >> testTheNeighboursTabDrawsTheWholeProjectWithThisPackageInFocus [
+	"A reader opening a package of this project meets the project first: every package of it, the
+	 arrows between them, and the one they came from filled apart from the rest. The picture is
+	 drawn once here: a force layout over forty-five boxes is not something to ask for twice."
+
+	| package presenter project renderer |
+	package := Smalltalk packageOrganizer packageNamed: 'VectorGraphics-Canvas-Fonts'.
+	project := package archDocProject.
+	presenter := self presenterOf: package on: #inspectionNeighbours:.
+	renderer := ArchDocPackageRenderer onProject: project focusing: package.
+	self assert: (project packages includes: package).
+	self assert: presenter canvas nodes size equals: project graph nodes size.
+	self assert: (renderer fillFor: package) equals: renderer focusColor
+]
+
+{ #category : 'tests' }
+VGDocumentationViewTest >> testTheNeighboursTabIsOfferedOnThisProjectsPackagesAlone [
+	"This package answers for its own project. Reading another project's layering would cost a
+	 scan of every method of every package a reader opens, and would claim to speak for code
+	 this project does not own."
+
+	self assert: (self isNeighboursTabActiveFor: 'VectorGraphics-Canvas-Fonts').
+	self assert: (self isNeighboursTabActiveFor: 'VectorGraphics-Documentation').
+	self deny: (self isNeighboursTabActiveFor: 'Kernel')
 ]
 
 { #category : 'tests' }
