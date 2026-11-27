@@ -40,6 +40,7 @@ TTCffOutlineBuilder >> closeContour [
 TTCffOutlineBuilder >> contours [
 	"The contours drawn so far, the one being drawn excepted."
 
+	<archRelation: #many to: #TTCffContour>
 	^ contours asArray
 ]
 

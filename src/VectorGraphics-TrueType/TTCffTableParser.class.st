@@ -24,6 +24,16 @@ Class {
 	#tag : 'CFF'
 }
 
+{ #category : 'architecture' }
+TTCffTableParser class >> archRelations [
+	"What an instance of me holds in a slot no accessor of mine exposes: the charstrings, one
+	 per glyph of the font, which is the index a glyph is drawn from. The charsetIdentifiers are
+	 numbers and are no holding of a class.
+	 My superclass's row is kept, because I hold the table directory entry I read from too."
+
+	^ super archRelations , #( #( #charstrings #one #TTCffIndex nil ) )
+]
+
 { #category : 'operators' }
 TTCffTableParser class >> charStringsOperator [
 	"The top dictionary entry that says where the charstrings are."
@@ -152,6 +162,10 @@ TTCffTableParser >> firstBytesOfCharstringAt: anIndex [
 
 { #category : 'accessing' }
 TTCffTableParser >> globalSubrs [
+	"The subroutines every glyph of the font may call. A font that defines none holds an index
+	 of no elements rather than nothing, so the holding is structural."
+
+	<archRelation: #one to: #TTCffIndex>
 	^ globalSubrs
 ]
 
@@ -225,6 +239,10 @@ TTCffTableParser >> inspectorTable: aBuilder [
 
 { #category : 'accessing' }
 TTCffTableParser >> localSubrs [
+	"The subroutines only the glyphs of this font may call. A private dictionary that names no
+	 Subrs operator leaves an empty index here, not nothing, so the holding is structural."
+
+	<archRelation: #one to: #TTCffIndex>
 	^ localSubrs
 ]
 
@@ -238,6 +256,11 @@ TTCffTableParser >> nominalWidthX [
 
 { #category : 'accessing' }
 TTCffTableParser >> privateDictionary [
+	"What a charstring of this font is drawn against: the nominal and default widths, and where
+	 the local subroutines start. The top dictionary says where it lies, and reading the table
+	 reads it, so it is never absent."
+
+	<archRelation: #one to: #TTCffDictionary>
 	^ privateDictionary
 ]
 
@@ -358,5 +381,9 @@ TTCffTableParser >> setBoundsOf: aGlyph [
 
 { #category : 'accessing' }
 TTCffTableParser >> topDictionary [
+	"The head of the table: where the charstrings are, which charset the font uses, and where
+	 the private dictionary lies. Read as the table is read, so it is never absent."
+
+	<archRelation: #one to: #TTCffDictionary>
 	^ topDictionary
 ]

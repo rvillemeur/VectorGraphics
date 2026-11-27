@@ -29,6 +29,18 @@ Class {
 	#tag : 'CFF'
 }
 
+{ #category : 'architecture' }
+TTCffCharstringInterpreter class >> archRelations [
+	"What an instance of me holds in a slot no accessor of mine exposes: the table whose
+	 subroutines and widths I read a charstring against, and the builder that holds what the
+	 charstring draws. Both are given when I am made, so neither is a cache. The stack, the
+	 stream and the counters are bytes being read and are no holding of a class."
+
+	^ #(
+		#( #table #one #TTCffTableParser nil )
+		#( #outline #one #TTCffOutlineBuilder nil ) )
+]
+
 { #category : 'operators' }
 TTCffCharstringInterpreter class >> biasForSubroutineCount: anInteger [
 	"What a charstring adds to the number it pushes to reach a subroutine of an index that

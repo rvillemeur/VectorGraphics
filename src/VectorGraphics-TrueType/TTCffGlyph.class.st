@@ -18,6 +18,15 @@ Class {
 	#tag : 'CFF'
 }
 
+{ #category : 'architecture' }
+TTCffGlyph class >> archRelations [
+	"What an instance of me holds in a slot no accessor of mine exposes: the table my charstring
+	 is read from, which is how I draw myself at the first ask. The index and the drawn flag are
+	 a number and a boolean."
+
+	^ #( #( #table #one #TTCffTableParser nil ) )
+]
+
 { #category : 'instance creation' }
 TTCffGlyph class >> onTable: aTableParser count: anInteger [
 	"One record a glyph of a font whose outlines are that CFF table, counted from one. Not a
