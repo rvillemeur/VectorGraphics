@@ -33,6 +33,16 @@ Class {
 	#tag : 'Reading'
 }
 
+{ #category : 'architecture' }
+TTFontReader class >> archRelations [
+	"What an instance of me holds, declared here because I expose no accessor for it: the font I
+	 read, which I answer from readTTFFrom: rather than keep for a caller to ask about.
+	 Declared a cache, because a reader that has not read yet holds nothing and that says
+	 nothing about the reader: the slot is filled by my own work on the first read."
+
+	^ #( #( #fontDescription #cacheOne #TTFontDescription nil ) )
+]
+
 { #category : 'reading' }
 TTFontReader class >> buildTableDirectory: fontData offset: anOffset [
 

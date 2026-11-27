@@ -106,6 +106,22 @@ VGDocumentationViewTest >> testTheArchitectureTabIsOfferedOnThisProjectsPackages
 ]
 
 { #category : 'tests' }
+VGDocumentationViewTest >> testTheArchitectureTabOfTheTrueTypePackageDrawsTheArrowsTheReaderDeclares [
+	"The reader's declarations must reach the picture, not only the checker: a catalogue over its
+	 entries, and a table parser over the directory entry it reads from."
+
+	| package presenter lines |
+	package := Smalltalk packageOrganizer packageNamed: 'VectorGraphics-TrueType'.
+	presenter := self presenterOf: package on: #inspectionArchitecture:.
+	lines := presenter canvas lines collect: [ :each | each model ].
+	self assert: (lines anySatisfy: [ :each |
+		each source name = #TTFontCatalogue and: [ each target name = #TTFontCatalogueEntry ] ]).
+	self assert: (lines anySatisfy: [ :each |
+		each source name = #TTCmapTableParser
+			and: [ each target name = #TTFontTableDirEntry ] ])
+]
+
+{ #category : 'tests' }
 VGDocumentationViewTest >> testTheComponentsTabIsOfferedOnThePackagesAMapClaimsAlone [
 	"A package no map claims has no components to show, so the tab is not built for it. The
 	 architecture tab stays wherever it was: the two altitudes sit side by side."

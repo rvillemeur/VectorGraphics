@@ -13,6 +13,14 @@ Class {
 }
 
 { #category : 'accessing' }
+VGFontArchitectureTest >> cffExampleSelector [
+	"The one example of the reader known not to run: it asks the installed fonts for a CFF table,
+	 and an image whose font directory holds none answers KeyNotFound on the tag 'CFF '."
+
+	^ 'cffGlyphSource'
+]
+
+{ #category : 'accessing' }
 VGFontArchitectureTest >> fontPackageNames [
 	"The packages of the font route whose declarations this gate holds. Slice one declares the two
 	 that carry the Bloc replacement; VectorGraphics-TrueType joins them when its relations are
@@ -30,6 +38,18 @@ VGFontArchitectureTest >> isKnownBrokenExample: aFinding [
 
 	^ aFinding kind = #brokenExample
 		and: [ aFinding explanation includesSubstring: self openTypeExampleSelector ]
+]
+
+{ #category : 'private' }
+VGFontArchitectureTest >> isKnownBrokenTrueTypeExample: aFinding [
+	"One example of the reader cannot run in an image whose fonts carry no CFF table, which is a
+	 defect of that example and not of any declaration — the same defect as the one the drawing
+	 packages carry. It is pinned by
+	 testTheCffGlyphSourceExampleIsTheOnlyReaderExampleThatCannotRun, so this gate stays about
+	 declarations while the defect stands."
+
+	^ aFinding kind = #brokenExample
+		and: [ aFinding explanation includesSubstring: self cffExampleSelector ]
 ]
 
 { #category : 'accessing' }
@@ -53,6 +73,34 @@ VGFontArchitectureTest >> testEveryDeclarationOfTheFontPackagesResolvesAndAgrees
 		self
 			assert: (findings collect: [ :finding | finding explanation ]) asArray
 			equals: #() ]
+]
+
+{ #category : 'tests' }
+VGFontArchitectureTest >> testEveryDeclarationOfTheTrueTypePackageResolvesAndAgreesWithItsSamples [
+	"The same gate as the one over the drawing packages, over the reader: a target class that is
+	 gone, an opposite only one side states, or a sample instance holding something other than
+	 what it declares are reported here rather than found by a reader of the diagram. The one
+	 example that cannot run in an image without a CFF font is pinned elsewhere and left out."
+
+	| findings |
+	findings := (ArchDocChecker onPackageNamed: self trueTypePackageName) findings
+		reject: [ :finding | self isKnownBrokenTrueTypeExample: finding ].
+	self
+		assert: (findings collect: [ :each | each explanation ]) asArray
+		equals: #()
+]
+
+{ #category : 'tests' }
+VGFontArchitectureTest >> testTheCffGlyphSourceExampleIsTheOnlyReaderExampleThatCannotRun [
+	"A pin on a defect, not a rule: TrueTypeExamples >> cffGlyphSource raises KeyNotFound on the
+	 tag 'CFF ' in an image whose font directory holds no font with a CFF table. The declaration
+	 gate ignores that one example by name, so this test is what fails when the example is fixed
+	 or when a second example of the reader starts to raise."
+
+	| broken |
+	broken := (ArchDocChecker onPackageNamed: self trueTypePackageName) brokenExamples.
+	self assert: broken size equals: 1.
+	self assert: (broken allSatisfy: [ :each | self isKnownBrokenTrueTypeExample: each ])
 ]
 
 { #category : 'tests' }
@@ -103,4 +151,34 @@ VGFontArchitectureTest >> testTheRouteMapClaimsTheFontPackagesAndMapsEveryClassO
 	self
 		assert: (map findings collect: [ :each | each explanation ]) asArray
 		equals: #()
+]
+
+{ #category : 'tests' }
+VGFontArchitectureTest >> testTheTrueTypePackageDeclaresEveryHoldingOfItsFourTags [
+	"The reader is declared one tag at a time, so the gate counts per tag and says which tag is
+	 short. A tag at zero is a tag whose relations are not written yet.
+	 A class-side table is inherited, so one row on TTFontParser is a declaration of every table
+	 parser, which is the truth about them: each one holds the entry it reads from. That is why
+	 the Reading tag counts eighteen for six written rows, and why the CFF tag already counts the
+	 one TTCffTableParser inherits."
+
+	| byTag |
+	byTag := Dictionary new.
+	#( 'Reading' 'Glyphs' 'Fonts' 'CFF' ) do: [ :each | byTag at: each put: 0 ].
+	(ArchDocModel onPackageNamed: self trueTypePackageName) relations do: [ :each |
+		| tag |
+		tag := each declaringClass instanceSide packageTag name.
+		byTag at: tag put: (byTag at: tag ifAbsent: [ 0 ]) + 1 ].
+	self
+		assert: byTag
+		equals: (Dictionary newFrom: { 'Reading' -> 18. 'Glyphs' -> 0. 'Fonts' -> 0. 'CFF' -> 1 })
+]
+
+{ #category : 'accessing' }
+VGFontArchitectureTest >> trueTypePackageName [
+	"The package that reads a font file. It is held apart from fontPackageNames, because that
+	 list is also what the route map claims, and the map is about the drawing of text and not
+	 about the forty-four classes of the reader."
+
+	^ 'VectorGraphics-TrueType'
 ]

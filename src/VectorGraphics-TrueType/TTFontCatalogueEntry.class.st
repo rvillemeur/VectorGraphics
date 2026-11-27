@@ -79,6 +79,7 @@ TTFontCatalogueEntry >> isRejected [
 TTFontCatalogueEntry >> metadata [
 	"What my own tables say about me: a TTFontMetadata, read once when I was made."
 
+	<archRelation: #one to: #TTFontMetadata>
 	^ metadata
 ]
 

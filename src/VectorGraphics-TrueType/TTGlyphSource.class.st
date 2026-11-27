@@ -16,6 +16,17 @@ Class {
 	#tag : 'Reading'
 }
 
+{ #category : 'architecture' }
+TTGlyphSource class >> archRelations [
+	"What an instance of me holds, declared here because I expose no accessor for it: a reader
+	 asks me for one glyph by index through glyphAt:, so the whole array is mine. Each row is
+	 the role, the multiplicity, the target and the opposite; nil names no opposite.
+	 A composite glyph is a TTGlyph as well, so one row covers both kinds. The array is read at
+	 creation, so a source always has it."
+
+	^ #( #( #glyphs #many #TTGlyph nil ) )
+]
+
 { #category : 'instance creation' }
 TTGlyphSource class >> on: aTableDictionary count: aGlyphCount indexToLocFormat: anInteger [
 	"The source for whichever outline table this font carries. The rule that decides is

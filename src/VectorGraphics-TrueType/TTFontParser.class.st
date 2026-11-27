@@ -35,6 +35,18 @@ Class {
 	#tag : 'Reading'
 }
 
+{ #category : 'architecture' }
+TTFontParser class >> archRelations [
+	"What an instance of me holds, declared here because I expose no accessor for it: the
+	 directory entry of the one table I parse, which is also a read stream over the font's
+	 bytes positioned at that table. Each row is the role, the multiplicity, the target and
+	 the opposite; nil names no opposite.
+	 The entry is given at creation, by on:, so every parser has one. A subclass inherits this
+	 row, which is the truth about each of them: every table parser holds the entry it reads."
+
+	^ #( #( #entry #one #TTFontTableDirEntry nil ) )
+]
+
 { #category : 'constants' }
 TTFontParser class >> glyphSubstitutions [
 	"The code points asked for in place of another: a wide minus for an ASCII dash, a centered

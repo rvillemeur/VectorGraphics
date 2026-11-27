@@ -91,6 +91,7 @@ TTFontCatalogue >> entries [
 	"Every file I have met, in the order I met it, each one an entry carrying its source and its
 	 metadata. The ones I rejected are among them."
 
+	<archRelation: #many to: #TTFontCatalogueEntry>
 	^ entries
 ]
 

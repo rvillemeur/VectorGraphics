@@ -18,6 +18,16 @@ Class {
 	#tag : 'Reading'
 }
 
+{ #category : 'architecture' }
+TTGlyfGlyphSource class >> archRelations [
+	"What an instance of me holds beyond the glyphs my superclass declares, and I expose no
+	 accessor for it either: the directory entry of the glyf table, which is where I read the
+	 outline of a glyph from. A table row and not a pragma, for the same reason.
+	 My superclass's rows are kept, because an instance of mine holds those too."
+
+	^ super archRelations , #( #( #glyfEntry #one #TTFontTableDirEntry nil ) )
+]
+
 { #category : 'constants' }
 TTGlyfGlyphSource class >> argumentsAreOffsetsFlag [
 	"The two placement arguments are an offset, not a pair of point indices to match."

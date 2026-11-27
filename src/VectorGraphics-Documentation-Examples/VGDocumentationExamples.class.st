@@ -23,6 +23,19 @@ VGDocumentationExamples class >> architectureOfTheFontPackage [
 ]
 
 { #category : 'examples' }
+VGDocumentationExamples class >> architectureOfTheTrueTypeReader [
+	"The diagram of the package that reads a font file: forty-four classes, and the arrows the
+	 reader's own declarations state — the catalogue over its entries, each entry over the
+	 metadata read from its tables, every table parser over the directory entry it reads from,
+	 and a glyph source over the glyphs it answers by index.
+	 Opened on the package rather than on one tag, because ArchDoc models a package and the tags
+	 are read off the boxes: the Reading tag is the whole of the left of the picture."
+
+	<sampleInstance>
+	^ ArchDocGraphRenderer onPackageNamed: 'VectorGraphics-TrueType'
+]
+
+{ #category : 'examples' }
 VGDocumentationExamples class >> fontRouteMap [
 	"The component map of the font route: six parts over the two packages of slice one. Its
 	 diagram tab is the picture that answers the heap of class names."
