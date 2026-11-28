@@ -225,18 +225,25 @@ TTFontReaderTest >> testEveryInstalledTrueTypeFontHoldsACharacterMapAndNoFileOfT
 	"Asking whether a file carries a table is the reader's own question: it reads the offset
 	 table and one record per table and nothing else. A font answers yes for a table every sfnt
 	 must have, and a file that is not a font at all answers no rather than raising, because the
-	 font directories of a machine hold licence files and caches beside the fonts."
+	 font directories of a machine hold licence files and caches beside the fonts.
+	 Whether this machine carries a font is asked of the directories themselves and never of the
+	 finder, so that a finder answering nil fails this test rather than skipping it."
 
 	| font notAFont |
 	notAFont := FileLocator temp / 'not-a-font-at-all.ttf'.
 	notAFont writeStreamDo: [ :stream | stream nextPutAll: 'this is not a font' ].
-	[
-	self deny: (TTFontReader file: notAFont holdsTableNamed: 'cmap') ] ensure: [
+	[ self deny: (TTFontReader file: notAFont holdsTableNamed: 'cmap') ] ensure: [
 		notAFont ensureDelete ].
+	(TTFontCatalogue defaultFontDirectories anySatisfy: [ :each |
+		 | directory |
+		 directory := each asFileReference.
+		 directory exists and: [
+			 directory allFiles anySatisfy: [ :file |
+				 file basename asLowercase endsWith: '.ttf' ] ] ]) ifFalse: [
+		^ self skip: 'this machine has no .ttf font under the default font directories' ].
 	font := TTFontCatalogue firstFontFileSuchThat: [ :each |
 		        each basename asLowercase endsWith: '.ttf' ].
-	font ifNil: [
-		^ self skip: 'this machine has no .ttf font under the default font directories' ].
+	self assert: font notNil.
 	self assert: (TTFontReader file: font holdsTableNamed: 'cmap').
 	self deny: (TTFontReader file: font holdsTableNamed: 'nope')
 ]

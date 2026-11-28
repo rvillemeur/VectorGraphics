@@ -289,13 +289,22 @@ TTFontCatalogueTest >> testTheFamiliesViewCountsTheFacesIndexedAndNamesTheirStyl
 TTFontCatalogueTest >> testTheFirstFileAPredicateAcceptsIsFoundUnderTheDefaultDirectories [
 	"The catalogue knows where this platform keeps its fonts, so it is what answers which file of
 	 those directories a caller can use. The file answered is a real one, it satisfies the
-	 predicate, and it lies under one of the directories scanned."
+	 predicate, and it lies under one of the directories scanned.
+	 Whether this machine carries the fixture is asked of the directories themselves and never of
+	 the finder: a finder that answered nil for every predicate would otherwise skip this test
+	 instead of failing it, and eight mutants of it survived for that reason."
 
 	| found |
+	(TTFontCatalogue defaultFontDirectories anySatisfy: [ :each |
+		 | directory |
+		 directory := each asFileReference.
+		 directory exists and: [
+			 directory allFiles anySatisfy: [ :file |
+				 file basename asLowercase endsWith: '.ttf' ] ] ]) ifFalse: [
+		^ self skip: 'this machine has no .ttf font under the default font directories' ].
 	found := TTFontCatalogue firstFontFileSuchThat: [ :file |
 		         file basename asLowercase endsWith: '.ttf' ].
-	found ifNil: [
-		^ self skip: 'this machine has no .ttf font under the default font directories' ].
+	self assert: found notNil.
 	self assert: found exists.
 	self assert: (found basename asLowercase endsWith: '.ttf').
 	self
