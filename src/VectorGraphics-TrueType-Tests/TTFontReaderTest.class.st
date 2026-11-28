@@ -119,6 +119,23 @@ TTFontReaderTest >> glyphWithOneContourAndAdvanceWidth: aNumber [
 ]
 
 { #category : 'tests' }
+TTFontReaderTest >> testAFontFileThatHasGoneAwayIsNoRatherThanAFailure [
+	"A file can be asked about after it has gone: a font directory is scanned, and the file is
+	 removed before the reader reaches it. Such a question is a no, the same answer a file that is
+	 not a font at all gets, because the caller is asking which fonts it can use and not whether
+	 this machine is sound.
+	 The two cases are separate tests because they fail the reader in different ways: a file of
+	 text raises on its own bytes, a file that is gone raises before any byte is read, and a
+	 handler narrowed to the first would let this one through."
+
+	| gone |
+	gone := FileLocator temp / 'no-such-font-at-all.ttf'.
+	gone ensureDelete.
+	self deny: gone exists.
+	self deny: (TTFontReader file: gone holdsTableNamed: 'cmap')
+]
+
+{ #category : 'tests' }
 TTFontReaderTest >> testAMappedCodePointResolvesToItsOwnGlyph [
 	"Both a one byte and a three byte code point reach the glyph their character map entry
 	 names, so building the table sparsely must still walk the UTF-8 bytes."
