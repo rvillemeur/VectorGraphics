@@ -318,10 +318,15 @@ VGArchitectureTest class >> dependencyReport [
 { #category : 'layering' }
 VGArchitectureTest class >> edgesOf: aPackageName [
 	"The packages aPackageName own methods name, itself excluded. Asking the package for its
-	 methods reads its extension methods on base classes too."
+	 methods reads its extension methods on base classes too.
+	 A package this image does not hold names nothing, and answers no edges rather than raising:
+	 the walk is a reading of the image, and whether an absent package is a finding or a skip
+	 belongs to the test that reads it."
 
 	| package found |
-	package := PackageOrganizer default packageNamed: aPackageName.
+	package := PackageOrganizer default
+		           packageNamed: aPackageName
+		           ifAbsent: [ ^ Set new ].
 	found := Set new.
 	package methods do: [ :method | found addAll: (self packagesNamedBy: method) ].
 	^ found copyWithout: aPackageName
@@ -372,12 +377,15 @@ VGArchitectureTest class >> inheritanceOfGroupNamed: aGroupName into: aCollectio
 	"The links from a class of that group to a superclass or trait in one of those packages,
 	 as 'Subject -> Behaviour' strings. A superclass and a trait are named by the class
 	 definition, not by any method, so the literal scan of VGCairoReferenceScanner cannot see
-	 them, and this is the link Metacello fails on first."
+	 them, and this is the link Metacello fails on first.
+	 The group names what it loads, so a package of it this image does not hold is passed over:
+	 the answer is the links of the classes that are there."
 
 	| found |
 	found := OrderedCollection new.
-	(self packagesLoadedByGroupNamed: aGroupName) do: [ :packageName |
-		(PackageOrganizer default packageNamed: packageName) definedClasses do: [ :each |
+	(self loadedPackagesNamed: (self packagesLoadedByGroupNamed: aGroupName)) do: [
+		:package |
+		package definedClasses do: [ :each |
 			| behaviours |
 			behaviours := each allSuperclasses asOrderedCollection
 				              addAll: each traits;
@@ -443,6 +451,37 @@ VGArchitectureTest class >> inspectorGroupsContext: aContext [
 	^ aContext active: BaselineOfVectorGraphics project version groups notEmpty
 ]
 
+{ #category : 'inspecting' }
+VGArchitectureTest class >> inspectorLoadedPackages: aBuilder [
+	"Which packages of the dependency table this image holds, and which gate of mine reads each
+	 one. A group loading part of the project - canvas-tests loads fifteen of the forty-five
+	 packages the table names - leaves the rest absent, and the gates of those packages skip
+	 rather than raise. This tab is where that is read: it names every row the table has, so a
+	 run reporting forty-five tests of which twenty-one skipped is accounted for here. Reads
+	 loadedPackageReport, a live scan, and mutates nothing it shows."
+
+	<inspectorPresentationOrder: 30 title: 'Loaded'>
+	^ aBuilder newTable
+		  addColumn:
+			  (SpStringTableColumn title: 'Package' evaluated: [ :each | each first ]);
+		  addColumn: (SpStringTableColumn
+				   title: 'In this image'
+				   evaluated: [ :each | each second ]);
+		  addColumn:
+			  (SpStringTableColumn title: 'Its gate' evaluated: [ :each | each third ]);
+		  items: self loadedPackageReport;
+		  yourself
+]
+
+{ #category : 'inspecting' }
+VGArchitectureTest class >> inspectorLoadedPackagesContext: aContext [
+	"The tab belongs to whichever class in this hierarchy holds the dependency table, which
+	 today is this one and only one. Asking the table rather than naming the class keeps the
+	 gate true if a second project ever subclasses me for its own layering."
+
+	^ aContext active: self allowedDependencies notEmpty
+]
+
 { #category : 'layering' }
 VGArchitectureTest class >> isPlatformPathOfAFont: aString [
 	"Whether this string is an absolute path, of this platform or of another, naming a font or a
@@ -469,6 +508,45 @@ VGArchitectureTest class >> isProductionPackageNamed: aPackageName [
 		   aPackageName endsWith: '-Examples' ]) not and: [
 		  ((aPackageName endsWith: '-Conformance') or: [
 			   aPackageName endsWith: '-Benchmarks' ]) not ]
+]
+
+{ #category : 'reporting' }
+VGArchitectureTest class >> loadedPackageReport [
+	"One row per package the dependency table names: the package, whether this image holds it,
+	 and the gate of mine that reads it. The gate is found by reflecting over my own test
+	 selectors for the one naming that package as a literal, so a gate renamed or deleted shows
+	 as none rather than as a name that no longer answers. Nothing is cached: the row says what
+	 the image holds the moment the tab opens."
+
+	| gates |
+	gates := Dictionary new.
+	(self selectors select: [ :each | each beginsWith: 'test' ]) do: [ :selector |
+		self allowedDependencies keysDo: [ :packageName |
+			((self >> selector) sourceCode includesSubstring: '''' , packageName , '''')
+				ifTrue: [ (gates at: packageName ifAbsentPut: [ OrderedCollection new ])
+						add: selector ] ] ].
+	^ self allowedDependencies keys asSortedCollection asArray collect: [ :packageName |
+		  {
+			  packageName.
+			  ((PackageOrganizer default packageNamed: packageName ifAbsent: [ nil ])
+				   ifNil: [ 'absent, its gate skips' ]
+				   ifNotNil: [ :package |
+					   package methods size printString , ' methods read' ]).
+			  (', ' join: (gates at: packageName ifAbsent: [ #( 'none' ) ]) asSortedCollection) }  ]
+]
+
+{ #category : 'layering' }
+VGArchitectureTest class >> loadedPackagesNamed: aCollectionOfPackageNames [
+	"The packages of those names this image holds, in the order given, the ones it lacks passed
+	 over. A sweep over a group of the baseline reads the names the group loads, not the names
+	 this image has: a group loading part of the project - canvas-tests loads fifteen of the
+	 forty-five packages the table names - leaves the rest absent, and an absent package names
+	 nothing a sweep could find."
+
+	^ aCollectionOfPackageNames
+		  collect: [ :each |
+			  PackageOrganizer default packageNamed: each ifAbsent: [ nil ] ]
+		  thenReject: [ :each | each isNil ]
 ]
 
 { #category : 'layering' }
@@ -541,7 +619,12 @@ VGArchitectureTest class >> projectPackageNamePrefix [
 { #category : 'layering' }
 VGArchitectureTest class >> projectPackageNames [
 	"Every package of this project, asked of the organiser so that a package added tomorrow is
-	 covered by the coverage test rather than by a list written out by hand."
+	 covered by the coverage test rather than by a list written out by hand.
+	 Asking the organiser answers the packages this image holds, which is the whole project only
+	 in an image that loaded it whole. The sweeps read it and so answer for the packages that are
+	 there, which is what a sweep can say; a test comparing the whole dependency table against
+	 the image first sends skipUnlessEveryPackageIsLoaded:, because a package the table names and
+	 the image lacks would read there as a stray or as a dependency that stopped being real."
 
 	^ ((PackageOrganizer default packages select: [ :each |
 		    each name beginsWith: self projectPackageNamePrefix ]) collect: [ :each |
@@ -599,17 +682,91 @@ VGArchitectureTest >> assertEdgesOfPackageNamed: aPackageName [
 	"Fail naming every method that makes a reference allowedDependencies does not grant. A bare
 	 package name would say that the layering broke without saying where to look for it. The
 	 class name is asked for as a string, because a symbol would carry its quoting into the
-	 failure message."
+	 failure message.
+	 The package is asked for through my own packageNamed:, so a gate whose package this image
+	 does not hold skips instead of raising."
 
 	| allowed strays |
 	allowed := (self class allowedDependencies at: aPackageName ifAbsent: [ #(  ) ]) asSet.
 	strays := Set new.
-	(PackageOrganizer default packageNamed: aPackageName) methods do: [ :method |
+	(self packageNamed: aPackageName) methods do: [ :method |
 		((self class packagesNamedBy: method) copyWithout: aPackageName) do: [ :each |
 			(allowed includes: each) ifFalse: [
 				strays add: method methodClass name asString , ' >> '
 					, method selector asString , ' -> ' , each ] ] ].
 	self assert: strays asSortedCollection asArray equals: #(  )
+]
+
+{ #category : 'running' }
+VGArchitectureTest >> packageNamed: aPackageName [
+	"The package of this project a gate reads, or a skip when this image does not hold it. A
+	 gate names its package as a literal so that it has a name of its own in a report, and a
+	 group that loads part of the project - canvas-tests loads fifteen of the forty-five
+	 packages the table names - reaches gates whose package is absent. Such a gate has nothing
+	 to look at, so it says so and the gates of the packages that are loaded still run."
+
+	^ PackageOrganizer default
+		  packageNamed: aPackageName
+		  ifAbsent: [ self skip: aPackageName , ' is not loaded in this image' ]
+]
+
+{ #category : 'running' }
+VGArchitectureTest >> skipUnlessEveryPackageIsLoaded: aCollectionOfPackageNames [
+	"Skip the test unless this image holds every one of these packages, naming the ones it
+	 lacks. A test that compares a whole-project statement - the dependency table, a group of
+	 the baseline - against the image can only report falsely when part of the project is
+	 absent: every row of a missing package reads as stale, or as a stray, or as an edge nobody
+	 declared."
+
+	| absent |
+	absent := aCollectionOfPackageNames reject: [ :each |
+		          (PackageOrganizer default packageNamed: each ifAbsent: [ nil ]) notNil ].
+	absent ifNotEmpty: [
+		self skip: 'these packages are not loaded in this image: '
+			, (', ' join: absent asSortedCollection) ]
+]
+
+{ #category : 'tests - partial loads' }
+VGArchitectureTest >> testAGateSkipsRatherThanRaisesWhenItsPackageIsNotLoaded [
+	"My gates name their package as a literal, because each one is a test of its own with its
+	 own name in a report. A group that loads less than the whole project - canvas-tests loads
+	 fifteen packages of the forty-five the table names - therefore reaches a gate whose package
+	 is absent, and asking the organiser for it raised KeyNotFound. A gate that cannot look at
+	 its package has nothing to say about it, which is a skip and not an error."
+
+	self
+		should: [ self packageNamed: 'VectorGraphics-NotLoadedInAnyImage' ]
+		raise: TestSkipped
+]
+
+{ #category : 'tests - partial loads' }
+VGArchitectureTest >> testAGroupSweepReadsOnlyThePackagesOfThatGroupThisImageHolds [
+	"The tests that sweep a group of the baseline - the default group names no method and no
+	 superclass of the stack it replaces - take their package names from the baseline, which
+	 lists what the group loads and not what this image holds. A package of the group that was
+	 never loaded names nothing, so it is passed over and the sweep answers for the packages
+	 that are there."
+
+	| loaded |
+	loaded := self class loadedPackagesNamed:
+		          #( 'VectorGraphics-Canvas-Tests' 'VectorGraphics-NotLoadedInAnyImage' ).
+	self assert: (loaded collect: [ :each | each name asString ]) asArray
+		equals: #( 'VectorGraphics-Canvas-Tests' )
+]
+
+{ #category : 'tests - partial loads' }
+VGArchitectureTest >> testAWholeProjectTestSkipsWhenAPackageOfTheTableIsAbsent [
+	"Two of my tests compare the whole dependency table against the whole image: one asks
+	 whether every granted edge is real, the other whether every name in the table is a package
+	 of this project. Both read the image through the organiser, which holds only what was
+	 loaded, so in a partial image every row of an absent package reads as stale or as a stray.
+	 That is a false report rather than a finding, so the comparison is skipped unless the
+	 project is whole."
+
+	self
+		should: [
+			self skipUnlessEveryPackageIsLoaded: #( 'VectorGraphics-NotLoadedInAnyImage' ) ]
+		raise: TestSkipped
 ]
 
 { #category : 'tests' }
@@ -765,9 +922,13 @@ VGArchitectureTest >> testEveryAllowedDependencyIsDeclaredInTheBaseline [
 { #category : 'tests' }
 VGArchitectureTest >> testEveryAllowedDependencyIsOneThePackageReallyMakes [
 	"A dependency that stopped being real has to come out of the table, or the table stops
-	 describing the code and starts describing its history."
+	 describing the code and starts describing its history.
+	 The whole table is read against the whole image, so the image has to hold the whole
+	 project: a package that was never loaded names nothing, and every edge granted to it would
+	 read as one that stopped being real."
 
 	| stale |
+	self skipUnlessEveryPackageIsLoaded: self class allowedDependencies keys.
 	stale := Set new.
 	self class allowedDependencies keysAndValuesDo: [ :package :allowed |
 		| actual |
@@ -780,9 +941,14 @@ VGArchitectureTest >> testEveryAllowedDependencyIsOneThePackageReallyMakes [
 { #category : 'tests' }
 VGArchitectureTest >> testEveryAllowedDependencyNamesAPackageOfThisProject [
 	"A renamed package leaves its old name behind in the table, where it would silently grant
-	 nothing and hide the edge that replaced it."
+	 nothing and hide the edge that replaced it.
+	 projectPackageNames is read from the organiser, so it answers the packages this image
+	 holds and not the packages the project has. The image therefore has to hold the whole
+	 project, or every name in the table whose package was not loaded would read as a name no
+	 package of this project answers to."
 
 	| strays |
+	self skipUnlessEveryPackageIsLoaded: self class allowedDependencies keys.
 	strays := Set new.
 	self class allowedDependencies keysAndValuesDo: [ :package :allowed |
 		allowed do: [ :each |
@@ -1012,19 +1178,21 @@ VGArchitectureTest >> testNoPackageOfTheDefaultGroupDefinesAMethodOnTheStackItRe
 	 class to go on. The Bloc packages extend both by design since phases 3 and 4 of the font
 	 plan — a scaled font of ours answers an Alexandrie context, and a Cairo surface answers a
 	 context of ours — and what they may name is stated by #allowedDependencies. This rule spoke
-	 for the whole project, as a gate of VGRendererTest, until that design landed."
+	 for the whole project, as a gate of VGRendererTest, until that design landed.
+	 The group names what it loads, so a package of it this image does not hold is passed over:
+	 it defines no method at all here."
 
 	| stack offenders |
 	stack := self class replacedStackPackageNames asSet.
-	offenders := (self class packagesLoadedByGroupNamed: 'default')
-		             asSortedCollection asArray flatCollect: [ :packageName |
-			             ((PackageOrganizer default packageNamed: packageName)
-				              methods select: [ :each |
-				              | owner |
-				              owner := each methodClass instanceSide package.
-				              owner notNil and: [
-					              stack includes: owner name asString ] ]) collect: [
-				             :each | packageName , ': ' , each printString ] ].
+	offenders := (self class loadedPackagesNamed:
+		              (self class packagesLoadedByGroupNamed: 'default')
+			              asSortedCollection asArray) flatCollect: [ :package |
+		             (package methods select: [ :each |
+			              | owner |
+			              owner := each methodClass instanceSide package.
+			              owner notNil and: [ stack includes: owner name asString ] ])
+			             collect: [ :each |
+			             package name asString , ': ' , each printString ] ].
 	self assert: offenders asSortedCollection asArray equals: #(  )
 ]
 
@@ -1341,6 +1509,15 @@ VGArchitectureTest >> testTheDevGroupLoadsTheDefaultStackItsTestsAndMuTalk [
 { #category : 'tests - dependencies' }
 VGArchitectureTest >> testTheDocumentationGatePackageStaysInsideItsAllowedDependencies [
 	self assertEdgesOfPackageNamed: 'VectorGraphics-Tests'
+]
+
+{ #category : 'tests - partial loads' }
+VGArchitectureTest >> testTheEdgesOfAPackageThisImageDoesNotHoldAreNoneRatherThanAnError [
+	"The walk answers what a package's own methods name. A package that is not loaded names
+	 nothing in this image, which is an empty answer: the walk is a reading of the image and not
+	 a judgement, so the test that reads it is where the absence is decided."
+
+	self assert: (self class edgesOf: 'VectorGraphics-NotLoadedInAnyImage') isEmpty
 ]
 
 { #category : 'tests' }
