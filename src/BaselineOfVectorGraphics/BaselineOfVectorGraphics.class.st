@@ -94,7 +94,7 @@ BaselineOfVectorGraphics >> declareBackendPackagesOn: spec [
 			spec requires:
 					#( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 					   'VectorGraphics-Canvas-Geometry'
-					   'VectorGraphics-Conformance' ) ];
+					   'VectorGraphics-Conformance' 'VectorGraphics-TrueType' ) ];
 		package: 'VectorGraphics-Canvas-Fonts-Tests'
 		with: [
 			spec requires:

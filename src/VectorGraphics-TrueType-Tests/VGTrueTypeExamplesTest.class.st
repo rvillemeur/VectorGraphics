@@ -66,11 +66,13 @@ VGTrueTypeExamplesTest >> mayAnswerNil: aMethod [
 VGTrueTypeExamplesTest >> testAKeptPathThatNoLongerNamesAFileIsFoundAgain [
 	"The kept path outlives what it names: a font is uninstalled, or the image file itself is
 	 carried to another machine. The next asker must scan again rather than answer a path that
-	 names nothing."
+	 names nothing. The path that names nothing is built from the image directory, because an
+	 absolute path written here would be a path of one platform."
 
 	| found |
 	found := TrueTypeExamples defaultFontPath.
-	TrueTypeExamples defaultFontPath: '/no/such/directory/NoSuchFont.ttf'.
+	TrueTypeExamples defaultFontPath:
+		(FileLocator imageDirectory / 'no-such-directory' / 'NoSuchFont.ttf') fullName.
 	self assert: TrueTypeExamples defaultFontPath equals: found
 ]
 

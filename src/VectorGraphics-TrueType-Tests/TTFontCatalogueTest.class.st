@@ -286,6 +286,25 @@ TTFontCatalogueTest >> testTheFamiliesViewCountsTheFacesIndexedAndNamesTheirStyl
 ]
 
 { #category : 'tests' }
+TTFontCatalogueTest >> testTheFirstFileAPredicateAcceptsIsFoundUnderTheDefaultDirectories [
+	"The catalogue knows where this platform keeps its fonts, so it is what answers which file of
+	 those directories a caller can use. The file answered is a real one, it satisfies the
+	 predicate, and it lies under one of the directories scanned."
+
+	| found |
+	found := TTFontCatalogue firstFontFileSuchThat: [ :file |
+		         file basename asLowercase endsWith: '.ttf' ].
+	found ifNil: [
+		^ self skip: 'this machine has no .ttf font under the default font directories' ].
+	self assert: found exists.
+	self assert: (found basename asLowercase endsWith: '.ttf').
+	self
+		assert: (TTFontCatalogue defaultFontDirectories anySatisfy: [ :each |
+				 found fullName beginsWith: each asFileReference fullName ])
+		description: found fullName , ' is under none of the default font directories'
+]
+
+{ #category : 'tests' }
 TTFontCatalogueTest >> testTheFirstSourceOfAFaceWinsAndTheSecondIsStillKept [
 	"The same face installed twice — a user font and a system font of the same name — is one
 	 face to a consumer, and the scan order decides which copy answers. The second copy is

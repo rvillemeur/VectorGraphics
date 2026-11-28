@@ -35,6 +35,63 @@ TTFontCatalogue class >> defaultFontDirectories [
 		  (FileLocator imageDirectory / 'Fonts') }
 ]
 
+{ #category : 'scanning' }
+TTFontCatalogue class >> firstFontFileSuchThat: aBlock [
+	"The first file of the default font directories this block accepts, or nil when none of them
+	 holds such a file. The directories are the fact this class states, so a caller looking for a
+	 font of some format asks here rather than naming a directory of its own platform. A
+	 directory that does not exist is passed over."
+
+	self defaultFontDirectories do: [ :each |
+		| directory |
+		directory := each asFileReference.
+		directory exists ifTrue: [
+			directory allFiles
+				detect: [ :file | aBlock value: file ]
+				ifFound: [ :file | ^ file ] ] ].
+	^ nil
+]
+
+{ #category : 'inspecting' }
+TTFontCatalogue class >> inspectorFontDirectories: aBuilder [
+	"Where this platform keeps fonts, which of those places exist on this machine, and how many
+	 files each holds. A reader asking why a scan found nothing reads the answer here instead of
+	 evaluating the scan. The directories are asked of defaultFontDirectories, so a place added
+	 there shows up without this view being touched, and nothing is written."
+
+	<inspectorPresentationOrder: 30 title: 'Font directories'>
+	^ aBuilder newTable
+		  addColumn: ((SpStringTableColumn
+				    title: 'Directory'
+				    evaluated: [ :each | each asFileReference fullName ])
+				   width: 320);
+		  addColumn: ((SpStringTableColumn
+				    title: 'Exists'
+				    evaluated: [ :each |
+					    each asFileReference exists
+						    ifTrue: [ 'yes' ]
+						    ifFalse: [ 'no' ] ])
+				   width: 70);
+		  addColumn: (SpStringTableColumn
+				   title: 'Files'
+				   evaluated: [ :each |
+					   each asFileReference exists
+						   ifTrue: [ each asFileReference allFiles size printString ]
+						   ifFalse: [ '' ] ]);
+		  items: self defaultFontDirectories;
+		  yourself
+]
+
+{ #category : 'inspecting' }
+TTFontCatalogue class >> inspectorFontDirectoriesContext: aContext [
+	"Offer the tab on the class that states the places, and not on a subclass that states its
+	 own or inherits these: a reader opening the subclass would read the same table twice. The
+	 question is asked of the position in the hierarchy rather than of the class name, so a
+	 rename cannot leave the gate behind."
+
+	^ aContext active: self superclass = Object
+]
+
 { #category : 'adding' }
 TTFontCatalogue >> addBytes: aByteArray [
 	"Meet a font nobody wrote to disk: the embedded faces of a package, a font pulled over the

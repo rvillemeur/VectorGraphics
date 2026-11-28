@@ -134,10 +134,15 @@ VGArchitectureTest class >> allowedDependencies [
 			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Geometry'
 				    'VectorGraphics-Canvas-Raster' 'VectorGraphics-Conformance'
 				    'VectorGraphics-Reflection' ).
+			  "The font examples of the canvas name the font catalogue of the reader, which is where
+			   this project states where a platform keeps its fonts. Scanning a directory list of
+			   their own made these examples examples of one machine: a single Linux font directory
+			   exists on that platform alone, so the face, the scaled font and the atlas showed
+			   nothing on macOS and on Windows."
 			  'VectorGraphics-Canvas-Fonts-Examples'
 			  -> #( 'VectorGraphics-Canvas' 'VectorGraphics-Canvas-Fonts'
 				    'VectorGraphics-Canvas-Geometry'
-				    'VectorGraphics-Conformance' ).
+				    'VectorGraphics-Conformance' 'VectorGraphics-TrueType' ).
 			  "The font tests of the canvas name the font reader and its fixtures since the
 			   glyph source of review point 4: the flags of a composite glyph record are
 			   TTGlyfGlyphSource's constants now, and VGFontBytesFixture, which builds a font
@@ -438,6 +443,22 @@ VGArchitectureTest class >> inspectorGroupsContext: aContext [
 	^ aContext active: BaselineOfVectorGraphics project version groups notEmpty
 ]
 
+{ #category : 'layering' }
+VGArchitectureTest class >> isPlatformPathOfAFont: aString [
+	"Whether this string is an absolute path, of this platform or of another, naming a font or a
+	 directory of fonts. The question is asked of a string literal rather than of source, so a
+	 path inside a comment is no offence and a path the code really holds is."
+
+	| absolute lowercase |
+	absolute := (aString beginsWith: '/') or: [
+		            aString size > 2 and: [ (aString at: 2) = $: ] ].
+	absolute ifFalse: [ ^ false ].
+	lowercase := aString asLowercase.
+	^ (lowercase includesSubstring: 'font') or: [
+		  #( '.ttf' '.otf' '.ttc' ) anySatisfy: [ :each |
+			  lowercase endsWith: each ] ]
+]
+
 { #category : 'accessing' }
 VGArchitectureTest class >> isProductionPackageNamed: aPackageName [
 	"Whether a package of this project is one a consumer loads to draw, as against one that
@@ -554,6 +575,23 @@ VGArchitectureTest class >> requiresOfPackageNamed: aPackageName [
 	^ (BaselineOfVectorGraphics project version packages
 		   detect: [ :each | each name = aPackageName ]
 		   ifNone: [ ^ #(  ) ]) requires
+]
+
+{ #category : 'layering' }
+VGArchitectureTest class >> stringLiteralsOf: aCompiledMethod [
+	"Every string literal of this method, reading the literals of every block inside it as well
+	 as its own, to any depth. A path hidden in a block is a path the method holds."
+
+	| found scan |
+	found := OrderedCollection new.
+	scan := nil.
+	scan := [ :compiled |
+	        compiled literals do: [ :literal |
+		        literal isString
+			        ifTrue: [ found add: literal asString ]
+			        ifFalse: [ literal isBlock ifTrue: [ scan value: literal ] ] ] ].
+	scan value: aCompiledMethod.
+	^ found
 ]
 
 { #category : 'running' }
@@ -1036,6 +1074,29 @@ VGArchitectureTest >> testNoProductionMethodOfThisProjectReadsTheFontBytesAlexan
 					offenders add:
 						packageName , ': ' , each methodClass name , '>>' , each selector ] ] ] ].
 	self assert: offenders asSortedCollection asArray equals: #(  )
+]
+
+{ #category : 'tests - layering' }
+VGArchitectureTest >> testOnlyTheFontCatalogueNamesAPlatformFontDirectory [
+	"Where a platform keeps its fonts is one fact, and TTFontCatalogue class >>
+	 defaultFontDirectories is where this project states it. A path written anywhere else is the
+	 path of one machine: a path under one developer's home directory broke the examples of the
+	 text glue for everybody else, and a single Linux font directory breaks the examples of the
+	 scaled-font layer on macOS and on Windows, where it does not exist."
+
+	| offenders |
+	offenders := OrderedCollection new.
+	self class projectPackageNames do: [ :packageName |
+		packageName asPackage methods do: [ :method |
+			((self class stringLiteralsOf: method) anySatisfy: [ :literal |
+				 self class isPlatformPathOfAFont: literal ]) ifTrue: [
+				offenders add: method methodClass name , ' >> ' , method selector ] ] ].
+	self
+		assert:
+		(offenders reject: [ :each |
+			 each = 'TTFontCatalogue class >> defaultFontDirectories' ])
+			asSortedCollection asArray
+		equals: #( )
 ]
 
 { #category : 'tests - dependencies' }

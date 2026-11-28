@@ -34,18 +34,13 @@ TextDrawingExamples class >> defaultFontDescription [
 { #category : 'private' }
 TextDrawingExamples class >> defaultFontPath [
 	"The absolute path of the first .ttf file installed on this machine, or nil when it has none.
-	 The directories are the ones the font catalogue scans. A path written by hand here would be a
-	 path of one machine: the examples are read and clicked on every machine that loads the
-	 project, so the file is found rather than named."
+	 Where a platform keeps fonts is the catalogue's fact, and the walk is asked of it: a path
+	 written by hand here would be a path of one machine, and the examples are read and clicked
+	 on every machine that loads the project."
 
-	TTFontCatalogue defaultFontDirectories do: [ :each |
-		| directory |
-		directory := each asFileReference.
-		directory exists ifTrue: [
-			directory allFiles
-				detect: [ :file | file basename asLowercase endsWith: '.ttf' ]
-				ifFound: [ :file | ^ file fullName ] ] ].
-	^ nil
+	^ (TTFontCatalogue firstFontFileSuchThat: [ :file |
+		   file basename asLowercase endsWith: '.ttf' ]) ifNotNil: [ :file |
+		  file fullName ]
 ]
 
 { #category : 'examples' }

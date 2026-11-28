@@ -343,6 +343,20 @@ TrueTypeExamples class >> findDefaultFontPath [
 	^ found source fullName
 ]
 
+{ #category : 'examples' }
+TrueTypeExamples class >> firstInstalledTrueTypeFile [
+	"The first .ttf file of the font directories of this machine, found by the catalogue, or nil
+	 on a machine with none installed. Every example of the project that reads a real font starts
+	 here, and the Font directories tab of the catalogue class says which places were looked in
+	 and how many files each holds.
+
+	 TTFontCatalogue inspect"
+
+	<sampleInstance>
+	^ TTFontCatalogue firstFontFileSuchThat: [ :file |
+		  file basename asLowercase endsWith: '.ttf' ]
+]
+
 { #category : 'support' }
 TrueTypeExamples class >> font: aFileReference holdsTableNamed: aTableTag [
 	"Whether this file is an sfnt font carrying this table. Only the offset table and one record
@@ -533,19 +547,14 @@ TrueTypeExamples class >> installedFontPathEndingWith: anExtensionString holding
 			  self font: file holdsTableNamed: aTableTag ] ]
 ]
 
-{ #category : 'support' }
+{ #category : 'private' }
 TrueTypeExamples class >> installedFontPathSuchThat: aBlock [
 	"The absolute path of the first installed font file this block accepts, or nil when this
-	 machine has none. The directories are the ones the catalogue scans. Two questions are asked
-	 of a candidate — its name, and the tables it carries — and both walk the same files."
+	 machine has none. Where a platform keeps fonts is the catalogue's fact, so the walk is
+	 asked of it: a directory list written here would be a list of one platform."
 
-	TTFontCatalogue defaultFontDirectories do: [ :each |
-		| directory |
-		directory := each asFileReference.
-		directory exists ifTrue: [
-			directory allFiles do: [ :file |
-				(aBlock value: file) ifTrue: [ ^ file fullName ] ] ] ].
-	^ nil
+	^ (TTFontCatalogue firstFontFileSuchThat: aBlock) ifNotNil: [ :file |
+		  file fullName ]
 ]
 
 { #category : 'accessing' }

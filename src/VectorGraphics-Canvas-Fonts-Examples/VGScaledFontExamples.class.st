@@ -78,13 +78,6 @@ VGScaledFontExamples class >> exampleRun [
 ]
 
 { #category : 'fixture' }
-VGScaledFontExamples class >> fontDirectory [
-	"Where a Linux distribution installs its fonts."
-
-	^ '/usr/share/fonts' asFileReference
-]
-
-{ #category : 'fixture' }
 VGScaledFontExamples class >> fontFace [
 	"A font face over the first candidate system font, which is what every example here reads."
 
@@ -121,17 +114,14 @@ VGScaledFontExamples class >> fontFaceOfAnOpenTypeFont [
 { #category : 'fixture' }
 VGScaledFontExamples class >> fontFile [
 	"The first candidate font that is on this machine, searched for by name because the directory
-	 a distribution puts a font family in is its own business."
+	 a distribution puts a font family in is its own business. Where a platform keeps its fonts is
+	 asked of the catalogue, so these examples read a font on macOS and on Windows too."
 
-	| files |
-	self fontDirectory exists ifFalse: [
-		^ Error signal: 'no font directory at ' , self fontDirectory fullName ].
-	files := self fontDirectory allChildrenMatching: '*.ttf'.
 	self candidateFontFileNames do: [ :each |
-		(files detect: [ :file | file basename = each ] ifNone: [ nil ]) ifNotNil: [ :file |
-			^ file ] ].
-	^ Error signal: 'none of the candidate system fonts is installed under '
-		  , self fontDirectory fullName
+		(TTFontCatalogue firstFontFileSuchThat: [ :file | file basename = each ])
+			ifNotNil: [ :file | ^ file ] ].
+	^ Error signal: 'none of the candidate system fonts is installed in '
+		  , 'the font directories of this machine'
 ]
 
 { #category : 'examples' }
@@ -156,12 +146,12 @@ VGScaledFontExamples class >> openTypeFontFile [
 	 none. The extension alone is not the rule: a .otf can hold its outlines in CFF2, a format
 	 the reader does not read, and such a file made the example raise on the missing table
 	 instead of showing a face. This package may not name the reader's table classes, so
-	 building the face is how the question is asked."
+	 building the face is how the question is asked, and where the platform keeps its fonts is
+	 asked of the catalogue."
 
-	self fontDirectory exists ifFalse: [ ^ nil ].
-	^ (self fontDirectory allChildrenMatching: '*.otf')
-		  detect: [ :each | self canReadAFaceOf: each ]
-		  ifNone: [ nil ]
+	^ TTFontCatalogue firstFontFileSuchThat: [ :file |
+		  (file basename asLowercase endsWith: '.otf') and: [
+			  self canReadAFaceOf: file ] ]
 ]
 
 { #category : 'examples' }
