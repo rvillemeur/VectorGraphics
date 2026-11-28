@@ -286,3 +286,24 @@ How the absence is stated, in one place each:
 
 When the two files are carried in the repository, the examples read them instead of scanning the
 machine, the three skips become runs, and the pragmas come off. Nothing else has to change.
+
+### Why one side answers nil and the other raises
+
+A machine with no font holding a `CFF ` table is ordinary: that side answers nil behind the pragma,
+and the reader of the example sees the sentence saying what to install.
+A machine with no `.ttf` at all is not ordinary — it draws no text anywhere, through this project or
+through any other.
+`TextDrawingExamples class >> defaultFontDescription` therefore raises and says so, because an
+example answering nil there would hand the reader an empty `Form` and no reason for it.
+
+### Where a font directory may be named
+
+Only `TTFontCatalogue class >> defaultFontDirectories` states where a platform keeps its fonts, and
+`TTFontCatalogue class >> firstFontFileSuchThat:` is what every scan of the project asks.
+The rule is held by `VGArchitectureTest >>
+testOnlyTheFontCatalogueNamesAPlatformFontDirectory`, which reads the string literals of every
+method of the project, blocks at any depth included, and fails on an absolute path naming a font or
+a directory of fonts anywhere else.
+Two defects came from scans of their own: a path under one developer's home directory in the text
+glue, and `/usr/share/fonts` in the scaled-font examples, which showed nothing on macOS and on
+Windows.
