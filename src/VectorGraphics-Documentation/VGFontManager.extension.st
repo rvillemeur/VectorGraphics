@@ -13,3 +13,13 @@ VGFontManager >> inspectionObjectGraph: aBuilder [
 		canvas: (ArchDocGraphRenderer on: (ArchDocObjectGraph of: self) graph) canvas;
 		yourself
 ]
+
+{ #category : '*VectorGraphics-Documentation' }
+VGFontManager >> inspectionObjectGraphContext: aContext [
+	"Extension installed by this project's documentation package: offer the tab only where there
+	 is a graph to draw, which is where this object really holds something a declaration names. A
+	 font manager that has posed no family yet would draw one node and no arrow. The holdings are
+	 read through the slots, so asking leaves the object exactly as it was."
+
+	^ aContext active: ((ArchDocObjectGraph of: self) holdingsOf: self) notEmpty
+]

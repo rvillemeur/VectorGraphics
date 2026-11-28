@@ -12,3 +12,14 @@ VGScaledFont >> inspectionObjectGraph: aBuilder [
 		canvas: (ArchDocGraphRenderer on: (ArchDocObjectGraph of: self) graph) canvas;
 		yourself
 ]
+
+{ #category : '*VectorGraphics-Documentation' }
+VGScaledFont >> inspectionObjectGraphContext: aContext [
+	"Extension installed by this project's documentation package: offer the tab only where there
+	 is a graph to draw, which is where this object really holds something a declaration names. A
+	 scaled font whose caches are all unbuilt would draw one node and no arrow, and that tells a
+	 reader nothing. The holdings are read through the slots, so asking leaves the object exactly
+	 as it was."
+
+	^ aContext active: ((ArchDocObjectGraph of: self) holdingsOf: self) notEmpty
+]
