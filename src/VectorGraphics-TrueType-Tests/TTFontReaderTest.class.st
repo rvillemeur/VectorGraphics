@@ -221,6 +221,27 @@ TTFontReaderTest >> testEveryGlyphRecordIsReachedOnceAndTheDataHasNoGap [
 ]
 
 { #category : 'tests' }
+TTFontReaderTest >> testEveryInstalledTrueTypeFontHoldsACharacterMapAndNoFileOfTextHoldsATable [
+	"Asking whether a file carries a table is the reader's own question: it reads the offset
+	 table and one record per table and nothing else. A font answers yes for a table every sfnt
+	 must have, and a file that is not a font at all answers no rather than raising, because the
+	 font directories of a machine hold licence files and caches beside the fonts."
+
+	| font notAFont |
+	notAFont := FileLocator temp / 'not-a-font-at-all.ttf'.
+	notAFont writeStreamDo: [ :stream | stream nextPutAll: 'this is not a font' ].
+	[
+	self deny: (TTFontReader file: notAFont holdsTableNamed: 'cmap') ] ensure: [
+		notAFont ensureDelete ].
+	font := TTFontCatalogue firstFontFileSuchThat: [ :each |
+		        each basename asLowercase endsWith: '.ttf' ].
+	font ifNil: [
+		^ self skip: 'this machine has no .ttf font under the default font directories' ].
+	self assert: (TTFontReader file: font holdsTableNamed: 'cmap').
+	self deny: (TTFontReader file: font holdsTableNamed: 'nope')
+]
+
+{ #category : 'tests' }
 TTFontReaderTest >> testFlattenedContourDataHoldsTheUnknownGlyphAndTheMappedGlyphsOnly [
 	"The flattened data grows with the number of glyphs the font maps, not with the size of
 	 the character map. A font mapping two code points writes the unknown glyph and those two,

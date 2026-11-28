@@ -357,21 +357,6 @@ TrueTypeExamples class >> firstInstalledTrueTypeFile [
 		  file basename asLowercase endsWith: '.ttf' ]
 ]
 
-{ #category : 'support' }
-TrueTypeExamples class >> font: aFileReference holdsTableNamed: aTableTag [
-	"Whether this file is an sfnt font carrying this table. Only the offset table and one record
-	 per table are read, not the glyphs. A file that is not a font at all, or one this reader
-	 cannot even index, is a no and not a failure: the question asked is which fonts of a
-	 machine a reader can use, and the directories hold licence files and caches too."
-
-	^ [
-	  (aFileReference binaryReadStreamDo: [ :stream |
-		   TTFontReader buildTableDirectory: stream contents offset: 0 ])
-		  includesKey: aTableTag ]
-		  on: Error
-		  do: [ :error | false ]
-]
-
 { #category : 'examples' }
 TrueTypeExamples class >> fontFaceOfThisMachine [
 	"One click: the plain face of the family the examples draw with, as a family holds it —
@@ -528,9 +513,10 @@ TrueTypeExamples class >> glyphWithContours [
 TrueTypeExamples class >> installedFontPathEndingWith: anExtensionString [
 	"The absolute path of the first installed font file whose name ends with this extension,
 	 or nil when this machine has none. The examples of the reader need a font of a stated
-	 format: .ttf keeps its outlines in glyf, .otf keeps them in a CFF table, and
-	 defaultFontPath answers whichever of the two the preferred families lead to, which on
-	 this machine is a .otf."
+	 format: a .ttf keeps its outlines in a glyf table and a .otf keeps them in a CFF table.
+	 The extension is a name and not a proof, so an example that needs the table itself asks
+	 installedFontPathEndingWith:holdingTableNamed:. defaultFontPath is a different question
+	 again — it answers the font the examples draw with, whatever its format."
 
 	^ self installedFontPathSuchThat: [ :file |
 		  file basename asLowercase endsWith: anExtensionString ]
@@ -540,11 +526,12 @@ TrueTypeExamples class >> installedFontPathEndingWith: anExtensionString [
 TrueTypeExamples class >> installedFontPathEndingWith: anExtensionString holdingTableNamed: aTableTag [
 	"The absolute path of the first installed font named for this format and carrying this table,
 	 or nil when this machine has none. The name narrows the candidates so that the table
-	 directory of every font on the machine need not be read."
+	 directory of every font on the machine need not be read. Whether a file carries a table is
+	 the reader's own question, so it is asked of the reader."
 
 	^ self installedFontPathSuchThat: [ :file |
 		  (file basename asLowercase endsWith: anExtensionString) and: [
-			  self font: file holdsTableNamed: aTableTag ] ]
+			  TTFontReader file: file holdsTableNamed: aTableTag ] ]
 ]
 
 { #category : 'private' }

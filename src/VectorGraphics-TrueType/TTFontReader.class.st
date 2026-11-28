@@ -62,6 +62,25 @@ TTFontReader class >> buildTableDirectory: fontData offset: anOffset [
 ]
 
 { #category : 'testing' }
+TTFontReader class >> file: aFileReference holdsTableNamed: aTableTag [
+	"Whether this file is an sfnt font carrying this table. Only the offset table and one record
+	 per table are read, not the glyphs. A file that is not a font at all, or one this reader
+	 cannot even index, is a no and not a failure: the question asked is which fonts of a
+	 machine a reader can use, and the directories hold licence files and caches too.
+
+	 The question belongs to the reader because reading the table directory is what it does: an
+	 example package asking it was reading a font format with the reader's own method and its
+	 own table dictionary."
+
+	^ [
+	  (aFileReference binaryReadStreamDo: [ :stream |
+		   self buildTableDirectory: stream contents offset: 0 ]) includesKey:
+		  aTableTag ]
+		  on: Error
+		  do: [ :error | false ]
+]
+
+{ #category : 'testing' }
 TTFontReader class >> holdsTrueTypeOutlines: aTableDictionary [
 	"Whether the glyphs of this font are TrueType outlines rather than CFF charstrings. Either
 	 of the two tables that route reads says so, so a font carrying loca and no glyf is read as
